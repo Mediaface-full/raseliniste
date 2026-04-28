@@ -71,7 +71,7 @@ export const GET: APIRoute = async ({ cookies, params, url }) => {
   const isDownload = url.searchParams.get("download") === "1";
   // Convert Node Buffer → Uint8Array for Response body (Node Response handles both, but Uint8Array is safer)
   const bodyBytes = new Uint8Array(pdfBuffer.buffer, pdfBuffer.byteOffset, pdfBuffer.byteLength);
-  return new Response(bodyBytes, {
+  return new Response(bodyBytes as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

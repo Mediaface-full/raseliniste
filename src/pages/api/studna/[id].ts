@@ -45,6 +45,7 @@ export const GET: APIRoute = async ({ cookies, params }) => {
           audioDurationSec: true,
           isPinned: true,
           analysis: true,
+          transcript: true,
           createdAt: true,
         },
       },

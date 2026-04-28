@@ -918,16 +918,44 @@ gunzip -c rasel-2026-04-20.sql.gz | docker exec -i raseliniste_db psql -U raseli
 
 ## Roadmap
 
-Podle priority po deployi:
+### ✅ Hotovo (před uzavřením kapitoly „Studna" — duben 2026)
 
-1. **Todoist dispatch** (Iterace 2 Capture) — potvrzený TASK → Todoist API (mapování `suggestedProject` na Todoist project_id)
-2. **Knihovna** (Iterace 3) — UI pro KNOWLEDGE entries, filtry, fulltext, grupování po projektech
-3. **Ranní briefing** — Gemini Pro generuje každé ráno: co bylo včera + co čeká dnes (cron endpoint, stejný Task Scheduler pattern)
-4. **Health detaily** — klikneš na KPI kartu → detail analýza jen té metriky
-5. **Úkoly modul** — kanban nad CONFIRMED TASK entries, priority, deadliny
-6. **Poznámky / Kalendář / Kontakty / Finance / Soubory** — po jednom
-7. **AI chat + Claude kouč** — konverzační interface nad vlastními daty (RAG nad Recordings + Entries + Health)
-8. **Superlist / Plaud** — externí integrace
+- Todoist dispatch (auto-push při Triage confirm + manuální v `/tasks`)
+- Úkoly `/tasks` modul (grupy podle when, push)
+- Poznámky `/notes` modul (KNOWLEDGE+THOUGHT, search, filtry)
+- Kontakty `/contacts` (vCard import, VIP)
+- Gideonův Firewall (`/call-log` + admin)
+- Dopisy `/letters` (2 PDF témata, „Učesat" AI, verzování)
+- E-mail SMTP UI (Seznam/Gmail/Outlook presety)
+- Vertex AI dual-mode (EU residency)
+- **Studna `/studna`** (sdílené projektové boxíky s audio + AI rozborem + onboarding PDFs)
+
+### 🟡 P-1 (priorita „brzy")
+
+1. **Kalendář** — nový modul: osobní eventy, view měsíc/týden, integrace s Tasks due dates, případně CalDAV s Apple Calendar
+2. **Úkoly UX** — kalendářní pohled, inline edit textu, drag mezi sekcemi, due date picker
+3. **Tasks pull-sync z Todoistu** — odškrtnutí v TD se promítne do `/tasks`
+4. **„Co vzít s sebou"** — ranní briefing v Todoistu (čte z poznámek + úkolů + kontextu, vytvoří checklist)
+
+### 🟢 P-2 (UX vylepšení, časem)
+
+5. **Dashboard widgety** — KPI pro Studna, Tasks pending, Firewall unread
+6. **Per-projekt ikona Studny** — vlastní logo per projekt + dynamický apple-touch-icon
+7. **Backup automatizace** — nightly pg_dump → druhý NAS / Backblaze B2
+
+### 🔵 P-3 (nice-to-have)
+
+8. Capture iPhone Shortcut (návod existuje, dořešit reference shortcut JSON)
+9. Push notifikace pro VIP firewall (Web Push nebo Telegram bot)
+10. AI chat nad vlastními daty (RAG nad Recordings + Entries + Health)
+11. Health detaily — klikneš na KPI kartu → detail analýza jen té metriky
+
+### ⚪ P-4 (později)
+
+12. Modul **Soubory** — upload + organizace dokumentů
+13. **Plaud** integrace (audio diktafon)
+14. **Superlist** integrace
+15. **Claude kouč** — projektová integrace na Anthropic projekt
 
 ---
 

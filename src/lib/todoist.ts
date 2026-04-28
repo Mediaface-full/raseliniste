@@ -59,13 +59,10 @@ export async function listProjects(token: string): Promise<TodoistProject[]> {
   // Procházíme stránky dokud je cursor. Max 500 projektů stačí pro běžný účet.
   const all: TodoistProject[] = [];
   let cursor: string | null = null;
+  type Page = { results: TodoistProject[]; next_cursor: string | null };
   for (let i = 0; i < 10; i++) {
-    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-    const page = await call<{ results: TodoistProject[]; next_cursor: string | null }>(
-      token,
-      `/projects${query}`
-    );
-    // Defensive: pokud by API vrátilo přímo array (pro jistotu)
+    const query: string = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    const page: Page = await call<Page>(token, `/projects${query}`);
     if (Array.isArray(page)) return page as unknown as TodoistProject[];
     if (!page?.results) break;
     all.push(...page.results);

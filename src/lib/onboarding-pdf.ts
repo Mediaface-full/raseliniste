@@ -197,25 +197,27 @@ function LinkBox({ link }: { link: string }) {
   );
 }
 
-function Bullet({ children }: { children: string }) {
+// Pomocné komponenty — content předáváme přes prop, ne přes children,
+// abychom se vyhnuli React.createElement type-checkingu.
+function Bullet(text: string) {
   return h(View, { style: styles.bullet },
     h(Text, { style: styles.bulletDot }, "·"),
-    h(Text, { style: styles.bulletText }, children),
+    h(Text, { style: styles.bulletText }, text),
   );
 }
 
-function Step({ n, children }: { n: number; children: string }) {
+function Step(n: number, text: string) {
   return h(View, { style: styles.step },
     h(Text, { style: styles.stepNum }, `${n}.`),
-    h(Text, { style: styles.stepText }, children),
+    h(Text, { style: styles.stepText }, text),
   );
 }
 
-function Tip({ label, children }: { label: string; children: string }) {
+function Tip(label: string, text: string) {
   return h(View, { style: styles.tip },
     h(Text, null,
       h(Text, { style: styles.tipLabel }, label + " "),
-      h(Text, null, children),
+      h(Text, null, text),
     ),
   );
 }
@@ -279,22 +281,22 @@ function PageBriefInfo(d: OnboardingData): ReactElement {
     ),
 
     h(Text, { style: styles.h2 }, "Co by tvůj brief měl pokrýt"),
-    h(Bullet, null, "O čem projekt je — proč vznikl, co řeší, co je cílem."),
-    h(Bullet, null, "Stručná historie — kde to začalo, jakými fázemi to prošlo."),
-    h(Bullet, null, "Klíčové postavy — kdo je v projektu, kdo má jakou roli, kdo o čem rozhoduje."),
-    h(Bullet, null, "Aktuální stav — co se teď děje, co už je rozhodnuté, co se teprve řeší."),
-    h(Bullet, null, "Otevřené otázky — co je nedořešeno, kde Petr může pomoct."),
-    h(Bullet, null, "Důležitá rozhodnutí, která padla — proč, kdy, kdo."),
-    h(Bullet, null, "Pojmy a zkratky, které v projektu používáme."),
+    Bullet("O čem projekt je — proč vznikl, co řeší, co je cílem."),
+    Bullet("Stručná historie — kde to začalo, jakými fázemi to prošlo."),
+    Bullet("Klíčové postavy — kdo je v projektu, kdo má jakou roli, kdo o čem rozhoduje."),
+    Bullet("Aktuální stav — co se teď děje, co už je rozhodnuté, co se teprve řeší."),
+    Bullet("Otevřené otázky — co je nedořešeno, kde Petr může pomoct."),
+    Bullet("Důležitá rozhodnutí, která padla — proč, kdy, kdo."),
+    Bullet("Pojmy a zkratky, které v projektu používáme."),
 
     h(Text, { style: styles.h2 }, "Tipy, ať tvůj brief dobře sedne"),
-    h(Bullet, null, "Mluv jednoduše a přirozeně. AI si s odbočkami a vsuvkami poradí."),
-    h(Bullet, null, 'Když si na něco vzpomeneš později v záznamu, klidně se vrať („Ještě k tomu, co jsem říkal…"). Lineárnost není potřeba.'),
-    h(Bullet, null, "Klidně si dej pauzu na kafe — nahrávka může trvat dlouho."),
-    h(Bullet, null, 'Nemusíš mluvit „akademicky". Tvůj přirozený způsob, jak o projektu přemýšlíš, je to nejcennější.'),
-    h(Bullet, null, "Chyby v řeči neřeš — AI je opraví."),
+    Bullet("Mluv jednoduše a přirozeně. AI si s odbočkami a vsuvkami poradí."),
+    Bullet('Když si na něco vzpomeneš později v záznamu, klidně se vrať („Ještě k tomu, co jsem říkal…"). Lineárnost není potřeba.'),
+    Bullet("Klidně si dej pauzu na kafe — nahrávka může trvat dlouho."),
+    Bullet('Nemusíš mluvit „akademicky". Tvůj přirozený způsob, jak o projektu přemýšlíš, je to nejcennější.'),
+    Bullet("Chyby v řeči neřeš — AI je opraví."),
 
-    h(Tip, { label: "Tip:" }, "Klidně si dopředu udělej pár bodů na papír. Ale neřeš to moc — pokud zapomeneš, prostě se vrátíš a doplníš."),
+    Tip("Tip:", "Klidně si dopředu udělej pár bodů na papír. Ale neřeš to moc — pokud zapomeneš, prostě se vrátíš a doplníš."),
 
     h(Footer),
   );
@@ -312,26 +314,26 @@ function PageHowToRecord(d: OnboardingData, opts: { includeBriefUpload: boolean 
     ),
 
     h(Text, { style: styles.h3 }, "iPhone — uložení odkazu na plochu"),
-    h(Step, { n: 1 }, "V aplikaci Safari otevři odkaz, který máš nahoře na první stránce."),
-    h(Step, { n: 2 }, "Klepni na ikonu Sdílet (čtvereček s šipkou nahoru, dole uprostřed)."),
-    h(Step, { n: 3 }, 'V nabídce vyber „Přidat na plochu".'),
-    h(Step, { n: 4 }, 'Vpravo nahoře potvrď „Přidat".'),
-    h(Step, { n: 5 }, "Hotovo — na ploše vznikne ikona G. Klepneš na ni kdykoli, kdy budeš chtít něco poznamenat."),
+    Step(1, "V aplikaci Safari otevři odkaz, který máš nahoře na první stránce."),
+    Step(2, "Klepni na ikonu Sdílet (čtvereček s šipkou nahoru, dole uprostřed)."),
+    Step(3, 'V nabídce vyber „Přidat na plochu".'),
+    Step(4, 'Vpravo nahoře potvrď „Přidat".'),
+    Step(5, "Hotovo — na ploše vznikne ikona G. Klepneš na ni kdykoli, kdy budeš chtít něco poznamenat."),
 
     h(Text, { style: styles.h3 }, "Android — uložení odkazu na plochu"),
-    h(Step, { n: 1 }, "V aplikaci Chrome otevři odkaz nahoře."),
-    h(Step, { n: 2 }, "Klepni na tři tečky vpravo nahoře."),
-    h(Step, { n: 3 }, 'Vyber „Přidat na plochu" (nebo „Install app").'),
-    h(Step, { n: 4 }, "Potvrď. Ikona se objeví na hlavní obrazovce."),
+    Step(1, "V aplikaci Chrome otevři odkaz nahoře."),
+    Step(2, "Klepni na tři tečky vpravo nahoře."),
+    Step(3, 'Vyber „Přidat na plochu" (nebo „Install app").'),
+    Step(4, "Potvrď. Ikona se objeví na hlavní obrazovce."),
 
     h(Text, { style: styles.h3 }, "Jak nahrát rychlý záznam"),
-    h(Step, { n: 1 }, "Klepni na ikonu Studny na ploše."),
-    h(Step, { n: 2 }, "Pokud máš víc projektů, zvol nahoře ten, do kterého nahráváš."),
-    h(Step, { n: 3 }, "Klepni na velký kruh s mikrofonem uprostřed obrazovky."),
-    h(Step, { n: 4 }, 'Telefon se zeptá, jestli smí používat mikrofon. Klepni „Povolit".'),
-    h(Step, { n: 5 }, "Začne se nahrávat. Mluv normálně. Uvidíš odpočet, kolik času ti zbývá."),
-    h(Step, { n: 6 }, 'Až skončíš, klepni „Stop". Maximální délka je 10 minut, pak se to vypne samo.'),
-    h(Step, { n: 7 }, 'Za pár vteřin uvidíš „Záznam uložen ✓". Hotovo.'),
+    Step(1, "Klepni na ikonu Studny na ploše."),
+    Step(2, "Pokud máš víc projektů, zvol nahoře ten, do kterého nahráváš."),
+    Step(3, "Klepni na velký kruh s mikrofonem uprostřed obrazovky."),
+    Step(4, 'Telefon se zeptá, jestli smí používat mikrofon. Klepni „Povolit".'),
+    Step(5, "Začne se nahrávat. Mluv normálně. Uvidíš odpočet, kolik času ti zbývá."),
+    Step(6, 'Až skončíš, klepni „Stop". Maximální délka je 10 minut, pak se to vypne samo.'),
+    Step(7, 'Za pár vteřin uvidíš „Záznam uložen ✓". Hotovo.'),
 
     // Pokud je to brief verze, přidáme sekci pro upload dlouhého audio souboru
     opts.includeBriefUpload && h(View, null,
@@ -339,20 +341,20 @@ function PageHowToRecord(d: OnboardingData, opts: { includeBriefUpload: boolean 
       h(Text, { style: styles.para },
         "Brief NEnahrávej přímo přes web — devadesát minut v prohlížeči je riskantní (vybitá baterie, výpadek sítě, telefon se uspí). Místo toho použij standardní aplikaci na hlasové poznámky a hotový soubor pak nahraj.",
       ),
-      h(Step, { n: 1 }, "Otevři aplikaci Hlasové poznámky (iPhone) nebo Záznamník (Android)."),
-      h(Step, { n: 2 }, "Klepni na nahrávací tlačítko a začni mluvit. Telefon můžeš položit na stůl."),
-      h(Step, { n: 3 }, "Po skončení klepni Stop. Záznam se uloží do aplikace."),
-      h(Step, { n: 4 }, 'Otevři odkaz na Studnu, klepni pod mikrofonem na malý odkaz „Klíčový brief — nahrát soubor →".'),
-      h(Step, { n: 5 }, 'Klepni na „Vybrat soubor" a najdi nahrávku, kterou jsi natočil.'),
-      h(Step, { n: 6 }, 'Klepni „Odeslat brief". Vydrž 2–5 minut — AI ho zpracovává.'),
-      h(Step, { n: 7 }, 'Až uvidíš „Záznam uložen ✓", máš hotovo.'),
+      Step(1, "Otevři aplikaci Hlasové poznámky (iPhone) nebo Záznamník (Android)."),
+      Step(2, "Klepni na nahrávací tlačítko a začni mluvit. Telefon můžeš položit na stůl."),
+      Step(3, "Po skončení klepni Stop. Záznam se uloží do aplikace."),
+      Step(4, 'Otevři odkaz na Studnu, klepni pod mikrofonem na malý odkaz „Klíčový brief — nahrát soubor →".'),
+      Step(5, 'Klepni na „Vybrat soubor" a najdi nahrávku, kterou jsi natočil.'),
+      Step(6, 'Klepni „Odeslat brief". Vydrž 2–5 minut — AI ho zpracovává.'),
+      Step(7, 'Až uvidíš „Záznam uložen ✓", máš hotovo.'),
     ),
 
     h(Text, { style: styles.h3 }, "Tipy, ať to dobře dopadne"),
-    h(Bullet, null, "Mluv klidně, ne v hlučném prostředí — Gemini rozumí češtině moc dobře."),
-    h(Bullet, null, "Jeden záznam = jedna myšlenka nebo téma. Radši víc krátkých než jeden dlouhý."),
-    h(Bullet, null, 'Nemusíš formulovat „spisovně". Stačí říct, co tě napadlo.'),
-    h(Bullet, null, "Pokud zkazíš, klidně to natočíš znovu — Petr starý záznam smaže."),
+    Bullet("Mluv klidně, ne v hlučném prostředí — Gemini rozumí češtině moc dobře."),
+    Bullet("Jeden záznam = jedna myšlenka nebo téma. Radši víc krátkých než jeden dlouhý."),
+    Bullet('Nemusíš formulovat „spisovně". Stačí říct, co tě napadlo.'),
+    Bullet("Pokud zkazíš, klidně to natočíš znovu — Petr starý záznam smaže."),
 
     h(Footer),
   );

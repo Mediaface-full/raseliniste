@@ -40,6 +40,7 @@ interface ProjectDetail {
     isPinned: boolean;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     analysis: any;
+    transcript: string;
     createdAt: string;
   }>;
   summaries: Array<{

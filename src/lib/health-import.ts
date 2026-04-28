@@ -48,8 +48,11 @@ export async function importHealthRows(
       sleepData: m.sleepData ?? undefined,
       raw: m.raw ?? undefined,
     }));
+    // Cast — Prisma JSON pole akceptují běžné objekty, ale TS striktní type
+    // si stěžuje na Record<string, unknown> vs InputJsonValue.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await prisma.healthMetric.createMany({
-      data,
+      data: data as any,
       skipDuplicates: true,
     });
     metricsInserted += res.count;
@@ -69,8 +72,9 @@ export async function importHealthRows(
       symptoms: e.symptoms ?? undefined,
       raw: e.raw ?? undefined,
     }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await prisma.healthEcg.createMany({
-      data,
+      data: data as any,
       skipDuplicates: true,
     });
     ecgsInserted += res.count;

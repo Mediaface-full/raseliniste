@@ -52,7 +52,7 @@ export const GET: APIRoute = async ({ cookies, params, request }) => {
   const filename = `studna-${variant}-${safeProj}-${safeGuest}.pdf`;
 
   const bytes = new Uint8Array(pdfBuf.buffer, pdfBuf.byteOffset, pdfBuf.byteLength);
-  return new Response(bytes, {
+  return new Response(bytes as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

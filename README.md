@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rašeliniště
 
-## Getting Started
+Osobní informační systém Petra „Gideona" Periny. Single-user, max security, hostovaný na Synology DS718+ v Dockeru.
 
-First, run the development server:
+> **Pro detailní technickou dokumentaci** otevři [`HANDBOOK.md`](./HANDBOOK.md).
+> **Pro provozní postupy** (deploy, backup, troubleshoot) otevři [`RUNBOOK.md`](./RUNBOOK.md).
+
+---
+
+## Stack
+
+- **Astro 6** SSR + **React 19** islands
+- **TypeScript 5** strict
+- **Prisma 7** + **PostgreSQL 16**
+- **Vertex AI Gemini 2.5** (Flash + Pro, EU region) — fallback `GEMINI_API_KEY`
+- **Tailwind v4** + custom OKLCH design tokens (Liquid Glass dark theme)
+- Auth: argon2id + WebAuthn passkey (Touch ID)
+
+## Živé moduly (10)
+
+| Modul | Cesta | Co dělá |
+|---|---|---|
+| Auth | `/login` | heslo + Touch ID passkey |
+| Capture | `/capture`, `/triage` | diktát → Gemini Flash → 5 typů Entry |
+| Úkoly | `/tasks` | CONFIRMED TASKy + push do Todoistu |
+| Poznámky | `/notes` | KNOWLEDGE+THOUGHT, search/filter |
+| Deník | `/journal` | direct ingest + AI redakce + GPS |
+| Zdraví | `/health` | HAE ingest + dashboard + Gemini Pro analýzy |
+| Kontakty | `/contacts` | vCard import, VIP toggle |
+| Firewall | `/call-log`, `/firewall` | veřejný formulář pro vzkazy → Todoist + mail |
+| Dopisy | `/letters` | 2 PDF témata, AI „Učesat" |
+| Studna | `/studna`, `/me/<token>` | sdílené projektové boxíky s audio + AI rozborem |
+
+## Lokální dev
 
 ```bash
+# 1. deps
+npm install
+
+# 2. local Postgres
+docker compose -f docker-compose.dev.yml up -d
+
+# 3. .env.local — zkopíruj z .env.example, vyplň DATABASE_URL,
+#    SESSION_SECRET, GEMINI_API_KEY (nebo VERTEX_PROJECT)
+
+# 4. migrace + seed admina
+npx prisma migrate deploy
+npm run db:seed
+
+# 5. dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# → http://localhost:3000/login
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Detailní setup viz [`HANDBOOK.md`](./HANDBOOK.md#rychlý-start).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Push do `main` → GitHub Actions postaví image → na NASu spustíš:
 
-## Learn More
+```bash
+sudo /volume1/docker/raseliniste/deploy.sh
+```
 
-To learn more about Next.js, take a look at the following resources:
+Skript stáhne aktuální `docker-compose.yml`, validuje YAML, pulluje image, recreate kontejneru. Detailní postup viz [`RUNBOOK.md`](./RUNBOOK.md#deploy-nové-verze).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Klíčové konvence
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Žádný Python v image** — vše Node.js 22
+- **Žádný background runner** — synchronní requesty + Synology cron
+- **AI volání** — vždy přes `getGemini()` v `src/lib/gemini.ts`, nikdy ne z klienta
+- **Bezpečnost** — passkey povinný, JWT cookie httpOnly+strict, AES-256-GCM pro secrets v DB
+- **Komunikace s majitelem** — česky, stručně, žádné spekulace nad rámec zadání
 
-## Deploy on Vercel
+## Kde co je
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+├── pages/           — Astro routes (server) a /api/*
+├── components/      — React islands (interaktivní UI)
+├── layouts/         — Base.astro + Shell.astro (sidebar)
+├── lib/             — server-side utility (db, gemini, mailer, …)
+├── styles/          — global.css s OKLCH design tokeny
+├── assets/fonts/    — TTF fonty pro PDF (Noto Sans/Serif)
+└── generated/prisma — Prisma client (gitignored)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+prisma/
+├── schema.prisma    — datový model
+└── migrations/      — 13 migrací
+
+public/              — statické soubory (favicon, fonts pro PDF, apple-touch-icon)
+.github/workflows/   — CI: docker-build.yml
+```
+
+## License
+
+Soukromé. Všechna práva vyhrazena.

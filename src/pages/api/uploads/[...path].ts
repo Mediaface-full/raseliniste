@@ -62,7 +62,7 @@ export const GET: APIRoute = async ({ cookies, params }) => {
             : "application/octet-stream";
 
   const bytes = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-  return new Response(bytes, {
+  return new Response(bytes as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": ctype,
