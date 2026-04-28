@@ -507,6 +507,18 @@ Tyhle věci nás v minulosti shodily, ať se neopakují:
       `dist/client/fonts`, případně `src/assets/fonts` pro lokální skripty).
     - Týká se: PDF fontů (NotoSans/NotoSerif), apple-touch-icon, atd.
 
+15a. **Empty string z `${VAR:-}` v compose lámal zod env validaci.**
+    - Docker compose syntax `${MY_VAR:-}` nastaví prázdný string `""`
+      pokud `MY_VAR` není v `.env`. Ne `undefined`.
+    - Zod `.optional()` chytá jen `undefined`, prázdný string projde
+      do `.min(N)` validace → fail "Too small".
+    - Trvalý fix v `src/lib/env.ts`: helper `emptyToUndef()` preprocessuje
+      `""` na `undefined` PŘED validací. Všechny optional env pole jsou
+      obalené, plus `.pipe()` pro defaulty.
+    - **Při přidávání nových env proměnných: vždy použij `emptyToUndef(...)`.**
+    - Projevilo se: login po deployi vrací 500 „Něco se pokazilo".
+      `docker compose logs app | grep "Invalid environment"` ukáže problém.
+
 15. **Když UI projektu zaseklý — smazat přímo přes DB.**
     - Když klik na projekt v `/studna` neotevírá detail nebo cokoli vypadá
       zaseknutě, smaž přímo:
