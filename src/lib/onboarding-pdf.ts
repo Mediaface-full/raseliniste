@@ -5,8 +5,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 
-// Hledáme fonty a logo v různých kandidátních cestách, ať to funguje
-// v dev (./public, ./src/assets/fonts) i v produkci (/app/dist/client/fonts).
+// -----------------------------------------------------------------------------
+// Asset path resolution — fungující v dev (./public, ./src/assets)
+// i v produkci (/app/dist/client po Astro buildu).
+// -----------------------------------------------------------------------------
 function resolveAssetPath(filename: string, subdirs: string[]): string | null {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const candidates = subdirs.flatMap((sub) => [
@@ -23,8 +25,6 @@ function resolveAssetPath(filename: string, subdirs: string[]): string | null {
 }
 
 function fontPath(name: string): string {
-  // Fonty primárně v public/fonts/ (Astro je kopíruje do dist/client/fonts/),
-  // fallback assets/fonts/ pro dev.
   return (
     resolveAssetPath(name, ["public/fonts", "assets/fonts"]) ??
     path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../assets/fonts", name)
@@ -33,6 +33,9 @@ function fontPath(name: string): string {
 
 const LOGO_PATH = resolveAssetPath("apple-touch-icon.png", ["public"]);
 
+// -----------------------------------------------------------------------------
+// Fonty — bezpatkový NotoSans pro vše (žádné mixování serif/sans).
+// -----------------------------------------------------------------------------
 let fontsRegistered = false;
 function ensureFonts() {
   if (fontsRegistered) return;
@@ -43,16 +46,12 @@ function ensureFonts() {
       { src: fontPath("NotoSans-Bold.ttf"), fontWeight: 700 },
     ],
   });
-  Font.register({
-    family: "NotoSerif",
-    fonts: [
-      { src: fontPath("NotoSerif-Regular.ttf") },
-      { src: fontPath("NotoSerif-Bold.ttf"), fontWeight: 700 },
-    ],
-  });
   fontsRegistered = true;
 }
 
+// -----------------------------------------------------------------------------
+// Styly — sans-serif, čistý layout, link nahoře dobře viditelný.
+// -----------------------------------------------------------------------------
 const styles = StyleSheet.create({
   page: {
     paddingTop: 50,
@@ -63,47 +62,99 @@ const styles = StyleSheet.create({
     color: "#1a1a1a",
     lineHeight: 1.6,
   },
-  header: { marginBottom: 24, alignItems: "flex-start" },
-  logo: { width: 56, height: 56, borderRadius: 12, marginBottom: 16 },
-  brand: { fontSize: 9, letterSpacing: 2, textTransform: "uppercase", color: "#888", marginBottom: 8 },
-  title: { fontFamily: "NotoSerif", fontWeight: 700, fontSize: 28, marginBottom: 10, lineHeight: 1.15 },
-  subtitle: { fontSize: 14, color: "#666", marginBottom: 4 },
-  greeting: { fontSize: 12, marginTop: 14, marginBottom: 14, lineHeight: 1.6 },
-  h2: { fontFamily: "NotoSerif", fontWeight: 700, fontSize: 16, marginTop: 18, marginBottom: 8 },
-  h3: { fontFamily: "NotoSans", fontWeight: 700, fontSize: 13, marginTop: 12, marginBottom: 6 },
+
+  // Hlavička s logem
+  headerBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 22,
+  },
+  logo: { width: 56, height: 56, borderRadius: 12 },
+  headerCol: { flex: 1, flexDirection: "column" },
+  brand: {
+    fontSize: 9,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+    color: "#888",
+    marginBottom: 6,
+    lineHeight: 1.2,
+  },
+  title: {
+    fontFamily: "NotoSans",
+    fontWeight: 700,
+    fontSize: 22,
+    marginBottom: 6,
+    lineHeight: 1.15,
+  },
+  subtitle: { fontSize: 13, color: "#555", lineHeight: 1.3 },
+
+  // Link box nahoře
+  linkBox: {
+    backgroundColor: "#fbebd0",
+    padding: 14,
+    borderRadius: 8,
+    marginBottom: 18,
+  },
+  linkBoxTitle: {
+    fontFamily: "NotoSans",
+    fontWeight: 700,
+    fontSize: 12,
+    marginBottom: 4,
+    color: "#1a1a1a",
+  },
+  linkBoxSub: { fontSize: 10, color: "#6a4a1a", marginBottom: 6 },
+  linkText: {
+    color: "#a05a1f",
+    fontFamily: "NotoSans",
+    fontWeight: 700,
+    fontSize: 11,
+  },
+
+  // Sekce
+  h2: {
+    fontFamily: "NotoSans",
+    fontWeight: 700,
+    fontSize: 16,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  h3: {
+    fontFamily: "NotoSans",
+    fontWeight: 700,
+    fontSize: 12,
+    marginTop: 12,
+    marginBottom: 6,
+  },
   para: { marginBottom: 8 },
-  intro: { fontSize: 11, color: "#444", marginBottom: 8, lineHeight: 1.6 },
+  intro: { fontSize: 11, color: "#444", marginBottom: 10, lineHeight: 1.6 },
+
+  // Bullety + kroky
   bullet: { flexDirection: "row", marginBottom: 5, paddingLeft: 4 },
   bulletDot: { width: 12, color: "#b8763c", fontWeight: 700, fontSize: 12 },
   bulletText: { flex: 1 },
   step: { flexDirection: "row", marginBottom: 6, paddingLeft: 4 },
   stepNum: {
     width: 22,
-    height: 18,
     fontFamily: "NotoSans",
     fontWeight: 700,
     fontSize: 11,
     color: "#b8763c",
   },
   stepText: { flex: 1 },
-  cta: {
-    marginTop: 18,
-    backgroundColor: "#fbebd0",
-    padding: 14,
-    borderRadius: 8,
-  },
-  ctaTitle: { fontFamily: "NotoSerif", fontWeight: 700, fontSize: 14, marginBottom: 4 },
-  ctaSub: { fontSize: 10, color: "#666", marginBottom: 8 },
-  link: { color: "#a05a1f", fontFamily: "NotoSans", fontWeight: 700, fontSize: 11 },
+
+  // Tip box
   tip: {
-    marginTop: 10,
+    marginTop: 12,
     backgroundColor: "#f0f0f0",
     padding: 10,
     borderRadius: 6,
     fontSize: 10,
     color: "#444",
+    lineHeight: 1.5,
   },
   tipLabel: { fontFamily: "NotoSans", fontWeight: 700, color: "#1a1a1a" },
+
   footer: {
     position: "absolute",
     bottom: 30,
@@ -117,11 +168,33 @@ const styles = StyleSheet.create({
   },
 });
 
+// -----------------------------------------------------------------------------
+// Pomocné komponenty
+// -----------------------------------------------------------------------------
 interface OnboardingData {
   guestName: string;
   projectName: string;
   projectDescription: string | null;
   inviteLink: string;
+}
+
+function Header({ brandText, title, subtitle }: { brandText: string; title: string; subtitle: string }) {
+  return h(View, { style: styles.headerBlock },
+    LOGO_PATH && h(Image as any, { src: LOGO_PATH, style: styles.logo }),
+    h(View, { style: styles.headerCol },
+      h(Text, { style: styles.brand }, brandText),
+      h(Text, { style: styles.title }, title),
+      h(Text, { style: styles.subtitle }, subtitle),
+    ),
+  );
+}
+
+function LinkBox({ link }: { link: string }) {
+  return h(View, { style: styles.linkBox },
+    h(Text, { style: styles.linkBoxTitle }, "Tvůj osobní odkaz"),
+    h(Text, { style: styles.linkBoxSub }, "Ulož si ho do oblíbených nebo na plochu telefonu. Když tě Petr přidá do dalšího projektu, uvidíš ho v nabídce — žádný nový odkaz nedostaneš."),
+    h(Text, { style: styles.linkText }, link),
+  );
 }
 
 function Bullet({ children }: { children: string }) {
@@ -147,203 +220,162 @@ function Tip({ label, children }: { label: string; children: string }) {
   );
 }
 
-// =============================================================================
-// STANDARD onboarding
-// =============================================================================
-function StandardOnboarding(d: OnboardingData): ReactElement {
-  return h(Document, null,
-    // === STRÁNKA 1 ===
-    h(Page as any, { size: "A4", style: styles.page },
-      h(View, { style: styles.header },
-        LOGO_PATH && h(Image as any, { src: LOGO_PATH, style: styles.logo }),
-        h(Text, { style: styles.brand }, "Rašeliniště · Studna"),
-        h(Text, { style: styles.title }, "Vítej v projektu"),
-        h(Text, { style: styles.subtitle }, d.projectName),
-      ),
+function Footer() {
+  return h(Text, { style: styles.footer }, "Děkuji, Petr · raseliniste.cz");
+}
 
-      h(Text, { style: styles.greeting },
-        `Ahoj ${d.guestName},\n\nPetr tě pozval do projektu „${d.projectName}". Tady je krátký a jednoduchý návod, jak fungovat. Není to nic složitého — slibuju.`,
-      ),
+// -----------------------------------------------------------------------------
+// Stránka 1 — společná pro Standard i Brief: uvítání + projekt + link nahoře
+// -----------------------------------------------------------------------------
+function PageWelcome(d: OnboardingData, opts: { brandText: string; title: string }): ReactElement {
+  return h(Page as any, { size: "A4", style: styles.page },
+    h(Header, {
+      brandText: opts.brandText,
+      title: opts.title,
+      subtitle: d.projectName,
+    }),
 
-      d.projectDescription && h(View, null,
-        h(Text, { style: styles.h2 }, "O čem to je"),
-        h(Text, { style: styles.para }, d.projectDescription),
-      ),
+    // Link hned nahoře, hezky viditelný
+    h(LinkBox, { link: d.inviteLink }),
 
-      h(Text, { style: styles.h2 }, "K čemu to slouží"),
-      h(Text, { style: styles.para },
-        "Když tě napadne myšlenka, postřeh nebo nápad k projektu — otevřeš odkaz, klepneš na velký mikrofon a nahlas to řekneš. Stačí mluvit normálně, jako bys to říkal Petrovi do telefonu. Umělá inteligence to přepíše a vytáhne z toho hlavní body. Petr si to pak v klidu projde.",
-      ),
-      h(Text, { style: styles.para },
-        "Maximální délka jednoho záznamu je 10 minut. Když zapomeneš zastavit, sám se vypne. Můžeš nahrát klidně víc krátkých záznamů za sebou.",
-      ),
-
-      // === Jak na iPhone ===
-      h(Text, { style: styles.h2 }, "iPhone — uložení odkazu na plochu"),
-      h(Text, { style: styles.intro },
-        "Doporučujeme si odkaz uložit na hlavní plochu telefonu, ať na něj pak ťukneš jako na běžnou aplikaci.",
-      ),
-      h(Step, { n: 1 }, "Otevři odkaz dole na této stránce v aplikaci Safari."),
-      h(Step, { n: 2 }, "Klepni na ikonu Sdílet (čtvereček s šipkou nahoru, dole uprostřed)."),
-      h(Step, { n: 3 }, 'Posuň nabídku dolů a klepni na "Přidat na plochu".'),
-      h(Step, { n: 4 }, 'Vpravo nahoře potvrď "Přidat".'),
-      h(Step, { n: 5 }, "Hotovo — na ploše se objeví ikona G. Klepni na ni kdykoli, kdy budeš chtít něco poznamenat."),
-
-      // === Jak na Androidu ===
-      h(Text, { style: styles.h2 }, "Android — uložení odkazu na plochu"),
-      h(Step, { n: 1 }, "Otevři odkaz dole na této stránce v aplikaci Chrome."),
-      h(Step, { n: 2 }, "Klepni na tři tečky vpravo nahoře."),
-      h(Step, { n: 3 }, 'Vyber "Přidat na plochu" (nebo "Install app", podle verze).'),
-      h(Step, { n: 4 }, "Potvrď. Ikona se objeví na hlavní obrazovce."),
+    // Pozdrav (vyhýbá se vokativu — "Ahoj!" bez jména)
+    h(Text, { style: styles.intro },
+      `Ahoj!\n\nPetr tě pozval do projektu „${d.projectName}". Tady je krátký a srozumitelný návod, jak to bude celé fungovat. Není to nic složitého.`,
     ),
 
-    // === STRÁNKA 2 ===
-    h(Page as any, { size: "A4", style: styles.page },
-      h(Text, { style: styles.h2 }, "Jak nahrát záznam — krok za krokem"),
-      h(Step, { n: 1 }, "Klepni na ikonu Studny na ploše (nebo otevři odkaz dole)."),
-      h(Step, { n: 2 }, 'Pokud máš víc projektů, zvol nahoře "Test" nebo to, co chceš.'),
-      h(Step, { n: 3 }, "Klepni na velký kruh s mikrofonem uprostřed obrazovky."),
-      h(Step, { n: 4 }, 'Telefon se zeptá, jestli smí používat mikrofon. Klepni "Povolit".'),
-      h(Step, { n: 5 }, "Začne se nahrávat. Mluv normálně. Uvidíš odpočet, kolik času ti zbývá."),
-      h(Step, { n: 6 }, 'Až skončíš, klepni na "Stop".'),
-      h(Step, { n: 7 }, 'Za pár vteřin uvidíš zelenou fajfku a "Záznam uložen". Hotovo.'),
-
-      h(Text, { style: styles.h2 }, "Tipy, ať to dobře dopadne"),
-      h(Bullet, null, "Mluv klidně, ne v hlučném prostředí — Gemini rozumí češtině moc dobře."),
-      h(Bullet, null, "Jeden záznam = jedna myšlenka nebo jedno téma. Radši víc krátkých než jeden dlouhý."),
-      h(Bullet, null, 'Nemusíš formulovat „spisovně". Stačí, abys řekl, co tě napadlo. AI si s tím poradí.'),
-      h(Bullet, null, "Kdykoli něco zkazíš, můžeš to jednoduše natočit znovu — Petr starý záznam smaže."),
-      h(Bullet, null, "Petr u každého záznamu vidí, kdo ho natočil, takže se autorství nikdy neztratí."),
-
-      h(View, { style: styles.tip },
-        h(Text, null,
-          h(Text, { style: styles.tipLabel }, "Když by se ti otevíralo dialogové okno o mikrofonu pokaždé znova: "),
-          h(Text, null, 'to je bezpečnostní fíčura prohlížeče. V iPhone Nastavení → Safari → Mikrofon můžeš pro tuhle stránku nastavit „Povolit".'),
-        ),
-      ),
-
-      // === Tvůj odkaz ===
-      h(View, { style: styles.cta },
-        h(Text, { style: styles.ctaTitle }, "Tvůj odkaz"),
-        h(Text, { style: styles.ctaSub }, "Tento odkaz je tvůj osobní. Když tě Petr přidá do dalšího projektu, uvidíš ho v nabídce — žádný nový odkaz nedostaneš."),
-        h(Text, { style: styles.link }, d.inviteLink),
-      ),
-
-      h(Text, { style: styles.footer },
-        "Děkuji, Petr · raseliniste.cz",
-      ),
+    // O projektu
+    d.projectDescription && h(View, null,
+      h(Text, { style: styles.h2 }, "O projektu"),
+      h(Text, { style: styles.para }, d.projectDescription),
     ),
+
+    // Co si má představit
+    h(Text, { style: styles.h2 }, "Co si pod tím představit"),
+    h(Text, { style: styles.para },
+      "Studna je sdílená nahrávárna pro tým. Když tě napadne myšlenka, postřeh, otázka nebo nápad k projektu, otevřeš odkaz výše a hlasem to nahraješ. Mluvíš normálně, jako bys to říkal po telefonu Petrovi.",
+    ),
+    h(Text, { style: styles.para },
+      "Umělá inteligence záznam přepíše a vytáhne z něj klíčové body. Petr si to pak v klidu projde. Nemusíš nic psát.",
+    ),
+    h(Text, { style: styles.para },
+      "Petr u každého záznamu vidí, kdo ho natočil — autorství se nikdy neztratí.",
+    ),
+
+    h(Footer),
   );
 }
 
-// =============================================================================
-// BRIEF onboarding
-// =============================================================================
-function BriefOnboarding(d: OnboardingData): ReactElement {
+// -----------------------------------------------------------------------------
+// Stránka „Klíčový brief" (jen pro brief verzi)
+// -----------------------------------------------------------------------------
+function PageBriefInfo(d: OnboardingData): ReactElement {
+  return h(Page as any, { size: "A4", style: styles.page },
+    h(Text, { style: styles.h2 }, "Klíčový brief"),
+    h(Text, { style: styles.intro },
+      "Brief je delší hlasová nahrávka — typicky 30 až 90 minut — ve které vyprávíš to nejdůležitější o projektu. Mluvíš o kontextu, historii, lidech, cílech a o tom, co je teď otevřené.",
+    ),
+    h(Text, { style: styles.para },
+      "Slouží jako referenční materiál. Petr se k němu vrací, když potřebuje rychle nahodit kontext. AI z něj vytvoří přehledný strukturovaný dokument: souhrn, glosář pojmů, seznam aktérů, historii rozhodnutí.",
+    ),
+
+    h(Text, { style: styles.h2 }, "Co by tvůj brief měl pokrýt"),
+    h(Bullet, null, "O čem projekt je — proč vznikl, co řeší, co je cílem."),
+    h(Bullet, null, "Stručná historie — kde to začalo, jakými fázemi to prošlo."),
+    h(Bullet, null, "Klíčové postavy — kdo je v projektu, kdo má jakou roli, kdo o čem rozhoduje."),
+    h(Bullet, null, "Aktuální stav — co se teď děje, co už je rozhodnuté, co se teprve řeší."),
+    h(Bullet, null, "Otevřené otázky — co je nedořešeno, kde Petr může pomoct."),
+    h(Bullet, null, "Důležitá rozhodnutí, která padla — proč, kdy, kdo."),
+    h(Bullet, null, "Pojmy a zkratky, které v projektu používáme."),
+
+    h(Text, { style: styles.h2 }, "Tipy, ať tvůj brief dobře sedne"),
+    h(Bullet, null, "Mluv jednoduše a přirozeně. AI si s odbočkami a vsuvkami poradí."),
+    h(Bullet, null, 'Když si na něco vzpomeneš později v záznamu, klidně se vrať („Ještě k tomu, co jsem říkal…"). Lineárnost není potřeba.'),
+    h(Bullet, null, "Klidně si dej pauzu na kafe — nahrávka může trvat dlouho."),
+    h(Bullet, null, 'Nemusíš mluvit „akademicky". Tvůj přirozený způsob, jak o projektu přemýšlíš, je to nejcennější.'),
+    h(Bullet, null, "Chyby v řeči neřeš — AI je opraví."),
+
+    h(Tip, { label: "Tip:" }, "Klidně si dopředu udělej pár bodů na papír. Ale neřeš to moc — pokud zapomeneš, prostě se vrátíš a doplníš."),
+
+    h(Footer),
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Stránka „Nahrání záznamů do Studny" — pro oba typy
+// Pro brief verzi obsahuje navíc sekci o uploadu souboru (pro dlouhé briefy).
+// -----------------------------------------------------------------------------
+function PageHowToRecord(d: OnboardingData, opts: { includeBriefUpload: boolean }): ReactElement {
+  return h(Page as any, { size: "A4", style: styles.page },
+    h(Text, { style: styles.h2 }, "Nahrání záznamů do Studny"),
+    h(Text, { style: styles.intro },
+      "Komentář, nápad, informace, otázka — cokoliv tě k projektu napadne. Nahraješ to hlasem, my si s tím poradíme.",
+    ),
+
+    h(Text, { style: styles.h3 }, "iPhone — uložení odkazu na plochu"),
+    h(Step, { n: 1 }, "V aplikaci Safari otevři odkaz, který máš nahoře na první stránce."),
+    h(Step, { n: 2 }, "Klepni na ikonu Sdílet (čtvereček s šipkou nahoru, dole uprostřed)."),
+    h(Step, { n: 3 }, 'V nabídce vyber „Přidat na plochu".'),
+    h(Step, { n: 4 }, 'Vpravo nahoře potvrď „Přidat".'),
+    h(Step, { n: 5 }, "Hotovo — na ploše vznikne ikona G. Klepneš na ni kdykoli, kdy budeš chtít něco poznamenat."),
+
+    h(Text, { style: styles.h3 }, "Android — uložení odkazu na plochu"),
+    h(Step, { n: 1 }, "V aplikaci Chrome otevři odkaz nahoře."),
+    h(Step, { n: 2 }, "Klepni na tři tečky vpravo nahoře."),
+    h(Step, { n: 3 }, 'Vyber „Přidat na plochu" (nebo „Install app").'),
+    h(Step, { n: 4 }, "Potvrď. Ikona se objeví na hlavní obrazovce."),
+
+    h(Text, { style: styles.h3 }, "Jak nahrát rychlý záznam"),
+    h(Step, { n: 1 }, "Klepni na ikonu Studny na ploše."),
+    h(Step, { n: 2 }, "Pokud máš víc projektů, zvol nahoře ten, do kterého nahráváš."),
+    h(Step, { n: 3 }, "Klepni na velký kruh s mikrofonem uprostřed obrazovky."),
+    h(Step, { n: 4 }, 'Telefon se zeptá, jestli smí používat mikrofon. Klepni „Povolit".'),
+    h(Step, { n: 5 }, "Začne se nahrávat. Mluv normálně. Uvidíš odpočet, kolik času ti zbývá."),
+    h(Step, { n: 6 }, 'Až skončíš, klepni „Stop". Maximální délka je 10 minut, pak se to vypne samo.'),
+    h(Step, { n: 7 }, 'Za pár vteřin uvidíš „Záznam uložen ✓". Hotovo.'),
+
+    // Pokud je to brief verze, přidáme sekci pro upload dlouhého audio souboru
+    opts.includeBriefUpload && h(View, null,
+      h(Text, { style: styles.h3 }, "Jak nahrát dlouhý brief (přes upload souboru)"),
+      h(Text, { style: styles.para },
+        "Brief NEnahrávej přímo přes web — devadesát minut v prohlížeči je riskantní (vybitá baterie, výpadek sítě, telefon se uspí). Místo toho použij standardní aplikaci na hlasové poznámky a hotový soubor pak nahraj.",
+      ),
+      h(Step, { n: 1 }, "Otevři aplikaci Hlasové poznámky (iPhone) nebo Záznamník (Android)."),
+      h(Step, { n: 2 }, "Klepni na nahrávací tlačítko a začni mluvit. Telefon můžeš položit na stůl."),
+      h(Step, { n: 3 }, "Po skončení klepni Stop. Záznam se uloží do aplikace."),
+      h(Step, { n: 4 }, 'Otevři odkaz na Studnu, klepni pod mikrofonem na malý odkaz „Klíčový brief — nahrát soubor →".'),
+      h(Step, { n: 5 }, 'Klepni na „Vybrat soubor" a najdi nahrávku, kterou jsi natočil.'),
+      h(Step, { n: 6 }, 'Klepni „Odeslat brief". Vydrž 2–5 minut — AI ho zpracovává.'),
+      h(Step, { n: 7 }, 'Až uvidíš „Záznam uložen ✓", máš hotovo.'),
+    ),
+
+    h(Text, { style: styles.h3 }, "Tipy, ať to dobře dopadne"),
+    h(Bullet, null, "Mluv klidně, ne v hlučném prostředí — Gemini rozumí češtině moc dobře."),
+    h(Bullet, null, "Jeden záznam = jedna myšlenka nebo téma. Radši víc krátkých než jeden dlouhý."),
+    h(Bullet, null, 'Nemusíš formulovat „spisovně". Stačí říct, co tě napadlo.'),
+    h(Bullet, null, "Pokud zkazíš, klidně to natočíš znovu — Petr starý záznam smaže."),
+
+    h(Footer),
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Standard PDF (2 strany): Vítej / Nahrání záznamů
+// -----------------------------------------------------------------------------
+function StandardPdf(d: OnboardingData): ReactElement {
   return h(Document, null,
-    // === STRÁNKA 1 ===
-    h(Page as any, { size: "A4", style: styles.page },
-      h(View, { style: styles.header },
-        LOGO_PATH && h(Image as any, { src: LOGO_PATH, style: styles.logo }),
-        h(Text, { style: styles.brand }, "Rašeliniště · Studna · Klíčový brief"),
-        h(Text, { style: styles.title }, "Klíčový brief"),
-        h(Text, { style: styles.subtitle }, d.projectName),
-      ),
+    PageWelcome(d, { brandText: "Rašeliniště · Studna", title: "Vítej v projektu" }),
+    PageHowToRecord(d, { includeBriefUpload: false }),
+  );
+}
 
-      h(Text, { style: styles.greeting },
-        `Ahoj ${d.guestName},\n\nPetr tě požádal o tzv. „klíčový brief" k projektu „${d.projectName}". Není to úkol na 5 minut, ale je to extrémně cenné — pomůže Petrovi a celému týmu rychle pochopit kontext.`,
-      ),
-
-      d.projectDescription && h(View, null,
-        h(Text, { style: styles.h2 }, "O čem to je"),
-        h(Text, { style: styles.para }, d.projectDescription),
-      ),
-
-      h(Text, { style: styles.h2 }, "Co je klíčový brief"),
-      h(Text, { style: styles.para },
-        "Brief je delší hlasový záznam — typicky 30 až 90 minut — ve kterém vyprávíš to nejdůležitější o projektu. Mluvíš o kontextu, historii, lidech, cílech a o tom, co je teď otevřené.",
-      ),
-      h(Text, { style: styles.para },
-        "Slouží Petrovi jako referenční materiál. Vrací se k němu, když potřebuje rychle nahodit kontext. AI ti z toho vytvoří přehledný dokument: souhrn, glosář pojmů, seznam aktérů, historii rozhodnutí.",
-      ),
-      h(Text, { style: styles.para },
-        "Není to formální. Mluv tak, jak to máš v hlavě.",
-      ),
-
-      h(Text, { style: styles.h2 }, "Co by tvůj brief měl pokrýt"),
-      h(Bullet, null, "O čem projekt je — proč vznikl, co řeší, co je cílem."),
-      h(Bullet, null, "Stručná historie — kde to začalo, jakými fázemi to prošlo."),
-      h(Bullet, null, "Klíčové postavy — kdo je v projektu, kdo má jakou roli, kdo o čem rozhoduje."),
-      h(Bullet, null, "Aktuální stav — co se teď děje, co už je rozhodnuté, co se teprve řeší."),
-      h(Bullet, null, "Otevřené otázky — co je nedořešeno, kde Petr může pomoct."),
-      h(Bullet, null, "Důležitá rozhodnutí, která padla — proč, kdy, kdo."),
-      h(Bullet, null, "Pojmy a zkratky, které v projektu používáme."),
-
-      h(View, { style: styles.tip },
-        h(Text, null,
-          h(Text, { style: styles.tipLabel }, "Tip: "),
-          h(Text, null, 'Klidně si dopředu uděláš pár bodů na papír. Ale neřeš to dlouho — když si na něco vzpomeneš později, prostě se vrátíš a doplníš („A ještě k tomu, na co jsem zapomněl…").'),
-        ),
-      ),
-    ),
-
-    // === STRÁNKA 2 — JAK NAHRÁT ===
-    h(Page as any, { size: "A4", style: styles.page },
-      h(Text, { style: styles.h2 }, "Jak brief nahrát"),
-      h(Text, { style: styles.intro },
-        "Brief NEnahrávej přímo přes web. Devadesát minut nahrávání v prohlížeči je riskantní (vybitá baterie, výpadek sítě, telefon se uspí). Místo toho použij standardní aplikaci na hlasové poznámky a hotový soubor pak nahraj.",
-      ),
-
-      // iPhone
-      h(Text, { style: styles.h3 }, "iPhone — Hlasové poznámky"),
-      h(Step, { n: 1 }, 'Otevři aplikaci Hlasové poznámky (ikona červené vlnovky, často je v "Užitečné" složce).'),
-      h(Step, { n: 2 }, "Klepni na velké červené kolečko dole uprostřed."),
-      h(Step, { n: 3 }, "Začni mluvit. Telefon můžeš klidně položit na stůl. Klidně si dej pauzu, vrať se, opravuj — nevadí."),
-      h(Step, { n: 4 }, "Když skončíš, klepni na červený čtvereček (Stop)."),
-      h(Step, { n: 5 }, 'Záznam se objeví v seznamu (typicky pojmenovaný „Nový záznam").'),
-
-      // Android
-      h(Text, { style: styles.h3 }, "Android — Záznamník (nebo Easy Voice Recorder)"),
-      h(Step, { n: 1 }, 'Otevři vestavěný "Záznamník" (Recorder). Pokud nemáš, stáhni z Google Play "Easy Voice Recorder".'),
-      h(Step, { n: 2 }, "Klepni na velké tlačítko nahrávat."),
-      h(Step, { n: 3 }, "Mluv. Telefon můžeš nechat ležet."),
-      h(Step, { n: 4 }, "Po skončení klepni Stop. Záznam se uloží."),
-
-      // Upload do Studny
-      h(Text, { style: styles.h2 }, "Nahrání záznamu do Studny"),
-      h(Step, { n: 1 }, "Otevři odkaz, který ti Petr poslal (najdeš ho dole na této stránce)."),
-      h(Step, { n: 2 }, 'Pod velkým tlačítkem "Tap pro záznam" je menší odkaz "Klíčový brief — nahrát soubor →". Klepni na něj.'),
-      h(Step, { n: 3 }, 'Klepni "Vybrat soubor". Telefon ti otevře průzkumník souborů.'),
-      h(Step, { n: 4 }, "Najdi ten záznam, který jsi natočil v Hlasových poznámkách / Záznamníku, a vyber ho."),
-      h(Step, { n: 5 }, 'Vrátíš se zpět do Studny — zobrazí se ti název souboru a tlačítko "Odeslat brief". Klepni.'),
-      h(Step, { n: 6 }, "Vydrž. Nahrávání + zpracování trvá u dlouhého briefu klidně 2–5 minut. Neopouštěj stránku."),
-      h(Step, { n: 7 }, 'Až uvidíš "Záznam uložen ✓", máš hotovo. Můžeš zavřít.'),
-
-      h(View, { style: styles.tip },
-        h(Text, null,
-          h(Text, { style: styles.tipLabel }, "Tip: "),
-          h(Text, null, "Pokud máš záznam na jiném zařízení (např. natočil jsi ho na iPhone, ale chceš nahrávat z počítače), pošli si soubor sám sobě e-mailem nebo přes AirDrop / Google Drive — pak ho nahraješ z toho zařízení, kde ho máš."),
-        ),
-      ),
-
-      h(Text, { style: styles.h2 }, "Tipy, ať tvůj brief dobře sedne"),
-      h(Bullet, null, "Mluv jednoduše a přirozeně. AI si s odbočkami a vsuvkami poradí."),
-      h(Bullet, null, 'Když si na něco vzpomeneš později v záznamu, vrať se („Ještě se vrátím k tomu, co jsem říkal…"). Nemusíš mluvit dokonale lineárně.'),
-      h(Bullet, null, "Klidně si dej pauzu na kafe — nahrávka může pokračovat dlouho."),
-      h(Bullet, null, "Nepotřebuješ akademický tón. Petrovi pomáhá tvůj přirozený způsob, jak o projektu přemýšlíš."),
-      h(Bullet, null, "Chyby v řeči neřeš — AI je opraví."),
-
-      // === Tvůj odkaz ===
-      h(View, { style: styles.cta },
-        h(Text, { style: styles.ctaTitle }, "Tvůj odkaz pro upload"),
-        h(Text, { style: styles.ctaSub }, "Pošli si ho i sám sobě na zařízení, kde máš nahraný brief, ať z něj můžeš nahrát přímo."),
-        h(Text, { style: styles.link }, d.inviteLink),
-      ),
-
-      h(Text, { style: styles.footer },
-        "Děkuji, Petr · raseliniste.cz",
-      ),
-    ),
+// -----------------------------------------------------------------------------
+// Brief PDF (3 strany): Vítej / Klíčový brief / Nahrání záznamů (vč. brief upload)
+// -----------------------------------------------------------------------------
+function BriefPdf(d: OnboardingData): ReactElement {
+  return h(Document, null,
+    PageWelcome(d, { brandText: "Rašeliniště · Studna · Klíčový brief", title: "Vítej v projektu" }),
+    PageBriefInfo(d),
+    PageHowToRecord(d, { includeBriefUpload: true }),
   );
 }
 
@@ -352,7 +384,7 @@ export async function renderOnboardingPdf(
   data: OnboardingData,
 ): Promise<Buffer> {
   ensureFonts();
-  const doc = variant === "brief" ? BriefOnboarding(data) : StandardOnboarding(data);
+  const doc = variant === "brief" ? BriefPdf(data) : StandardPdf(data);
   const stream = await pdf(doc as any).toBuffer();
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {

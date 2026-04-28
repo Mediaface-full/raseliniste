@@ -349,7 +349,7 @@ export default function GuestRecorder({
           <>
             <CheckCircle2 className="size-16 text-[var(--tint-sage)]" />
             <div className="text-lg font-medium">Záznam uložen ✓</div>
-            <div className="text-xs text-muted-foreground">díky, {guestName}</div>
+            <div className="text-xs text-muted-foreground">díky!</div>
             <button
               onClick={() => {
                 setPhase("idle");
