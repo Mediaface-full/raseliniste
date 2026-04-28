@@ -3,14 +3,27 @@ import { Document, Page, Text, View, Image, StyleSheet, pdf, Font } from "@react
 import { createElement as h, type ReactElement } from "react";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 import { resolveUpload, uploadExists } from "./uploads";
 
-// Registrace fontů s českou diakritikou (Noto Sans + Noto Serif).
-// Helvetica (default) nemá kompletní český Unicode — háčky a čárky padají.
-const FONT_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../assets/fonts",
-);
+// Hledáme fonty v public/fonts/ (po Astro buildu v dist/client/fonts/)
+// nebo fallback na assets/fonts/ pro dev. Helvetica defaultní v PDF padá
+// na češtinu, takže je nutno vždy registrovat Noto.
+function fontPath(filename: string): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.resolve(here, "../../public/fonts", filename),
+    path.resolve(here, "../../../public/fonts", filename),
+    path.resolve(here, "../assets/fonts", filename),
+    path.resolve(here, "../../assets/fonts", filename),
+    `/app/dist/client/fonts/${filename}`,
+    `/app/public/fonts/${filename}`,
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return path.resolve(here, "../assets/fonts", filename);
+}
 
 let fontsRegistered = false;
 function ensureFontsRegistered() {
@@ -18,15 +31,15 @@ function ensureFontsRegistered() {
   Font.register({
     family: "NotoSans",
     fonts: [
-      { src: path.join(FONT_DIR, "NotoSans-Regular.ttf") },
-      { src: path.join(FONT_DIR, "NotoSans-Bold.ttf"), fontWeight: 700 },
+      { src: fontPath("NotoSans-Regular.ttf") },
+      { src: fontPath("NotoSans-Bold.ttf"), fontWeight: 700 },
     ],
   });
   Font.register({
     family: "NotoSerif",
     fonts: [
-      { src: path.join(FONT_DIR, "NotoSerif-Regular.ttf") },
-      { src: path.join(FONT_DIR, "NotoSerif-Bold.ttf"), fontWeight: 700 },
+      { src: fontPath("NotoSerif-Regular.ttf") },
+      { src: fontPath("NotoSerif-Bold.ttf"), fontWeight: 700 },
     ],
   });
   fontsRegistered = true;

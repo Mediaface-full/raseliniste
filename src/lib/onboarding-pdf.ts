@@ -5,25 +5,33 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 
-const FONT_DIR = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../assets/fonts",
-);
-
-// Logo G — z public/apple-touch-icon.png (180×180). V produkci je to
-// /app/public/, v dev /Users/.../public/.
-const LOGO_PATH = (() => {
+// Hledáme fonty a logo v různých kandidátních cestách, ať to funguje
+// v dev (./public, ./src/assets/fonts) i v produkci (/app/dist/client/fonts).
+function resolveAssetPath(filename: string, subdirs: string[]): string | null {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    path.resolve(here, "../../public/apple-touch-icon.png"),
-    path.resolve(here, "../../../public/apple-touch-icon.png"),
-    "/app/public/apple-touch-icon.png",
-  ];
+  const candidates = subdirs.flatMap((sub) => [
+    path.resolve(here, `../${sub}`, filename),
+    path.resolve(here, `../../${sub}`, filename),
+    path.resolve(here, `../../../${sub}`, filename),
+    `/app/${sub}/${filename}`,
+    `/app/dist/client/${sub.replace(/^public\//, "")}/${filename}`,
+  ]);
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }
   return null;
-})();
+}
+
+function fontPath(name: string): string {
+  // Fonty primárně v public/fonts/ (Astro je kopíruje do dist/client/fonts/),
+  // fallback assets/fonts/ pro dev.
+  return (
+    resolveAssetPath(name, ["public/fonts", "assets/fonts"]) ??
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../assets/fonts", name)
+  );
+}
+
+const LOGO_PATH = resolveAssetPath("apple-touch-icon.png", ["public"]);
 
 let fontsRegistered = false;
 function ensureFonts() {
@@ -31,15 +39,15 @@ function ensureFonts() {
   Font.register({
     family: "NotoSans",
     fonts: [
-      { src: path.join(FONT_DIR, "NotoSans-Regular.ttf") },
-      { src: path.join(FONT_DIR, "NotoSans-Bold.ttf"), fontWeight: 700 },
+      { src: fontPath("NotoSans-Regular.ttf") },
+      { src: fontPath("NotoSans-Bold.ttf"), fontWeight: 700 },
     ],
   });
   Font.register({
     family: "NotoSerif",
     fonts: [
-      { src: path.join(FONT_DIR, "NotoSerif-Regular.ttf") },
-      { src: path.join(FONT_DIR, "NotoSerif-Bold.ttf"), fontWeight: 700 },
+      { src: fontPath("NotoSerif-Regular.ttf") },
+      { src: fontPath("NotoSerif-Bold.ttf"), fontWeight: 700 },
     ],
   });
   fontsRegistered = true;
