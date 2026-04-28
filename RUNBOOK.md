@@ -497,6 +497,33 @@ Tyhle věci nás v minulosti shodily, ať se neopakují:
     níže). Jeden příkaz `~/deploy.sh` udělá vše: aktualizuje compose,
     pulluje image, recreate, ukáže logy.
 
+14. **Astro nezahrnuje `src/assets/*` do `dist/server/`.**
+    - Soubory v `src/assets/*` (fonty, obrázky) Astro do build artefaktů
+      **nezkopíruje**, pokud nejsou Vite-importované (`?url`, `?inline`).
+    - Při `fs.readFile()` na nich v produkci → `ENOENT: no such file`.
+    - **Řešení:** dej je do `public/<podsložka>/`. Astro je automaticky
+      kopíruje do `dist/client/<podsložka>/`.
+    - V kódu hledáš přes fallback chain (dev `public/fonts`, prod
+      `dist/client/fonts`, případně `src/assets/fonts` pro lokální skripty).
+    - Týká se: PDF fontů (NotoSans/NotoSerif), apple-touch-icon, atd.
+
+15. **Když UI projektu zaseklý — smazat přímo přes DB.**
+    - Když klik na projekt v `/studna` neotevírá detail nebo cokoli vypadá
+      zaseknutě, smaž přímo:
+      ```bash
+      # Najít ID
+      sudo docker compose -f /volume1/docker/raseliniste/docker-compose.yml \
+        exec postgres psql -U raseliniste -d raseliniste \
+        -c "SELECT id, name FROM \"ProjectBox\";"
+
+      # Smazat konkrétní (cascade automaticky vyčistí recordings + invitations)
+      sudo docker compose -f /volume1/docker/raseliniste/docker-compose.yml \
+        exec postgres psql -U raseliniste -d raseliniste \
+        -c "DELETE FROM \"ProjectBox\" WHERE id='<cuid>';"
+      ```
+    - Stejný pattern pro jakoukoli tabulku — uvozovky kolem názvu tabulky
+      v Postgres potřebují backslash escape (`\"ProjectBox\"`).
+
 ### Časté problémy → fix
 
 | Symptom | Řešení |
@@ -508,6 +535,10 @@ Tyhle věci nás v minulosti shodily, ať se neopakují:
 | Cron vrátil 503 CRON_NOT_CONFIGURED | `CRON_SECRET` v `.env` chybí, nebo kontejner ho neviděl → restart |
 | Mail se neodeslal | Resend nenakonfigurovaný nebo DNS ověření ještě neprošlo — zkontroluj `/settings/reports` status kartu |
 | Aplikace nestartuje | Log → hledej "failed migration", "EACCES", "ENOENT". Buď heal-migrations nezabral, nebo permissions na `./uploads/` |
+| PDF padá `ENOENT NotoSans-*.ttf` | Fonty musí být v `public/fonts/` (ne `src/assets/fonts/`) — viz bod 14 výše |
+| 500 error na invite hosta ve Studně | Zkontroluj log — pravděpodobně padá kvůli PDF fontu nebo prisma constraint. Po opravě fontů 99 % případů zmizí |
+| `/api/health/ai` `EACCES gcp-key.json` | `sudo chmod 644 gcp-key.json` (kontejner běží jako neroot, 600 nestačí) |
+| Studna projekt v UI nejde otevřít/smazat | Smaž přímo v DB — viz bod 15 |
 
 ### Nuclear option — přestartovat všechno
 
