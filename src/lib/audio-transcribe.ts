@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { GoogleGenAI } from "@google/genai";
 import { getGemini, getGeminiMode, DEFAULT_MODEL, ANALYSIS_MODEL } from "./gemini";
+import { env } from "./env";
 
 /**
  * Audio transkripce + bohatá strukturovaná analýza pro Studnu.
@@ -140,34 +142,46 @@ export async function transcribeAudio(params: {
   recordingType: RecordingTypeStr;
   projectContext?: string | null;
 }): Promise<TranscribeResult> {
-  const genai = getGemini();
   const isBrief = params.recordingType === "BRIEF";
   const model = isBrief ? ANALYSIS_MODEL : DEFAULT_MODEL;
   const prompt = isBrief
     ? BRIEF_PROMPT(params.projectContext ?? null)
     : STANDARD_PROMPT(params.projectContext ?? null);
 
-  // Připrav audio part — buď inline (malé) nebo přes Files API (velké briefy)
+  const fitsInline = params.audio.byteLength <= INLINE_AUDIO_LIMIT_BYTES;
+  const mode = getGeminiMode();
+
+  // Vyber klienta — Vertex pro inline (preferováno: EU + no-training),
+  // AI Studio Files API pro velké soubory (Vertex by potřeboval GCS bucket).
+  let genai = getGemini();
+  let usedMode: "vertex" | "api" = mode === "vertex" ? "vertex" : "api";
+
+  if (!fitsInline && mode === "vertex") {
+    if (!env.GEMINI_API_KEY) {
+      const sizeMb = (params.audio.byteLength / 1024 / 1024).toFixed(1);
+      throw new Error(
+        `Audio ${sizeMb} MB je nad ${INLINE_AUDIO_LIMIT_BYTES / 1024 / 1024} MB inline limit pro Vertex AI a GEMINI_API_KEY není v .env (fallback na AI Studio Files API tedy nelze). ` +
+        `Buď doplň GEMINI_API_KEY do .env, rozsekni audio na kratší úseky, nebo zkomprimuj bitrate.`,
+      );
+    }
+    // Fallback klient na AI Studio (samostatná instance, default zůstává Vertex)
+    genai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+    usedMode = "api";
+    console.log(`[audio-transcribe] Audio ${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB > ${INLINE_AUDIO_LIMIT_BYTES / 1024 / 1024} MB — fallback na AI Studio Files API.`);
+  }
+
+  // Připrav audio part
   let audioPart: { inlineData: { mimeType: string; data: string } } | { fileData: { mimeType: string; fileUri: string } };
 
-  if (params.audio.byteLength <= INLINE_AUDIO_LIMIT_BYTES) {
+  if (fitsInline) {
     audioPart = {
       inlineData: {
         mimeType: params.mimeType,
         data: params.audio.toString("base64"),
       },
     };
-  } else if (getGeminiMode() === "vertex") {
-    // Vertex AI nepodporuje genai.files.upload() — Files API existuje jen
-    // v Google AI Studio módu. Pro Vertex by velké soubory šly přes GCS
-    // bucket, což zatím nemáme nasazené.
-    const sizeMb = (params.audio.byteLength / 1024 / 1024).toFixed(1);
-    throw new Error(
-      `Audio ${sizeMb} MB je nad limit ${INLINE_AUDIO_LIMIT_BYTES / 1024 / 1024} MB pro Vertex AI inline transcribe. ` +
-      `Rozsekni záznam na kratší úseky (do ~13 minut MP3 / ~10 minut M4A) nebo zkomprimuj na nižší bitrate (32-48 kbps stačí pro řeč).`,
-    );
   } else {
-    // AI Studio mode — Files API funguje. Pošli soubor (Blob), získej URI.
+    // Files API — pošli soubor (Blob), získej URI, reference v generateContent.
     const blob = new Blob([params.audio.buffer.slice(params.audio.byteOffset, params.audio.byteOffset + params.audio.byteLength) as ArrayBuffer], {
       type: params.mimeType,
     });
@@ -176,21 +190,21 @@ export async function transcribeAudio(params: {
       config: { mimeType: params.mimeType },
     });
     if (!uploaded.uri || !uploaded.mimeType) {
-      throw new Error("Gemini Files API: upload neselhal nevrátil uri/mimeType.");
+      throw new Error("Gemini Files API: upload nevrátil uri/mimeType.");
     }
-    // Počkej, až bude soubor ACTIVE (Gemini Files má asynchronní processing)
+    // Počkej, až bude soubor ACTIVE (asynchronní processing, ~30-60 s pro hodinové audio)
     let file = uploaded;
     let attempts = 0;
-    while (file.state !== "ACTIVE" && attempts < 60) {
-      await new Promise((r) => setTimeout(r, 1500));
+    while (file.state !== "ACTIVE" && attempts < 120) {
+      await new Promise((r) => setTimeout(r, 2000));
       file = await genai.files.get({ name: uploaded.name! });
       attempts++;
       if (file.state === "FAILED") {
-        throw new Error("Gemini Files: zpracování souboru selhalo.");
+        throw new Error("Gemini Files: zpracování souboru selhalo (server-side).");
       }
     }
     if (file.state !== "ACTIVE") {
-      throw new Error("Gemini Files: timeout při čekání na zpracování souboru.");
+      throw new Error("Gemini Files: timeout (>4 min) při čekání na zpracování souboru.");
     }
     audioPart = {
       fileData: { mimeType: file.mimeType!, fileUri: file.uri! },
@@ -211,6 +225,7 @@ export async function transcribeAudio(params: {
       responseMimeType: "application/json",
     },
   });
+  void usedMode; // pro budoucí logging/stats
 
   const raw = (response.text ?? "").trim();
   if (!raw) {
