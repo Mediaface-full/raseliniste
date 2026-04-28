@@ -1,0 +1,31 @@
+---
+import Shell from "../layouts/Shell.astro";
+import QuickAdd from "../components/QuickAdd";
+import { prisma } from "../lib/db";
+import { readSession } from "../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Rychlé zadání · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Kalendář" }, { label: "Rychlé zadání" }]}
+>
+  <div class="max-w-2xl mx-auto">
+    <div class="mb-4">
+      <h1 class="font-serif text-3xl">Rychlé zadání</h1>
+      <p class="text-sm text-muted-foreground mt-1">
+        Diktuj nebo napiš v jedné větě. Pravidla zkontrolují konflikty (hokej syna, šichty partnerky, dny pro Prahu/doma, buffery, denní zátěž).
+      </p>
+    </div>
+    <QuickAdd client:load />
+  </div>
+</Shell>

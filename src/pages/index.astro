@@ -22,6 +22,48 @@ const unseenFirewall = await prisma.callLog.count({
   where: { userId: session.uid, seenAt: null },
 });
 
+// Plán — dnešní + zítřejší eventy
+const dayStart = new Date();
+dayStart.setHours(0, 0, 0, 0);
+const dayPlus2End = new Date(dayStart);
+dayPlus2End.setDate(dayPlus2End.getDate() + 2);
+dayPlus2End.setHours(23, 59, 59, 999);
+
+const upcomingEvents = await prisma.calendarEvent.findMany({
+  where: {
+    deletedRemotely: false,
+    AND: [{ endsAt: { gte: dayStart } }, { startsAt: { lte: dayPlus2End } }],
+  },
+  select: {
+    id: true, title: true, type: true, source: true,
+    startsAt: true, endsAt: true, locationText: true, allDay: true,
+  },
+  orderBy: { startsAt: "asc" },
+  take: 12,
+});
+
+// Aktivní porušení pravidel pro nejbližší dny (neacknowledged)
+const todayDate = new Date();
+todayDate.setHours(0, 0, 0, 0);
+const horizon = new Date(todayDate);
+horizon.setDate(horizon.getDate() + 7);
+
+const activeViolations = await prisma.ruleViolation.findMany({
+  where: { acknowledged: false, forDate: { gte: todayDate, lte: horizon } },
+  orderBy: [{ severity: "desc" }, { forDate: "asc" }],
+  take: 10,
+});
+
+const fmtDay = (d: Date) =>
+  d.toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" });
+const fmtTime = (d: Date) =>
+  d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+const sourceLabel = (src: string) =>
+  src === "ICLOUD_SON" ? "syn" : src === "ICLOUD_PARTNER" ? "partnerka" : "G";
+const sourceTint = (src: string): Tint =>
+  src === "ICLOUD_SON" ? "mint" : src === "ICLOUD_PARTNER" ? "lavender" : "sky";
+
 const kpis: { label: string; value: string; delta?: string; deltaDir?: "up" | "down" | "flat"; href?: string; icon: string; tint: Tint }[] = [
   { label: "Otevřené úkoly",  value: "—", delta: "—",   deltaDir: "flat", icon: "lucide:check-square",  tint: "peach" },
   { label: "Poznámky týden",  value: "—", delta: "—",   deltaDir: "flat", icon: "lucide:notebook-pen",  tint: "mint" },
@@ -65,6 +107,80 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
         Poslední přihlášení: <span class="text-foreground">{fmt(user.lastLoginAt)}</span>
       </div>
     </div>
+
+    {/* Plán — nejbližší eventy + porušení pravidel */}
+    {(upcomingEvents.length > 0 || activeViolations.length > 0) && (
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div class="glass rounded-xl p-4 lg:col-span-2" style="--c: var(--tint-sky);">
+          <div class="flex items-center gap-2 mb-3">
+            <Icon name="lucide:calendar-days" class="size-4" style="color: var(--c);" />
+            <h2 class="font-serif text-lg">Plán (dnes + 2 dny)</h2>
+            <a href="/quickadd" class="ml-auto text-xs font-mono text-[var(--tint-sky)] hover:underline">
+              + Rychlé zadání
+            </a>
+          </div>
+          {upcomingEvents.length === 0 ? (
+            <div class="text-sm text-muted-foreground italic">Žádné události — užij si volno.</div>
+          ) : (
+            <div class="space-y-1.5">
+              {upcomingEvents.map((e) => {
+                const start = new Date(e.startsAt);
+                const end = new Date(e.endsAt);
+                return (
+                  <div class="flex items-center gap-3 text-sm rounded-md px-2 py-1.5 bg-black/10">
+                    <span class="font-mono text-xs tabular w-16 shrink-0 text-muted-foreground">
+                      {fmtDay(start)}
+                    </span>
+                    <span class="font-mono text-xs tabular w-24 shrink-0 text-muted-foreground">
+                      {e.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
+                    </span>
+                    <span class="flex-1 truncate">{e.title}</span>
+                    {e.locationText && (
+                      <span class="text-xs text-muted-foreground truncate max-w-[8rem]">
+                        {e.locationText}
+                      </span>
+                    )}
+                    <span class={`text-xs font-mono text-[var(--tint-${sourceTint(e.source)})]`}>
+                      {sourceLabel(e.source)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {activeViolations.length > 0 ? (
+          <div class="glass rounded-xl p-4" style="--c: var(--tint-rose);">
+            <div class="flex items-center gap-2 mb-3">
+              <Icon name="lucide:alert-triangle" class="size-4" style="color: var(--c);" />
+              <h2 class="font-serif text-lg">Pravidla</h2>
+            </div>
+            <div class="space-y-2">
+              {activeViolations.map((v) => {
+                const tint = v.severity === "ERROR" ? "rose" : v.severity === "WARNING" ? "butter" : "sky";
+                return (
+                  <div class={`text-sm rounded-md p-2 border border-[var(--tint-${tint})]/30 bg-[var(--tint-${tint})]/10`}>
+                    <div class="text-xs font-mono text-muted-foreground mb-0.5">
+                      {fmtDay(new Date(v.forDate))} · {v.ruleName}
+                    </div>
+                    <div>{v.message}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div class="glass rounded-xl p-4" style="--c: var(--tint-sage);">
+            <div class="flex items-center gap-2 mb-2">
+              <Icon name="lucide:check-circle-2" class="size-4" style="color: var(--c);" />
+              <h2 class="font-serif text-lg">Pravidla</h2>
+            </div>
+            <div class="text-sm text-muted-foreground">Žádná aktivní varování. ✓</div>
+          </div>
+        )}
+      </section>
+    )}
 
     {/* KPI grid — glass cards, každý v pastelovém tintu */}
     <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
