@@ -1,0 +1,27 @@
+---
+import Shell from "../layouts/Shell.astro";
+import CalendarView from "../components/CalendarView";
+import { prisma } from "../lib/db";
+import { readSession } from "../lib/session";
+import { isConnected } from "../lib/google-oauth";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const status = await isConnected(session.uid);
+---
+
+<Shell
+  title="Kalendář · Rašeliniště"
+  username={user.username}
+  heading="Kalendář"
+  breadcrumb={[{ label: "Organizace" }, { label: "Kalendář" }]}
+>
+  <CalendarView client:load googleConnected={status.connected} />
+</Shell>

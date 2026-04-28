@@ -21,6 +21,15 @@ const schema = z.object({
   NOTIFICATION_EMAIL: z.string().email().optional(),
   // Cron endpoint auth (Synology Task Scheduler posílá v x-cron-key).
   CRON_SECRET: z.string().min(16).optional(),
+  // Google OAuth (Calendar + People API)
+  GOOGLE_CLIENT_ID: z.string().min(10).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(10).optional(),
+  GOOGLE_REDIRECT_URI: z.string().url().default("https://www.raseliniste.cz/api/integrations/google/callback"),
+  // Booking magic-link
+  BOOKING_MAGIC_LINK_SECRET: z.string().min(16).optional(),
+  BOOKING_MAGIC_LINK_TTL_HOURS: z.coerce.number().int().positive().default(24),
+  // Siri Shortcut (calendar check)
+  SIRI_API_TOKEN: z.string().min(16).optional(),
 });
 
 type Env = z.infer<typeof schema>;

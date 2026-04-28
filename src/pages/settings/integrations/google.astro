@@ -1,0 +1,49 @@
+---
+import Shell from "../../../layouts/Shell.astro";
+import GoogleIntegration from "../../../components/GoogleIntegration";
+import { prisma } from "../../../lib/db";
+import { readSession } from "../../../lib/session";
+import { isConnected } from "../../../lib/google-oauth";
+import { env } from "../../../lib/env";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const status = await isConnected(session.uid);
+const eventsCount = await prisma.calendarEvent.count({
+  where: { source: "GOOGLE_PRIMARY", deletedRemotely: false },
+});
+const contactsCount = await prisma.contact.count({
+  where: { userId: session.uid, googleResourceName: { not: null } },
+});
+
+const justConnected = Astro.url.searchParams.get("just_connected") === "1";
+const oauthMisconfigured = !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET;
+---
+
+<Shell
+  title="Google · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Nastavení" }, { label: "Integrace" }, { label: "Google" }]}
+>
+  <div class="max-w-2xl">
+    <GoogleIntegration
+      client:load
+      initial={{
+        connected: status.connected,
+        lastUsedAt: status.lastUsedAt?.toISOString() ?? null,
+        lastError: status.lastError,
+        eventsCount,
+        contactsCount,
+        justConnected,
+        oauthMisconfigured,
+      }}
+    />
+  </div>
+</Shell>

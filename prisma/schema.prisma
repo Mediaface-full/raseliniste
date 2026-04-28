@@ -231,18 +231,37 @@ model Contact {
   note         String?
   isVip        Boolean        @default(false)
 
-  importedFrom String?        // "vcard" | "manual"
+  // Booking módy (kalendář): kontakt může mít víc tagů zároveň
+  isClient            Boolean        @default(false)
+  isFriend            Boolean        @default(false)
+  isFamily            Boolean        @default(false)
+  defaultBookingMode  BookingMode?
+
+  importedFrom String?        // "vcard" | "manual" | "google"
   externalId   String?        // UID z vCard, pokud má
+
+  // Google People API sync
+  googleResourceName  String?        @unique
+  googlePhotoUrl      String?
+  lastGoogleSyncAt    DateTime?
 
   phones       Phone[]
   emails       ContactEmail[]
   callLogs     CallLog[]
+  bookingInvites      BookingInvite[]
 
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
   @@index([userId])
   @@index([userId, isVip])
+  @@index([userId, isClient])
+  @@index([userId, isFriend])
+}
+
+enum BookingMode {
+  CLIENT
+  FRIEND
 }
 
 model Phone {
@@ -618,4 +637,172 @@ model ProjectSummary {
   createdAt   DateTime @default(now())
 
   @@index([projectId, createdAt])
+}
+
+// ============================================================================
+// Kalendář & Bookingy
+// ============================================================================
+
+enum CalendarSource {
+  GOOGLE_PRIMARY      // Petrův pracovní/osobní Google
+  ICLOUD_SON          // synův program (read-only)
+  ICLOUD_PARTNER      // partnerčiny služby (read-only)
+  RASELINISTE         // vytvořeno přímo v Rašeliništi (rezerva, zatím nepoužíváno)
+}
+
+enum EventType {
+  MEETING_PRAGUE      // prezenční v Praze
+  MEETING_HOME        // prezenční u Petra doma
+  MEETING_ELSEWHERE   // prezenční jinde (Plzeň, Brno...)
+  MEETING_ONLINE      // online (Meet, Zoom...)
+  PERSONAL            // soukromé, nepatří do bookingů
+  HOCKEY_SON          // hokejové tréninky (auto z ICLOUD_SON)
+  PARTNER_SHIFT       // partnerčina směna (auto z ICLOUD_PARTNER)
+  PARTNER_VACATION    // partnerčina dovolená (kontext, neblok)
+  OOO_FULL            // dovolená, vše blokované
+  OOO_TRAVEL_WORKING  // nomád, jen prezenční blokované
+  OTHER
+}
+
+model Location {
+  id              String          @id @default(cuid())
+  name            String          @unique          // "Praha", "Jílové u Prahy", "Plzeň"
+  aliases         String[]        @default([])     // ["Prague", "Vinohrady", ...]
+  commuteMinPeak  Int                              // ve špičce (min)
+  commuteMinOff   Int                              // mimo špičku (min)
+  isLocal         Boolean         @default(false)  // domov / žádný commute
+  createdAt       DateTime        @default(now())
+
+  events          CalendarEvent[]
+}
+
+model CalendarEvent {
+  id              String          @id @default(cuid())
+  source          CalendarSource
+  externalId      String          // Google event ID nebo iCloud UID
+  sourceUrl       String?         // odkaz zpět (např. Google Calendar URL)
+
+  type            EventType
+  title           String
+  description     String?         // Markdown z popisu události
+  locationText    String?         // volný text z eventu
+  locationId      String?
+  location        Location?       @relation(fields: [locationId], references: [id])
+
+  startsAt        DateTime
+  endsAt          DateTime
+  allDay          Boolean         @default(false)
+  timezone        String          @default("Europe/Prague")
+
+  // Per-event metadata jen v Rašeliništi (ne v Google)
+  prepNote        String?
+  itemsToBring    Json?           // [{name: "knížky", forPerson: "Franta"}, ...]
+  manualOverride  Boolean         @default(false)  // commit přes /quickadd 'přesto zapsat'
+
+  // Booking metadata
+  bookingInviteId String?
+  bookingInvite   BookingInvite?  @relation(fields: [bookingInviteId], references: [id])
+
+  // Sync metadata
+  lastSyncedAt    DateTime
+  etag            String?
+  deletedRemotely Boolean         @default(false)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([source, externalId])
+  @@index([startsAt, endsAt])
+  @@index([type, startsAt])
+  @@index([source, lastSyncedAt])
+}
+
+enum BookingMeetingType {
+  CHOICE_PRAGUE
+  CHOICE_ONLINE
+  CHOICE_HOME
+  CHOICE_ANY
+}
+
+enum BookingStatus {
+  PENDING       // odeslán link, ještě nekliknul
+  VIEWED        // klient otevřel
+  RESERVED      // vybral slot, čekáme magic-link confirm
+  CONFIRMED     // potvrzeno, event vytvořen
+  CANCELED
+  EXPIRED
+}
+
+model BookingInvite {
+  id              String              @id @default(cuid())
+  token           String              @unique     // 32 znaků
+  mode            BookingMode
+  meetingType     BookingMeetingType
+
+  contactId       String?
+  contact         Contact?            @relation(fields: [contactId], references: [id])
+
+  // Pro cold leady (z /schuzka, žádný Contact)
+  inviteeName     String?
+  inviteeEmail    String?
+  inviteePhone    String?
+  inviteeSubject  String?
+
+  internalNote    String?
+
+  status          BookingStatus       @default(PENDING)
+  validUntil      DateTime
+  reservedSlot    Json?               // {startsAt, endsAt, type}
+  confirmedAt     DateTime?
+
+  events          CalendarEvent[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([token])
+  @@index([status, validUntil])
+}
+
+model DayNote {
+  id          String    @id @default(cuid())
+  forDate     DateTime  @db.Date
+  text        String
+  area        String?                  // "Praha 5", "Smíchov", null
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([forDate, done])
+}
+
+enum RuleViolationSeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
+model RuleViolation {
+  id            String                @id @default(cuid())
+  forDate       DateTime              @db.Date
+  eventId       String?
+  ruleName      String
+  severity      RuleViolationSeverity
+  message       String
+  acknowledged  Boolean               @default(false)
+  createdAt     DateTime              @default(now())
+
+  @@index([forDate, acknowledged])
+}
+
+model BriefingDigest {
+  id              String    @id @default(cuid())
+  forDate         DateTime  @db.Date  @unique
+  generatedAt     DateTime  @default(now())
+
+  // Strukturovaný obsah pro re-render v UI
+  content         Json
+
+  todoistTaskId   String?
+  pushedAt        DateTime?
 }
