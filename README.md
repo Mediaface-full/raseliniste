@@ -2,6 +2,7 @@
 
 Osobní informační systém Petra „Gideona" Periny. Single-user, max security, hostovaný na Synology DS718+ v Dockeru.
 
+> **Nová Claude session:** otevři [`HANDOFF.md`](./HANDOFF.md) — má aktuální stav a immediate next steps.
 > **Pro detailní technickou dokumentaci** otevři [`HANDBOOK.md`](./HANDBOOK.md).
 > **Pro provozní postupy** (deploy, backup, troubleshoot) otevři [`RUNBOOK.md`](./RUNBOOK.md).
 
@@ -16,7 +17,7 @@ Osobní informační systém Petra „Gideona" Periny. Single-user, max security
 - **Tailwind v4** + custom OKLCH design tokens (Liquid Glass dark theme)
 - Auth: argon2id + WebAuthn passkey (Touch ID)
 
-## Živé moduly (10)
+## Živé moduly (11)
 
 | Modul | Cesta | Co dělá |
 |---|---|---|
@@ -26,10 +27,11 @@ Osobní informační systém Petra „Gideona" Periny. Single-user, max security
 | Poznámky | `/notes` | KNOWLEDGE+THOUGHT, search/filter |
 | Deník | `/journal` | direct ingest + AI redakce + GPS |
 | Zdraví | `/health` | HAE ingest + dashboard + Gemini Pro analýzy |
-| Kontakty | `/contacts` | vCard import, VIP toggle |
+| Kontakty | `/contacts` | vCard + Google sync, VIP, booking módy |
 | Firewall | `/call-log`, `/firewall` | veřejný formulář pro vzkazy → Todoist + mail |
 | Dopisy | `/letters` | 2 PDF témata, AI „Učesat" |
 | Studna | `/studna`, `/me/<token>` | sdílené projektové boxíky s audio + AI rozborem |
+| **Kalendář** | `/calendar` | Google Calendar sync (fáze 1a) — iCloud + rules + /quickadd ve fázi 1b |
 
 ## Lokální dev
 

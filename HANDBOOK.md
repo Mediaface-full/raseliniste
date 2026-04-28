@@ -2,7 +2,9 @@
 
 Osobní informační systém Petra „Gideona" Perniy. Jeden uživatel, maximum bezpečnosti, postupné rozšiřování.
 
-> **TL;DR:** Astro 6 + React 19 islands + Prisma 7 + PostgreSQL 16, běží na Synology DS718+ v Dockeru, deploy přes ghcr.io. Design **Liquid Glass** na dark navy pozadí. Login je **heslo + passkey (Touch ID)**. Deset živých modulů: **Capture** (diktát → Gemini → triage → auto-push do Todoistu), **Úkoly** (`/tasks`, grupované podle when), **Poznámky** (`/notes`, KNOWLEDGE+THOUGHT), **Deník** (`/journal`, AI redakce, lokace), **Zdraví** (HAE + dashboard + AI analýzy), **Kontakty** (vCard import, VIP), **Gideonův Firewall** (`/call-log`, public form → Todoist + mail), **Dopisy** (`/letters`, 2 PDF šablony, učesat AI), **Studna** (`/studna`, sdílené projektové boxíky s hlasovými záznamy + AI rozborem + brief upload + denní digest), **E-mail** (SMTP přes UI: Seznam/Gmail/…). AI běží na **Vertex AI** (EU region) nebo Gemini API key.
+> **TL;DR:** Astro 6 + React 19 islands + Prisma 7 + PostgreSQL 16, běží na Synology DS718+ v Dockeru, deploy přes ghcr.io. Design **Liquid Glass** na dark navy pozadí. Login je **heslo + passkey (Touch ID)**. Jedenáct živých modulů: Capture, Úkoly, Poznámky, Deník, Zdraví, Kontakty (vCard + Google sync), Gideonův Firewall, Dopisy, Studna, **Kalendář (Google sync — fáze 1a; iCloud + rules + /quickadd ve fázi 1b)**, E-mail SMTP. AI běží na **Vertex AI** (EU region) nebo Gemini API key.
+
+> **NOVÁ SESSION:** přečti nejdřív [`HANDOFF.md`](./HANDOFF.md) — má aktuální stav, rozdělané věci a immediate next steps.
 
 ---
 
@@ -265,8 +267,18 @@ raseliniste/
 - **LetterRecipient** — `name`, `addressLines[]`. Knihovna sdílená napříč dopisy; lze i ad-hoc per dopis.
 - **Letter** — `senderId`, `recipientId?`, **snapshot adresáta** (`recipientNameSnapshot`, `recipientAddressLinesSnapshot`, `showRecipientAddress`), `letterDate`, `place?`, **`bodyRaw` + `bodyFinal`** (před/po Učesat), `promptOverride?`, **verzování** (`parentLetterId`, `version`), `pdfPath?` (cache).
 
+### Kalendář & Bookingy (fáze 1a hotová, 1b+2+3+4 v plánu — viz HANDOFF.md)
+- **CalendarEvent** — `source` (GOOGLE_PRIMARY / ICLOUD_SON / ICLOUD_PARTNER / RASELINISTE), `externalId`, `type` (EventType enum), `title`, `description`, `locationText`, `locationId` FK, `startsAt/endsAt`, `allDay`, `timezone`, `prepNote`, `itemsToBring Json`, `manualOverride`, `bookingInviteId?`, `etag`, `deletedRemotely`, `lastSyncedAt`. Unique `[source, externalId]`.
+- **Location** — `name`, `aliases[]`, `commuteMinPeak/Off`, `isLocal`. Seedy: Praha (60/35), Jílové u Prahy (0/0 isLocal), Plzeň, Brno.
+- **BookingInvite** — `token`, `mode` (CLIENT/FRIEND), `meetingType` (CHOICE_PRAGUE/ONLINE/HOME/ANY), `contactId?`, snapshot pole pro cold leady, `status` (PENDING/VIEWED/RESERVED/CONFIRMED/CANCELED/EXPIRED), `validUntil`, `reservedSlot Json`.
+- **DayNote** — operativní úkoly bez času (errands "při cestě"). `forDate` (Date), `text`, `area?`, `done`, `doneAt`.
+- **RuleViolation** — log post-hoc detekce přebookování. `forDate`, `eventId?`, `ruleName`, `severity` (INFO/WARNING/ERROR), `message`, `acknowledged`.
+- **BriefingDigest** — záznam noční generace (22:00 cron → Todoist). `forDate` unique, `content Json` (schedule, itemsToBringAggregate, dayNotes, contextWarnings, commuteSummary), `todoistTaskId?`, `pushedAt?`.
+- **Contact rozšíření**: `isClient`, `isFriend`, `isFamily`, `defaultBookingMode`, `googleResourceName` (unique), `googlePhotoUrl`, `lastGoogleSyncAt`.
+
 ### Enums
 - `RecordingSource`, `EntryType`, `TaskWhen`, `EntryStatus`, `AnalysisTrigger`
+- **Kalendář:** `CalendarSource`, `EventType`, `BookingMode`, `BookingMeetingType`, `BookingStatus`, `RuleViolationSeverity`
 
 ---
 
@@ -375,6 +387,24 @@ Sdílené projektové boxíky s hlasovými záznamy.
 - **Project summary** — Pro model nad všemi recordings (briefy primární kontext) — strukturovaný markdown dokument o stavu projektu
 - **Cron:** `daily-projects-digest` (18:00 — souhrn nepošle pokud nic nepřibylo), `cleanup-audio` (03:00 — STANDARD older 14d & not pinned)
 - **Onboarding PDFs** — 2 šablony (Standard + Brief) generované přes `@react-pdf/renderer`, owner si stáhne v admin a pošle hostovi mailem
+
+### 🚧 Kalendář & Bookingy (fáze 1a hotová — Google sync; 1b+2+3+4 v plánu)
+
+**Hotovo (fáze 1a):**
+- Schema: `CalendarEvent`, `Location` (4 seedy), `BookingInvite`, `DayNote`, `RuleViolation`, `BriefingDigest` + `Contact` rozšíření o booking módy + Google sync fields
+- `lib/google-oauth.ts` — OAuth 2.0 (Workspace), refresh token v `UserIntegration(provider="google")` šifrovaný AES-256-GCM
+- `lib/google-calendar.ts` — incremental sync s `timeMin/timeMax` window (-7d/+60d), recurring expanded přes `singleEvents=true`, etag-based skip, upsert podle `[source, externalId]`. Plus `createGoogleEvent` (write s Meet) a `deleteGoogleEvent`.
+- `lib/google-people.ts` — read-only sync přes `connections.list`, dedup podle `googleResourceName → email → phone`, sloučení do existujícího `Contact`.
+- `lib/event-classifier.ts` — Vertex Flash classifier title+location → EventType, s heuristikou pre-filtrů (HOCKEY/SHIFT/VACATION/NOMAD/ONLINE regex) + Map cache v procesu.
+- `/calendar` UI s react-big-calendar (default WEEK, Liquid Glass dark CSS), `/settings/integrations/google` (status, stats, sync, disconnect).
+- Cron: `/api/cron/sync-calendars` (5 min), `/api/cron/sync-contacts` (denně 04:00).
+- Sidebar: Kalendář první v Organizace.
+
+**V plánu (fáze 1b/2/3/4 — viz brief Petra `raseliniste-kalendar-brief.md` a HANDOFF.md):**
+- 1b: iCloud CalDAV sync (syn + partnerka), pravidlový engine (15+ pravidel), `/quickadd` parser
+- 2: Bookingy (`/calendar/invite`, `/i/<token>`, `/schuzka` cold lead), magic-link flow
+- 3: DayNote UI, Briefing 22:00 → Todoist, Capture integrace pro time-binding
+- 4: OOO management, Locations admin, PWA polish
 
 ### ✅ E-mail (hotovo, dual SMTP/Resend)
 - `lib/mailer.ts` — priorita: **SMTP z DB** → Resend env → log fallback
@@ -649,12 +679,24 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | GET | `/api/me/:token` | **public** | seznam projektů hosta |
 | POST | `/api/me/:token/recording` | **public** | multipart audio (rate-limit 20/h/host) |
 
+### Calendar (fáze 1a)
+| Method | Path | Auth | Body / Query |
+|---|---|---|---|
+| GET | `/api/calendar/events` | session | `?from&to` (ISO date overlapping window) |
+| GET | `/api/integrations/google` | session | — (status + stats: events, contacts) |
+| POST | `/api/integrations/google` | session | — (start OAuth, vrátí `{url, state}`) |
+| DELETE | `/api/integrations/google` | session | — (disconnect + revoke) |
+| GET | `/api/integrations/google/callback` | session + state cookie | `?code&state` (Google → naše app) |
+| POST | `/api/integrations/google/sync` | session | `{what: "calendar"\|"contacts"\|"all"}` |
+
 ### Cron
 | Method | Path | Auth | Query |
 |---|---|---|---|
 | POST | `/api/cron/monthly-health-report` | **x-cron-key** | `?from&to` (override; jinak předchozí celý měsíc) |
 | POST | `/api/cron/daily-projects-digest` | **x-cron-key** | `?date=YYYY-MM-DD` (override; jinak dnes) |
 | POST | `/api/cron/cleanup-audio` | **x-cron-key** | — (smaže STANDARD audio >14d, pokud není pinned) |
+| POST | `/api/cron/sync-calendars` | **x-cron-key** | — (Google primary, à 5 min) |
+| POST | `/api/cron/sync-contacts` | **x-cron-key** | — (Google People, denně 04:00) |
 
 ### AI
 | Method | Path | Auth | Body |
@@ -918,24 +960,31 @@ gunzip -c rasel-2026-04-20.sql.gz | docker exec -i raseliniste_db psql -U raseli
 
 ## Roadmap
 
-### ✅ Hotovo (před uzavřením kapitoly „Studna" — duben 2026)
+### ✅ Hotovo (do 28. 4. 2026)
 
 - Todoist dispatch (auto-push při Triage confirm + manuální v `/tasks`)
-- Úkoly `/tasks` modul (grupy podle when, push)
-- Poznámky `/notes` modul (KNOWLEDGE+THOUGHT, search, filtry)
-- Kontakty `/contacts` (vCard import, VIP)
+- Úkoly `/tasks`, Poznámky `/notes`, Kontakty `/contacts` (vCard + Google sync)
 - Gideonův Firewall (`/call-log` + admin)
 - Dopisy `/letters` (2 PDF témata, „Učesat" AI, verzování)
 - E-mail SMTP UI (Seznam/Gmail/Outlook presety)
 - Vertex AI dual-mode (EU residency)
-- **Studna `/studna`** (sdílené projektové boxíky s audio + AI rozborem + onboarding PDFs)
+- Studna `/studna` (sdílené projektové boxíky s audio + AI rozborem)
+- **Kalendář fáze 1a** — Google Calendar + Contacts sync, `/calendar` UI, `/settings/integrations/google`
 
-### 🟡 P-1 (priorita „brzy")
+### 🚧 Rozpracováno
 
-1. **Kalendář** — nový modul: osobní eventy, view měsíc/týden, integrace s Tasks due dates, případně CalDAV s Apple Calendar
-2. **Úkoly UX** — kalendářní pohled, inline edit textu, drag mezi sekcemi, due date picker
-3. **Tasks pull-sync z Todoistu** — odškrtnutí v TD se promítne do `/tasks`
-4. **„Co vzít s sebou"** — ranní briefing v Todoistu (čte z poznámek + úkolů + kontextu, vytvoří checklist)
+**Kalendář fáze 1b/2/3/4** — postupně dotahujeme podle briefu (`raseliniste-kalendar-brief.md`):
+
+- **1b**: iCloud CalDAV sync (syn + partnerka) + pravidlový engine + `/quickadd` parser
+- **2**: Bookingy (`/calendar/invite`, `/i/<token>`, `/schuzka` cold lead) + magic-link
+- **3**: DayNote UI + Briefing 22:00 → Todoist + Capture integrace pro time-binding
+- **4**: OOO management, Locations admin, PWA polish
+
+### 🟡 P-1 (následující)
+
+1. **Úkoly UX** — kalendářní pohled, inline edit textu, drag mezi sekcemi, due date picker
+2. **Tasks pull-sync z Todoistu** — odškrtnutí v TD se promítne do `/tasks`
+3. **„Co vzít s sebou"** — bude součástí fáze 3 (briefing 22:00 to nahradí)
 
 ### 🟢 P-2 (UX vylepšení, časem)
 
