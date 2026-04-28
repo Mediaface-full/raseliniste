@@ -1,0 +1,74 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import DayView from "../../components/DayView";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const dateStr = Astro.params.date;
+if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+  return Astro.redirect("/day/" + new Date().toISOString().slice(0, 10));
+}
+
+const dayStart = new Date(`${dateStr}T00:00:00`);
+const dayEnd = new Date(`${dateStr}T23:59:59.999`);
+
+const [events, dayNotes, briefingDigest, ruleViolations] = await Promise.all([
+  prisma.calendarEvent.findMany({
+    where: {
+      deletedRemotely: false,
+      AND: [{ endsAt: { gte: dayStart } }, { startsAt: { lte: dayEnd } }],
+    },
+    orderBy: { startsAt: "asc" },
+  }),
+  prisma.dayNote.findMany({
+    where: { forDate: dayStart },
+    orderBy: [{ done: "asc" }, { createdAt: "asc" }],
+  }),
+  prisma.briefingDigest.findUnique({ where: { forDate: dayStart } }),
+  prisma.ruleViolation.findMany({
+    where: { forDate: dayStart },
+    orderBy: { createdAt: "asc" },
+  }),
+]);
+
+const initial = {
+  date: dateStr,
+  events: events.map((e) => ({
+    ...e,
+    startsAt: e.startsAt.toISOString(),
+    endsAt: e.endsAt.toISOString(),
+  })),
+  dayNotes: dayNotes.map((n) => ({
+    ...n,
+    doneAt: n.doneAt?.toISOString() ?? null,
+  })),
+  briefingDigest: briefingDigest
+    ? {
+        ...briefingDigest,
+        forDate: briefingDigest.forDate.toISOString(),
+        generatedAt: briefingDigest.generatedAt.toISOString(),
+        pushedAt: briefingDigest.pushedAt?.toISOString() ?? null,
+      }
+    : null,
+  ruleViolations,
+};
+---
+
+<Shell
+  title={`Den ${dateStr} · Rašeliniště`}
+  username={user.username}
+  breadcrumb={[{ label: "Kalendář" }, { label: "Den" }]}
+>
+  <div class="max-w-3xl mx-auto">
+    <DayView client:load initial={initial} />
+  </div>
+</Shell>
