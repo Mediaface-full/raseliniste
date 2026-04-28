@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { getGemini, DEFAULT_MODEL, ANALYSIS_MODEL } from "./gemini";
+import { getGemini, getGeminiMode, DEFAULT_MODEL, ANALYSIS_MODEL } from "./gemini";
 
 /**
  * Audio transkripce + bohatá strukturovaná analýza pro Studnu.
@@ -130,9 +130,9 @@ function extractJson(text: string): string {
   return trimmed;
 }
 
-// Inline audio limit (Gemini API): 20 MB. Větší pošleme přes Files API,
-// kde dostane URI a my v generateContent referencujeme `fileData`.
-const INLINE_AUDIO_LIMIT_BYTES = 18 * 1024 * 1024; // 18 MB s rezervou
+// Inline audio limit. Vertex i AI Studio mají ~20 MB request size limit.
+// Base64 inflation +33 %, takže 14 MB raw = ~19 MB v requestu — bezpečný strop.
+const INLINE_AUDIO_LIMIT_BYTES = 14 * 1024 * 1024;
 
 export async function transcribeAudio(params: {
   audio: Buffer;
@@ -157,8 +157,17 @@ export async function transcribeAudio(params: {
         data: params.audio.toString("base64"),
       },
     };
+  } else if (getGeminiMode() === "vertex") {
+    // Vertex AI nepodporuje genai.files.upload() — Files API existuje jen
+    // v Google AI Studio módu. Pro Vertex by velké soubory šly přes GCS
+    // bucket, což zatím nemáme nasazené.
+    const sizeMb = (params.audio.byteLength / 1024 / 1024).toFixed(1);
+    throw new Error(
+      `Audio ${sizeMb} MB je nad limit ${INLINE_AUDIO_LIMIT_BYTES / 1024 / 1024} MB pro Vertex AI inline transcribe. ` +
+      `Rozsekni záznam na kratší úseky (do ~13 minut MP3 / ~10 minut M4A) nebo zkomprimuj na nižší bitrate (32-48 kbps stačí pro řeč).`,
+    );
   } else {
-    // Files API — pošli soubor (Blob), získej URI, reference v generateContent.
+    // AI Studio mode — Files API funguje. Pošli soubor (Blob), získej URI.
     const blob = new Blob([params.audio.buffer.slice(params.audio.byteOffset, params.audio.byteOffset + params.audio.byteLength) as ArrayBuffer], {
       type: params.mimeType,
     });
