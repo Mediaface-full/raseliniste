@@ -1,0 +1,39 @@
+---
+import Shell from "../../../layouts/Shell.astro";
+import IcloudIntegration from "../../../components/IcloudIntegration";
+import { prisma } from "../../../lib/db";
+import { readSession } from "../../../lib/session";
+import { getStatus } from "../../../lib/icloud-calendar";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const status = await getStatus(session.uid);
+---
+
+<Shell
+  title="iCloud · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Nastavení" }, { label: "Integrace" }, { label: "iCloud" }]}
+>
+  <div class="max-w-2xl">
+    <IcloudIntegration
+      client:load
+      initial={{
+        connected: status.connected,
+        appleId: status.appleId,
+        sonCalendarName: status.sonCalendarName,
+        partnerCalendarName: status.partnerCalendarName,
+        lastUsedAt: status.lastUsedAt?.toISOString() ?? null,
+        lastError: status.lastError,
+        stats: status.stats,
+      }}
+    />
+  </div>
+</Shell>

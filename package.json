@@ -39,6 +39,7 @@
     "clsx": "^2.1.1",
     "dayjs": "^1.11.20",
     "googleapis": "^171.4.0",
+    "ical.js": "^2.2.1",
     "jose": "^6.2.2",
     "libphonenumber-js": "^1.12.41",
     "lucide-react": "^1.8.0",
