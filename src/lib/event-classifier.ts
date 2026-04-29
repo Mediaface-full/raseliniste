@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getGemini, DEFAULT_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 
 /**
  * Vertex Flash classifier — určí EventType podle titulu, popisu, lokace.
@@ -121,10 +122,14 @@ Celodenní: ${input.allDay ? "ano" : "ne"}
 
 Vrať pouze kód, žádný text navíc.`;
 
-  const response = await genai.models.generateContent({
-    model: DEFAULT_MODEL,
-    contents: prompt,
-    config: { temperature: 0, maxOutputTokens: 30 },
+  const response = await callTracked({
+    module: "event-classifier",
+    modelName: DEFAULT_MODEL,
+    fn: () => genai.models.generateContent({
+      model: DEFAULT_MODEL,
+      contents: prompt,
+      config: { temperature: 0, maxOutputTokens: 30 },
+    }),
   });
 
   const text = (response.text ?? "").trim().toUpperCase();

@@ -1,4 +1,5 @@
 import { getGemini, FAST_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 
 export type ClassifiedEntry = {
   type: "TASK" | "JOURNAL" | "THOUGHT" | "CONTEXT" | "KNOWLEDGE";
@@ -199,19 +200,18 @@ function parseAndValidate(raw: string): ClassifiedEntry[] {
 
 export async function classify(rawText: string): Promise<ClassifiedEntry[]> {
   const gemini = getGemini();
-  const response = await gemini.models.generateContent({
-    model: FAST_MODEL,
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: rawText }],
+  const response = await callTracked({
+    module: "capture-classifier",
+    modelName: FAST_MODEL,
+    fn: () => gemini.models.generateContent({
+      model: FAST_MODEL,
+      contents: [{ role: "user", parts: [{ text: rawText }] }],
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        responseMimeType: "application/json",
+        temperature: 0.3,
       },
-    ],
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      responseMimeType: "application/json",
-      temperature: 0.3,
-    },
+    }),
   });
 
   const text = response.text ?? "";

@@ -905,3 +905,29 @@ model TaskAudioBatch {
 
   @@index([userId, status])
 }
+
+// ============================================================================
+// AI USAGE TRACKING — log každého Gemini volání pro kostový přehled
+// ============================================================================
+
+model AiUsageLog {
+  id             String   @id @default(cuid())
+  at             DateTime @default(now())
+
+  userId         String?  // null pro cron běhy bez user kontextu
+  module         String   // "briefing" | "task-extract" | "audio-stage1" | ...
+  model          String   // "gemini-2.5-flash" | "gemini-2.5-pro"
+  mode           String   // "vertex" | "api"
+
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  costUsd        Float    @default(0)
+  costCzk        Float    @default(0)
+  durationMs     Int      @default(0)
+
+  success        Boolean  @default(true)
+  errorMsg       String?
+
+  @@index([at])
+  @@index([module, at])
+}

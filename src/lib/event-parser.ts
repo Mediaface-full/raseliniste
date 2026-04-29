@@ -1,4 +1,5 @@
 import { getGemini, DEFAULT_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 import type { EventTypeStr } from "./event-classifier";
 
 /**
@@ -75,14 +76,18 @@ Vrať POUZE jeden JSON objekt, žádný markdown, žádný další text.`;
 
   try {
     const genai = getGemini();
-    const response = await genai.models.generateContent({
-      model: DEFAULT_MODEL,
-      contents: prompt,
-      config: {
-        temperature: 0.1,
-        maxOutputTokens: 500,
-        responseMimeType: "application/json",
-      },
+    const response = await callTracked({
+      module: "event-parser",
+      modelName: DEFAULT_MODEL,
+      fn: () => genai.models.generateContent({
+        model: DEFAULT_MODEL,
+        contents: prompt,
+        config: {
+          temperature: 0.1,
+          maxOutputTokens: 500,
+          responseMimeType: "application/json",
+        },
+      }),
     });
 
     const text = (response.text ?? "").trim();

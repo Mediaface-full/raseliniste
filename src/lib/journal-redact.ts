@@ -1,4 +1,5 @@
 import { getGemini, DEFAULT_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 
 export type RedactedJournal = {
   cleanedText: string;
@@ -100,14 +101,18 @@ function parseResponse(raw: string): RedactedJournal | null {
 export async function redactJournal(rawText: string): Promise<RedactedJournal | null> {
   try {
     const gemini = getGemini();
-    const response = await gemini.models.generateContent({
-      model: DEFAULT_MODEL, // gemini-2.5-flash
-      contents: [{ role: "user", parts: [{ text: rawText }] }],
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        responseMimeType: "application/json",
-        temperature: 0.2, // konzervativní — minimalizuje riziko že text zmršíme
-      },
+    const response = await callTracked({
+      module: "journal-redact",
+      modelName: DEFAULT_MODEL,
+      fn: () => gemini.models.generateContent({
+        model: DEFAULT_MODEL,
+        contents: [{ role: "user", parts: [{ text: rawText }] }],
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+          temperature: 0.2,
+        },
+      }),
     });
 
     const text = response.text ?? "";

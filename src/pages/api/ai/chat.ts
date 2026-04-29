@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { z } from "zod";
 import { readSession } from "@/lib/session";
 import { getGemini, DEFAULT_MODEL, FAST_MODEL } from "@/lib/gemini";
+import { callTracked } from "@/lib/gemini-usage";
 
 export const prerender = false;
 
@@ -25,9 +26,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   try {
     const gemini = getGemini();
-    const result = await gemini.models.generateContent({
-      model: body.fast ? FAST_MODEL : DEFAULT_MODEL,
-      contents: body.prompt,
+    const model = body.fast ? FAST_MODEL : DEFAULT_MODEL;
+    const result = await callTracked({
+      module: "ai-chat",
+      modelName: model,
+      userId: session.uid,
+      fn: () => gemini.models.generateContent({ model, contents: body.prompt }),
     });
     return Response.json({ text: result.text });
   } catch (err) {

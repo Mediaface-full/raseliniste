@@ -1,0 +1,25 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import AiUsageView from "../../components/AiUsageView";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="AI náklady · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Nastavení" }, { label: "AI náklady" }]}
+>
+  <div class="max-w-4xl">
+    <AiUsageView client:load />
+  </div>
+</Shell>

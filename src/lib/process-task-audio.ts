@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { transcribeAudio } from "./audio-transcribe";
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 
 /**
  * Audio → seznam úkolů (proposals).
@@ -155,14 +156,18 @@ Vrať POUZE JSON tohoto tvaru, žádný markdown wrapper, žádný úvod:
 Pokud přepis neobsahuje žádný úkol (Petr se přeřekl, nahrál ticho), vrať {"tasks": []}.`;
 
   const genai = getGemini();
-  const response = await genai.models.generateContent({
-    model: ANALYSIS_MODEL,
-    contents: prompt,
-    config: {
-      temperature: 0.2,
-      maxOutputTokens: 4000,
-      responseMimeType: "application/json",
-    },
+  const response = await callTracked({
+    module: "task-extract",
+    modelName: ANALYSIS_MODEL,
+    fn: () => genai.models.generateContent({
+      model: ANALYSIS_MODEL,
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 4000,
+        responseMimeType: "application/json",
+      },
+    }),
   });
 
   const raw = (response.text ?? "").trim();

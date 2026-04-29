@@ -1,4 +1,5 @@
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 import {
   AGGREGATION_MAP,
   queryBloodPressure,
@@ -270,13 +271,17 @@ export async function analyzeHealth(
   const userPrompt = buildUserPrompt(from, to, focus, simples, reducedBp, reducedSleep);
 
   const gemini = getGemini();
-  const response = await gemini.models.generateContent({
-    model: ANALYSIS_MODEL, // gemini-2.5-pro — zdravotní analýza si zaslouží hloubku
-    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      temperature: 0.4,
-    },
+  const response = await callTracked({
+    module: "health-analyze",
+    modelName: ANALYSIS_MODEL,
+    fn: () => gemini.models.generateContent({
+      model: ANALYSIS_MODEL,
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        temperature: 0.4,
+      },
+    }),
   });
 
   const text = response.text ?? "";

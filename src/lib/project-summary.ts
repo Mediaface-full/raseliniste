@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 
 /**
  * AI souhrn celého projektu — projede všechny recordings (briefy s vyšší vahou)
@@ -117,13 +118,17 @@ PODKLADY:
 ${recordingsBundle}`;
 
   const genai = getGemini();
-  const response = await genai.models.generateContent({
-    model: ANALYSIS_MODEL,
-    contents: prompt,
-    config: {
-      temperature: 0.4,
-      maxOutputTokens: 16000,
-    },
+  const response = await callTracked({
+    module: "project-summary",
+    modelName: ANALYSIS_MODEL,
+    fn: () => genai.models.generateContent({
+      model: ANALYSIS_MODEL,
+      contents: prompt,
+      config: {
+        temperature: 0.4,
+        maxOutputTokens: 16000,
+      },
+    }),
   });
 
   const text = (response.text ?? "").trim();

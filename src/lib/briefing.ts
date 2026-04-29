@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { decryptSecret } from "./crypto";
 import { createTask } from "./todoist";
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 
 /**
  * Noční briefing 22:00 → Todoist.
@@ -212,14 +213,18 @@ JSON SCHEMA:
 Vrať POUZE JSON, žádný další text.`;
 
   const genai = getGemini();
-  const response = await genai.models.generateContent({
-    model: ANALYSIS_MODEL, // Pro = lepší pochopení kontextu, jednou denně OK
-    contents: prompt,
-    config: {
-      temperature: 0.2,
-      maxOutputTokens: 4000,
-      responseMimeType: "application/json",
-    },
+  const response = await callTracked({
+    module: "briefing",
+    modelName: ANALYSIS_MODEL,
+    fn: () => genai.models.generateContent({
+      model: ANALYSIS_MODEL,
+      contents: prompt,
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 4000,
+        responseMimeType: "application/json",
+      },
+    }),
   });
 
   const text = (response.text ?? "").trim();

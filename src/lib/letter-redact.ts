@@ -1,4 +1,5 @@
 import { getGemini, DEFAULT_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 
 /**
  * "Učesat" tlačítko v editoru dopisu.
@@ -30,13 +31,17 @@ export async function redactLetter(params: {
   const finalPrompt = promptParts.join("\n");
 
   const genai = getGemini();
-  const response = await genai.models.generateContent({
-    model: DEFAULT_MODEL,
-    contents: finalPrompt,
-    config: {
-      temperature: 0.4,
-      maxOutputTokens: 4096,
-    },
+  const response = await callTracked({
+    module: "letter-redact",
+    modelName: DEFAULT_MODEL,
+    fn: () => genai.models.generateContent({
+      model: DEFAULT_MODEL,
+      contents: finalPrompt,
+      config: {
+        temperature: 0.4,
+        maxOutputTokens: 4096,
+      },
+    }),
   });
 
   const text = (response.text ?? "").trim();
