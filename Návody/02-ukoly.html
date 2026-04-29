@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Úkoly — návod</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; line-height: 1.5; max-width: 720px; margin: 0 auto; padding: 24px; font-size: 10.5pt; }
+  h1 { font-family: "Iowan Old Style", Georgia, serif; font-size: 26pt; margin: 0 0 4px; line-height: 1.1; }
+  h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 16pt; margin: 28px 0 8px; padding-top: 14px; border-top: 1px solid #ddd; page-break-after: avoid; }
+  h3 { font-family: "Iowan Old Style", Georgia, serif; font-size: 12pt; margin: 18px 0 6px; page-break-after: avoid; }
+  .lede { color: #555; font-size: 11pt; margin: 6px 0 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #666; font-weight: 600; }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f0f0f3; padding: 1px 5px; border-radius: 3px; }
+  pre { background: #f5f5f7; padding: 10px 12px; border-radius: 6px; font-size: 9pt; font-family: "SF Mono", Menlo, monospace; white-space: pre-wrap; }
+  .step { margin: 10px 0; padding-left: 22px; position: relative; }
+  .step::before { content: counter(step) "."; counter-increment: step; position: absolute; left: 0; font-weight: 600; color: #888; }
+  .steps { counter-reset: step; }
+  .meta { font-size: 8pt; color: #999; margin-top: 32px; padding-top: 12px; border-top: 1px solid #eee; }
+  .tldr { background: #fbf8e7; padding: 12px 16px; border-left: 4px solid #d4a017; border-radius: 4px; margin: 12px 0; }
+  .tip { background: #e7f4ff; padding: 12px 16px; border-left: 4px solid #1976d2; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+  .warn { background: #fff0f0; padding: 12px 16px; border-left: 4px solid #c62828; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+  .toc { background: #f8f8f8; padding: 12px 18px; border-radius: 6px; margin: 16px 0 24px; font-size: 10pt; }
+  .toc ol { margin: 4px 0 0; padding-left: 22px; }
+</style>
+</head>
+<body>
+
+<h1>Úkoly — návod</h1>
+<p class="lede">Modul Úkoly v Rašeliništi. Manuální i hlasové vytváření, delegace, automatický push do Todoistu.</p>
+
+<div class="toc">
+<strong>Obsah</strong>
+<ol>
+  <li>Co modul umí (přehled)</li>
+  <li><code>/ukoly</code> — hlavní stránka</li>
+  <li>Manuální vytvoření úkolu</li>
+  <li>Filtry a hledání</li>
+  <li>Edit, mark done, delete</li>
+  <li>Delegace — přidělení komu</li>
+  <li>Push do Todoistu — smart routing</li>
+  <li><code>/ukoly/audio</code> — hlasový diktát</li>
+  <li>PWA: ikona na ploše iPhone</li>
+  <li>Review obrazovka po diktátu</li>
+  <li>Tipy &amp; obvyklé otázky</li>
+</ol>
+</div>
+
+<h2>1. Co modul umí</h2>
+
+<div class="tldr">
+<strong>TL;DR:</strong> Vytvoříš úkol — buď ručně formulářem, nebo namluvíš salvu („zítra zavolat Honzovi, do pátku faktura, koupit krmení"). AI ji rozdělí na samostatné úkoly s termíny a tagy. Schválíš v review screen, pushneš do Todoistu. Když je úkol pro někoho jiného (Karel), automaticky přistane v Todoistu v projektu/sekci „Karel" — Karel ho vidí, dostane notifikaci.
+</div>
+
+<p>Tři vstupní cesty:</p>
+<ul>
+  <li><strong>Manuálně</strong> — formulář s plnou paletou (datum, priorita, tagy, přidělit)</li>
+  <li><strong>Hlasem</strong> — diktát na <code>/ukoly/audio</code>, AI vyrobí seznam, ty schválíš</li>
+  <li><strong>Z Capture</strong> — když přes iPhone Shortcut diktuješ něco, AI to klasifikuje jako TASK a propíše do staré <code>/tasks</code> stránky (legacy Capture inbox)</li>
+</ul>
+
+<h2>2. <code>/ukoly</code> — hlavní stránka</h2>
+
+<p>Sidebar → <strong>Úkoly</strong> (peach tint, check-square ikona). Standardně vidíš jen otevřené.</p>
+
+<h3>Hlavička</h3>
+<ul>
+  <li><strong>Nový úkol</strong> — otevře inline create form</li>
+  <li><strong>Nadiktovat úkoly</strong> — přechod na <code>/ukoly/audio</code></li>
+</ul>
+
+<h3>Filtry</h3>
+<table>
+<tr><th>Filtr</th><th>Hodnoty</th></tr>
+<tr><td>Status</td><td>Otevřené (default) / Hotové / Vše</td></tr>
+<tr><td>Přidělené</td><td>Všichni / Moje / per kontakt (top 5)</td></tr>
+<tr><td>Tagy</td><td>Top 8 tagů s počtem (klik pro filter, znovuklik pro zrušení)</td></tr>
+</table>
+
+<h2>3. Manuální vytvoření úkolu</h2>
+
+<p>Klik <strong>Nový úkol</strong> → formulář:</p>
+
+<table>
+<tr><th>Pole</th><th>Co tam jde</th></tr>
+<tr><td>Co je třeba udělat</td><td>Title (povinné, max 200 znaků)</td></tr>
+<tr><td>Poznámka</td><td>Detail / kontext (volitelné)</td></tr>
+<tr><td>Termín</td><td>Date picker (volitelné)</td></tr>
+<tr><td>Priorita</td><td>Nízká / Normální (default) / Vysoká</td></tr>
+<tr><td>Tagy</td><td>Čárkou oddělené (např. <code>prace, dum, telefonat</code>)</td></tr>
+<tr><td>Přidělit komu</td><td>Já (default) / kontakt z dropdown</td></tr>
+</table>
+
+<h2>4. Filtry a hledání</h2>
+
+<p>Tagy se generují automaticky z toho, co jsi v úkolech použil. Top 8 nejpoužívanějších se zobrazí jako pills s číslem (kolikrát).</p>
+
+<p>Příklad: pokud máš úkoly s tagem <code>#dominik</code> u 5 úkolů, klikneš na <code>#dominik</code> → uvidíš jen tyto. Znovuklik = zrušit filter.</p>
+
+<h2>5. Edit, mark done, delete</h2>
+
+<p>Každý úkol v seznamu (TaskRow) má:</p>
+<ul>
+  <li><strong>Checkbox</strong> vlevo — klik = mark done (přesunutí do „Hotové"). Znovu klik = vrátit otevřené.</li>
+  <li><strong>Edit</strong> ikona vpravo — inline editace všech polí (zachovává sticky bottom apply/cancel)</li>
+  <li><strong>Trash</strong> ikona — smazání (s confirm)</li>
+  <li><strong>Send</strong> ikona — push do Todoistu (jen pokud nejsi v Todoistu a Todoist je nakonfigurovaný)</li>
+</ul>
+
+<h3>Vizuální badge na kartě</h3>
+<table>
+<tr><th>Co</th><th>Vypadá</th></tr>
+<tr><td>Datum splnění</td><td>🕐 šedé / 🟡 dnes / 🔴 overdue</td></tr>
+<tr><td>Přidělené</td><td>👤 Karel Novák (lavender)</td></tr>
+<tr><td>Vysoká priorita</td><td>! priorita (rose)</td></tr>
+<tr><td>Nízká priorita</td><td>↓ low (šedé)</td></tr>
+<tr><td>Tagy</td><td><code>#dum #telefonat</code></td></tr>
+<tr><td>V Todoistu</td><td>✓ Todoist (sage)</td></tr>
+<tr><td>Zdroj</td><td><code>[audio]</code> / <code>[manual]</code></td></tr>
+</table>
+
+<h2>6. Delegace — přidělení komu</h2>
+
+<p>Každý úkol může mít <code>assignedToContact</code> — kdo má úkol vyřešit. Vybíráš z tvých kontaktů (Contact tabulka v Rašeliništi, naplněna z Google People + ručně + vCard).</p>
+
+<h3>Kde nastavit</h3>
+<ul>
+  <li>Při vytvoření: dropdown „Přidělit komu" (Já / kontakt)</li>
+  <li>Při editu: stejný dropdown</li>
+  <li>Z hlasu: AI to detekuje (viz <em>9. Review obrazovka</em>)</li>
+</ul>
+
+<h3>Filtrování v seznamu</h3>
+<p>Pills v hlavičce: <strong>Všichni</strong> / <strong>Moje</strong> / per kontakt (top 5). Použiješ na rychlé „co mám delegované Dominikovi".</p>
+
+<h2>7. Push do Todoistu — smart routing</h2>
+
+<div class="tldr">
+<strong>Pravidlo:</strong> Pokud má úkol assignedToContact → zkusí se najít vhodné místo v tvém Todoistu. Pokud ne, padá do default mojeUkoly projektu.
+</div>
+
+<h3>Routing priority</h3>
+<div class="steps">
+<div class="step">Hledá se <strong>top-level projekt</strong> přesně jménem assignee (firstName preferred). Příklad: pro Dominika hledá projekt „Dominik". Pokud existuje → push tam.</div>
+<div class="step">Pokud ne, hledá se projekt <strong>„Lidé"</strong> (nebo „People" / „Tým"). V něm se hledá <strong>sekce</strong> jménem assignee. Pokud sekce existuje → push tam.</div>
+<div class="step">Pokud sekce neexistuje → <strong>VYTVOŘÍ se</strong> automaticky.</div>
+<div class="step">Pokud ani projekt „Lidé" neexistuje → <strong>VYTVOŘÍ se</strong> + sekce.</div>
+<div class="step">Pokud úkol nemá assignee → push do <code>mojeUkoly</code> projektu (nastavený v Nastavení → Todoist).</div>
+</div>
+
+<div class="tip">
+<strong>Praktické:</strong> Pokud máš v Todoistu sdílený projekt „Lidé" se všemi, do kterých deleguješ, automaticky vznikne sekce per osoba. Dominik vidí svojí sekci, Agáta svojí, atd. Petr má jeden přehled v Lidé, oni vidí svoje sekce.
+</div>
+
+<h3>Co se v Todoistu objeví</h3>
+<ul>
+  <li><strong>Title</strong> = title z Rašeliniště</li>
+  <li><strong>Description</strong>: poznámka + raw snippet (pokud z hlasu) + footer „Z Rašeliniště — datum · routedHow"</li>
+  <li><strong>Due date</strong>: dueAt (pokud máš)</li>
+  <li><strong>Labels</strong>: <code>raseliniste</code> + tagy úkolu (lowercase ASCII)</li>
+  <li><strong>Priority</strong>: high → 4 (P1), normal → 2 (P3), low → 1 (P4)</li>
+</ul>
+
+<h3>Idempotence</h3>
+<p>Push je idempotent přes <code>Task.todoistTaskId</code>. Když klikneš Send 2× na ten samý úkol, vznikne v Todoistu jen jeden task. Pokud ho v Todoistu smažeš a chceš znovu, smaž ho v Rašeliništi a vytvoř znova.</p>
+
+<h2>8. <code>/ukoly/audio</code> — hlasový diktát</h2>
+
+<p>Sidebar → <strong>Úkoly → Nadiktovat úkoly</strong>, nebo PWA ikona na ploše telefonu (viz dále).</p>
+
+<h3>Před nahráváním</h3>
+<ul>
+  <li>Volba délky: <strong>3 / 10 / 30 min</strong> (default 10, persistent v localStorage prohlížeče)</li>
+  <li>Auto-stop po vybraném limitu</li>
+  <li>Alternativa: <strong>Nahrát soubor</strong> — pro již existující audio (max 50 MB)</li>
+</ul>
+
+<h3>Během nahrávání</h3>
+<ul>
+  <li>Velký mono countdown <strong>MM:SS zbývá</strong></li>
+  <li>Pod tím „uplynulo MM:SS z LL:00" + progress bar</li>
+  <li>Tlačítko Stop kdykoliv</li>
+</ul>
+
+<h3>Po stop</h3>
+<div class="steps">
+<div class="step">Audio se nahrává na server (5–30 s podle sítě)</div>
+<div class="step">Vznikne TaskAudioBatch v DB se status=processing</div>
+<div class="step">Redirect na <code>/ukoly/audio/&lt;id&gt;/review</code></div>
+<div class="step">AI běží na pozadí 15–60 s (Stage 1: přepis Flash, Stage 2: extrakce Pro)</div>
+<div class="step">Stránka pollne každé 3 s, sama se obnoví na review screen</div>
+</div>
+
+<div class="warn">
+<strong>Když je něco zlé:</strong> AI selže typicky 0× z 100. Pokud ano: status=error, k vidění je <strong>Surový přepis</strong> + tlačítko <strong>Zkusit znovu</strong>. Buď stage 2 (rychlé, jen extrakce), nebo full (od audio).
+</div>
+
+<h2>9. PWA: ikona na ploše iPhone</h2>
+
+<p>Pro rychlý diktát z mobilu si <code>/ukoly/audio</code> přidej na plochu jako appku.</p>
+
+<div class="steps">
+<div class="step">V Safari na iPhone otevři <code>https://www.raseliniste.cz/ukoly/audio</code></div>
+<div class="step">Přihlaš se</div>
+<div class="step">Sdílet (čtverec se šipkou nahoru)</div>
+<div class="step">Přidat na plochu</div>
+<div class="step">Název „Diktovat úkoly", ulož</div>
+</div>
+
+<p>Tap = full-screen recorder bez Safari chromu. Žádné lišty, žádné rušení.</p>
+
+<h2>10. Review obrazovka po diktátu</h2>
+
+<p>Když je AI hotová, vidíš seznam navržených úkolů.</p>
+
+<h3>Hlavička</h3>
+<ul>
+  <li>„Nadiktoval jsi N úkolů · 1m12s"</li>
+  <li><strong>Zkusit znovu</strong> — re-run AI extrakce nad stejným přepisem</li>
+  <li>Sbalitelný <strong>Surový přepis</strong> — co AI slyšela</li>
+</ul>
+
+<h3>Per úkol</h3>
+<table>
+<tr><th>Element</th><th>Co</th></tr>
+<tr><td>Checkbox</td><td>Default zaškrtnutý — odškrtni co nechceš vytvořit</td></tr>
+<tr><td>Title</td><td>Imperativ („Zavolat…"), AI ho extrahovala</td></tr>
+<tr><td>Datum</td><td>Z relativních výrazů („zítra", „do pátku") nebo null</td></tr>
+<tr><td>Přiděleno</td><td>Z fráze („Karel ať udělá") + match na Contact. Pokud nesedí, žluté upozornění.</td></tr>
+<tr><td>Priorita / tagy</td><td>Default normal, tagy z předdefinované sady + volné</td></tr>
+<tr><td>Raw snippet</td><td>Doslovný úryvek, ze kterého úkol vznikl — kontrola AI</td></tr>
+<tr><td>Edit</td><td>Inline edit všech polí</td></tr>
+<tr><td>X (smazat)</td><td>Odebere ze seznamu</td></tr>
+</table>
+
+<h3>Sticky bottom akce</h3>
+<ul>
+  <li><strong>Vytvořit zaškrtnuté (N)</strong> — vznikne N Task entries, batch se označí committed, audio se smaže</li>
+  <li><strong>Zahodit vše</strong> — všechno se zahodí, audio i transcript se smažou</li>
+</ul>
+
+<p>Po commit redirect na <code>/ukoly?created=N</code> se zeleným bannerem „Vytvořeno 4 úkoly z diktátu".</p>
+
+<h3>Detekce delegace</h3>
+<p>AI v promptu zná seznam tvých kontaktů. Když řekneš <em>„Karel ať udělá X"</em> nebo <em>„pro Dominika"</em>, AI vyplní <code>assignedToContactName</code>. Systém to pak resolve na Contact.id (case-insensitive, fuzzy match na firstName).</p>
+
+<p>Pokud jméno nesedí přesně (např. „Dom" vs „Dominik"), uvidíš na kartě žluté upozornění <em>„Dom (nesedne na kontakt — vyber)"</em>. V edit dropdown vyber správný kontakt.</p>
+
+<h2>11. Tipy &amp; obvyklé otázky</h2>
+
+<h3>Jaký je optimální způsob diktování?</h3>
+<p>Mluv plynule, jeden úkol = jedna myšlenka. Začni slovesem. Příklad:</p>
+<pre>„Zítra ráno zavolat Honzovi kvůli střeše. Do pátku poslat fakturu Wonderhood. Někdy příští týden domluvit servis na auto. A koupit Mortykovi krmení, kdykoliv."</pre>
+<p>→ AI vyrobí 4 úkoly s termíny: zítra / do pátku / příští týden (pondělí) / null.</p>
+
+<h3>Jak udělám, aby úkol skončil v Todoistu u Dominika?</h3>
+<ol>
+  <li>Dominik musí být v tvých Contacts (Sidebar → Kontakty)</li>
+  <li>V Todoistu musíš mít buď projekt „Dominik" (sdílený s ním), nebo projekt „Lidé" (pak vznikne sekce „Dominik"). Pokud nemáš ani jedno, vytvoří se „Lidé" + sekce automaticky.</li>
+  <li>Vytvoř úkol (manuálně nebo z hlasu „Dominik ať udělá X")</li>
+  <li>Klik Send (Push do Todoistu)</li>
+</ol>
+
+<h3>AI navrhla termín, který nesedí — můžu to opravit?</h3>
+<p>V review screen klik na úkol → Edit → změň datum / priority / tagy / assignee. Pak Vytvořit zaškrtnuté.</p>
+
+<h3>AI vynechala úkol, který jsem řekl — co s tím?</h3>
+<p>V review screen klik <strong>Zkusit znovu</strong> — re-run extrakce nad stejným přepisem. Pokud druhý pokus to chytne, použij ten. Pokud ne, přidej úkol ručně přes Nový úkol.</p>
+
+<h3>Hodně mluvím a překračuju 30 min limit — co?</h3>
+<p>Krátké úkolové salvy jsou OK do 30 min. Pokud diktuješ delší obsah (briefink, brainstorm), použij modul Studna místo Úkolů — ta zvládá až 90 min audio s hlubší analýzou.</p>
+
+<h3>Jak je to s Todoist priority?</h3>
+<p>Mapování: Rašeliniště high → Todoist P1 (4), normal → P3 (2), low → P4 (1). Todoist priority jsou invertované (P1 nejvyšší).</p>
+
+<h3>Push do Todoistu vrátil chybu</h3>
+<p>Detail v <code>Task.pushError</code>. Klikni na úkol → expand detail → uvidíš error. Typicky: Todoist token expirovaný (Settings → Todoist znovu nastavit) nebo project ID neexistuje (smazaný projekt).</p>
+
+<p class="meta">Rašeliniště — Úkoly návod · 2026-04-29</p>
+
+</body>
+</html>

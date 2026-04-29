@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Testovací checklist</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; line-height: 1.5; max-width: 720px; margin: 0 auto; padding: 24px; font-size: 10.5pt; }
+  h1 { font-family: "Iowan Old Style", Georgia, serif; font-size: 26pt; margin: 0 0 4px; line-height: 1.1; }
+  h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 16pt; margin: 28px 0 8px; padding-top: 14px; border-top: 1px solid #ddd; page-break-after: avoid; }
+  h3 { font-family: "Iowan Old Style", Georgia, serif; font-size: 12pt; margin: 18px 0 6px; page-break-after: avoid; }
+  .lede { color: #555; font-size: 11pt; margin: 6px 0 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #666; font-weight: 600; }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f0f0f3; padding: 1px 5px; border-radius: 3px; }
+  pre { background: #f5f5f7; padding: 10px 12px; border-radius: 6px; font-size: 9pt; font-family: "SF Mono", Menlo, monospace; white-space: pre-wrap; word-wrap: break-word; }
+  .step { margin: 4px 0; padding-left: 22px; position: relative; }
+  .step::before { content: counter(step) "."; counter-increment: step; position: absolute; left: 0; font-weight: 600; color: #888; }
+  .steps { counter-reset: step; }
+  .meta { font-size: 8pt; color: #999; margin-top: 32px; padding-top: 12px; border-top: 1px solid #eee; }
+  .tldr { background: #fbf8e7; padding: 12px 16px; border-left: 4px solid #d4a017; border-radius: 4px; margin: 12px 0; }
+  .check { display: inline-block; width: 16px; height: 16px; border: 1.5px solid #555; border-radius: 3px; vertical-align: -3px; margin-right: 8px; }
+  .test-card { border: 1px solid #ddd; border-radius: 6px; padding: 12px 14px; margin: 10px 0; page-break-inside: avoid; background: #fafafa; }
+  .test-card .title { font-weight: 600; font-size: 10.5pt; margin-bottom: 4px; }
+  .test-card .expect { color: #555; font-size: 9.5pt; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #ddd; }
+  .test-card .expect strong { color: #1a1a1a; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<h1>Testovací checklist</h1>
+<p class="lede">Postupný průchod všemi funkcemi Kalendáře a Úkolů. Odškrtávej, ať víš co už máš ověřené. ~30–45 minut na celý průchod.</p>
+
+<div class="tldr">
+<strong>Pravidla testování:</strong> Po každém deployi (commit pushnut + <code>~/deploy.sh</code>) udělej aspoň testy z kapitoly „A. Nutné minimum" — to ověří, že core funguje. Zbytek si projdi 1× kompletně, pak jen výběrově při změnách.
+</div>
+
+<h2>A. Nutné minimum (po každém deployi)</h2>
+<p>Pět základních věcí, které musí jet vždycky.</p>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> A.1 Login + dashboard</div>
+<div>Otevři <code>https://www.raseliniste.cz/login</code>, přihlas se heslem + Touch ID.</div>
+<div class="expect"><strong>Očekávám:</strong> Dashboard se načte, vlevo nahoře vidím své jméno, sekce „Plán" ukazuje dnešní/zítřejší eventy z Google + iCloud.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> A.2 Sidebar — všechny moduly otvírají</div>
+<div>Klikni postupně: Kalendář / Rychlé zadání / Dnes / Dovolená / Lokace / Pozvánka / Úkoly / Kontakty / Studna / Deník / Zdraví.</div>
+<div class="expect"><strong>Očekávám:</strong> Žádný 500 error, každá stránka se načte (i když může být prázdná).</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> A.3 Sync běží</div>
+<div>Otevři <code>/settings/integrations/google</code> — koukni na „Naposledy synchronizováno". Stejně <code>/settings/integrations/icloud</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Obě integrace připojené, last sync &lt; 10 min stará.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> A.4 AI funguje</div>
+<div>Otevři <code>/api/health/ai</code> v prohlížeči (přihlášený).</div>
+<div class="expect"><strong>Očekávám:</strong> JSON s <code>{"ok":true,"mode":"vertex","model":"gemini-2.5-flash","sample":"..."}</code>. Pokud <code>mode</code> není „vertex", zkontroluj <code>VERTEX_PROJECT</code> v .env.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> A.5 Crony zaregistrované</div>
+<div>DSM → Task Scheduler → koukni že vidíš 10 úloh „Raseliniste …". Pravý klik na #1 (sync calendars) → Run → History.</div>
+<div class="expect"><strong>Očekávám:</strong> Result code 200, doba běhu &lt; 30 s.</div>
+</div>
+
+<h2>B. Kalendář — pohled a sync</h2>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> B.1 Kalendář ukazuje eventy ze všech zdrojů</div>
+<div>Otevři <code>/calendar</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Týdenní pohled, vidím své Google eventy + synovy hokejové bloky + partnerčiny šichty (různé barvy/intenzity).</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> B.2 Nový event ve Fantastical → 5 min v Rašeliništi</div>
+<div>V Fantastical na iPhone vytvoř event „Test sync 14:00 zítra". Počkej 5 min. Refresh <code>/calendar</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Event se objeví. Pokud ne do 10 min, zkontroluj cron #1 v DSM History.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> B.3 Smazání ve Fantastical → propsání</div>
+<div>Smaž ten test event ve Fantastical. Počkej 5 min.</div>
+<div class="expect"><strong>Očekávám:</strong> V Rašeliništi event zmizí (nebo má <code>deletedRemotely=true</code>, neukazuje se).</div>
+</div>
+
+<h2>C. Quickadd a pravidla (kalendář)</h2>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> C.1 Quickadd parser — základ</div>
+<div>Otevři <code>/quickadd</code>. Napiš: <code>úterý v 11 schůzka Praha</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Po ~2 s parsed shrnutí: úterý DD.MM. 11:00–12:00, MEETING_PRAGUE, Praha. Verdikt 🟢.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> C.2 Pravidlo Praha pondělí → 🔴</div>
+<div>Napiš: <code>pondělí 14 schůzka Praha</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Verdikt 🔴 RED, signal <code>HARD_DAY_RESTRICTION_PRAGUE</code> „Praha jen úterý/středa".</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> C.3 Pravidlo doma úterý → 🔴</div>
+<div>Napiš: <code>středa 10 oběd s Karlem doma</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Verdikt 🔴 RED, signal <code>HARD_DAY_RESTRICTION_HOME</code> „Doma jen pondělí/čtvrtek/pátek".</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> C.4 Pravidlo online v noci → 🔴</div>
+<div>Napiš: <code>zítra v 7 zoom call</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Verdikt 🔴 RED, signal <code>HARD_ONLINE_HOURS</code> „Online jen 8:00–18:00".</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> C.5 Hokej blok — 🔴</div>
+<div>Najdi v <code>/calendar</code> kdy má syn hokej (typicky úterý 16:00 nebo středa 13:30). V <code>/quickadd</code> zkus zadat schůzku na ten čas.</div>
+<div class="expect"><strong>Očekávám:</strong> 🔴 + signal <code>HARD_HOCKEY_BLOCK</code> s časy hokeje.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> C.6 Lunch warning — 🟡</div>
+<div>Napiš: <code>úterý 12:30 oběd Praha</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Verdikt 🟡, signal <code>LUNCH_BREAK</code>.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> C.7 Zápis 🟢 do Google</div>
+<div>Vyber slot který je 🟢 (např. úterý 14:00 schůzka online). Klik <strong>Zapsat do Google</strong>.</div>
+<div class="expect"><strong>Očekávám:</strong> Spinner → ✓ vytvořeno. Otevři Google Calendar webové UI — event tam je s Meet linkem (pro online).</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> C.8 Diktát na mobilu</div>
+<div>V Safari iPhone otevři <code>/quickadd</code>. Klik mikrofon. Diktuj: „úterý jedenáct schůzka v Praze".</div>
+<div class="expect"><strong>Očekávám:</strong> Text se zapíše, parser to projede stejně.</div>
+</div>
+
+<h2>D. Bookingy</h2>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> D.1 Vytvoření personalizované pozvánky</div>
+<div><code>/calendar/invite</code> → vyber kontakt z dropdownu → vztah Klient → Libovolně → 60 min → 14 dní → Vygenerovat link.</div>
+<div class="expect"><strong>Očekávám:</strong> Link <code>/i/&lt;token&gt;</code>, button Kopírovat funguje.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> D.2 Klient vidí jen volné sloty</div>
+<div>Otevři ten link v <strong>anonymním okně</strong>. Koukni na první den, ve kterém máš v kalendáři něco od 10:00.</div>
+<div class="expect"><strong>Očekávám:</strong> Slot 10:00 NENÍ v nabídce (kolize). Sloty v 12:30 NEjsou (lunch). Praha jen út/st, doma jen po/čt/pá. Online jen 8–18.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> D.3 Klient zarezervuje</div>
+<div>Klikni nějaký 🟢 slot (např. čtvrtek 14:00 doma) → klik Potvrdit a poslat e-mail. Vyplň jméno/email pokud žádá.</div>
+<div class="expect"><strong>Očekávám:</strong> Hláška „Skoro hotovo, klikni v mailu". Mail dorazí do 1 min na adresu z kontaktu.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> D.4 Magic-link confirm</div>
+<div>V mailu klik <strong>Potvrdit termín</strong>.</div>
+<div class="expect"><strong>Očekávám:</strong> Stránka „Termín potvrzený ✓" + tlačítko Otevřít Google Meet (pro online). Event se objeví v Google Calendar.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> D.5 Cancel pozvánky</div>
+<div>V <code>/calendar/invite</code> seznam → klik Zrušit u testovací pozvánky.</div>
+<div class="expect"><strong>Očekávám:</strong> Status CANCELED, mail klientovi „termín bohužel musím zrušit". Event v Google musíš zrušit ručně.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> D.6 Univerzální /schuzka link</div>
+<div>Otevři <code>https://www.raseliniste.cz/schuzka</code> v anonym okně.</div>
+<div class="expect"><strong>Očekávám:</strong> Stejné UI jako personalizovaný invite, ale povinné jméno + email + subject. Default 30 min, jen online sloty.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> D.7 OOO blokuje sloty</div>
+<div><code>/calendar/away</code> → vytvoř Dovolenou na pondělí–pátek příští týden. Počkej 5 min (sync). Otevři aktivní pozvánku v anonym okně.</div>
+<div class="expect"><strong>Očekávám:</strong> Sloty z toho týdne NEjsou v nabídce (vyblokované).</div>
+</div>
+
+<h2>E. Day pohled + briefing</h2>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> E.1 /day/&lt;dnes&gt;</div>
+<div>Sidebar → Dnes (briefing). Nebo <code>/day/&lt;YYYY-MM-DD&gt;</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> Sekce Plán / Při cestě / Pravidla / Briefing. Eventy z dneška, žádné errands.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> E.2 Přidání DayNote</div>
+<div>V sekci Při cestě napiš „AlzaBox Smíchov", area „Praha 5", Přidat.</div>
+<div class="expect"><strong>Očekávám:</strong> Note se objeví v seznamu se checkboxem.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> E.3 Označit done + smazat</div>
+<div>Klikni checkbox u DayNote → mělo by zešednout (line-through). Klikni X → smazání.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> E.4 Manuální generování briefingu</div>
+<div>V <code>/day/&lt;zítřek&gt;</code> klik <strong>Vygenerovat teď</strong>.</div>
+<div class="expect"><strong>Očekávám:</strong> Po 30–60 s preview content (vzít s sebou, kontext, commute) + status „✓ Pushnuto do Todoistu".</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> E.5 Briefing v Todoistu</div>
+<div>Otevři Todoist (mojeUkoly projekt).</div>
+<div class="expect"><strong>Očekávám:</strong> Task „🌙 Plán na &lt;datum&gt;" s description obsahující markdown (sekce, checkboxy, kontext).</div>
+</div>
+
+<h2>F. Úkoly — manuální</h2>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> F.1 Vytvoření úkolu</div>
+<div><code>/ukoly</code> → Nový úkol → Title „Test 1", datum zítra, priorita normal, tagy <code>test, demo</code>, přidělit Já.</div>
+<div class="expect"><strong>Očekávám:</strong> Úkol se objeví v seznamu se zítřejším datem (žluté = today/zítra).</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> F.2 Edit inline</div>
+<div>U Test 1 klik Edit → změň priority na High → uložit.</div>
+<div class="expect"><strong>Očekávám:</strong> Badge „! priorita" se objeví.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> F.3 Mark done a filtr</div>
+<div>Klik checkbox u Test 1 → přesune se do Hotové. V hlavičce přepni filter na Hotové.</div>
+<div class="expect"><strong>Očekávám:</strong> Test 1 vidím v Hotových, šedý line-through.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> F.4 Filtr podle tagu</div>
+<div>Vrať se na Otevřené. Vytvoř další úkol s tagem <code>test</code>. Klik chip <code>#test</code> v hlavičce.</div>
+<div class="expect"><strong>Očekávám:</strong> Vidím jen úkoly s tagem test.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> F.5 Delegace na Dominika</div>
+<div>Vytvoř úkol „Domluvit s Dominikem schůzku" → přidělit Dominik (musí být v Contacts).</div>
+<div class="expect"><strong>Očekávám:</strong> Badge „👤 Dominik" (lavender). Filter „Dominik" v hlavičce ho ukáže samostatně.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> F.6 Push do Todoistu (pro mě)</div>
+<div>U úkolu bez assignee klik Send (Todoist push).</div>
+<div class="expect"><strong>Očekávám:</strong> Po 1–3 s badge „✓ Todoist". V Todoistu projekt mojeUkoly má nový task se stejným title.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> F.7 Push delegovaného úkolu — Lidé/sekce</div>
+<div>U úkolu „Domluvit s Dominikem" klik Send.</div>
+<div class="expect"><strong>Očekávám:</strong> V Todoistu je úkol buď v top-level projektu „Dominik" (pokud máš), nebo v „Lidé / Dominik" sekci. Description obsahuje řádek „section 'Dominik' v projektu 'Lidé'".</div>
+</div>
+
+<h2>G. Úkoly — audio diktát</h2>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> G.1 PWA install na iPhone</div>
+<div>Safari iPhone → <code>/ukoly/audio</code> → Sdílet → Přidat na plochu → uložit „Diktovat úkoly".</div>
+<div class="expect"><strong>Očekávám:</strong> Ikona G na ploše. Tap = full-screen recorder bez Safari lišt.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> G.2 Volba délky</div>
+<div>V <code>/ukoly/audio</code> klik 3 min → 10 min → 30 min pills.</div>
+<div class="expect"><strong>Očekávám:</strong> Aktivní pill se podbarvuje. Po refresh stránky zachovaná volba (localStorage).</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> G.3 Krátký diktát (3 úkoly)</div>
+<div>Klik mikrofon. Mluv: „Zítra zavolat Honzovi kvůli střeše. Do pátku poslat fakturu Wonderhood. Koupit Mortykovi krmení." Stop.</div>
+<div class="expect"><strong>Očekávám:</strong> Upload &lt; 10 s. Redirect na review screen se spinnerem. Po 30–60 s seznam 3 úkolů s daty (zítra / pátek / null).</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> G.4 Detekce delegace z hlasu</div>
+<div>Diktuj: „Dominik ať mi pošle do středy ten návrh. Agáta ať dohodne tu schůzku."</div>
+<div class="expect"><strong>Očekávám:</strong> Oba úkoly mají assignee badge (Dominik / Agáta). Pokud match na Contact selhal, žluté upozornění „nesedne na kontakt — vyber".</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> G.5 Edit + commit</div>
+<div>V review screen klik Edit u jednoho úkolu, změň datum. Odškrtni jeden úkol který nechceš. Klik Vytvořit zaškrtnuté.</div>
+<div class="expect"><strong>Očekávám:</strong> Redirect na <code>/ukoly?created=2</code> se zeleným bannerem „Vytvořeno 2 úkoly z diktátu".</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> G.6 Discard</div>
+<div>Spustí nový diktát, v review klik Zahodit vše.</div>
+<div class="expect"><strong>Očekávám:</strong> Audio i transcript se smažou (status=discarded), redirect na /ukoly.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> G.7 Regenerovat (chybové přepis)</div>
+<div>Pokud máš chybný proces, klik Zkusit znovu. Jinak skip.</div>
+<div class="expect"><strong>Očekávám:</strong> Re-run AI extrakce, nový seznam (může být stejný).</div>
+</div>
+
+<h2>H. Edge case testy</h2>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> H.1 Zápis přesto (manualOverride)</div>
+<div>V <code>/quickadd</code> zadej Praha v pondělí (🔴). Klik <strong>Přesto zapsat</strong>.</div>
+<div class="expect"><strong>Očekávám:</strong> Vznikne event v Google. V <code>/calendar</code> ho vidím. Na dashboardu sekce „Pravidla" má aktivní violation se severity ERROR + ack=true.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> H.2 Sync když Fantastical přidá při bookingu</div>
+<div>Klient otevře pozvánku /i/&lt;token&gt;, vidí slot v 14:00 čtvrtek. Ty teď ve Fantastical přidáš jiný event na 14:00 čtvrtek. Klient klikne na slot 14:00.</div>
+<div class="expect"><strong>Očekávám:</strong> Po klikni na Potvrdit klient dostane chybu „Slot už není dostupný" (server re-evaluates při reservaci). Pokud ne (sync nedoběhl), ten slot se zarezervoval — server ale nepustí confirm pokud Vidi konflikt.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> H.3 Magic-link expiroval</div>
+<div>Vyrob pozvánku, klient zareservuje. Mailem dostane link. Počkej 25 hodin. Klikni link.</div>
+<div class="expect"><strong>Očekávám:</strong> Stránka „Odkaz není platný nebo expiroval. Pošli mi prosím novou pozvánku."</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> H.4 Stuck batch retry</div>
+<div>V /ukoly/audio nahraj záznam. HNED po uploadu (v okně 30 s) přejdi do DSM Container Manager → restart kontejneru.</div>
+<div class="expect"><strong>Očekávám:</strong> Po cca 5–10 min v review screen vidím buď status=review (auto-retry pomohl), nebo status=error s tlačítkem Regenerovat.</div>
+</div>
+
+<div class="test-card">
+<div class="title"><span class="check"></span> H.5 Studna upload velkého audia</div>
+<div>Ve Studně nahraj BRIEF audio &gt; 14 MB (ale &lt; 100 MB). V <code>.env</code> musí být <code>GEMINI_API_KEY</code>.</div>
+<div class="expect"><strong>Očekávám:</strong> ✓ uploaded hned. V admin polling zachycuje processing → processed během 2–5 min. Logs ukazují „Audio X MB &gt; 14 MB — fallback na AI Studio Files API.".</div>
+</div>
+
+<h2>Výsledky</h2>
+
+<p>Po průchodu si zaznamenej:</p>
+<ul>
+  <li>Datum testu: ____________</li>
+  <li>Verze (commit hash): ____________</li>
+  <li>Co prošlo: ____________</li>
+  <li>Co selhalo + screenshot/log: ____________</li>
+</ul>
+
+<p>Pokud něco padá, zkopíruj log:</p>
+<pre>sudo docker compose -f /volume1/docker/raseliniste/docker-compose.yml \
+     logs app --tail 100</pre>
+
+<p class="meta">Rašeliniště — Testovací checklist · 2026-04-29</p>
+
+</body>
+</html>

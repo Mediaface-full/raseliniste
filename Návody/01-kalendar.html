@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Kalendář — návod</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; line-height: 1.5; max-width: 720px; margin: 0 auto; padding: 24px; font-size: 10.5pt; }
+  h1 { font-family: "Iowan Old Style", Georgia, serif; font-size: 26pt; margin: 0 0 4px; line-height: 1.1; }
+  h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 16pt; margin: 28px 0 8px; padding-top: 14px; border-top: 1px solid #ddd; page-break-after: avoid; }
+  h3 { font-family: "Iowan Old Style", Georgia, serif; font-size: 12pt; margin: 18px 0 6px; page-break-after: avoid; }
+  .lede { color: #555; font-size: 11pt; margin: 6px 0 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #666; font-weight: 600; }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f0f0f3; padding: 1px 5px; border-radius: 3px; }
+  pre { background: #f5f5f7; padding: 10px 12px; border-radius: 6px; font-size: 9pt; font-family: "SF Mono", Menlo, monospace; overflow-x: auto; line-height: 1.4; white-space: pre-wrap; }
+  .step { margin: 10px 0; padding-left: 22px; position: relative; }
+  .step::before { content: counter(step) "."; counter-increment: step; position: absolute; left: 0; font-weight: 600; color: #888; }
+  .steps { counter-reset: step; }
+  .badge { display: inline-block; font-size: 8pt; padding: 1px 6px; border-radius: 3px; background: #eef; color: #336; font-family: "SF Mono", Menlo, monospace; }
+  .b-ok { background: #dfd; color: #262; }
+  .b-warn { background: #ffe9c8; color: #8b5a00; }
+  .b-error { background: #fdd; color: #800; }
+  .meta { font-size: 8pt; color: #999; margin-top: 32px; padding-top: 12px; border-top: 1px solid #eee; }
+  .tldr { background: #fbf8e7; padding: 12px 16px; border-left: 4px solid #d4a017; border-radius: 4px; margin: 12px 0; }
+  .tip { background: #e7f4ff; padding: 12px 16px; border-left: 4px solid #1976d2; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+  .warn { background: #fff0f0; padding: 12px 16px; border-left: 4px solid #c62828; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+  .nopagebreak { page-break-inside: avoid; }
+  .toc { background: #f8f8f8; padding: 12px 18px; border-radius: 6px; margin: 16px 0 24px; font-size: 10pt; }
+  .toc ol { margin: 4px 0 0; padding-left: 22px; }
+  .toc li { margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<h1>Kalendář & Bookingy — návod</h1>
+<p class="lede">Kompletní průvodce modulem Kalendář v Rašeliništi. Co umí, kde to najdeš, jak to ovládat.</p>
+
+<div class="toc">
+<strong>Obsah</strong>
+<ol>
+  <li>Co umí systém (přehled)</li>
+  <li>Propojení s Google + iCloud</li>
+  <li><code>/calendar</code> — hlavní pohled</li>
+  <li><code>/quickadd</code> — rychlé zadání s hlasem</li>
+  <li><code>/calendar/invite</code> — pozvánky pro klienty</li>
+  <li><code>/schuzka</code> — veřejný link pro cold leady</li>
+  <li><code>/day/&lt;datum&gt;</code> — denní pohled, DayNote, briefing</li>
+  <li><code>/calendar/away</code> — dovolená a nomád</li>
+  <li><code>/calendar/locations</code> — lokace</li>
+  <li>18 pravidel (kdy je 🟢/🟡/🔴)</li>
+  <li>Noční briefing 22:00 → Todoist</li>
+  <li>Tipy &amp; obvyklé otázky</li>
+</ol>
+</div>
+
+<h2>1. Co umí systém</h2>
+
+<div class="tldr">
+<strong>TL;DR:</strong> Vidíš sjednocený kalendář (svůj Google + synův + partnerčin), zadáváš nové schůzky hlasem nebo formulářem, systém ti řekne 🟢/🟡/🔴 jestli to dává smysl podle tvých pravidel, posíláš pozvánky klientům s automatickým výběrem volných slotů, a každý večer ve 22:00 dostaneš do Todoistu plán na zítra.
+</div>
+
+<p>Tři jádra:</p>
+<ul>
+  <li><strong>Defenzivní vrstva</strong> — pravidla, která ti brání zadat špatný termín. Praha jen úterý/středa, doma po/čt/pá, online jen 8–18, max 3 prezenční denně, atd.</li>
+  <li><strong>Bookingové stránky</strong> — klienti i přátelé si vybírají čas v rámci tvých předdefinovaných oken, bez chaotického dohadování.</li>
+  <li><strong>Noční briefing</strong> — ve 22:00 dostaneš do Todoistu plán zítřka (program, „co vzít", lidi, errands).</li>
+</ul>
+
+<h2>2. Propojení s Google + iCloud</h2>
+
+<h3>Google Calendar + Contacts</h3>
+<p><strong>Sidebar → Nastavení → Google (Kalendář+Kontakty)</strong>, klik <strong>Připojit Google</strong>, projdi OAuth.</p>
+<ul>
+  <li>Kalendář — read-write (vytváříš events z bookingu i quickaddu)</li>
+  <li>Kontakty — read-only (sync 1× denně 04:00)</li>
+  <li>Sync à 5 min (cron <code>sync-calendars</code>)</li>
+  <li>EU region, end-to-end přes OAuth</li>
+</ul>
+
+<h3>iCloud kalendáře (syn + partnerka)</h3>
+<p><strong>Sidebar → Nastavení → iCloud (Syn+Partnerka)</strong></p>
+<div class="steps">
+<div class="step">Apple ID + app-specific password (vygeneruj na <code>appleid.apple.com</code> → Sign-In and Security)</div>
+<div class="step">Načti seznam kalendářů</div>
+<div class="step">Vyber synův kalendář (RODINA) a partnerčin (S &amp; P)</div>
+<div class="step">Sync vše</div>
+</div>
+<p>Read-only — do iCloudu nikdy nezapisujeme. Synovy hokejové bloky a partnerčiny šichty se promítnou do pravidel a briefingu.</p>
+
+<h2>3. <code>/calendar</code> — hlavní pohled</h2>
+<p>Týdenní kalendář s eventy ze všech zdrojů. Klikni na event pro detail.</p>
+<ul>
+  <li>Google primary — plný display</li>
+  <li>iCloud syn — světlejší (kontext, ne tvůj program)</li>
+  <li>iCloud partnerka — nejsvětlejší</li>
+  <li>OOO — průhledná překryvka</li>
+</ul>
+
+<h2>4. <code>/quickadd</code> — rychlé zadání s hlasem</h2>
+
+<p>Sidebar → <strong>Rychlé zadání</strong>. Mobil-first stránka, autofocus textarea, mikrofon button.</p>
+
+<h3>Jak diktovat</h3>
+<p>Mluv plynule, např.: <em>„úterý v 11 ČSOB Praha"</em> nebo <em>„zítra v 9 schůzka u Karla doma"</em>.</p>
+
+<h3>Co se stane</h3>
+<div class="steps">
+<div class="step">Vertex Flash parsuje text → typ + čas + místo</div>
+<div class="step">Pravidla vyhodnotí 🟢/🟡/🔴</div>
+<div class="step">Ukáže se mini-timeline daný den s tvým novým eventem zvýrazněným</div>
+<div class="step">Klik <strong>Zapsat do Google</strong> → vytvoří event v Google primary</div>
+</div>
+
+<h3>Verdikty</h3>
+<table>
+<tr><th>Barva</th><th>Co znamená</th><th>Co můžeš udělat</th></tr>
+<tr><td>🟢 GREEN</td><td>Vše OK, žádný konflikt</td><td>Klik Zapsat</td></tr>
+<tr><td>🟡 YELLOW</td><td>Varování (např. 2. schůzka v Praze, oběd zasažen)</td><td>Projdi varování, klik <strong>Přesto zapsat</strong></td></tr>
+<tr><td>🔴 RED</td><td>Tvrdá kolize (Praha v pondělí, hokej syna, dovolená)</td><td>Buď oprav, nebo <strong>Přesto zapsat</strong> (logguje se do RuleViolation)</td></tr>
+</table>
+
+<div class="tip">
+<strong>Tip:</strong> Mikrofon vpravo dole v textboxu funguje v Safari (iOS) a Chrome. Diktuj česky.
+</div>
+
+<h2>5. <code>/calendar/invite</code> — pozvánky pro klienty</h2>
+
+<p>Sidebar → <strong>Pozvánka</strong>. Vytvoříš link, který pošleš klientovi/příteli, on si vybere slot, dostane mail, klikne, vznikne event v Google.</p>
+
+<h3>Vytvoření pozvánky</h3>
+<table>
+<tr><th>Pole</th><th>Hodnoty</th></tr>
+<tr><td>Typ</td><td><strong>Konkrétní osoba</strong> (z kontaktů, předvyplněno) / <strong>Univerzální link</strong> (komukoliv, vyplní jméno+e-mail)</td></tr>
+<tr><td>Vztah</td><td>Klient (lead time 48h) / Přítel (lead time 12h)</td></tr>
+<tr><td>Typ schůzky</td><td>Jen Praha / jen online / jen doma / libovolně</td></tr>
+<tr><td>Délka</td><td>30 / 45 / 60 / 90 / 120 min</td></tr>
+<tr><td>Platnost</td><td>7 / 14 / 30 / 90 dní</td></tr>
+<tr><td>Interní poznámka</td><td>Jen pro tebe — klient nevidí</td></tr>
+</table>
+
+<h3>Klientský pohled (<code>/i/&lt;token&gt;</code>)</h3>
+<ul>
+  <li>Klient vidí grid volných slotů po dnech (max 14 dní)</li>
+  <li>Filtr Praha/online/doma (jen pokud meetingType=libovolně)</li>
+  <li>Vybere slot → klikne Potvrdit → dostane magic-link mail</li>
+  <li>V mailu klikne potvrzení → vznikne event v Google s Meet linkem (pro online)</li>
+  <li>Klient dostane confirmation mail s detaily</li>
+</ul>
+
+<h3>Cancel</h3>
+<p>V seznamu pozvánek tlačítko <strong>Zrušit</strong> — pokud byla v RESERVED/CONFIRMED a má email, pošle se cancellation mail.</p>
+
+<h2>6. <code>/schuzka</code> — veřejný link pro cold leady</h2>
+
+<p>Stálý URL <code>https://www.raseliniste.cz/schuzka</code> — pošli ho komukoliv, dej do podpisu mailu nebo na web.</p>
+
+<ul>
+  <li>Default 30 min, jen online, klient mode (lead 48h)</li>
+  <li>Cold lead musí vyplnit jméno + e-mail + krátký subject</li>
+  <li>Magic-link confirm (proti spamu)</li>
+  <li>Každá rezervace vytvoří NOVÝ BookingInvite (template zůstává živý)</li>
+</ul>
+
+<h2>7. <code>/day/&lt;YYYY-MM-DD&gt;</code> — denní pohled</h2>
+
+<p>Sidebar → <strong>Dnes (briefing)</strong>. Den po dni navigace.</p>
+
+<h3>Sekce</h3>
+<ul>
+  <li><strong>Plán</strong> — události daného dne (Google + syn + partnerka), source badge</li>
+  <li><strong>Při cestě</strong> — DayNote (errands „co stihnout cestou"), inline CRUD, checkbox done</li>
+  <li><strong>Pravidla</strong> — RuleViolation pro daný den</li>
+  <li><strong>Briefing</strong> — preview noční generace (vzít s sebou, kontext, commute) + tlačítko <strong>Vygenerovat teď</strong> pro manuální spuštění</li>
+</ul>
+
+<div class="tip">
+<strong>Workflow:</strong> Večer před spaním otevři <code>/day/zítra</code>, doplň errands („AlzaBox Smíchov"), pak ve 22:00 cron pošle do Todoistu plán s nimi i bez tvé akce.
+</div>
+
+<h2>8. <code>/calendar/away</code> — dovolená a nomád</h2>
+
+<p>Sidebar → <strong>Dovolená / nomád</strong>.</p>
+
+<table>
+<tr><th>Režim</th><th>Co dělá</th></tr>
+<tr><td>🌴 <strong>Dovolená (FULL)</strong></td><td>Vyblokuje VŠE — i online. Pravidla: 🔴 RED. V Google se vytvoří all-day event s eventType=outOfOffice.</td></tr>
+<tr><td>💻 <strong>Nomád (TRAVEL_WORKING)</strong></td><td>Online OK, prezenční ne. Pravidla: 🔴 RED jen pro prezenční. V Google se vytvoří všedný event s prefixem 💻 NOMÁD.</td></tr>
+</table>
+
+<p>Mazání nebo úpravy řeš v Google Calendar / Fantastical — sync stáhne změny do 5 min.</p>
+
+<h2>9. <code>/calendar/locations</code> — lokace</h2>
+
+<p>Sidebar → <strong>Lokace</strong>. Tabulka měst pro pravidla a budoucí parser.</p>
+<ul>
+  <li>Název (Praha, Plzeň, Brno, Hradec, …)</li>
+  <li>Aliasy (Prague, Vinohrady, Smíchov, …) — fuzzy match</li>
+  <li>Commute špička / mimo špičku (min)</li>
+  <li>isLocal flag (= žádný commute, např. Jílové)</li>
+</ul>
+<p>Smazání: zablokuje se pokud na lokaci odkazují existující eventy.</p>
+
+<h2>10. 18 pravidel — kdy je 🟢 / 🟡 / 🔴</h2>
+
+<table>
+<tr><th>Pravidlo</th><th>Severita</th><th>Logika</th></tr>
+<tr><td><code>HARD_HOCKEY_BLOCK</code></td><td>🔴</td><td>Slot překrývá hokej syna</td></tr>
+<tr><td><code>HARD_OOO_FULL</code></td><td>🔴</td><td>Slot v tvé dovolené</td></tr>
+<tr><td><code>HARD_OOO_TRAVEL_INPERSON</code></td><td>🔴</td><td>Nomád + prezenční (online OK)</td></tr>
+<tr><td><code>HARD_DAY_RESTRICTION_PRAGUE</code></td><td>🔴</td><td>Praha mimo úterý/středu</td></tr>
+<tr><td><code>HARD_DAY_RESTRICTION_HOME</code></td><td>🔴</td><td>Doma mimo pondělí/čtvrtek/pátek</td></tr>
+<tr><td><code>HARD_ONLINE_HOURS</code></td><td>🔴</td><td>Online mimo 8:00–18:00</td></tr>
+<tr><td><code>MAX_PRAGUE_PER_DAY</code></td><td>🟡</td><td>2+ schůzky v Praze v jednom dni</td></tr>
+<tr><td><code>MAX_INPERSON_PER_DAY</code></td><td>🟡 / 🔴</td><td>2+ prezenčních = warning, 3+ = error</td></tr>
+<tr><td><code>MAX_ONLINE_PER_DAY</code></td><td>🟡</td><td>3+ online v dni</td></tr>
+<tr><td><code>WEIGHTED_DAILY_LOAD</code></td><td>🟡 / 🔴</td><td>Hybridní zátěž (prezenční=1.0, online=0.6) > 2.5 / > 3.5</td></tr>
+<tr><td><code>BUFFER_BEFORE_PRAGUE</code></td><td>🟡</td><td>&lt;60 min před cestou do Prahy něco</td></tr>
+<tr><td><code>BUFFER_BETWEEN_ONLINE</code></td><td>🟡</td><td>&lt;30 min mezi online schůzkami</td></tr>
+<tr><td><code>LUNCH_BREAK</code></td><td>🟡</td><td>Slot zasahuje do 12:00–13:00</td></tr>
+<tr><td><code>END_OF_DAY</code></td><td>🟡</td><td>Začátek po 18:00</td></tr>
+<tr><td><code>PARTNER_SHIFT_HOME</code></td><td>🟡</td><td>Meeting doma + partnerka má NOCNI/DENNI</td></tr>
+<tr><td><code>PARTNER_VACATION</code></td><td>ℹ️</td><td>Partnerčina dovolená — jen kontext</td></tr>
+<tr><td><code>MIN_LEAD_TIME</code></td><td>🔴 (jen booking)</td><td>Klient: &lt;48 h, přítel: &lt;12 h</td></tr>
+<tr><td><code>OUTSIDE_AVAILABILITY</code></td><td>🔴 (jen booking)</td><td>Slot mimo definovaná booking okna</td></tr>
+</table>
+
+<h3>Kdy je verdict GREEN / YELLOW / RED</h3>
+<ul>
+  <li><strong>RED</strong> = aspoň jeden ERROR signal</li>
+  <li><strong>YELLOW</strong> = žádný ERROR ale aspoň jeden WARNING</li>
+  <li><strong>GREEN</strong> = nic</li>
+</ul>
+
+<p>Konfigurace pravidel je v <code>src/lib/rules-config.ts</code> (hardcoded). Změna = redeploy. Editovatelné UI v plánu (fáze 4).</p>
+
+<h2>11. Noční briefing 22:00 → Todoist</h2>
+
+<p>Cron <code>nightly-briefing</code> každý den v 22:00 vygeneruje pro zítřek strukturovaný briefing a pošle do Todoistu (projekt <code>mojeUkoly</code>).</p>
+
+<h3>Co briefing obsahuje</h3>
+<ul>
+  <li>🎒 <strong>Vzít s sebou</strong> — agregát z prep notes / itemsToBring eventů</li>
+  <li>📍 <strong>Schůzky</strong> — chronologicky tvoje events (čas, místo, příprava)</li>
+  <li>🛒 <strong>Při cestě</strong> — DayNote pro daný den</li>
+  <li>💡 <strong>Kontext</strong> — synovy/partnerčiny věci, partnerčina šichta, commute</li>
+  <li>⚠ <strong>Pravidla</strong> — porušení pravidel pro zítřek</li>
+</ul>
+
+<p>Idempotentní — pokud běží 2× pro stejný den, vznikne 1 task. Pro manuální spuštění: <code>/day/&lt;datum&gt;</code> → <strong>Vygenerovat teď</strong>.</p>
+
+<h2>12. Tipy &amp; obvyklé otázky</h2>
+
+<h3>Když přidám event ve Fantastical, kdy ho uvidí systém?</h3>
+<p>Do 5 min (sync-calendars cron). Klient v <code>/i/&lt;token&gt;</code> uvidí slot zmizet automaticky.</p>
+
+<h3>Klient potvrdil, ale nemůžu přijít — jak zruším?</h3>
+<p><code>/calendar/invite</code> → najdi pozvánku → <strong>Zrušit</strong>. Klient dostane cancellation mail. Ale event v Google musíš zrušit ručně (nebo přes Fantastical).</p>
+
+<h3>Můžu mít víc univerzálních linků?</h3>
+<p>Aktuálně jeden (<code>/schuzka</code>). Pokud chceš víc různých kampaní (např. „LinkedIn link" vs „web link"), můžeš vyrobit personalizované invity bez kontaktu (toggle Univerzální link v <code>/calendar/invite</code>) — každá kampaň má svůj token.</p>
+
+<h3>Synův hokej je ve špatném čase v iCloudu — jak ho opravit?</h3>
+<p>Oprav v iCloudu (Petr nebo syn). Sync stáhne změnu do 5 min. Rašeliniště do iCloudu nikdy nezapisuje.</p>
+
+<h3>Jak zjistit, proč slot v bookingu neuvidí klient?</h3>
+<p>V <code>/quickadd</code> zkus zadat ten samý slot — uvidíš proč je 🔴 (kolize, mimo okno, lead time). Pravidla jsou stejná pro tebe i pro klienty (jen MIN_LEAD_TIME a OUTSIDE_AVAILABILITY platí jen booking-only).</p>
+
+<h3>Můžu změnit pravidla?</h3>
+<p>Aktuálně přes editaci <code>src/lib/rules-config.ts</code> + redeploy. Editovatelné UI v plánu.</p>
+
+<p class="meta">Rašeliniště — Kalendář & Bookingy návod · 2026-04-29</p>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Cron nastavení na NASu</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; line-height: 1.5; max-width: 720px; margin: 0 auto; padding: 24px; font-size: 10.5pt; }
+  h1 { font-family: "Iowan Old Style", Georgia, serif; font-size: 26pt; margin: 0 0 4px; line-height: 1.1; }
+  h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 16pt; margin: 28px 0 8px; padding-top: 14px; border-top: 1px solid #ddd; page-break-after: avoid; }
+  h3 { font-family: "Iowan Old Style", Georgia, serif; font-size: 12pt; margin: 18px 0 6px; page-break-after: avoid; }
+  .lede { color: #555; font-size: 11pt; margin: 6px 0 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 9px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #666; font-weight: 600; }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f0f0f3; padding: 1px 5px; border-radius: 3px; }
+  pre { background: #f5f5f7; padding: 10px 12px; border-radius: 6px; font-size: 9pt; font-family: "SF Mono", Menlo, monospace; white-space: pre-wrap; word-wrap: break-word; }
+  .step { margin: 8px 0; padding-left: 22px; position: relative; }
+  .step::before { content: counter(step) "."; counter-increment: step; position: absolute; left: 0; font-weight: 600; color: #888; }
+  .steps { counter-reset: step; }
+  .meta { font-size: 8pt; color: #999; margin-top: 32px; padding-top: 12px; border-top: 1px solid #eee; }
+  .tldr { background: #fbf8e7; padding: 12px 16px; border-left: 4px solid #d4a017; border-radius: 4px; margin: 12px 0; }
+  .tip { background: #e7f4ff; padding: 12px 16px; border-left: 4px solid #1976d2; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+  .checkbox { display: inline-block; width: 14px; height: 14px; border: 1.5px solid #888; border-radius: 2px; vertical-align: -2px; margin-right: 6px; }
+  .cron-card { border: 1px solid #ddd; border-radius: 6px; padding: 14px 16px; margin: 12px 0; page-break-inside: avoid; }
+  .cron-card h3 { margin-top: 0; }
+  .cron-meta { font-size: 9pt; color: #666; margin: 4px 0 8px; font-family: "SF Mono", Menlo, monospace; }
+  .endpoint { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; color: #336; font-weight: 600; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<h1>Cron nastavení na NASu</h1>
+<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 10 úloh celkem.</p>
+
+<div class="tldr">
+<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 10 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~15 minut.
+</div>
+
+<h2>Společné nastavení (vzor)</h2>
+
+<div class="steps">
+<div class="step"><strong>Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script</strong></div>
+<div class="step"><strong>General:</strong> Task = název dle tabulky. User = <code>root</code>. Enabled = ✓</div>
+<div class="step"><strong>Schedule:</strong> dle sloupce „Spouštění" — viz „Schedule překlad" níže</div>
+<div class="step"><strong>Task Settings → Run command:</strong></div>
+</div>
+
+<pre>curl -fsS -X POST https://www.raseliniste.cz/api/cron/&lt;ENDPOINT&gt; \
+     -H "x-cron-key: &lt;CRON_SECRET&gt;" \
+     --max-time 120</pre>
+
+<p>Zaměň <code>&lt;ENDPOINT&gt;</code> a <code>&lt;CRON_SECRET&gt;</code>.</p>
+
+<h3>Kde najdu CRON_SECRET</h3>
+<p>SSH na NAS:</p>
+<pre>sudo grep CRON_SECRET /volume1/docker/raseliniste/.env</pre>
+<p>Nebo otevři ten soubor přes File Station / SFTP.</p>
+
+<h3>Schedule překlad</h3>
+<table>
+<tr><th>Co píšeme</th><th>Co nastavit v DSM</th></tr>
+<tr><td><code>každých 5 / 15 min</code></td><td>Run on: <strong>Repeat</strong>, Frequency: <strong>Every 5 / 15 minutes</strong></td></tr>
+<tr><td><code>denně HH:MM</code></td><td>Run on: <strong>Daily</strong>, First run time: <strong>HH:MM</strong></td></tr>
+<tr><td><code>poslední den měsíce</code></td><td>Run on: <strong>Monthly</strong>, Date: <strong>Last day of month</strong></td></tr>
+</table>
+
+<h2>10 úloh — checklist</h2>
+
+<!-- 1 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>1. Raseliniste sync calendars</h3>
+<div class="cron-meta">každých 5 min · POST <span class="endpoint">/api/cron/sync-calendars</span> · max-time 120</div>
+<p><strong>K čemu:</strong> Stahuje Google Calendar primary + iCloud syn (RODINA) + iCloud partnerka (S &amp; P). Klíčové pro to, aby kalendář v aplikaci byl aktuální (max 5 min pozadu za Fantasticalem). Bez něj nebudou fungovat ani booking sloty (klient by viděl jako volné to, co už máš obsazené ve Fantasticalu).</p>
+<p><strong>Test:</strong> v DSM pravý klik na task → Run → History → Result code 200. Plus zkontroluj v <code>/calendar</code>, že nový event z Fantasticalu se objeví do 5 min.</p>
+</div>
+
+<!-- 2 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>2. Raseliniste sync contacts</h3>
+<div class="cron-meta">denně 04:00 · POST <span class="endpoint">/api/cron/sync-contacts</span> · max-time 120</div>
+<p><strong>K čemu:</strong> Stahuje Google People API (My Contacts) → Contact tabulku v Rašeliništi. Dedup s existujícími kontakty (vCard import + manuální + Google) podle e-mailu / telefonu. Délka noční sync, ne real-time — kontakty se nemění tak často.</p>
+<p><strong>Test:</strong> přidej nový kontakt v Google → druhý den v 04:01 už by měl být v <code>/contacts</code>.</p>
+</div>
+
+<!-- 3 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>3. Raseliniste nightly briefing</h3>
+<div class="cron-meta">denně 22:00 · POST <span class="endpoint">/api/cron/nightly-briefing</span> · max-time 120</div>
+<p><strong>K čemu:</strong> Vygeneruje pro zítřek strukturovaný plán (schůzky, vzít s sebou, errands, kontextová varování, porušení pravidel) a pushne do Todoistu (projekt mojeUkoly) jako jeden task s due_string="today". Trvá typicky 30–60 s (Vertex Pro analyzuje).</p>
+<p><strong>Test:</strong> klikni Run kdykoliv → v Todoistu by se měl objevit task „🌙 Plán na <em>zítra</em>". Idempotent — 2× run = 1 task.</p>
+</div>
+
+<!-- 4 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>4. Raseliniste retry stuck recordings (Studna)</h3>
+<div class="cron-meta">každých 15 min · POST <span class="endpoint">/api/cron/retry-stuck-recordings</span> · max-time 30</div>
+<p><strong>K čemu:</strong> Pickne Studna recordings ve stavu „processing" starší než 10 min — typicky uvázly při restartu kontejneru (fire-and-forget Promise umřela). Spustí AI processing znovu z uloženého audia. Bez něj by záznamy zůstaly „processing" navěky.</p>
+<p><strong>Test:</strong> ve Studně nahraj záznam, hned po uploadu DSM → Container Manager → restart kontejneru. Po 15 min by měl recording být buď processed nebo error (ne pořád processing).</p>
+</div>
+
+<!-- 5 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>5. Raseliniste cleanup audio (Studna)</h3>
+<div class="cron-meta">denně 03:00 · POST <span class="endpoint">/api/cron/cleanup-audio</span> · max-time 120</div>
+<p><strong>K čemu:</strong> Maže Studna STANDARD audia starší 14 dní (briefy + pinned se nemažou). Šetří místo na disku NAS. Transkripty + analýzy zůstávají v DB.</p>
+<p><strong>Test:</strong> nahraj testovací STANDARD záznam, počkej 14 dní (nebo upravíme threshold v kódu pro test). Po cron běhu by audio (file na disku) zmizelo, recording v DB by měl <code>audioPath: null</code>.</p>
+</div>
+
+<!-- 6 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>6. Raseliniste daily projects digest (Studna)</h3>
+<div class="cron-meta">denně 18:00 · POST <span class="endpoint">/api/cron/daily-projects-digest</span> · max-time 120</div>
+<p><strong>K čemu:</strong> Pro každý ProjectBox se <code>includeInDigest=true</code> vyrobí denní souhrn, co se v něm hosti za den nahráli, a pošle ti ho mailem. Přeskočí se pokud nic nepřibylo.</p>
+<p><strong>Test:</strong> v Studně otevři projekt → Nastavení → zapni „Zahrnout do denního souhrnu". Klikni Run → mail by měl dorazit (nebo skip pokud projekt nemá nové recordings).</p>
+</div>
+
+<!-- 7 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>7. Raseliniste monthly health report</h3>
+<div class="cron-meta">poslední den měsíce 23:00 · POST <span class="endpoint">/api/cron/monthly-health-report</span> · max-time 180</div>
+<p><strong>K čemu:</strong> Vertex Pro analyzuje tvá zdravotní data za uplynulý měsíc (Health Auto Export → HealthMetric tabulka), vyrobí markdown report a pošle ti ho na <code>notificationEmail</code> (z Settings → E-mail reporty). Uloží se do <code>/health</code> historie.</p>
+<p><strong>Test:</strong> klik Run → měl by vzniknout HealthAnalysis s trigger=MONTHLY_AUTO + mail. Pokud nemáš HealthAuto Export aktivní, dostaneš report s „chybí data".</p>
+</div>
+
+<!-- 8 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>8. Raseliniste cleanup expired invites (Booking)</h3>
+<div class="cron-meta">denně 01:00 · POST <span class="endpoint">/api/cron/cleanup-expired-invites</span> · max-time 30</div>
+<p><strong>K čemu:</strong> Označí BookingInvity ve stavu PENDING/VIEWED/RESERVED s validUntil &lt; now jako EXPIRED. Bez něj by zůstaly v aktivním stavu navěky.</p>
+<p><strong>Test:</strong> vytvoř pozvánku s validity 1 den → druhý den po 01:00 by měla mít status EXPIRED v <code>/calendar/invite</code>.</p>
+</div>
+
+<!-- 9 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>9. Raseliniste cleanup task audio batches</h3>
+<div class="cron-meta">denně 02:30 · POST <span class="endpoint">/api/cron/cleanup-task-audio-batches</span> · max-time 60</div>
+<p><strong>K čemu:</strong> Audio retention pro <code>/ukoly/audio</code> diktáty. Maže audio file z batchů starších 7 dní (transkript zůstává). Maže celé batche (committed/discarded) starší 30 dní. Stuck processing &gt;30 min → status=error (po retries).</p>
+<p><strong>Test:</strong> nadiktuj úkoly, commit. Po 7 dnech by měl batch.audioPath být null. Po 30 dnech celý batch zmizet.</p>
+</div>
+
+<!-- 10 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>10. Raseliniste retry stuck task batches</h3>
+<div class="cron-meta">každých 5 min · POST <span class="endpoint">/api/cron/retry-stuck-task-batches</span> · max-time 30</div>
+<p><strong>K čemu:</strong> Analogicky #4 ale pro <code>/ukoly/audio</code>. Pickne TaskAudioBatch ve „processing" starší 5 min (= kontejner restartl uprostřed AI), spustí znovu. Bez něj by diktáty mohly uvíznout.</p>
+<p><strong>Test:</strong> nadiktuj úkoly, hned po uploadu restart kontejneru. Po 5 min by měl batch být buď v review nebo error.</p>
+</div>
+
+<h2>Po vytvoření všech 10 — kontrola</h2>
+
+<div class="steps">
+<div class="step">DSM → Task Scheduler → seznam má 10 řádků s prefix „Raseliniste"</div>
+<div class="step">Všechny mají sloupec Status = <strong>Enabled</strong></div>
+<div class="step">U každé pravý klik → <strong>Run</strong> → History → Last run = OK / Result code 200</div>
+<div class="step">Pro #1, #4, #10 (vysoká frekvence) zkontroluj History po 1 hodině — měl by tam být běh à 5/15 min</div>
+</div>
+
+<h2>Troubleshoot</h2>
+
+<table>
+<tr><th>Symptom</th><th>Řešení</th></tr>
+<tr><td>HTTP 503 <code>CRON_NOT_CONFIGURED</code></td><td><code>CRON_SECRET</code> není v <code>.env</code> kontejneru. Recreate: <code>~/deploy.sh</code>.</td></tr>
+<tr><td>HTTP 401 <code>UNAUTHORIZED</code></td><td>Špatný <code>x-cron-key</code> header — překlep, nebo se neshoduje s env.</td></tr>
+<tr><td>HTTP 500 + dlouhý error</td><td>Chyba v aplikaci. <code>sudo docker compose logs app --tail 50</code> na NASu, najdi stack trace.</td></tr>
+<tr><td>HTTP 200 ale nic se nestalo</td><td>Cron prošel ale data nemá co dělat (např. žádné stuck batches). Přečti response JSON pro detail.</td></tr>
+<tr><td>Synology timeout</td><td>Zvedni <code>--max-time</code>. Default jsem dal 120 s, briefingy můžou trvat víc.</td></tr>
+</table>
+
+<h2>Dodatek — env proměnné související</h2>
+
+<p>V <code>/volume1/docker/raseliniste/.env</code> musí být:</p>
+<table>
+<tr><th>Proměnná</th><th>K čemu</th></tr>
+<tr><td><code>CRON_SECRET</code></td><td>Sdílený secret pro <code>x-cron-key</code> auth. Generuj <code>openssl rand -base64 32</code>.</td></tr>
+<tr><td><code>SESSION_SECRET</code></td><td>Cookie + AES klíč. ≥ 32 znaků.</td></tr>
+<tr><td><code>DATABASE_URL</code></td><td>Postgres URL.</td></tr>
+<tr><td><code>APP_URL</code></td><td><code>https://www.raseliniste.cz</code></td></tr>
+<tr><td><code>VERTEX_PROJECT</code> + <code>VERTEX_LOCATION</code> + <code>GOOGLE_APPLICATION_CREDENTIALS</code></td><td>Vertex AI (preferováno).</td></tr>
+<tr><td><code>GEMINI_API_KEY</code></td><td>AI Studio fallback (pro audia &gt; 14 MB v Vertex módu).</td></tr>
+<tr><td><code>GOOGLE_CLIENT_ID</code> + <code>GOOGLE_CLIENT_SECRET</code> + <code>GOOGLE_REDIRECT_URI</code></td><td>Google OAuth (Calendar + Contacts).</td></tr>
+<tr><td><code>BOOKING_MAGIC_LINK_SECRET</code></td><td>HMAC pro magic-link maily. Fallback: SESSION_SECRET.</td></tr>
+<tr><td><code>BOOKING_MAGIC_LINK_TTL_HOURS</code></td><td>Default 24.</td></tr>
+<tr><td><code>SIRI_API_TOKEN</code></td><td>Pro budoucí Siri shortcut „zkontroluj termín" (volitelné).</td></tr>
+<tr><td><code>RESEND_API_KEY</code> nebo SMTP cfg</td><td>Posílání mailů (Resend nebo Seznam SMTP).</td></tr>
+<tr><td><code>NOTIFICATION_FROM</code> + <code>NOTIFICATION_EMAIL</code></td><td>Mail odesílatel + globální fallback příjemce.</td></tr>
+</table>
+
+<p class="meta">Rašeliniště — Cron nastavení · 2026-04-29</p>
+
+</body>
+</html>
