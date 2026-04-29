@@ -1,0 +1,160 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+type Tile = {
+  href: string;
+  title: string;
+  description: string;
+  icon: string;
+  tint: "peach" | "mint" | "lavender" | "sky" | "sage" | "butter" | "rose" | "pink";
+};
+
+const groups: { label: string; tiles: Tile[] }[] = [
+  {
+    label: "Integrace",
+    tiles: [
+      {
+        href: "/settings/integrations/google",
+        title: "Google",
+        description: "Kalendář + kontakty (OAuth, sync à 5 min / denně)",
+        icon: "lucide:calendar-clock",
+        tint: "sky",
+      },
+      {
+        href: "/settings/integrations/icloud",
+        title: "iCloud",
+        description: "Synův a partnerčin kalendář (CalDAV, read-only)",
+        icon: "lucide:cloud",
+        tint: "lavender",
+      },
+      {
+        href: "/settings/integrations",
+        title: "Todoist",
+        description: "Push úkolů, briefing 22:00, Lidé/sekce routing",
+        icon: "lucide:plug",
+        tint: "mint",
+      },
+      {
+        href: "/settings/reports",
+        title: "E-mail (SMTP)",
+        description: "Seznam / Gmail / vlastní SMTP, příjemce reportů",
+        icon: "lucide:mail",
+        tint: "butter",
+      },
+    ],
+  },
+  {
+    label: "Mobilní zařízení",
+    tiles: [
+      {
+        href: "/settings/shortcuts",
+        title: "iPhone Shortcuty",
+        description: "Capture + Deník diktát z mobilu (Bearer tokeny)",
+        icon: "lucide:smartphone",
+        tint: "peach",
+      },
+      {
+        href: "/settings/ingest",
+        title: "Health Auto Export",
+        description: "Apple Health → Rašeliniště (REST API z iPhone)",
+        icon: "lucide:cable",
+        tint: "rose",
+      },
+      {
+        href: "/settings/tokens",
+        title: "API tokeny",
+        description: "Bearer tokeny pro Capture / Journal / Health (revokovatelné)",
+        icon: "lucide:key",
+        tint: "lavender",
+      },
+    ],
+  },
+  {
+    label: "Obsah a šablony",
+    tiles: [
+      {
+        href: "/settings/letter-senders",
+        title: "Odesílatelé dopisů",
+        description: "Hlavičky + podpisy + per-sender AI prompt",
+        icon: "lucide:user-square",
+        tint: "butter",
+      },
+    ],
+  },
+  {
+    label: "AI",
+    tiles: [
+      {
+        href: "/settings/ai-prompts",
+        title: "AI prompty",
+        description: "Edituj instrukce pro Ozvěnu, Studnu, briefing, deníkové review",
+        icon: "lucide:sparkles",
+        tint: "rose",
+      },
+      {
+        href: "/settings/ai-usage",
+        title: "AI náklady",
+        description: "Sledování útraty Gemini volání (per modul, model, den)",
+        icon: "lucide:coins",
+        tint: "sage",
+      },
+    ],
+  },
+];
+---
+
+<Shell
+  title="Nastavení · Rašeliniště"
+  username={user.username}
+  heading="Nastavení"
+  breadcrumb={[{ label: "Nastavení" }]}
+>
+  <div class="max-w-4xl space-y-6">
+    {groups.map((group) => (
+      <section>
+        <h2 class="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-3">
+          {group.label}
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {group.tiles.map((tile) => (
+            <a
+              href={tile.href}
+              class="glass rounded-xl p-4 hover:bg-white/5 transition-colors block group relative overflow-hidden"
+              style={`--c: var(--tint-${tile.tint});`}
+            >
+              <div
+                class="absolute -top-10 -right-10 size-24 rounded-full blur-2xl pointer-events-none"
+                style="background: color-mix(in oklch, var(--c) 25%, transparent);"
+              ></div>
+
+              <div class="relative">
+                <div
+                  class="size-9 rounded-lg grid place-items-center mb-3"
+                  style="background: color-mix(in oklch, var(--c) 18%, transparent); color: var(--c);"
+                >
+                  <Icon name={tile.icon} class="size-5" />
+                </div>
+                <div class="font-serif text-base">{tile.title}</div>
+                <div class="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {tile.description}
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+</Shell>
