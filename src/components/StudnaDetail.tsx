@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Loader2, Plus, Pin, Trash2, Sparkles, FileText, Settings, Users, AudioLines,
   ChevronDown, ChevronRight, Copy, Check, FileAudio2, Mic, Send, FileDown,
-  Star,
+  Star, RotateCw,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -164,6 +164,23 @@ function FeedTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: ()
     }
   }
 
+  async function regenerate(recId: string) {
+    setBusy(recId);
+    try {
+      const res = await fetch(`/api/studna/recordings/${recId}/regenerate`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        onRefresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Regenerace selhala.");
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (project.recordings.length === 0) {
     return (
       <div className="glass rounded-xl p-8 text-center text-muted-foreground">
@@ -182,6 +199,7 @@ function FeedTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: ()
           busy={busy === r.id}
           onTogglePin={() => togglePin(r.id, r.isPinned)}
           onDelete={() => remove(r.id)}
+          onRegenerate={() => regenerate(r.id)}
         />
       ))}
     </div>
@@ -193,10 +211,12 @@ function RecordingCard({
   busy,
   onTogglePin,
   onDelete,
+  onRegenerate,
 }: {
   recording: ProjectDetail["recordings"][number];
   busy: boolean;
   onTogglePin: () => void;
+  onRegenerate: () => void;
   onDelete: () => void;
 }) {
   const [showTranscript, setShowTranscript] = useState(false);
@@ -432,6 +452,16 @@ function RecordingCard({
               fill={recording.isPinned ? "currentColor" : "none"}
             />
           </button>
+          {(recording.status === "error" || (recording.status === "processed" && !recording.transcript)) && (
+            <button
+              onClick={onRegenerate}
+              disabled={busy}
+              className="p-1.5 rounded hover:bg-[var(--tint-sky)]/20 transition-colors text-[var(--tint-sky)]"
+              title="Regenerovat AI analýzu z uloženého audia"
+            >
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
+            </button>
+          )}
           <button
             onClick={onDelete}
             disabled={busy}

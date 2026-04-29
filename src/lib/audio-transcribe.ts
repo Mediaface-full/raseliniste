@@ -122,6 +122,34 @@ Tvoje úkoly:
 
 Vrať VÝHRADNĚ JSON v rozšířeném schématu standardního s navíc \`glossary\`, \`actors\`, \`decision_history\`.`;
 
+/**
+ * Retry wrapper s exponential backoff.
+ * Pokrývá transient errors: network blip, Gemini 5xx, rate limit.
+ * Zpoždění: 1 s, 4 s. Po 3 pokusech to vzdá a hodí poslední error nahoru.
+ */
+async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const delays = [0, 1000, 4000];
+  let lastErr: unknown = null;
+  for (let i = 0; i < delays.length; i++) {
+    if (delays[i] > 0) {
+      console.log(`[audio-transcribe] retry ${label} attempt ${i + 1}/3 after ${delays[i]}ms`);
+      await new Promise((r) => setTimeout(r, delays[i]));
+    }
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      // Pokud je chyba "non-retryable" (špatný request, auth), vyhoď hned
+      if (/INVALID_ARGUMENT|UNAUTHENTICATED|PERMISSION_DENIED|400|401|403/i.test(msg)) {
+        throw e;
+      }
+      console.warn(`[audio-transcribe] ${label} attempt ${i + 1}/3 failed: ${msg.slice(0, 200)}`);
+    }
+  }
+  throw lastErr;
+}
+
 function extractJson(text: string): string {
   // Gemini občas vrací JSON v markdown code-fence, i když říkáme „bez markdown".
   const trimmed = text.trim();
@@ -224,19 +252,21 @@ Pravidla:
 - Drobně oprav jen očividné gramatické chyby a doplň interpunkci/odstavce.
 - Žádné komentáře, žádný JSON, žádný markdown — vrať POUZE čistý text přepisu.`;
 
-  const transcribeResp = await genai.models.generateContent({
-    model: DEFAULT_MODEL, // Flash je na přepis dostatečný i pro briefy (analýza je pak Pro)
-    contents: [
-      {
-        role: "user",
-        parts: [audioPart as never, { text: transcribePrompt }],
+  const transcribeResp = await withRetry("Stage 1 (transcribe)", () =>
+    genai.models.generateContent({
+      model: DEFAULT_MODEL, // Flash je na přepis dostatečný i pro briefy (analýza je pak Pro)
+      contents: [
+        {
+          role: "user",
+          parts: [audioPart as never, { text: transcribePrompt }],
+        },
+      ],
+      config: {
+        temperature: 0.1,
+        maxOutputTokens: 65000, // pro 90 min audio reálně potřeba
       },
-    ],
-    config: {
-      temperature: 0.1,
-      maxOutputTokens: 65000, // pro 90 min audio reálně potřeba
-    },
-  });
+    }),
+  );
 
   const transcript = (transcribeResp.text ?? "").trim();
   if (!transcript) {
@@ -260,15 +290,17 @@ ${prompt}
 
 Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň všechna ostatní pole. Vrať POUZE JSON.`;
 
-  const analyzeResp = await genai.models.generateContent({
-    model, // Flash pro STANDARD, Pro pro BRIEF
-    contents: analyzePrompt,
-    config: {
-      temperature: 0.3,
-      maxOutputTokens: isBrief ? 32000 : 8000,
-      responseMimeType: "application/json",
-    },
-  });
+  const analyzeResp = await withRetry("Stage 2 (analyze)", () =>
+    genai.models.generateContent({
+      model, // Flash pro STANDARD, Pro pro BRIEF
+      contents: analyzePrompt,
+      config: {
+        temperature: 0.3,
+        maxOutputTokens: isBrief ? 32000 : 8000,
+        responseMimeType: "application/json",
+      },
+    }),
+  );
 
   const rawAnalysis = (analyzeResp.text ?? "").trim();
   if (!rawAnalysis) {
