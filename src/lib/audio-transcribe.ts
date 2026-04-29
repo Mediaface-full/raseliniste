@@ -211,52 +211,91 @@ export async function transcribeAudio(params: {
     };
   }
 
-  const response = await genai.models.generateContent({
-    model,
+  void usedMode; // pro budoucí logging/stats
+
+  // -------------------------------------------------------------------------
+  // STAGE 1: Pouhý přepis. Gemini dostane audio + minimální plain-text instrukci.
+  // Vrátí prostý text, žádný JSON. Spolehlivé i pro dlouhé audio.
+  // -------------------------------------------------------------------------
+  const transcribePrompt = `Přepiš mluvené slovo z přiloženého audio souboru do textu v češtině.
+
+Pravidla:
+- Doslovný přepis. Zachovej tón, opakování, váhání i nedokončené věty.
+- Drobně oprav jen očividné gramatické chyby a doplň interpunkci/odstavce.
+- Žádné komentáře, žádný JSON, žádný markdown — vrať POUZE čistý text přepisu.`;
+
+  const transcribeResp = await genai.models.generateContent({
+    model: DEFAULT_MODEL, // Flash je na přepis dostatečný i pro briefy (analýza je pak Pro)
     contents: [
       {
         role: "user",
-        parts: [audioPart as never, { text: prompt }],
+        parts: [audioPart as never, { text: transcribePrompt }],
       },
     ],
+    config: {
+      temperature: 0.1,
+      maxOutputTokens: 65000, // pro 90 min audio reálně potřeba
+    },
+  });
+
+  const transcript = (transcribeResp.text ?? "").trim();
+  if (!transcript) {
+    throw new Error(
+      `Gemini Stage 1 (přepis) vrátil prázdný výstup. ` +
+      `Audio: ${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB, mime ${params.mimeType}, mode ${usedMode}.`,
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // STAGE 2: Analýza nad přepisem. Žádné audio, jen text → spolehlivý JSON.
+  // -------------------------------------------------------------------------
+  const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Petra. Audio už je přepsané — pracuj jen s textem.
+
+${params.projectContext ? `Kontext projektu: ${params.projectContext}\n\n` : ""}Přepis:
+"""
+${transcript}
+"""
+
+${prompt}
+
+Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň všechna ostatní pole. Vrať POUZE JSON.`;
+
+  const analyzeResp = await genai.models.generateContent({
+    model, // Flash pro STANDARD, Pro pro BRIEF
+    contents: analyzePrompt,
     config: {
       temperature: 0.3,
       maxOutputTokens: isBrief ? 32000 : 8000,
       responseMimeType: "application/json",
     },
   });
-  void usedMode; // pro budoucí logging/stats
 
-  const raw = (response.text ?? "").trim();
-  if (!raw) {
-    throw new Error("Gemini vrátil prázdný výstup.");
+  const rawAnalysis = (analyzeResp.text ?? "").trim();
+  if (!rawAnalysis) {
+    // Stage 2 selhal, ale přepis máme — vrať s minimální analýzou.
+    return {
+      transcript,
+      analysis: minimalAnalysis(isBrief, "Stage 2 (analýza) vrátila prázdný výstup. Přepis je k dispozici, analýzu lze regenerovat."),
+      model,
+      promptChars: prompt.length,
+    };
   }
 
   let parsed: any;
   try {
-    parsed = JSON.parse(extractJson(raw));
+    parsed = JSON.parse(extractJson(rawAnalysis));
   } catch (e) {
-    throw new Error(
-      `Gemini výstup není validní JSON: ${e instanceof Error ? e.message : String(e)}\n\nPrvních 500 znaků: ${raw.slice(0, 500)}`,
-    );
+    return {
+      transcript,
+      analysis: minimalAnalysis(
+        isBrief,
+        `Stage 2 výstup není validní JSON: ${e instanceof Error ? e.message : String(e)}. Přepis je k dispozici. Surový output (200 znaků): ${rawAnalysis.slice(0, 200)}`,
+      ),
+      model,
+      promptChars: prompt.length,
+    };
   }
 
-  // Defenzivně: pokud transcript chybí, zkus alternativy nebo akceptuj prázdný.
-  // Místo throwu uložíme co máme + přilepíme info do summary, ať uživatel
-  // dostane aspoň částečnou hodnotu.
-  if (typeof parsed.transcript !== "string") {
-    const altTranscript =
-      typeof parsed.text === "string" ? parsed.text :
-      typeof parsed.full_text === "string" ? parsed.full_text :
-      typeof parsed.content === "string" ? parsed.content : "";
-    parsed.transcript = altTranscript;
-    if (!altTranscript) {
-      parsed.summary = (parsed.summary ? `${parsed.summary}\n\n` : "") +
-        `⚠ Gemini nevrátil přepis (audio bylo možná tiché, příliš krátké, nebo v nepodporovaném formátu). Surový JSON output je v processingError.`;
-    }
-  }
-
-  // Defensivní defaulty (pokud Gemini něco vynechá)
   const analysis: AudioAnalysis = {
     summary: parsed.summary ?? "",
     key_themes: Array.isArray(parsed.key_themes) ? parsed.key_themes : [],
@@ -274,9 +313,21 @@ export async function transcribeAudio(params: {
   };
 
   return {
-    transcript: parsed.transcript,
+    transcript,
     analysis,
     model,
-    promptChars: prompt.length,
+    promptChars: transcribePrompt.length + analyzePrompt.length,
+  };
+}
+
+function minimalAnalysis(isBrief: boolean, note: string): AudioAnalysis {
+  return {
+    summary: `_${note}_`,
+    key_themes: [],
+    thoughts: [],
+    open_questions: [],
+    sentiment: "neutral",
+    intensity_signals: "",
+    ...(isBrief ? { glossary: [], actors: [], decision_history: [] } : {}),
   };
 }
