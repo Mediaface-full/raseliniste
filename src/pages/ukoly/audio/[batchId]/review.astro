@@ -1,0 +1,39 @@
+---
+import Shell from "../../../../layouts/Shell.astro";
+import TaskAudioReview from "../../../../components/TaskAudioReview";
+import { prisma } from "../../../../lib/db";
+import { readSession } from "../../../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const batchId = Astro.params.batchId as string;
+if (!batchId) return Astro.redirect("/ukoly/audio");
+
+// Quick check že batch existuje a patří userovi
+const batch = await prisma.taskAudioBatch.findFirst({
+  where: { id: batchId, userId: session.uid },
+  select: { id: true },
+});
+if (!batch) return Astro.redirect("/ukoly/audio");
+---
+
+<Shell
+  title="Review úkolů · Rašeliniště"
+  username={user.username}
+  breadcrumb={[
+    { label: "Úkoly", href: "/ukoly" },
+    { label: "Diktát", href: "/ukoly/audio" },
+    { label: "Review" },
+  ]}
+>
+  <div class="max-w-3xl mx-auto">
+    <TaskAudioReview client:load batchId={batchId} />
+  </div>
+</Shell>

@@ -1,0 +1,25 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import TaskAudioRecorder from "../../components/TaskAudioRecorder";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Diktát úkolů · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Úkoly", href: "/ukoly" }, { label: "Diktát" }]}
+>
+  <div class="max-w-2xl mx-auto">
+    <TaskAudioRecorder client:load />
+  </div>
+</Shell>
