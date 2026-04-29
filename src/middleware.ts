@@ -28,6 +28,12 @@ function isPublic(pathname: string): boolean {
   // Studna — pozvánkové linky pro hosty (autorizace přes guestToken v URL).
   if (pathname.startsWith("/me/")) return true;
   if (pathname.startsWith("/api/me/")) return true;
+  // Booking — public klient stránky a public booking endpointy.
+  if (pathname.startsWith("/i/")) return true;
+  if (pathname === "/schuzka") return true;
+  if (pathname.startsWith("/api/booking/by-token/")) return true;
+  if (pathname === "/api/booking/reserve") return true;
+  if (pathname === "/api/booking/confirm") return true;
   return false;
 }
 

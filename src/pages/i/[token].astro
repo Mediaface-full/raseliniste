@@ -1,0 +1,14 @@
+---
+import Base from "../../layouts/Base.astro";
+import BookingPicker from "../../components/BookingPicker";
+
+const token = Astro.params.token as string;
+---
+
+<Base title="Termín | Petr Perina">
+  <main class="min-h-screen flex items-start justify-center py-8 px-4">
+    <div class="w-full max-w-2xl">
+      <BookingPicker client:load token={token} />
+    </div>
+  </main>
+</Base>

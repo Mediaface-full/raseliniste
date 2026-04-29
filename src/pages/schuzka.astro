@@ -1,0 +1,53 @@
+---
+import Base from "../layouts/Base.astro";
+import BookingPicker from "../components/BookingPicker";
+import { prisma } from "../lib/db";
+import { randomBytes } from "node:crypto";
+import { EVERGREEN_NOTE } from "../lib/booking";
+
+/**
+ * /schuzka — VEŘEJNÁ stránka pro cold leady.
+ * Evergreen BookingInvite (contactId=null), reserveSlot detekuje EVERGREEN_NOTE
+ * a vytvoří KLON, originál zůstává PENDING pro další návštěvníky.
+ */
+
+// Najdi existující evergreen invite, nebo vytvoř nový
+let invite = await prisma.bookingInvite.findFirst({
+  where: { internalNote: EVERGREEN_NOTE },
+});
+
+const farFuture = new Date();
+farFuture.setFullYear(farFuture.getFullYear() + 5);
+
+if (!invite) {
+  invite = await prisma.bookingInvite.create({
+    data: {
+      token: randomBytes(16).toString("base64url"),
+      mode: "CLIENT",
+      meetingType: "CHOICE_ONLINE",
+      slotDurationMin: 30,
+      validUntil: farFuture,
+      internalNote: EVERGREEN_NOTE,
+      status: "PENDING",
+    },
+  });
+} else if (invite.validUntil < new Date() || invite.status !== "PENDING") {
+  // Prodlouž a resetuj — evergreen
+  invite = await prisma.bookingInvite.update({
+    where: { id: invite.id },
+    data: { validUntil: farFuture, status: "PENDING" },
+  });
+}
+---
+
+<Base title="Schůzka | Petr Perina">
+  <main class="min-h-screen flex items-start justify-center py-8 px-4">
+    <div class="w-full max-w-2xl">
+      <div class="mb-4 text-center">
+        <h1 class="font-serif text-3xl">Domluvíme schůzku?</h1>
+        <p class="text-sm text-muted-foreground mt-1">Vyber si chvíli, vyplň pár údajů, potvrdím e-mailem.</p>
+      </div>
+      <BookingPicker client:load token={invite.token} />
+    </div>
+  </main>
+</Base>
