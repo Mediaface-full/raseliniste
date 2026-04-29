@@ -30,18 +30,42 @@ export interface TaskProposal {
   assignedToContactName: string | null;
 }
 
+// Module-level reference holder — chrání před GC fire-and-forget Promise.
+// Stejný pattern jako process-recording.ts (kritické pro async upload flow).
+interface InFlightTask {
+  batchId: string;
+  startedAt: number;
+  promise: Promise<void>;
+}
+const inFlightTasks = new Set<InFlightTask>();
+
+export function getInFlightTaskAudioSnapshot(): Array<{ batchId: string; ageMs: number }> {
+  const now = Date.now();
+  return Array.from(inFlightTasks).map((f) => ({ batchId: f.batchId, ageMs: now - f.startedAt }));
+}
+
 export async function processTaskAudio(params: {
   batchId: string;
   audio: Buffer;
   mimeType: string;
 }): Promise<void> {
-  const batch = await prisma.taskAudioBatch.findUnique({ where: { id: params.batchId } });
-  if (!batch) {
-    console.error(`[process-task-audio] Batch ${params.batchId} nenalezen.`);
-    return;
-  }
+  const entry: InFlightTask = {
+    batchId: params.batchId,
+    startedAt: Date.now(),
+    promise: Promise.resolve(),
+  };
 
-  try {
+  entry.promise = (async () => {
+    const batch = await prisma.taskAudioBatch.findUnique({ where: { id: params.batchId } });
+    if (!batch) {
+      console.error(`[process-task-audio] Batch ${params.batchId} nenalezen.`);
+      inFlightTasks.delete(entry);
+      return;
+    }
+
+    console.log(`[process-task-audio] ${params.batchId} start (${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB)`);
+
+    try {
     // Stage 1: přepis (znovupoužití existujícího transcribeAudio,
     // ale pro úkoly nepotřebujeme jeho analysis — jen transcript).
     const transcribeResult = await transcribeAudio({
@@ -73,16 +97,23 @@ export async function processTaskAudio(params: {
         processingError: null,
       },
     });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[process-task-audio] ${params.batchId} failed:`, msg);
-    await prisma.taskAudioBatch
-      .update({
-        where: { id: params.batchId },
-        data: { status: "error", processingError: msg.slice(0, 1000) },
-      })
-      .catch(() => null);
-  }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[process-task-audio] ${params.batchId} failed:`, msg);
+      await prisma.taskAudioBatch
+        .update({
+          where: { id: params.batchId },
+          data: { status: "error", processingError: msg.slice(0, 1000) },
+        })
+        .catch(() => null);
+    } finally {
+      console.log(`[process-task-audio] ${params.batchId} finished in ${Date.now() - entry.startedAt}ms`);
+      inFlightTasks.delete(entry);
+    }
+  })();
+
+  inFlightTasks.add(entry);
+  return entry.promise;
 }
 
 // ---------------------------------------------------------------------------
