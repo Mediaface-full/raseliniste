@@ -1,0 +1,34 @@
+---
+import Shell from "../../../layouts/Shell.astro";
+import JournalEntryView from "../../../components/JournalEntryView";
+import { prisma } from "../../../lib/db";
+import { readSession } from "../../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const id = Astro.params.id as string;
+if (!id) return Astro.redirect("/denik");
+
+const entry = await prisma.journalEntry.findFirst({
+  where: { id, userId: session.uid },
+  select: { id: true },
+});
+if (!entry) return Astro.redirect("/denik");
+---
+
+<Shell
+  title="Zápis · Deník"
+  username={user.username}
+  breadcrumb={[{ label: "Deník", href: "/denik" }, { label: "Zápis" }]}
+>
+  <div class="max-w-3xl mx-auto">
+    <JournalEntryView client:load entryId={id} />
+  </div>
+</Shell>

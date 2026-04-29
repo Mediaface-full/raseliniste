@@ -36,6 +36,7 @@ model User {
   guestUsers    GuestUser[]
   tasks            Task[]
   taskAudioBatches TaskAudioBatch[]
+  journalEntries   JournalEntry[]
 }
 
 model WebauthnCredential {
@@ -930,4 +931,56 @@ model AiUsageLog {
 
   @@index([at])
   @@index([module, at])
+}
+
+// ============================================================================
+// DENÍK (samostatný JournalEntry model — diktafonový + textový vstup)
+// ============================================================================
+
+enum JournalMood {
+  ELATED
+  CONTENT
+  NEUTRAL
+  TIRED
+  STRESSED
+  DOWN
+  ANGRY
+  MIXED
+}
+
+enum JournalStatus {
+  draft
+  processing
+  ready
+  error
+}
+
+model JournalEntry {
+  id                String        @id @default(cuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id])
+
+  date              DateTime      @db.Date
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  title             String?
+  bodyMarkdown      String        @db.Text
+  rawTranscript     String?       @db.Text
+  mood              JournalMood?
+  tags              String[]      @default([])
+  highlights        String[]      @default([])
+
+  audioPath         String?
+  audioMime         String?
+  audioBytes        Int?
+  audioDurationSec  Int?
+  audioRetainForever Boolean      @default(false)
+  audioDeletedAt    DateTime?
+
+  status            JournalStatus @default(draft)
+  processingError   String?       @db.Text
+
+  @@index([userId, date])
+  @@index([status])
 }

@@ -1,0 +1,26 @@
+---
+import Shell from "../layouts/Shell.astro";
+import DenikList from "../components/DenikList";
+import { prisma } from "../lib/db";
+import { readSession } from "../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Deník · Rašeliniště"
+  username={user.username}
+  heading="Deník"
+  breadcrumb={[{ label: "Organizace" }, { label: "Deník" }]}
+>
+  <div class="max-w-3xl">
+    <DenikList client:load />
+  </div>
+</Shell>

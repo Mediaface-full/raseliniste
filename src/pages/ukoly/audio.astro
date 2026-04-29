@@ -1,39 +1,6 @@
 ---
-import Base from "../../layouts/Base.astro";
-import TaskAudioRecorder from "../../components/TaskAudioRecorder";
-import { prisma } from "../../lib/db";
-import { readSession } from "../../lib/session";
-
-const session = await readSession(Astro.cookies);
-if (!session) return Astro.redirect("/login");
-
-const user = await prisma.user.findUnique({
-  where: { id: session.uid },
-  select: { username: true },
-});
-if (!user) return Astro.redirect("/login");
+// Redirect na sjednocenou /diktat stránku.
+// Stará URL (/ukoly/audio) zachována pro zpětnou kompatibilitu —
+// pokud Petr měl PWA ikonu na této routě, nadále funguje.
+return Astro.redirect("/diktat");
 ---
-
-<Base
-  title="Diktovat úkoly · Rašeliniště"
-  appleTitle="Diktovat úkoly"
-  appleCapable={true}
-  manifestPath="/manifest-ukoly-audio.json"
->
-  <main class="min-h-screen flex flex-col">
-    <div class="border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <a href="/ukoly" class="text-xs font-mono text-muted-foreground hover:text-foreground">← Úkoly</a>
-      <span class="text-xs font-mono text-muted-foreground">{user.username}</span>
-    </div>
-
-    <div class="flex-1 flex items-start sm:items-center justify-center p-4 sm:p-6">
-      <div class="w-full max-w-2xl">
-        <TaskAudioRecorder client:load />
-      </div>
-    </div>
-
-    <div class="text-center text-xs font-mono text-muted-foreground/60 pb-4 px-4">
-      Tip: <strong>Sdílet → Přidat na plochu</strong> = ikona Diktovat úkoly
-    </div>
-  </main>
-</Base>
