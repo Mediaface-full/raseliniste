@@ -34,10 +34,10 @@
 <body>
 
 <h1>Cron nastavení na NASu</h1>
-<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 10 úloh celkem.</p>
+<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 11 úloh celkem.</p>
 
 <div class="tldr">
-<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 10 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~15 minut.
+<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 11 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~15 minut.
 </div>
 
 <h2>Společné nastavení (vzor)</h2>
@@ -68,7 +68,7 @@
 <tr><td><code>poslední den měsíce</code></td><td>Run on: <strong>Monthly</strong>, Date: <strong>Last day of month</strong></td></tr>
 </table>
 
-<h2>10 úloh — checklist</h2>
+<h2>11 úloh — checklist</h2>
 
 <!-- 1 -->
 <div class="cron-card">
@@ -138,7 +138,7 @@
 <div class="cron-card">
 <h3><span class="checkbox"></span>9. Raseliniste cleanup task audio batches</h3>
 <div class="cron-meta">denně 02:30 · POST <span class="endpoint">/api/cron/cleanup-task-audio-batches</span> · max-time 60</div>
-<p><strong>K čemu:</strong> Audio retention pro <code>/ukoly/audio</code> diktáty. Maže audio file z batchů starších 7 dní (transkript zůstává). Maže celé batche (committed/discarded) starší 30 dní. Stuck processing &gt;30 min → status=error (po retries).</p>
+<p><strong>K čemu:</strong> Audio retention pro <code>/ozvena</code> diktáty. Maže audio file z batchů starších 7 dní (transkript zůstává). Maže celé batche (committed/discarded) starší 30 dní. Stuck processing &gt;30 min → status=error (po retries).</p>
 <p><strong>Test:</strong> nadiktuj úkoly, commit. Po 7 dnech by měl batch.audioPath být null. Po 30 dnech celý batch zmizet.</p>
 </div>
 
@@ -146,14 +146,22 @@
 <div class="cron-card">
 <h3><span class="checkbox"></span>10. Raseliniste retry stuck task batches</h3>
 <div class="cron-meta">každých 5 min · POST <span class="endpoint">/api/cron/retry-stuck-task-batches</span> · max-time 30</div>
-<p><strong>K čemu:</strong> Analogicky #4 ale pro <code>/ukoly/audio</code>. Pickne TaskAudioBatch ve „processing" starší 5 min (= kontejner restartl uprostřed AI), spustí znovu. Bez něj by diktáty mohly uvíznout.</p>
+<p><strong>K čemu:</strong> Analogicky #4 ale pro <code>/ozvena</code>. Pickne TaskAudioBatch ve „processing" starší 5 min (= kontejner restartl uprostřed AI), spustí znovu. Bez něj by diktáty mohly uvíznout.</p>
 <p><strong>Test:</strong> nadiktuj úkoly, hned po uploadu restart kontejneru. Po 5 min by měl batch být buď v review nebo error.</p>
 </div>
 
-<h2>Po vytvoření všech 10 — kontrola</h2>
+<!-- 11 -->
+<div class="cron-card">
+<h3><span class="checkbox"></span>11. Raseliniste cleanup journal audio (Deník)</h3>
+<div class="cron-meta">denně 03:15 · POST <span class="endpoint">/api/cron/cleanup-journal-audio</span> · max-time 60</div>
+<p><strong>K čemu:</strong> Audio retention pro deníkové zápisy. Maže audio z entries starších 7 dní (s <code>audioRetainForever=false</code> — Gideon to může u zápisu přepnout v UI). Plus auto-retry stuck „processing" &gt;5 min a finally error po 30 min.</p>
+<p><strong>Test:</strong> nahraj testovací deníkový zápis. Po 7 dnech by audio file mělo zmizet, ale text zápisu zůstane.</p>
+</div>
+
+<h2>Po vytvoření všech 11 — kontrola</h2>
 
 <div class="steps">
-<div class="step">DSM → Task Scheduler → seznam má 10 řádků s prefix „Raseliniste"</div>
+<div class="step">DSM → Task Scheduler → seznam má 11 řádků s prefix „Raseliniste"</div>
 <div class="step">Všechny mají sloupec Status = <strong>Enabled</strong></div>
 <div class="step">U každé pravý klik → <strong>Run</strong> → History → Last run = OK / Result code 200</div>
 <div class="step">Pro #1, #4, #10 (vysoká frekvence) zkontroluj History po 1 hodině — měl by tam být běh à 5/15 min</div>

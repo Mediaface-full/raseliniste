@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Deník — návod</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; line-height: 1.5; max-width: 720px; margin: 0 auto; padding: 24px; font-size: 10.5pt; }
+  h1 { font-family: "Iowan Old Style", Georgia, serif; font-size: 26pt; margin: 0 0 4px; line-height: 1.1; }
+  h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 16pt; margin: 28px 0 8px; padding-top: 14px; border-top: 1px solid #ddd; page-break-after: avoid; }
+  h3 { font-family: "Iowan Old Style", Georgia, serif; font-size: 12pt; margin: 18px 0 6px; page-break-after: avoid; }
+  .lede { color: #555; font-size: 11pt; margin: 6px 0 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #666; font-weight: 600; }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f0f0f3; padding: 1px 5px; border-radius: 3px; }
+  pre { background: #f5f5f7; padding: 10px 12px; border-radius: 6px; font-size: 9pt; font-family: "SF Mono", Menlo, monospace; white-space: pre-wrap; }
+  .step { margin: 10px 0; padding-left: 22px; position: relative; }
+  .step::before { content: counter(step) "."; counter-increment: step; position: absolute; left: 0; font-weight: 600; color: #888; }
+  .steps { counter-reset: step; }
+  .meta { font-size: 8pt; color: #999; margin-top: 32px; padding-top: 12px; border-top: 1px solid #eee; }
+  .tldr { background: #fbf8e7; padding: 12px 16px; border-left: 4px solid #d4a017; border-radius: 4px; margin: 12px 0; }
+  .tip { background: #e7f4ff; padding: 12px 16px; border-left: 4px solid #1976d2; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+  .toc { background: #f8f8f8; padding: 12px 18px; border-radius: 6px; margin: 16px 0 24px; font-size: 10pt; }
+  .toc ol { margin: 4px 0 0; padding-left: 22px; }
+</style>
+</head>
+<body>
+
+<h1>Deník — návod</h1>
+<p class="lede">Soukromý deník Gideona. Hlasový diktát s AI strukturováním do CPTSD/ADHD-aware editorského formátu, plný-text vyhledávání, měsíční reflexivní rekapitulace.</p>
+
+<div class="toc">
+<strong>Obsah</strong>
+<ol>
+  <li>Co modul umí (přehled)</li>
+  <li><code>/denik</code> — hlavní stránka, list zápisů</li>
+  <li>Vstup zápisu — hlasem (Ozvěna) nebo ručně</li>
+  <li>Struktura zápisu — METADATA / tělo / POZNÁMKY EDITORA</li>
+  <li>NÁPADY — extrakce a typy</li>
+  <li>Vyhledávání a filtry</li>
+  <li>Měsíční review — reflexivní pohled</li>
+  <li>Audio retention — kdy se maže audio</li>
+  <li>Editace promptu</li>
+  <li>Pojmenování souborů a archivace</li>
+  <li>Tipy &amp; FAQ</li>
+</ol>
+</div>
+
+<h2>1. Co modul umí</h2>
+
+<div class="tldr">
+<strong>TL;DR:</strong> Diktuješ volně. AI z toho udělá strukturovaný zápis v Gideonově hlasu — s METADATA hlavičkou (datum, nálada, lidé, témata, NÁPADY), vyčištěným plynulým textem a POZNÁMKAMI EDITORA na konci. Nic se necenzuruje, NÁPADY se extrahují aby se neztratily, vzorce vyplynou v měsíčním review.
+</div>
+
+<p>Tři vstupní cesty:</p>
+<ul>
+  <li><strong>Hlasem (Ozvěna)</strong> — diktuj volně, AI strukturuje (Stage 2 prompt v <code>/settings/ai-prompts</code>)</li>
+  <li><strong>Ručně</strong> — formulář s textareou, žádný AI processing (status=ready hned)</li>
+  <li><em>Audio z aplikací</em> — file upload (Plaud, WhatsApp voice, Voice Memos) — projde stejnou pipeline</li>
+</ul>
+
+<h2>2. <code>/denik</code> — hlavní stránka</h2>
+
+<p>Sidebar → <strong>Deník</strong> (butter tint, book-open ikona).</p>
+
+<h3>Hlavička</h3>
+<ul>
+  <li><strong>Nadiktovat zápis</strong> → přesměruje na <code>/ozvena</code> s předvybraným módem deník</li>
+  <li><strong>Textový zápis</strong> → inline form s datem + textareou</li>
+  <li><strong>Měsíční review</strong> dropdown → posledních 6 měsíců s daty</li>
+</ul>
+
+<h3>List zápisů</h3>
+<p>Zápisy jsou groupnuté po datech, popisek dne v hlavičce má identifikátor <code>denik_RRRR-MM-DD</code>. Klik na zápis = otevře editor.</p>
+
+<p>Per zápis vidíš v listu:</p>
+<ul>
+  <li>Mood emoji (🌟 nadšený, 🙂 v pohodě, 😐 neutrální, 😴 unavený, 😰 ve stresu, 😔 smutný, 😠 naštvaný, 🌗 smíšené)</li>
+  <li>Title (extrahovaný z UDÁLOSTI)</li>
+  <li>Snippet z body (200 znaků)</li>
+  <li>Lidé (lavender) — z hlavičky LIDÉ</li>
+  <li>Tagy — z TÉMATA, lowercase bez háčků</li>
+  <li>🎤 audio indikátor (pokud má audio na disku)</li>
+  <li>⏳ AI strukturuje… (pokud zápis je v processing)</li>
+</ul>
+
+<h2>3. Vstup zápisu</h2>
+
+<h3>Hlasem (Ozvěna deník)</h3>
+<div class="steps">
+<div class="step">Sidebar → <strong>Ozvěna</strong> nebo PWA ikona</div>
+<div class="step">Přepni nahoře na <strong>Deník</strong> (butter, BookOpen ikona)</div>
+<div class="step">Volba délky (5/15/30/60 min, default 15)</div>
+<div class="step">Tap mikrofon → mluv volně, jako k sobě</div>
+<div class="step">Stop → upload (5–30 s) → redirect na <code>/denik/&lt;id&gt;/edit</code></div>
+<div class="step">Spinner 30–90 s (Vertex Pro strukturuje)</div>
+<div class="step">Stránka se sama obnoví na strukturovaný zápis</div>
+</div>
+
+<h3>Ručně</h3>
+<p>Na <code>/denik</code> klik <strong>Textový zápis</strong> → date picker + textarea → Uložit. Žádné AI processing — text se uloží jak je, bez metadat, status=ready.</p>
+
+<h2>4. Struktura zápisu</h2>
+
+<p>AI vrací plain markdown ve 3 částech:</p>
+
+<h3>1. Hlavička METADATA</h3>
+<pre>---
+DATUM: [datum diktování nebo "nezmíněno"]
+NÁLADA: [krátký odhad, např. "vyčerpaný, ale jasný"]
+LIDÉ: [jména a vztahy: "matka, partnerka, syn, Ondra Holoubek"]
+TÉMATA: [3-5 klíčových: "hranice v práci, vyhýbání konfliktu"]
+UDÁLOSTI: [konkrétní události zmíněné]
+KLÍČOVÉ MOMENTY: [1-3 vhledy které stojí za zachování]
+NÁPADY: [extrahované kreativní záblesky, viz §5]
+---</pre>
+
+<h3>2. Tělo zápisu</h3>
+<p>Vyčištěný plynulý text v Gideonově hlasu. Odstraněno „eh", „no", „jakože", opakování, koktání. Zachováno: sarkasmus, vulgarismy, neologismy, přezdívky, specifické formulace. <strong>Nic se necenzuruje.</strong></p>
+
+<h3>3. POZNÁMKY EDITORA</h3>
+<p>Sekce na konci se sumarizací (1-3 věty), pojmenováním vzorců (např. „vyhýbání konfliktu", „self-blame"), klíčovými slovy pro budoucí dohledatelnost.</p>
+
+<h2>5. NÁPADY — extrakce a typy</h2>
+
+<p>AI při strukturování detekuje nápady — kreativní záblesky, projekty, dárky pro syna, hypotézy. Tyto jdou do sekce <strong>NÁPADY</strong> v hlavičce ve formátu:</p>
+
+<pre>NÁPADY:
+- [POVÍDKA]: O muži, který nepoznává svou tvář v zrcadle.
+- [DÁREK]: Synovi koupit knížku o origami.
+- [HYPOTÉZA]: Možná moje neschopnost dokončit projekty souvisí s tím, že dokončit = být hodnocen.</pre>
+
+<table>
+<tr><th>Typ</th><th>K čemu</th></tr>
+<tr><td><code>POVÍDKA / KNIHA</code></td><td>Beletrie, kreativní psaní</td></tr>
+<tr><td><code>ESEJ / TEXT</code></td><td>Non-fiction, úvaha, článek</td></tr>
+<tr><td><code>PROJEKT</code></td><td>Pracovní, podnikatelský, technický</td></tr>
+<tr><td><code>DÁREK</code></td><td>Pro někoho konkrétního</td></tr>
+<tr><td><code>ROZHOVOR</code></td><td>S kým a o čem (terapeut, syn, partnerka)</td></tr>
+<tr><td><code>AKCE</code></td><td>Něco co chceš udělat (výlet, schůzka)</td></tr>
+<tr><td><code>HYPOTÉZA</code></td><td>Myšlenka o sobě / vztahu / světě k ověření</td></tr>
+<tr><td><code>JINÉ</code></td><td>Pokud nezapadá</td></tr>
+</table>
+
+<p>NÁPADY zůstávají i v hlavním textu zápisu (na svém místě v kontextu). V hlavičce jsou jen pro snadné dohledání.</p>
+
+<div class="tip">
+<strong>Důležité:</strong> AI nápady NEROZVÍJÍ. Když řekneš „nápad na povídku o X", AI nepíše tu povídku — jen ji zaznamená.
+</div>
+
+<h2>6. Vyhledávání a filtry</h2>
+
+<p>Search bar v <code>/denik</code> — debounced 300 ms. Když začneš psát, spouští se vyhledávání.</p>
+
+<h3>Co se hledá</h3>
+<ul>
+  <li><strong>Fulltext</strong> v <code>bodyMarkdown</code> + <code>rawTranscript</code> + <code>title</code> (case-insensitive ILIKE)</li>
+  <li><strong>Lidé</strong> — case-insensitive substring match v <code>people[]</code> poli (z hlavičky LIDÉ)</li>
+  <li><strong>Tagy</strong> — exact match v <code>tags[]</code> (z TÉMATA, lowercase bez háčků)</li>
+  <li><strong>Date range</strong> — od/do</li>
+</ul>
+
+<h3>Filter panel</h3>
+<p>Klik na <strong>Filtry</strong> tlačítko vedle search baru → roztáhne se panel:</p>
+<ul>
+  <li>Date pickers <strong>Od / Do</strong></li>
+  <li><strong>Lidé</strong> chips — top 12 lidí v matched results, klik = filter</li>
+  <li><strong>Témata</strong> chips — top 12 tagů, klik = filter</li>
+</ul>
+
+<p>Kombinace filtrů je AND. Klik na X v search baru = clear all filters.</p>
+
+<div class="tip">
+<strong>Příklad:</strong> chceš vidět co jsi v dubnu psal o partnerce? Search prázdný, Filtry → Od 1.4. Do 30.4., klik chip „partnerka" → vidíš všechny zápisy z dubna kde se objevuje.
+</div>
+
+<h2>7. Měsíční review — reflexivní pohled</h2>
+
+<p>Sidebar v <code>/denik</code> → <strong>Měsíční review</strong> dropdown nebo přímo <code>/denik/review/2026-04</code>.</p>
+
+<h3>Co AI vidí (a co ne)</h3>
+<p><strong>AI dostane jen:</strong> METADATA hlavičky a POZNÁMKY EDITORA z každého zápisu. <strong>Tělo zápisů AI NEČTE.</strong> Citlivý obsah těla zůstává v DB, AI pracuje s extrahovanou strukturou.</p>
+
+<h3>Co AI vrátí</h3>
+<ul>
+  <li><strong>Vzorce</strong> — co se opakuje napříč měsícem (3-5 dominantních)</li>
+  <li><strong>Vývoj v čase</strong> — posun nálady/témat/situací mezi začátkem a koncem</li>
+  <li><strong>Lidé</strong> — kdo se nejčastěji objevuje a v jakém kontextu</li>
+  <li><strong>Nedořešené nitky</strong> — opakující se témata bez závěru</li>
+  <li><strong>Kreativní výstupy</strong> — pokud z NÁPADŮ vznikl trend</li>
+</ul>
+
+<h3>Co AI NEdělá</h3>
+<ul>
+  <li>Neradí co dělat (jsi reflexivní průvodce, ne kouč)</li>
+  <li>Neinterpretuje terapeuticky</li>
+  <li>Neshrnuje obsah jednotlivých zápisů (pracuje s metadaty)</li>
+</ul>
+
+<h3>Plus deterministická čísla</h3>
+<p>Vedle AI reflexe stránka ukazuje i bez AI vypočítaná čísla:</p>
+<ul>
+  <li>Počet zápisů</li>
+  <li>Náladový histogram (kolik bylo „v pohodě" / „unavený" / „naštvaný" atd.)</li>
+  <li>Top 12 témat s počtem výskytů</li>
+  <li>Top 12 lidí s počtem výskytů</li>
+</ul>
+
+<p>Tlačítko <strong>Regenerovat</strong> spustí novou Vertex Pro analýzu — užitečné když Gideon přidal/upravil zápisy a chce čerstvý pohled.</p>
+
+<div class="tldr">
+<strong>Doporučená praxe:</strong> jednou za měsíc (např. první víkend) si pusť review předchozího měsíce. Vidíš věci, které v denním záznamu nevidíš.
+</div>
+
+<h2>8. Audio retention — kdy se maže audio</h2>
+
+<p>Audio se ze zápisu maže <strong>automaticky po 7 dnech</strong> (cron <code>cleanup-journal-audio</code> denně 03:15). Přepis (rawTranscript) i strukturovaný text (bodyMarkdown) zůstávají v DB.</p>
+
+<p>U každého zápisu vidíš v editoru banner:</p>
+<pre>Audio se smaže za 4 dny. [Ponechat navždy]</pre>
+
+<p>Klik na <strong>Ponechat navždy</strong> → <code>audioRetainForever=true</code>, audio se nikdy nesmaže. Zpětně lze přepnout — banner pak ukáže <em>„Audio se ponechává navždy. [Smazat za 7 dní místo toho]"</em>.</p>
+
+<p>Tlačítko <strong>Smazat audio</strong> v action řádku okamžitě smaže audio (text zápisu zůstane).</p>
+
+<h2>9. Editace promptu</h2>
+
+<p>Sidebar → <strong>Nastavení → AI prompty</strong>. Najdi kartu <strong>„Ozvěna — strukturování deníku"</strong> a uprav.</p>
+
+<p>Default je dlouhý CPTSD/ADHD-aware editorský prompt. Pokud chceš zkusit jiný styl (méně metadat, jiný formát NÁPADŮ, atd.):</p>
+<div class="steps">
+<div class="step">Klik <strong>Edit</strong> na kartě</div>
+<div class="step">Uprav text</div>
+<div class="step"><strong>Uložit</strong></div>
+<div class="step">Cache 60 s — nový diktát použije nový prompt do minuty</div>
+<div class="step">Pokud nesedí, klik <strong>Reset</strong> = vrátí default</div>
+</div>
+
+<p>Plus pro měsíční review je separátní prompt <strong>„Deník — měsíční rekapitulace"</strong> — taky editovatelný.</p>
+
+<h2>10. Pojmenování souborů a archivace</h2>
+
+<p>Gideonova preference: chronologické dohledávání. Každý zápis má identifikátor <code>denik_RRRR-MM-DD</code>:</p>
+<ul>
+  <li>Viditelný v hlavičce dne v listu</li>
+  <li>Viditelný v hlavičce detail view (vedle data)</li>
+  <li>Tlačítko <strong>Stáhnout denik_2026-04-29.txt</strong> v editoru — uloží body markdown jako .txt soubor</li>
+</ul>
+
+<p>Tím můžeš mít offline backup zápisů. Plain text .txt funguje napříč všemi platformami, dohledatelný fulltextem v Spotlight / Finder.</p>
+
+<h2>11. Tipy &amp; FAQ</h2>
+
+<h3>Jak rozhodnout: hlas nebo text?</h3>
+<p>Hlas pokud nemůžeš psát (auto, procházka, vlak) nebo nechceš se zastavovat. Text pokud máš čas a víš co napsat. Hlas dá AI bohatší materiál (tón, váhání, opakování).</p>
+
+<h3>AI strukturování trvá moc dlouho — můžu zkrátit?</h3>
+<p>Ne, Vertex Pro je nejpomalejší krok. 30–60 s pro 5 min audio je normální. Můžeš zatím dělat něco jiného, stránka se sama obnoví.</p>
+
+<h3>AI vyhodila něco důležitého z těla — jak vrátit?</h3>
+<p>V editoru klik <strong>Surový přepis</strong> (sklápěcí blok) — vidíš co AI slyšela. Klik <strong>Upravit</strong> → vlož chybějící do body. Nebo <strong>Přepsat AI</strong> → znovu Stage 2.</p>
+
+<h3>NÁPADY se opakují, řešily by se?</h3>
+<p>V měsíčním review uvidíš trendy v nápadech. Pokud máš nápad na povídku zmíněný 3× za měsíc, AI to v reflexi pojmenuje.</p>
+
+<h3>Můžu přidat zápis k jinému datu než dnes?</h3>
+<p>Ano, v <strong>Textový zápis</strong> formuláři je date picker. U hlasového diktátu se default bere dnes — pokud chceš jiné datum, edituj v <code>/denik/&lt;id&gt;/edit</code> přes API (PATCH endpoint). UI pro change date po vytvoření v plánu.</p>
+
+<h3>Můžu si pustit review za víc měsíců najednou?</h3>
+<p>Aktuálně jeden měsíc per stránka. Pokud chceš čtvrtletní/roční review, řekni si — postavíme.</p>
+
+<p class="meta">Rašeliniště — Deník návod · 2026-04-29</p>
+
+</body>
+</html>

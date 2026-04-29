@@ -44,7 +44,7 @@
   <li>Edit, mark done, delete</li>
   <li>Delegace — přidělení komu</li>
   <li>Push do Todoistu — smart routing</li>
-  <li><code>/ukoly/audio</code> — hlasový diktát</li>
+  <li><code>/ozvena</code> — hlasový diktát</li>
   <li>PWA: ikona na ploše iPhone</li>
   <li>Review obrazovka po diktátu</li>
   <li>Tipy &amp; obvyklé otázky</li>
@@ -60,7 +60,7 @@
 <p>Tři vstupní cesty:</p>
 <ul>
   <li><strong>Manuálně</strong> — formulář s plnou paletou (datum, priorita, tagy, přidělit)</li>
-  <li><strong>Hlasem</strong> — diktát na <code>/ukoly/audio</code>, AI vyrobí seznam, ty schválíš</li>
+  <li><strong>Hlasem</strong> — diktát na <code>/ozvena</code>, AI vyrobí seznam, ty schválíš</li>
   <li><strong>Z Capture</strong> — když přes iPhone Shortcut diktuješ něco, AI to klasifikuje jako TASK a propíše do staré <code>/tasks</code> stránky (legacy Capture inbox)</li>
 </ul>
 
@@ -71,7 +71,7 @@
 <h3>Hlavička</h3>
 <ul>
   <li><strong>Nový úkol</strong> — otevře inline create form</li>
-  <li><strong>Nadiktovat úkoly</strong> — přechod na <code>/ukoly/audio</code></li>
+  <li><strong>Nadiktovat úkoly</strong> — přechod na <code>/ozvena</code></li>
 </ul>
 
 <h3>Filtry</h3>
@@ -169,7 +169,7 @@
 <h3>Idempotence</h3>
 <p>Push je idempotent přes <code>Task.todoistTaskId</code>. Když klikneš Send 2× na ten samý úkol, vznikne v Todoistu jen jeden task. Pokud ho v Todoistu smažeš a chceš znovu, smaž ho v Rašeliništi a vytvoř znova.</p>
 
-<h2>8. <code>/ukoly/audio</code> — hlasový diktát</h2>
+<h2>8. <code>/ozvena</code> — hlasový diktát</h2>
 
 <p>Sidebar → <strong>Úkoly → Nadiktovat úkoly</strong>, nebo PWA ikona na ploše telefonu (viz dále).</p>
 
@@ -191,7 +191,7 @@
 <div class="steps">
 <div class="step">Audio se nahrává na server (5–30 s podle sítě)</div>
 <div class="step">Vznikne TaskAudioBatch v DB se status=processing</div>
-<div class="step">Redirect na <code>/ukoly/audio/&lt;id&gt;/review</code></div>
+<div class="step">Redirect na <code>/ozvena/&lt;id&gt;/review</code></div>
 <div class="step">AI běží na pozadí 15–60 s (Stage 1: přepis Flash, Stage 2: extrakce Pro)</div>
 <div class="step">Stránka pollne každé 3 s, sama se obnoví na review screen</div>
 </div>
@@ -202,14 +202,14 @@
 
 <h2>9. PWA: ikona na ploše iPhone</h2>
 
-<p>Pro rychlý diktát z mobilu si <code>/ukoly/audio</code> přidej na plochu jako appku.</p>
+<p>Pro rychlý diktát z mobilu si <code>/ozvena</code> přidej na plochu jako appku.</p>
 
 <div class="steps">
-<div class="step">V Safari na iPhone otevři <code>https://www.raseliniste.cz/ukoly/audio</code></div>
+<div class="step">V Safari na iPhone otevři <code>https://www.raseliniste.cz/ozvena</code></div>
 <div class="step">Přihlaš se</div>
 <div class="step">Sdílet (čtverec se šipkou nahoru)</div>
 <div class="step">Přidat na plochu</div>
-<div class="step">Název „Diktovat úkoly", ulož</div>
+<div class="step">Název „Ozvěna", ulož</div>
 </div>
 
 <p>Tap = full-screen recorder bez Safari chromu. Žádné lišty, žádné rušení.</p>

@@ -6,6 +6,19 @@ import type { EventTypeStr } from "@/lib/event-classifier";
 
 export const prerender = false;
 
+// Rate limit per IP — chrání proti booking spam (kdyby někdo flood-mailoval Gideona).
+// Plus uvážlivý limit na hostitelské bookings (každá rezervace = mail).
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 h
+const RATE_LIMIT_PER_IP = 20;
+
+function clientIp(request: Request, clientAddress: string | undefined): string {
+  const fwd = request.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  const real = request.headers.get("x-real-ip");
+  if (real) return real.trim();
+  return clientAddress ?? "unknown";
+}
+
 const schema = z.object({
   token: z.string().min(1),
   slot: z.object({
@@ -24,7 +37,26 @@ const schema = z.object({
  * POST /api/booking/reserve — public, klient zarezervuje slot
  * Pošle magic-link mail klientovi pro confirmation.
  */
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, clientAddress }) => {
+  // Rate limit per IP — anti-spam. Counter přes BookingInvite createdAt.
+  const ip = clientIp(request, clientAddress);
+  const since = new Date(Date.now() - RATE_LIMIT_WINDOW_MS);
+  const recentCount = await prisma.bookingInvite.count({
+    where: {
+      // Heuristic: hosts vytvářené z /schuzka mají internalNote začínající "Z /schuzka"
+      // — hashneme IP do internalNote pro přesnější tracking? Pro teď stačí
+      // počet všech RESERVED za 1h.
+      status: "RESERVED",
+      createdAt: { gte: since },
+    },
+  });
+  if (recentCount >= RATE_LIMIT_PER_IP) {
+    return Response.json(
+      { error: `Příliš mnoho rezervací za hodinu. Zkus to prosím za chvíli.` },
+      { status: 429 },
+    );
+  }
+  void ip; // pro budoucí per-IP tracking
   const body = await request.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

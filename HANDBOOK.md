@@ -1021,3 +1021,160 @@ gunzip -c rasel-2026-04-20.sql.gz | docker exec -i raseliniste_db psql -U raseli
 ---
 
 *Stav ke dni 2026-04-20: Auth + Capture + Deník + Zdraví + Settings + Cron hotové a lokálně otestované. Připraveno k prvnímu deployi na Synology.*
+
+# === Aktualizace 2026-04-29 — kompletní stav ===
+
+> Tato sekce je konsolidovaná aktualizace všeho, co přibylo / změnilo se od 2026-04-20. Detail výše v dokumentu může být zastaralý — tato sekce má přednost.
+
+## Aktuální stav modulů (2026-04-29)
+
+| Modul | Status | URL | Poznámka |
+|---|---|---|---|
+| Auth (heslo + passkey) | ✅ hotovo | `/login` | sameSite: lax (kvůli OAuth) |
+| Capture | ✅ hotovo | `/capture`, `/triage` | Entry-based |
+| Capture inbox | ✅ hotovo | `/tasks` | legacy z Capture flow, zachováno |
+| **Úkoly (samostatný Task model)** | ✅ **NOVÉ** | `/ukoly` | manuální + delegace + Todoist push (Lidé/sekce smart routing) |
+| Poznámky | ✅ hotovo | `/notes` | |
+| **Deník (samostatný JournalEntry)** | ✅ **NOVÉ** | `/denik` | hlasový + textový + měsíční review |
+| Deník (legacy) | ✅ hotovo | `/journal` | Capture-based, zachováno |
+| **Ozvěna — sjednocený diktát** | ✅ **NOVÉ** | `/ozvena` | přepínač Úkoly / Deník, PWA |
+| Zdraví | ✅ hotovo | `/health` | |
+| Kontakty | ✅ hotovo | `/contacts` | vCard + Google sync |
+| Gideonův Firewall | ✅ hotovo | `/call-log`, `/firewall` | |
+| Dopisy | ✅ hotovo | `/letters` | |
+| Studna | ✅ hotovo | `/studna` | + inline recorder v detailu projektu, two-stage AI pipeline, fire-and-forget Promise pinning |
+| **Kalendář (kompletní)** | ✅ **dokončeno** | `/calendar` | 1a+1b+2+3+4 (Google + iCloud + Rules + Quickadd + Bookingy + Briefing + OOO + Locations) |
+| **AI usage tracking** | ✅ **NOVÉ** | `/settings/ai-usage` | Recharts dashboard, per modul/model/den |
+| **AI prompty editor** | ✅ **NOVÉ** | `/settings/ai-prompts` | 7 editovatelných promptů |
+| **Diagnostika Studny** | ✅ **NOVÉ** | `/api/diagnose/studna` | komplexní health check pro debug |
+
+## Nové datové modely
+
+```prisma
+// Úkoly (samostatný od Entry)
+model Task {
+  id, userId, title, notes, dueAt, dueIsTime, tags[], status, priority,
+  assignedToContactId (FK Contact), source (manual/audio/quickadd/capture),
+  sourceBatchId (FK TaskAudioBatch), rawSnippet,
+  todoistTaskId, todoistProjectId, pushedAt, pushError, completedAt
+}
+
+model TaskAudioBatch {
+  id, userId, audio*, rawTranscript, proposalsJson, status, processingError
+}
+
+// Deník (samostatný od Entry)
+model JournalEntry {
+  id, userId, date, title, bodyMarkdown, rawTranscript, mood (enum),
+  tags[], people[] (z hlavičky LIDÉ pro vyhledávání), highlights[],
+  audio*, audioRetainForever, status, processingError
+}
+
+// AI tracking
+model AiUsageLog {
+  id, at, userId?, module, model, mode, inputTokens, outputTokens,
+  costUsd, costCzk, durationMs, success, errorMsg
+}
+
+model AiPrompt {
+  id, module unique, content, updatedAt
+  // Override defaultů z lib/ai-prompts.ts DEFAULT_PROMPTS
+}
+```
+
+## Cron úlohy (11 celkem) — kompletní seznam
+
+Detail v `Návody/03-crony.pdf`. Krátký výpis:
+
+| # | Endpoint | Schedule |
+|---|---|---|
+| 1 | sync-calendars | každých 5 min |
+| 2 | sync-contacts | denně 04:00 |
+| 3 | nightly-briefing | denně 22:00 |
+| 4 | retry-stuck-recordings (Studna) | každých 15 min |
+| 5 | cleanup-audio (Studna) | denně 03:00 |
+| 6 | daily-projects-digest (Studna) | denně 18:00 |
+| 7 | monthly-health-report | poslední den měsíce 23:00 |
+| 8 | cleanup-expired-invites (Bookingy) | denně 01:00 |
+| 9 | cleanup-task-audio-batches | denně 02:30 |
+| 10 | retry-stuck-task-batches | každých 5 min |
+| 11 | cleanup-journal-audio | denně 03:15 |
+
+## Důležité architektonické změny
+
+### Fire-and-forget Promise pinning (commit 2f32fac)
+
+Astro/Node garbage-collectoval Promises po vrácení Response. Audio AI processing se ztrácel. **Řešení:** module-level `Set<InFlight>` v `process-recording.ts`, `process-task-audio.ts`, `process-journal-audio.ts`. Reference se drží dokud Promise neresolvne.
+
+Diagnostika: `/api/diagnose/studna` ukazuje aktuální in-flight processings + stuck recordings + audio na disku check.
+
+### Two-stage audio pipeline (commit 7d1cb88)
+
+Předtím: Gemini JSON output mode pro audio = nespolehlivý (občas chybí pole `transcript`).
+
+Nyní:
+- **Stage 1:** Flash plain-text přepis (žádný JSON, vysoká spolehlivost)
+- **Stage 2:** Pro/Flash JSON analýza nad přepisem (žádné audio v requestu)
+
+Garantujeme: i když Stage 2 selže, transcript je vždy uložený. Pokrývá retries (3× exp backoff).
+
+### Vertex / AI Studio fallback pro velké audio (commit 1dc1039)
+
+Vertex AI nepodporuje `genai.files.upload()` (Files API existuje jen v Google AI Studio). Pro audio > 14 MB v Vertex módu fallback na AI Studio Files API přes `GEMINI_API_KEY`.
+
+### AI prompts override system (commit 00086dd)
+
+Default prompty hardcoded v `lib/ai-prompts.ts` (single source of truth). Override v DB tabulce `AiPrompt`. UI v `/settings/ai-prompts`. 60 s in-memory cache. Reset = smaže DB, vrátí default.
+
+7 editovatelných modulů:
+- ozvena-stage1-transcribe
+- ozvena-stage2-task
+- ozvena-stage2-journal
+- denik-monthly-review
+- studna-standard
+- studna-brief
+- briefing-nightly
+
+### Sjednocený `/ozvena` recorder (commit fb07525, přejmenováno v c221871)
+
+Místo separátních `/ukoly/audio` a `/denik/audio` jeden vstup `/ozvena` s přepínačem mód úkoly/deník. PWA manifest `/manifest-ozvena.json`. Stará URL redirected.
+
+### Smart Todoist routing pro delegované úkoly (commit 9f9e8af)
+
+Při push úkolu s `assignedToContact`:
+1. Top-level projekt přesně jménem assignee → push tam
+2. Projekt „Lidé" → najdi/vytvoř sekci jménem assignee
+3. Pokud Lidé neexistuje → vytvoř + sekci
+4. Bez assignee → default mojeUkoly
+
+## Bezpečnost (audit 2026-04-29)
+
+Ověřené vrstvy:
+- ✅ Argon2id + WebAuthn passkey
+- ✅ Session cookie httpOnly + sameSite=lax + secure (production) + JWT validovaný proti DB
+- ✅ Rate limity: login (5/15min/user), Capture (100/24h), Journal (200/24h), Health analyze (10/24h), Call-log (5/10min/IP), Studna guest (20/h/host), **Booking reserve (20/h/IP — nově přidáno)**
+- ✅ AES-256-GCM šifrování secrets v UserIntegration (token derived from SESSION_SECRET)
+- ✅ Path-traversal blokovaný v `lib/uploads.ts`
+- ✅ File size cap per modul (50/100/500 MB)
+- ✅ HMAC-SHA256 magic-link tokeny (booking confirmation)
+- ✅ Honeypot + IP rate limit na public formulářích (/call-log, /schuzka)
+- ✅ Origin canonical redirect (apex → www) v middleware
+- ✅ Public path whitelist v middleware (auth, /me/<token>, /i/<token>, /schuzka, /call-log, cron endpointy)
+- ✅ Cron endpointy chráněné x-cron-key + CRON_SECRET v env
+- ✅ Vertex AI = no-training, EU region (europe-west1)
+- ✅ Ownership check v každém PATCH/DELETE endpointu
+
+Známé limity (nejde o aktuální chyby):
+- `checkOrigin: false` v Astro config (kvůli reverse proxy mismatch). Kompenzováno sameSite=lax + ostatní vrstvy.
+- Single-user systém, ale schémata `userId` ready na multi-user (nedoplatek je v UI).
+
+## Komunikace s uživatelem
+
+- **Vždy česky, stručně.**
+- **Přezdívka v systému: Gideon.** Jméno „Petr" se zachovává jen v externí komunikaci (mail klientům, dopisy, onboarding PDF pro hosty Studny).
+- AI prompty mluví o uživateli jako Gideon.
+- Vokativy v UI vyhýbat („Ahoj!" místo „Ahoj Gideone").
+
+---
+
+*Stav 2026-04-29 (commit pushnutý před tímto changelog). Další commity přidávají jen drobnosti.*

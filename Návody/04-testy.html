@@ -137,7 +137,7 @@
 </div>
 
 <div class="test-card">
-<div class="title"><span class="check"></span> C.8 Diktát na mobilu</div>
+<div class="title"><span class="check"></span> C.8 Ozvěna na mobilu</div>
 <div>V Safari iPhone otevři <code>/quickadd</code>. Klik mikrofon. Diktuj: „úterý jedenáct schůzka v Praze".</div>
 <div class="expect"><strong>Očekávám:</strong> Text se zapíše, parser to projede stejně.</div>
 </div>
@@ -265,13 +265,13 @@
 
 <div class="test-card">
 <div class="title"><span class="check"></span> G.1 PWA install na iPhone</div>
-<div>Safari iPhone → <code>/ukoly/audio</code> → Sdílet → Přidat na plochu → uložit „Diktovat úkoly".</div>
+<div>Safari iPhone → <code>/ozvena</code> → Sdílet → Přidat na plochu → uložit „Ozvěna".</div>
 <div class="expect"><strong>Očekávám:</strong> Ikona G na ploše. Tap = full-screen recorder bez Safari lišt.</div>
 </div>
 
 <div class="test-card">
 <div class="title"><span class="check"></span> G.2 Volba délky</div>
-<div>V <code>/ukoly/audio</code> klik 3 min → 10 min → 30 min pills.</div>
+<div>V <code>/ozvena</code> klik 3 min → 10 min → 30 min pills.</div>
 <div class="expect"><strong>Očekávám:</strong> Aktivní pill se podbarvuje. Po refresh stránky zachovaná volba (localStorage).</div>
 </div>
 
@@ -327,7 +327,7 @@
 
 <div class="test-card">
 <div class="title"><span class="check"></span> H.4 Stuck batch retry</div>
-<div>V /ukoly/audio nahraj záznam. HNED po uploadu (v okně 30 s) přejdi do DSM Container Manager → restart kontejneru.</div>
+<div>V /ozvena nahraj záznam. HNED po uploadu (v okně 30 s) přejdi do DSM Container Manager → restart kontejneru.</div>
 <div class="expect"><strong>Očekávám:</strong> Po cca 5–10 min v review screen vidím buď status=review (auto-retry pomohl), nebo status=error s tlačítkem Regenerovat.</div>
 </div>
 
