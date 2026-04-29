@@ -34,6 +34,8 @@ model User {
   letters       Letter[]
   projectBoxes  ProjectBox[]
   guestUsers    GuestUser[]
+  tasks            Task[]
+  taskAudioBatches TaskAudioBatch[]
 }
 
 model WebauthnCredential {
@@ -249,6 +251,7 @@ model Contact {
   emails       ContactEmail[]
   callLogs     CallLog[]
   bookingInvites      BookingInvite[]
+  assignedTasks       Task[]   @relation("TaskAssignee")
 
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -808,4 +811,97 @@ model BriefingDigest {
 
   todoistTaskId   String?
   pushedAt        DateTime?
+}
+
+// ============================================================================
+// ÚKOLY (samostatný Task model — nezávislý na Entry/Capture)
+// ============================================================================
+
+enum TaskStatus {
+  open
+  done
+  cancelled
+}
+
+enum TaskPriority {
+  low
+  normal
+  high
+}
+
+enum TaskSource {
+  manual
+  audio
+  quickadd
+  capture
+}
+
+enum TaskBatchStatus {
+  processing
+  review
+  committed
+  discarded
+  error
+}
+
+model Task {
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id])
+
+  title             String
+  notes             String?      @db.Text
+  dueAt             DateTime?
+  dueIsTime         Boolean      @default(false)   // true = včetně času
+  tags              String[]     @default([])
+  status            TaskStatus   @default(open)
+  priority          TaskPriority @default(normal)
+
+  // Delegace — komu je úkol přidělen (z Contacts).
+  // null = vlastní úkol Petra.
+  assignedToContactId String?
+  assignedToContact   Contact?  @relation("TaskAssignee", fields: [assignedToContactId], references: [id])
+
+  // Origin tracking
+  source            TaskSource   @default(manual)
+  sourceBatchId     String?      // pro audio batch
+  sourceBatch       TaskAudioBatch? @relation(fields: [sourceBatchId], references: [id])
+  rawSnippet        String?      @db.Text
+
+  // Todoist push (one-way out)
+  todoistTaskId     String?
+  todoistProjectId  String?
+  pushedAt          DateTime?
+  pushError         String?      @db.Text
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  completedAt       DateTime?
+
+  @@index([userId, status, dueAt])
+  @@index([sourceBatchId])
+  @@index([assignedToContactId])
+}
+
+model TaskAudioBatch {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+
+  audioPath       String?
+  audioMime       String?
+  audioBytes      Int?
+  audioDurationSec Int?
+
+  rawTranscript   String?          @db.Text
+  proposalsJson   Json?            // [{ title, dueAt, dueIsTime, tags, priority, notes, rawSnippet, assignedToContactId? }]
+  status          TaskBatchStatus  @default(processing)
+  processingError String?          @db.Text
+
+  createdAt       DateTime         @default(now())
+  reviewedAt      DateTime?
+
+  tasks           Task[]
+
+  @@index([userId, status])
 }
