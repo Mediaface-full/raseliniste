@@ -1,15 +1,39 @@
 import { useState, useRef, useEffect } from "react";
 import { Mic, Square, Loader2, AlertTriangle, Upload, FileAudio } from "lucide-react";
 
-const STANDARD_LIMIT_SEC = 3 * 60; // 3 min — úkolová salva
 const TICK_MS = 250;
+const LIMIT_OPTIONS = [
+  { value: 3, label: "3 min — krátká salva" },
+  { value: 10, label: "10 min — střední" },
+  { value: 30, label: "30 min — dlouhá" },
+] as const;
+const LIMIT_STORAGE_KEY = "ukoly-audio-limit-min";
 
 type Phase = "idle" | "recording" | "uploading" | "redirecting" | "error";
+
+function loadLimit(): number {
+  if (typeof window === "undefined") return 10;
+  const raw = window.localStorage.getItem(LIMIT_STORAGE_KEY);
+  const n = raw ? parseInt(raw) : NaN;
+  return [3, 10, 30].includes(n) ? n : 10;
+}
 
 export default function TaskAudioRecorder() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [limitMin, setLimitMin] = useState<number>(10);
+
+  useEffect(() => { setLimitMin(loadLimit()); }, []);
+
+  function changeLimit(min: number) {
+    setLimitMin(min);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LIMIT_STORAGE_KEY, String(min));
+    }
+  }
+
+  const limitSec = limitMin * 60;
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -52,7 +76,7 @@ export default function TaskAudioRecorder() {
       tickRef.current = setInterval(() => {
         const e = Date.now() - startedAtRef.current;
         setElapsedMs(e);
-        if (e >= STANDARD_LIMIT_SEC * 1000) stopRecording();
+        if (e >= limitSec * 1000) stopRecording();
       }, TICK_MS);
     } catch (e) {
       setPhase("error");
@@ -96,10 +120,12 @@ export default function TaskAudioRecorder() {
     await upload(file, 0);
   }
 
-  const remM = Math.floor((STANDARD_LIMIT_SEC * 1000 - elapsedMs) / 60000);
-  const remS = Math.floor(((STANDARD_LIMIT_SEC * 1000 - elapsedMs) % 60000) / 1000).toString().padStart(2, "0");
+  const remainMs = Math.max(0, limitSec * 1000 - elapsedMs);
+  const remM = Math.floor(remainMs / 60000);
+  const remS = Math.floor((remainMs % 60000) / 1000).toString().padStart(2, "0");
   const elM = Math.floor(elapsedMs / 60000);
   const elS = Math.floor((elapsedMs % 60000) / 1000).toString().padStart(2, "0");
+  const progressPercent = Math.min(100, (elapsedMs / (limitSec * 1000)) * 100);
 
   return (
     <div className="space-y-4">
@@ -120,8 +146,23 @@ export default function TaskAudioRecorder() {
               <Mic className="size-10" />
             </button>
             <div className="text-base font-medium">Tap pro záznam</div>
+            <div className="flex gap-1">
+              {LIMIT_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  onClick={() => changeLimit(o.value)}
+                  className={`px-3 py-1 rounded text-xs font-mono ${
+                    limitMin === o.value
+                      ? "bg-foreground text-background"
+                      : "bg-white/5 hover:bg-white/10 text-muted-foreground"
+                  }`}
+                >
+                  {o.value} min
+                </button>
+              ))}
+            </div>
             <div className="text-xs text-muted-foreground font-mono">
-              max 3 min · auto-stop
+              auto-stop po {limitMin} min
             </div>
             <button
               onClick={() => briefInputRef.current?.click()}
@@ -148,8 +189,18 @@ export default function TaskAudioRecorder() {
             <div className="size-24 rounded-full bg-destructive/20 grid place-items-center animate-pulse">
               <div className="size-12 rounded-full bg-destructive" />
             </div>
-            <div className="font-mono text-4xl tabular-nums">{remM}:{remS}</div>
-            <div className="text-xs text-muted-foreground font-mono">uplynulo {elM}:{elS}</div>
+            <div className="font-mono text-5xl tabular-nums font-light">
+              {remM}:{remS}
+            </div>
+            <div className="text-xs text-muted-foreground font-mono">
+              zbývá · uplynulo {elM}:{elS} z {limitMin}:00
+            </div>
+            <div className="w-full max-w-xs h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full bg-destructive transition-all"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
             <button
               onClick={stopRecording}
               className="mt-2 px-6 py-3 rounded-md bg-foreground/90 text-background font-medium flex items-center gap-2"

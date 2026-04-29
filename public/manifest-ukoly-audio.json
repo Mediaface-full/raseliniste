@@ -1,0 +1,25 @@
+{
+  "name": "Diktovat úkoly",
+  "short_name": "Úkoly",
+  "description": "Rychlý diktát úkolů do Rašeliniště",
+  "start_url": "/ukoly/audio",
+  "scope": "/ukoly/audio",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c1126",
+  "theme_color": "#0c1126",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

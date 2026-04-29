@@ -32,9 +32,16 @@ export interface CreateTaskInput {
   content: string;
   description?: string;
   project_id?: string;
+  section_id?: string;
   priority?: 1 | 2 | 3 | 4;
   due_string?: string; // "today", "tomorrow at 9am", ...
   labels?: string[];
+}
+
+export interface TodoistSection {
+  id: string;
+  name: string;
+  project_id: string;
 }
 
 async function call<T>(token: string, path: string, init?: RequestInit): Promise<T> {
@@ -76,6 +83,38 @@ export async function createTask(token: string, input: CreateTaskInput): Promise
   return call<TodoistTask>(token, "/tasks", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export async function createProject(token: string, name: string): Promise<TodoistProject> {
+  return call<TodoistProject>(token, "/projects", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function listSections(token: string, projectId: string): Promise<TodoistSection[]> {
+  type Page = { results: TodoistSection[]; next_cursor: string | null };
+  const all: TodoistSection[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < 10; i++) {
+    const query: string = cursor
+      ? `?project_id=${encodeURIComponent(projectId)}&cursor=${encodeURIComponent(cursor)}`
+      : `?project_id=${encodeURIComponent(projectId)}`;
+    const page: Page = await call<Page>(token, `/sections${query}`);
+    if (Array.isArray(page)) return page as unknown as TodoistSection[];
+    if (!page?.results) break;
+    all.push(...page.results);
+    if (!page.next_cursor) break;
+    cursor = page.next_cursor;
+  }
+  return all;
+}
+
+export async function createSection(token: string, name: string, projectId: string): Promise<TodoistSection> {
+  return call<TodoistSection>(token, "/sections", {
+    method: "POST",
+    body: JSON.stringify({ name, project_id: projectId }),
   });
 }
 

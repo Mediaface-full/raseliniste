@@ -9,9 +9,10 @@ interface Props {
   description?: string;
   appleTitle?: string;          // název pod ikonou na ploše iPhone
   appleCapable?: boolean;        // otevřít jako "appka" bez Safari chromu
+  manifestPath?: string;         // PWA manifest cesta (pokud máme)
 }
 
-const { title, description = "", appleTitle, appleCapable = false } = Astro.props;
+const { title, description = "", appleTitle, appleCapable = false, manifestPath } = Astro.props;
 ---
 
 <!doctype html>
@@ -28,6 +29,7 @@ const { title, description = "", appleTitle, appleCapable = false } = Astro.prop
     {appleTitle && <meta name="apple-mobile-web-app-title" content={appleTitle} />}
     {appleCapable && <meta name="apple-mobile-web-app-capable" content="yes" />}
     {appleCapable && <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />}
+    {manifestPath && <link rel="manifest" href={manifestPath} />}
     <title>{title}</title>
   </head>
   <body class="min-h-screen bg-base-100 text-base-content antialiased">

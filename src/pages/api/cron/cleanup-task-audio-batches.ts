@@ -10,13 +10,10 @@ export const prerender = false;
  * Auth: x-cron-key
  * Schedule: denně 02:30
  *
- * Dvě úlohy:
- * 1) Smaž audio z batchů, kterým je víc než 7 dní (i z review co Petr nikdy
- *    nedořešil — audio už nebudeme potřebovat).
- * 2) Smaž záznamy committed/discarded batchů starší 30 dní (audit retention).
- *
- * Také: pokud je batch v "processing" déle než 30 min (= mrtvý fire-and-forget
- * po restartu), retry jednou nebo error-out.
+ * Audio retention pro task batches:
+ *   - Smaže audio z batchů > 7 dní (audio už je k ničemu, transcript zůstává)
+ *   - Smaže celé batche committed/discarded > 30 dní (audit retention)
+ *   - Stuck > 30 min → error (auto-retry mělo zafungovat dřív, viz retry-stuck-task-batches)
  */
 export const POST: APIRoute = async ({ request }) => {
   const secret = env.CRON_SECRET;
@@ -30,8 +27,6 @@ export const POST: APIRoute = async ({ request }) => {
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000);
 
-  // 1) Smaž audio z batchů starších 7 dní (kterékoliv status — review co
-  //    Petr neudělal, error, ...). Audio retention 7 dní.
   const oldWithAudio = await prisma.taskAudioBatch.findMany({
     where: { audioPath: { not: null }, createdAt: { lt: sevenDaysAgo } },
     select: { id: true, audioPath: true },
@@ -45,7 +40,6 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
-  // 2) Smaž celé batche committed/discarded starší 30 dní
   const purged = await prisma.taskAudioBatch.deleteMany({
     where: {
       status: { in: ["committed", "discarded"] },
@@ -53,12 +47,11 @@ export const POST: APIRoute = async ({ request }) => {
     },
   });
 
-  // 3) Stuck processing > 30 min → označ error
-  const stuck = await prisma.taskAudioBatch.updateMany({
+  const finallyError = await prisma.taskAudioBatch.updateMany({
     where: { status: "processing", createdAt: { lt: thirtyMinAgo } },
     data: {
       status: "error",
-      processingError: "Auto-error: batch zůstal v 'processing' déle než 30 min (kontejner zřejmě restartoval). Použij Regenerovat.",
+      processingError: "Auto-error: batch v 'processing' déle než 30 min i po retries. Použij ručně Regenerovat.",
     },
   });
 
@@ -66,6 +59,6 @@ export const POST: APIRoute = async ({ request }) => {
     ok: true,
     audioDeleted,
     batchesPurged: purged.count,
-    stuckMarked: stuck.count,
+    finallyErrored: finallyError.count,
   });
 };
