@@ -140,7 +140,7 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
       {/* Hlavička s tlačítky */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button onClick={() => setCreating(true)}><Plus /> Nový úkol</Button>
-        <a href="/ukoly/audio">
+        <a href="/ozvena">
           <Button variant="outline"><Mic /> Nadiktovat úkoly</Button>
         </a>
       </div>

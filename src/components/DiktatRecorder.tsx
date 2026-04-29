@@ -175,7 +175,7 @@ export default function DiktatRecorder() {
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <h1 className="font-serif text-2xl">Diktát</h1>
+        <h1 className="font-serif text-2xl">Ozvěna</h1>
         <p className="text-sm text-muted-foreground mt-1">{cfg.description}</p>
       </div>
 

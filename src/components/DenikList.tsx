@@ -71,7 +71,7 @@ export default function DenikList() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
-        <a href="/diktat">
+        <a href="/ozvena">
           <Button><Mic /> Nadiktovat zápis</Button>
         </a>
         <Button variant="outline" onClick={() => setCreating(!creating)}>
