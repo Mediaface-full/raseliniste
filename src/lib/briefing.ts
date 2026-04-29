@@ -3,6 +3,7 @@ import { decryptSecret } from "./crypto";
 import { createTask } from "./todoist";
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
 import { callTracked } from "./gemini-usage";
+import { getPrompt } from "./ai-prompts";
 
 /**
  * Noční briefing 22:00 → Todoist.
@@ -173,7 +174,11 @@ async function callVertexBriefing(
     description: (e.description ?? "").slice(0, 500),
   }));
 
-  const prompt = `Vygeneruj strukturovaný briefing pro Petra na den **${dateStr}**.
+  // Načti base prompt z DB (instrukce). JSON schema + vstupy připojí runtime.
+  const basePrompt = await getPrompt("briefing-nightly");
+  const prompt = `${basePrompt}
+
+DEN: ${dateStr}
 
 VSTUP — UDÁLOSTI:
 ${JSON.stringify(eventsForPrompt, null, 2)}
@@ -184,19 +189,7 @@ ${JSON.stringify(dayNotes, null, 2)}
 VSTUP — AKTIVNÍ PORUŠENÍ PRAVIDEL:
 ${JSON.stringify(violations, null, 2)}
 
-PRAVIDLA:
-- Vrať POUZE jeden JSON objekt přesně podle níže uvedeného schématu, bez markdownu.
-- Petrovy schůzky (source=GOOGLE_PRIMARY) jsou hlavní program.
-- Synovy události (source=ICLOUD_SON, type=HOCKEY_SON) jsou KONTEXT — Petr je zodpovědný za doprovod / vyzvednutí.
-- Partnerčiny šichty (source=ICLOUD_PARTNER, type=PARTNER_SHIFT) jsou KONTEXT — ovlivňují kdo má kluka.
-- "isContext: true" pro synovy/partnerčiny věci, "false" pro Petrovy.
-- Pro každou Petrovu schůzku zvaž "co vzít s sebou" — pokud z popisu nebo titulu plyne (smlouva, pas, knížky pro někoho), vyplň "bring" jako pole stringů.
-- "itemsToBringAggregate" sloučí všechny bring položky do jednoho seznamu (pro packing list ráno).
-- "contextWarnings" — krátké české věty: "Partnerka má NOCNI šichtu — po návratu klid", "Syn na hokeji 16-19", "Partnerka pryč — sám se synem", apod.
-- "commuteSummary" — pokud je v plánu Praha, doplň krátkou poznámku o cestování (např. "60 min do Prahy ze Studené").
-- "ruleWarnings" — kopíruj violations do strukturovaného formátu.
-
-JSON SCHEMA:
+JSON SCHEMA (povinný formát výstupu):
 {
   "schedule": [{
     "type": string, "source": string, "startsAt": string, "endsAt": string,

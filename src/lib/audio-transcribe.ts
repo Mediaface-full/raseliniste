@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { getGemini, getGeminiMode, DEFAULT_MODEL, ANALYSIS_MODEL } from "./gemini";
 import { env } from "./env";
 import { trackGeminiCall } from "./gemini-usage";
+import { getPrompt } from "./ai-prompts";
 
 /**
  * Audio transkripce + bohatá strukturovaná analýza pro Studnu.
@@ -173,9 +174,13 @@ export async function transcribeAudio(params: {
 }): Promise<TranscribeResult> {
   const isBrief = params.recordingType === "BRIEF";
   const model = isBrief ? ANALYSIS_MODEL : DEFAULT_MODEL;
-  const prompt = isBrief
-    ? BRIEF_PROMPT(params.projectContext ?? null)
-    : STANDARD_PROMPT(params.projectContext ?? null);
+
+  // Načti prompty z DB override (s fallbackem na default v kódu).
+  // Project context se připojuje runtime — Petr edituje jen instrukce.
+  const basePrompt = await getPrompt(isBrief ? "studna-brief" : "studna-standard");
+  const prompt = params.projectContext
+    ? `${basePrompt}\n\nKontext projektu: ${params.projectContext}`
+    : basePrompt;
 
   const fitsInline = params.audio.byteLength <= INLINE_AUDIO_LIMIT_BYTES;
   const mode = getGeminiMode();
@@ -246,12 +251,8 @@ export async function transcribeAudio(params: {
   // STAGE 1: Pouhý přepis. Gemini dostane audio + minimální plain-text instrukci.
   // Vrátí prostý text, žádný JSON. Spolehlivé i pro dlouhé audio.
   // -------------------------------------------------------------------------
-  const transcribePrompt = `Přepiš mluvené slovo z přiloženého audio souboru do textu v češtině.
-
-Pravidla:
-- Doslovný přepis. Zachovej tón, opakování, váhání i nedokončené věty.
-- Drobně oprav jen očividné gramatické chyby a doplň interpunkci/odstavce.
-- Žádné komentáře, žádný JSON, žádný markdown — vrať POUZE čistý text přepisu.`;
+  // Načti Stage 1 prompt z DB override (fallback na default v ai-prompts.ts)
+  const transcribePrompt = await getPrompt("ozvena-stage1-transcribe");
 
   const stage1Start = Date.now();
   const transcribeResp = await withRetry("Stage 1 (transcribe)", () =>

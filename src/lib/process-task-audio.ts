@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { transcribeAudio } from "./audio-transcribe";
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
 import { callTracked } from "./gemini-usage";
+import { getPrompt } from "./ai-prompts";
 
 /**
  * Audio → seznam úkolů (proposals).
@@ -135,28 +136,10 @@ export async function extractTaskProposals(transcript: string): Promise<TaskProp
   const todayStr = today.toISOString().slice(0, 10);
   const dayCz = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"][today.getDay()];
 
-  const prompt = `Jsi asistent Petra Periny pro správu úkolů. Petr ti dá přepis krátké mluvené salvy úkolů (typicky 30 s – 2 min). Tvým úkolem je vyrobit seznam jednotlivých úkolů ve strukturovaném JSON.
-
-PRAVIDLA:
-1. **Jeden záměr = jeden úkol.** "Zavolat Honzovi a poslat mu mail" → 2 úkoly. "Zavolat Honzovi kvůli střeše" → 1 úkol.
-2. **title** = imperativ, krátký (max 80 znaků), česky, věcný. Začni slovesem ("Zavolat...", "Poslat...", "Koupit...", "Domluvit..."). Bez tečky na konci.
-3. **dueAt** — parsuj relativní výrazy vůči referenceDate:
-   - "dnes" → ${todayStr}
-   - "zítra" → +1 den
-   - "pozítří" → +2 dny
-   - "v pondělí/úterý/..." → nejbližší budoucí výskyt
-   - "do pátku" / "do konce týdne" → nejbližší pátek / neděle
-   - "příští týden" → následující pondělí (orientační)
-   - "v 15:00" / "ve tři odpoledne" → dueIsTime=true, čas dopočítej
-   - "někdy" / "časem" / bez zmínky → dueAt = null
-   - **Nehádej, pokud chybí zmínka.** Lepší null než falešný termín.
-   - Format: "YYYY-MM-DD" pro datum, "YYYY-MM-DDTHH:MM:00" pro čas
-4. **tags** — 1-4 tagy malými písmeny bez háčků. Použij jeden z: prace, dum, auto, zdravi, rodina, mortyk, blanka, nakup, telefonat, email, fakturace, urad. Volně přidej další.
-5. **priority** — defaultně "normal". "high" jen pokud Petr explicitně řekl "důležité" / "urgent" / "rychle". "low" jen pokud "kdykoliv" / "není to spěch".
-6. **notes** — pokud Petr řekl kontext / upřesnění, vlož tam. Jinak null. Max 200 znaků.
-7. **rawSnippet** — doslovný úryvek z přepisu (5-15 slov), ze kterého úkol vznikl. Petrovi pomáhá v review.
-8. **assignedToContactName** — pokud Petr řekl "Karel ať udělá X" / "pro Karla" / "Karlovi přiřadit", vyplň jméno z následujícího seznamu kontaktů (přesně jak je tam napsáno). Jinak null.
-9. **Pořadí** = pořadí, v jakém Petr úkoly zmínil.
+  // Načti base prompt (instrukce) z DB override / default. Runtime kontext
+  // (datum, kontakty, přepis) se připojuje níže — Petr edituje jen instrukce.
+  const basePrompt = await getPrompt("ozvena-stage2-task");
+  const prompt = `${basePrompt}
 
 KONTAKTY (pro detekci delegace, vyber přesně podle jména):
 ${contactNames.length > 0 ? contactNames.slice(0, 50).join(", ") : "(žádné)"}
@@ -166,25 +149,7 @@ REFERENCE DATE: dnes je ${todayStr} (${dayCz})
 PŘEPIS:
 """
 ${transcript}
-"""
-
-Vrať POUZE JSON tohoto tvaru, žádný markdown wrapper, žádný úvod:
-{
-  "tasks": [
-    {
-      "title": "...",
-      "dueAt": "YYYY-MM-DD" | "YYYY-MM-DDTHH:MM:00" | null,
-      "dueIsTime": false,
-      "tags": ["..."],
-      "priority": "normal",
-      "notes": null,
-      "rawSnippet": "...",
-      "assignedToContactName": null
-    }
-  ]
-}
-
-Pokud přepis neobsahuje žádný úkol (Petr se přeřekl, nahrál ticho), vrať {"tasks": []}.`;
+"""`;
 
   const genai = getGemini();
   const response = await callTracked({

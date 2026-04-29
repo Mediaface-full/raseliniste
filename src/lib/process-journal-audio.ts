@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { transcribeAudio } from "./audio-transcribe";
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
 import { callTracked } from "./gemini-usage";
+import { getPrompt } from "./ai-prompts";
 
 /**
  * Audio → strukturovaný deníkový zápis.
@@ -137,31 +138,15 @@ export async function processJournalAudio(params: {
 // ---------------------------------------------------------------------------
 
 export async function structureJournalEntry(transcript: string): Promise<JournalStructured> {
-  const prompt = `Jsi asistent Petra Periny pro vedení osobního deníku. Petr ti dá přepis volně namluveného deníkového záznamu. Tvým úkolem je z toho vyrobit strukturovaný zápis v Petrově hlasu — věcný, krátký, bez literárních ozdob, bez vaty.
+  // Načti prompt z DB override / default. Petrův prompt vrací plain markdown
+  // s hlavičkou METADATA — heuristicky extrahujeme mood/tags/highlights/title.
+  const basePrompt = await getPrompt("ozvena-stage2-journal");
+  const prompt = `${basePrompt}
 
-PRAVIDLA:
-1. **Zachovej Petrův styl:** krátké věty, čeština, neformální tón, občasná vulgarita ano (necenzuruj).
-2. **Neměň fakta:** pokud Petr řekne "v úterý jsem byl u doktora", napiš to. Nevymýšlej souvislosti, neinterpretuj nálady, nesnaž se ho povzbudit ani komentovat.
-3. **Odstraň výplň:** "no a" / "takže" / "víš co" / opakování / koktání / falešné starty.
-4. **Strukturuj do sekcí jen pokud to dává smysl:** pokud zápis pokrývá víc témat, použij ## nadpisy (např. "## Práce", "## Rodina", "## Zdraví"). Pokud je to jeden tok myšlenek, nech to bez nadpisů.
-5. **Highlights:** vyber 1–3 nejdůležitější body (rozhodnutí, události, pocity) — krátké bullety, max 80 znaků každý.
-6. **Mood:** klasifikuj jednou hodnotou z enum: ELATED / CONTENT / NEUTRAL / TIRED / STRESSED / DOWN / ANGRY / MIXED. Při smíšených pocitech MIXED.
-7. **Tags:** 2–6 tagů malými písmeny, česky, bez háčků (např. "prace", "rodina", "spanek", "zdravi", "blanka", "mortyk"). Nepřekládej jména.
-8. **Title:** 1 věta, max 60 znaků, věcná. Ne clickbait, ne otázka. Např. "Únavný den po hokeji, večer s Blankou".
-
-PŘEPIS:
+PŘEPIS Z DIKTÁTU:
 """
 ${transcript}
-"""
-
-Vrať POUZE JSON tohoto tvaru, žádný markdown wrapper:
-{
-  "title": "...",
-  "bodyMarkdown": "...",
-  "mood": "CONTENT",
-  "tags": ["..."],
-  "highlights": ["...", "..."]
-}`;
+"""`;
 
   const genai = getGemini();
   const response = await callTracked({
@@ -173,7 +158,7 @@ Vrať POUZE JSON tohoto tvaru, žádný markdown wrapper:
       config: {
         temperature: 0.4,
         maxOutputTokens: 8000,
-        responseMimeType: "application/json",
+        // Bez responseMimeType — prompt vrací plain markdown, ne JSON
       },
     }),
   });
@@ -183,27 +168,77 @@ Vrať POUZE JSON tohoto tvaru, žádný markdown wrapper:
     throw new Error("Strukturování: Vertex vrátil prázdný výstup.");
   }
 
-  let parsed: Partial<JournalStructured>;
-  try {
-    const cleaned = raw.startsWith("```")
-      ? raw.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, "").trim()
-      : raw;
-    parsed = JSON.parse(cleaned);
-  } catch (e) {
-    throw new Error(`Strukturování: nelze parse JSON — ${e instanceof Error ? e.message : String(e)}. Prvních 200 znaků: ${raw.slice(0, 200)}`);
-  }
+  return parseJournalMarkdown(raw, transcript);
+}
 
-  const validMoods: JournalMoodStr[] = ["ELATED", "CONTENT", "NEUTRAL", "TIRED", "STRESSED", "DOWN", "ANGRY", "MIXED"];
+/**
+ * Parsuje Petrův markdown výstup s hlavičkou METADATA + body + POZNÁMKY EDITORA.
+ * Heuristicky extrahuje:
+ *   - title z TÉMATA / UDÁLOSTI
+ *   - mood z NÁLADA (pokus o mapping na enum)
+ *   - tags z TÉMATA + LIDÉ (lowercase bez háčků)
+ *   - highlights z KLÍČOVÉ MOMENTY (řádky)
+ *
+ * Body je VŽDY celý dokument — Petr nikdy nepřijde o text.
+ */
+function parseJournalMarkdown(raw: string, fallbackTranscript: string): JournalStructured {
+  const bodyMarkdown = raw.slice(0, 50_000) || fallbackTranscript;
 
-  return {
-    title: String(parsed.title ?? "").slice(0, 200) || "(bez názvu)",
-    bodyMarkdown: String(parsed.bodyMarkdown ?? "").slice(0, 50_000) || transcript,
-    mood: validMoods.includes(parsed.mood as JournalMoodStr) ? (parsed.mood as JournalMoodStr) : "NEUTRAL",
-    tags: Array.isArray(parsed.tags)
-      ? parsed.tags.filter((t: unknown) => typeof t === "string").slice(0, 8)
-      : [],
-    highlights: Array.isArray(parsed.highlights)
-      ? parsed.highlights.filter((h: unknown) => typeof h === "string").slice(0, 5)
-      : [],
+  const extractField = (label: string): string => {
+    const re = new RegExp(`${label}\\s*:\\s*([^\\n]+)`, "i");
+    const m = raw.match(re);
+    return m ? m[1].trim() : "";
   };
+
+  const moodLine = extractField("NÁLADA").toLowerCase();
+  const tematLine = extractField("TÉMATA");
+  const lideLine = extractField("LIDÉ");
+  const udalostiLine = extractField("UDÁLOSTI");
+
+  // Title — vezmeme první konkrétní událost, nebo téma, jako přibližný titulek
+  const title = (udalostiLine.split(/[,;.]/)[0] ?? "").trim().slice(0, 100)
+    || (tematLine.split(/[,;.]/)[0] ?? "").trim().slice(0, 100)
+    || null;
+
+  // Mood — heuristic mapping z popisu nálady na enum
+  const mood = mapMood(moodLine);
+
+  // Tags — z TÉMATA + LIDÉ + UDÁLOSTI vyextrahuj klíčová slova (lowercase, bez háčků)
+  const tagsRaw = [...splitToTags(tematLine), ...splitToTags(lideLine)];
+  const tags = Array.from(new Set(tagsRaw)).slice(0, 8);
+
+  // Highlights — řádky pod KLÍČOVÉ MOMENTY (pokud začínají na "-" nebo jsou v jednom řádku)
+  const highlightsBlock = raw.match(/KLÍČOVÉ MOMENTY\s*:\s*([\s\S]*?)(?:\n[A-ZÁ-Ý]+\s*:|---)/i);
+  const highlights = highlightsBlock
+    ? highlightsBlock[1].split(/\n/).map((l) => l.replace(/^[-*\s]+/, "").trim()).filter((l) => l.length > 0).slice(0, 5)
+    : [];
+
+  return { title, bodyMarkdown, mood, tags, highlights };
+}
+
+function splitToTags(text: string): string[] {
+  if (!text) return [];
+  return text
+    .split(/[,;]/)
+    .map((s) => s.trim().toLowerCase())
+    .map((s) => s
+      .replace(/[áä]/g, "a").replace(/[éě]/g, "e").replace(/[íi]/g, "i")
+      .replace(/[óö]/g, "o").replace(/[úůü]/g, "u").replace(/[ý]/g, "y")
+      .replace(/[čć]/g, "c").replace(/[ď]/g, "d").replace(/[ňń]/g, "n")
+      .replace(/[ř]/g, "r").replace(/[šś]/g, "s").replace(/[ť]/g, "t")
+      .replace(/[žź]/g, "z"))
+    .map((s) => s.replace(/[^a-z0-9-_]/g, "").slice(0, 30))
+    .filter((s) => s.length >= 2 && s.length <= 30);
+}
+
+function mapMood(text: string): JournalMoodStr {
+  const t = text.toLowerCase();
+  if (/(naden|elated|skvel|euforick)/i.test(t)) return "ELATED";
+  if (/(spokojen|content|v poh|klidn|smiren)/i.test(t)) return "CONTENT";
+  if (/(unav|tired|vycerpan|vyhorel)/i.test(t)) return "TIRED";
+  if (/(stres|napjat|uzkost|nervo)/i.test(t)) return "STRESSED";
+  if (/(smut|down|teskn|rezigno|deprese|self)/i.test(t)) return "DOWN";
+  if (/(naštv|zlostn|hnev|angry|wztek|wtek|vztek)/i.test(t)) return "ANGRY";
+  if (/(smišen|smis|mixed|rozporupln)/i.test(t)) return "MIXED";
+  return "NEUTRAL";
 }

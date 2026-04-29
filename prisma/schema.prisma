@@ -984,3 +984,17 @@ model JournalEntry {
   @@index([userId, date])
   @@index([status])
 }
+
+// ============================================================================
+// EDITOVATELNÉ AI PROMPTY (override defaultů z kódu)
+// ============================================================================
+
+model AiPrompt {
+  id        String   @id @default(cuid())
+  module    String   @unique  // "ozvena-stage2-journal", "ozvena-stage2-task", ...
+  content   String   @db.Text
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([module])
+}
