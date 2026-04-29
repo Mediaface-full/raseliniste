@@ -43,9 +43,21 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [createdBanner, setCreatedBanner] = useState<number | null>(null);
 
   useEffect(() => {
     void loadContacts();
+    // Detect ?created=N v URL po commit z review screenu
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const c = params.get("created");
+      if (c) {
+        setCreatedBanner(parseInt(c));
+        // Vyčisti URL bez reload
+        window.history.replaceState({}, "", "/ukoly");
+        setTimeout(() => setCreatedBanner(null), 6000);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -132,6 +144,14 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
           <Button variant="outline"><Mic /> Nadiktovat úkoly</Button>
         </a>
       </div>
+
+      {createdBanner !== null && (
+        <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 text-sm px-3 py-2 flex items-center gap-2">
+          <Check className="size-4 text-[var(--tint-sage)]" />
+          <span>Vytvořeno {createdBanner} {createdBanner === 1 ? "úkol" : createdBanner < 5 ? "úkoly" : "úkolů"} z diktátu.</span>
+          <button onClick={() => setCreatedBanner(null)} className="ml-auto text-muted-foreground"><X className="size-4" /></button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
