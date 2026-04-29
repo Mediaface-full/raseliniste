@@ -14,9 +14,13 @@ const TICK_MS = 250;
 export default function OwnerRecorder({
   ownerName,
   projects,
+  onSuccess,
+  compact = false,
 }: {
   ownerName: string;
   projects: Project[];
+  onSuccess?: () => void;
+  compact?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState(projects[0]?.id ?? "");
   const selected = projects.find((p) => p.id === selectedId);
@@ -119,12 +123,13 @@ export default function OwnerRecorder({
       return;
     }
     setPhase("done");
+    onSuccess?.();
     setTimeout(() => {
       setPhase("idle");
       setBriefMode(false);
       setBriefFile(null);
       setElapsedMs(0);
-    }, 4000);
+    }, 3000);
   }
 
   const remainingMs = Math.max(0, STANDARD_LIMIT_SEC * 1000 - elapsedMs);
@@ -135,36 +140,38 @@ export default function OwnerRecorder({
 
   return (
     <div className="space-y-4">
-      <div className="glass-strong rounded-xl p-4">
-        <label className="block text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono mb-1.5">
-          Do kterého projektu nahráváš?
-        </label>
-        <select
-          value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
-          disabled={phase !== "idle"}
-          className="w-full px-3 py-2.5 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-base"
-        >
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-        {selected?.description && (
-          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{selected.description}</p>
-        )}
-      </div>
+      {projects.length > 1 && (
+        <div className="glass-strong rounded-xl p-4">
+          <label className="block text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono mb-1.5">
+            Do kterého projektu nahráváš?
+          </label>
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            disabled={phase !== "idle"}
+            className="w-full px-3 py-2.5 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-base"
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          {selected?.description && (
+            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{selected.description}</p>
+          )}
+        </div>
+      )}
 
-      <div className="glass-strong rounded-xl p-6 text-center min-h-[280px] flex flex-col items-center justify-center gap-4">
+      <div className={`glass-strong rounded-xl text-center flex flex-col items-center justify-center gap-4 ${compact ? "p-4 min-h-[180px]" : "p-6 min-h-[280px]"}`}>
         {phase === "idle" && !briefMode && (
           <>
             <button
               onClick={startRecording}
               disabled={!selectedId}
-              className="size-24 rounded-full bg-[var(--tint-peach)] text-black grid place-items-center shadow-xl shadow-black/30 hover:scale-105 transition-transform active:scale-95 disabled:opacity-40"
+              className={`rounded-full bg-[var(--tint-peach)] text-black grid place-items-center shadow-xl shadow-black/30 hover:scale-105 transition-transform active:scale-95 disabled:opacity-40 ${compact ? "size-16" : "size-24"}`}
             >
-              <Mic className="size-10" />
+              <Mic className={compact ? "size-7" : "size-10"} />
             </button>
-            <div className="text-base font-medium">Tap pro záznam</div>
+            <div className="text-base font-medium">{compact ? "Nahrát záznam" : "Tap pro záznam"}</div>
             <div className="text-xs text-muted-foreground font-mono">
               max 10 min · auto-stop · {ownerName}
             </div>

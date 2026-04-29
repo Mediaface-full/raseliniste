@@ -31,5 +31,5 @@ if (!project) return Astro.redirect("/studna");
     { label: project.name },
   ]}
 >
-  <StudnaDetail client:load projectId={id} />
+  <StudnaDetail client:load projectId={id} ownerName={user.username} />
 </Shell>

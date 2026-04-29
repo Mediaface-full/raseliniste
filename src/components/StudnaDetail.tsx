@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
+import OwnerRecorder from "./OwnerRecorder";
 
 interface ProjectDetail {
   id: string;
@@ -55,7 +56,7 @@ interface ProjectDetail {
 
 type Tab = "feed" | "guests" | "summaries" | "settings";
 
-export default function StudnaDetail({ projectId }: { projectId: string }) {
+export default function StudnaDetail({ projectId, ownerName }: { projectId: string; ownerName: string }) {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("feed");
@@ -112,7 +113,7 @@ export default function StudnaDetail({ projectId }: { projectId: string }) {
         </TabButton>
       </div>
 
-      {tab === "feed" && <FeedTab project={project} onRefresh={load} />}
+      {tab === "feed" && <FeedTab project={project} ownerName={ownerName} onRefresh={load} />}
       {tab === "guests" && <GuestsTab project={project} onRefresh={load} />}
       {tab === "summaries" && <SummariesTab project={project} onRefresh={load} />}
       {tab === "settings" && <SettingsTab project={project} onRefresh={load} />}
@@ -136,7 +137,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 // =============================================================================
 // FEED tab
 // =============================================================================
-function FeedTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: () => void }) {
+function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ownerName: string; onRefresh: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
 
   async function togglePin(recId: string, current: boolean) {
@@ -181,27 +182,34 @@ function FeedTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: ()
     }
   }
 
-  if (project.recordings.length === 0) {
-    return (
-      <div className="glass rounded-xl p-8 text-center text-muted-foreground">
-        Zatím žádné záznamy. Pošli odkaz hostům, ať začnou nahrávat — nebo si nahraj sám
-        ve <a className="underline" href="/studna/nahravka">Studna → Nahrávka</a>.
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      {project.recordings.map((r) => (
-        <RecordingCard
-          key={r.id}
-          recording={r}
-          busy={busy === r.id}
-          onTogglePin={() => togglePin(r.id, r.isPinned)}
-          onDelete={() => remove(r.id)}
-          onRegenerate={() => regenerate(r.id)}
-        />
-      ))}
+    <div className="space-y-4">
+      {/* Inline recorder — nahrávej rovnou bez odchodu na /studna/nahravka */}
+      <OwnerRecorder
+        ownerName={ownerName}
+        projects={[{ id: project.id, name: project.name, description: project.description }]}
+        compact
+        onSuccess={onRefresh}
+      />
+
+      {project.recordings.length === 0 ? (
+        <div className="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
+          Zatím žádné záznamy. Nahraj nahoře, nebo pošli odkaz hostům.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {project.recordings.map((r) => (
+            <RecordingCard
+              key={r.id}
+              recording={r}
+              busy={busy === r.id}
+              onTogglePin={() => togglePin(r.id, r.isPinned)}
+              onDelete={() => remove(r.id)}
+              onRegenerate={() => regenerate(r.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
