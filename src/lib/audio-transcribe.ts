@@ -45,7 +45,7 @@ export interface TranscribeResult {
   promptChars: number;
 }
 
-const STANDARD_PROMPT = (projectContext: string | null) => `Jsi asistent, který zpracovává hlasové záznamy projektového brainstormingu pro Petra. Audio ti pošlu jako vstup.
+const STANDARD_PROMPT = (projectContext: string | null) => `Jsi asistent, který zpracovává hlasové záznamy projektového brainstormingu pro Gideona. Audio ti pošlu jako vstup.
 
 ${projectContext ? `Kontext projektu: ${projectContext}\n` : ""}
 Tvoje úkoly:
@@ -84,7 +84,7 @@ Vrať VÝHRADNĚ JSON v tomto schématu (žádný markdown, žádné komentáře
   "intensity_signals": "..."
 }`;
 
-const BRIEF_PROMPT = (projectContext: string | null) => `Jsi senior analytik, který pomáhá Petrovi orientovat se v dlouhých projektových briefech. Audio ti pošlu jako vstup — typicky 30 až 90 minut hlavní postavy projektu, která vykládá kontext, historii, cíle, postupy.
+const BRIEF_PROMPT = (projectContext: string | null) => `Jsi senior analytik, který pomáhá Gideonovi orientovat se v dlouhých projektových briefech. Audio ti pošlu jako vstup — typicky 30 až 90 minut hlavní postavy projektu, která vykládá kontext, historii, cíle, postupy.
 
 ${projectContext ? `Kontext projektu: ${projectContext}\n` : ""}
 Tohle je BRIEF, ne krátký brain-dump. Zpracuj to do hloubky. Klidně si vezmi tolik výstupu, kolik je potřeba.
@@ -288,7 +288,7 @@ export async function transcribeAudio(params: {
   // -------------------------------------------------------------------------
   // STAGE 2: Analýza nad přepisem. Žádné audio, jen text → spolehlivý JSON.
   // -------------------------------------------------------------------------
-  const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Petra. Audio už je přepsané — pracuj jen s textem.
+  const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Gideona. Audio už je přepsané — pracuj jen s textem.
 
 ${params.projectContext ? `Kontext projektu: ${params.projectContext}\n\n` : ""}Přepis:
 """

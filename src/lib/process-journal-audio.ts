@@ -21,10 +21,11 @@ import { getPrompt } from "./ai-prompts";
 export type JournalMoodStr = "ELATED" | "CONTENT" | "NEUTRAL" | "TIRED" | "STRESSED" | "DOWN" | "ANGRY" | "MIXED";
 
 export interface JournalStructured {
-  title: string;
+  title: string | null;
   bodyMarkdown: string;
   mood: JournalMoodStr;
   tags: string[];
+  people: string[];
   highlights: string[];
 }
 
@@ -92,6 +93,7 @@ export async function processJournalAudio(params: {
           bodyMarkdown: structured.bodyMarkdown,
           mood: structured.mood as never,
           tags: structured.tags,
+          people: structured.people,
           highlights: structured.highlights,
           status: "ready",
           processingError: null,
@@ -102,7 +104,7 @@ export async function processJournalAudio(params: {
       console.error(`[process-journal-audio] ${params.entryId} failed:`, msg);
 
       // Pokud máme aspoň přepis, ulož ho jako bodyMarkdown a označ ready
-      // s chybou v processingError. Petr to může přečíst, případně regenerovat.
+      // s chybou v processingError. Gideon to může přečíst, případně regenerovat.
       const current = await prisma.journalEntry.findUnique({ where: { id: params.entryId } });
       if (current?.rawTranscript) {
         await prisma.journalEntry
@@ -203,9 +205,11 @@ function parseJournalMarkdown(raw: string, fallbackTranscript: string): JournalS
   // Mood — heuristic mapping z popisu nálady na enum
   const mood = mapMood(moodLine);
 
-  // Tags — z TÉMATA + LIDÉ + UDÁLOSTI vyextrahuj klíčová slova (lowercase, bez háčků)
-  const tagsRaw = [...splitToTags(tematLine), ...splitToTags(lideLine)];
-  const tags = Array.from(new Set(tagsRaw)).slice(0, 8);
+  // Tags — primárně z TÉMATA (lowercase, bez háčků)
+  const tags = Array.from(new Set(splitToTags(tematLine))).slice(0, 8);
+
+  // People — z LIDÉ řádku, zachová původní velká písmena (jména) ale odstraní role v závorkách
+  const people = splitToPeople(lideLine).slice(0, 12);
 
   // Highlights — řádky pod KLÍČOVÉ MOMENTY (pokud začínají na "-" nebo jsou v jednom řádku)
   const highlightsBlock = raw.match(/KLÍČOVÉ MOMENTY\s*:\s*([\s\S]*?)(?:\n[A-ZÁ-Ý]+\s*:|---)/i);
@@ -213,7 +217,22 @@ function parseJournalMarkdown(raw: string, fallbackTranscript: string): JournalS
     ? highlightsBlock[1].split(/\n/).map((l) => l.replace(/^[-*\s]+/, "").trim()).filter((l) => l.length > 0).slice(0, 5)
     : [];
 
-  return { title, bodyMarkdown, mood, tags, highlights };
+  return { title, bodyMarkdown, mood, tags, people, highlights };
+}
+
+/**
+ * People — z LIDÉ hlavičky vytáhne jména. Zachová původní case (Karel, Dominik),
+ * odstraní role v závorkách / pomlčce ("matka — vztah" → "matka").
+ * Pro vyhledávání: full-text search v people[] použije ILIKE.
+ */
+function splitToPeople(text: string): string[] {
+  if (!text) return [];
+  return text
+    .split(/[,;]/)
+    .map((s) => s.trim())
+    // Odstraní popis za pomlčkou nebo dvojtečkou ("matka — vztah popis" → "matka")
+    .map((s) => s.split(/\s[—:-]\s/)[0].trim())
+    .filter((s) => s.length >= 2 && s.length <= 60);
 }
 
 function splitToTags(text: string): string[] {

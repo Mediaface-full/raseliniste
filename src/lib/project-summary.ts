@@ -71,7 +71,7 @@ export async function summarizeProject(params: {
 
   const recordingsBundle = sections.join("\n");
 
-  const prompt = `Jsi senior projektový analytik. Projdi všechny dostupné podklady projektu „${params.projectName}" a vytvoř pro Petra strukturovaný **stav projektu** v markdownu.
+  const prompt = `Jsi senior projektový analytik. Projdi všechny dostupné podklady projektu „${params.projectName}" a vytvoř pro Gideona strukturovaný **stav projektu** v markdownu.
 
 ${params.projectDescription ? `Kontext: ${params.projectDescription}\n\n` : ""}
 Tvoje úkoly:
@@ -102,12 +102,12 @@ Tvoje úkoly:
    Co se v podkladech opakuje, čemu autoři věnují nejvíc času, kde cítí nejistotu nebo nadšení. Z \`intensity_signals\` a \`sentiment\`.
 
    ## Glosář
-   Tabulka termínů z briefů (term + definice + zkratka pro Petra v jedné větě).
+   Tabulka termínů z briefů (term + definice + zkratka pro Gideona v jedné větě).
 
    ## Doporučené další kroky
-   Tvůj návrh, co Petr může udělat, aby projekt posunul. 3-7 konkrétních akcí.
+   Tvůj návrh, co Gideon může udělat, aby projekt posunul. 3-7 konkrétních akcí.
 
-3. **Citace autorů** — kdy je to relevantní, uveď, kdo myšlenku přinesl (např. „Karel zmínil, že …"). Buduješ Petrovi mentální mapu, kdo si co myslí.
+3. **Citace autorů** — kdy je to relevantní, uveď, kdo myšlenku přinesl (např. „Karel zmínil, že …"). Buduješ Gideonovi mentální mapu, kdo si co myslí.
 
 4. **Hloubka, ne plnění slovy** — buď bohatý, ale konkrétní. Žádné generické fráze typu „je důležité dál sledovat vývoj".
 

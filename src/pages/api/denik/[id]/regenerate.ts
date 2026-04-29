@@ -40,6 +40,7 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
             bodyMarkdown: structured.bodyMarkdown,
             mood: structured.mood as never,
             tags: structured.tags,
+            people: structured.people,
             highlights: structured.highlights,
             status: "ready",
           },

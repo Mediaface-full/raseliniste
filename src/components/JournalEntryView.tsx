@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Loader2, Check, X, ChevronDown, AlertTriangle, RotateCw, Trash2, Save,
-  Calendar, Tag, Sparkles, Volume2, VolumeX,
+  Calendar, Sparkles, Volume2, VolumeX, Download,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -160,9 +160,21 @@ export default function JournalEntryView({ entryId }: { entryId: string }) {
 
   const dateObj = new Date(entry.date);
   const dateStr = dateObj.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const fileId = `denik_${entry.date.slice(0, 10)}`;
+  const yearMonth = entry.date.slice(0, 7);
   const audioRetentionDays = entry.audioPath
     ? Math.max(0, 7 - Math.floor((Date.now() - new Date(entry.createdAt).getTime()) / (24 * 60 * 60 * 1000)))
     : null;
+
+  function downloadAsText() {
+    const blob = new Blob([entry?.bodyMarkdown ?? ""], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileId}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="space-y-4">
@@ -170,9 +182,16 @@ export default function JournalEntryView({ entryId }: { entryId: string }) {
       <div className="flex items-center gap-3 flex-wrap">
         <a href="/denik" className="text-xs font-mono text-muted-foreground hover:text-foreground">← Deník</a>
         <span className="text-xs font-mono text-muted-foreground"><Calendar className="inline size-3" /> {dateStr}</span>
+        <span className="text-[10px] font-mono text-muted-foreground/60">{fileId}</span>
         {entry.mood && (
           <span className="text-xs font-mono text-[var(--tint-butter)]">{MOOD_LABELS[entry.mood]}</span>
         )}
+        <a
+          href={`/denik/review/${yearMonth}`}
+          className="ml-auto text-xs font-mono text-muted-foreground hover:text-foreground underline"
+        >
+          měsíční review →
+        </a>
       </div>
 
       {entry.processingError && (
@@ -252,6 +271,9 @@ export default function JournalEntryView({ entryId }: { entryId: string }) {
         )}
         <Button size="sm" variant="outline" onClick={() => regenerate("structure-only")}>
           <Sparkles /> Přepsat AI
+        </Button>
+        <Button size="sm" variant="outline" onClick={downloadAsText}>
+          <Download /> Stáhnout {fileId}.txt
         </Button>
         {entry.audioPath && (
           <Button size="sm" variant="ghost" onClick={deleteAudio}>

@@ -9,6 +9,7 @@ const VALID_MODULES: PromptModule[] = [
   "ozvena-stage1-transcribe",
   "ozvena-stage2-task",
   "ozvena-stage2-journal",
+  "denik-monthly-review",
   "studna-standard",
   "studna-brief",
   "briefing-nightly",

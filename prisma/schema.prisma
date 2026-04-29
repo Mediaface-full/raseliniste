@@ -969,6 +969,7 @@ model JournalEntry {
   rawTranscript     String?       @db.Text
   mood              JournalMood?
   tags              String[]      @default([])
+  people            String[]      @default([])  // z hlavičky LIDÉ — vyhledávání
   highlights        String[]      @default([])
 
   audioPath         String?

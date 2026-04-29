@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mic, Plus, Loader2, Calendar } from "lucide-react";
+import { Mic, Plus, Loader2, Calendar, Search, X, Users, Tag, BookOpen, ChevronDown } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
@@ -13,9 +13,15 @@ interface Entry {
   bodyMarkdown: string;
   mood: Mood | null;
   tags: string[];
+  people: string[];
   highlights: string[];
   status: string;
   audioPath: string | null;
+}
+
+interface Facets {
+  tags: Array<{ tag: string; count: number }>;
+  people: Array<{ person: string; count: number }>;
 }
 
 const MOOD_EMOJI: Record<Mood, string> = {
@@ -25,20 +31,59 @@ const MOOD_EMOJI: Record<Mood, string> = {
 
 export default function DenikList() {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [facets, setFacets] = useState<Facets>({ tags: [], people: [] });
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
   const [newBody, setNewBody] = useState("");
 
-  useEffect(() => { void load(); }, []);
+  // Search/filter state
+  const [q, setQ] = useState("");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [personFilter, setPersonFilter] = useState<string | null>(null);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
+
+  // Re-load on filter change (debounced search)
+  useEffect(() => {
+    const t = setTimeout(() => void load(), q ? 300 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, tagFilter, personFilter, from, to]);
 
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/denik");
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (tagFilter) params.set("tag", tagFilter);
+      if (personFilter) params.set("person", personFilter);
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const url = (q || tagFilter || personFilter || from || to)
+        ? `/api/denik/search?${params}`
+        : "/api/denik";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setEntries(data.entries);
+        if (data.facets) setFacets(data.facets);
+        else {
+          // /api/denik nepošle facets, agreguj z entries
+          const tagCounts = new Map<string, number>();
+          const peopleCounts = new Map<string, number>();
+          for (const e of data.entries as Entry[]) {
+            for (const t of e.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+            for (const p of e.people ?? []) peopleCounts.set(p, (peopleCounts.get(p) ?? 0) + 1);
+          }
+          setFacets({
+            tags: Array.from(tagCounts.entries()).map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count).slice(0, 20),
+            people: Array.from(peopleCounts.entries()).map(([person, count]) => ({ person, count })).sort((a, b) => b.count - a.count).slice(0, 20),
+          });
+        }
       }
     } finally {
       setLoading(false);
@@ -59,6 +104,16 @@ export default function DenikList() {
     }
   }
 
+  function clearAllFilters() {
+    setQ("");
+    setTagFilter(null);
+    setPersonFilter(null);
+    setFrom("");
+    setTo("");
+  }
+
+  const hasFilter = Boolean(q || tagFilter || personFilter || from || to);
+
   // Group entries by date
   const byDate = new Map<string, Entry[]>();
   for (const e of entries) {
@@ -67,6 +122,10 @@ export default function DenikList() {
     byDate.get(day)!.push(e);
   }
   const days = Array.from(byDate.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+
+  // Měsíční review odkazy — vezmi unikátní YYYY-MM z entries, top 6
+  const monthsSet = new Set(entries.map((e) => e.date.slice(0, 7)));
+  const months = Array.from(monthsSet).sort().reverse().slice(0, 6);
 
   return (
     <div className="space-y-4">
@@ -77,6 +136,33 @@ export default function DenikList() {
         <Button variant="outline" onClick={() => setCreating(!creating)}>
           <Plus /> Textový zápis
         </Button>
+        {months.length > 0 && (
+          <div className="ml-auto relative">
+            <details className="group">
+              <summary className="list-none cursor-pointer">
+                <Button variant="outline" size="sm">
+                  <BookOpen /> Měsíční review <ChevronDown className="size-3" />
+                </Button>
+              </summary>
+              <div className="absolute right-0 top-full mt-1 glass-strong rounded-md p-2 min-w-[180px] z-10">
+                {months.map((ym) => {
+                  const [y, m] = ym.split("-");
+                  const monthName = new Date(parseInt(y), parseInt(m) - 1, 1)
+                    .toLocaleDateString("cs-CZ", { month: "long", year: "numeric" });
+                  return (
+                    <a
+                      key={ym}
+                      href={`/denik/review/${ym}`}
+                      className="block px-3 py-1.5 text-sm hover:bg-white/10 rounded"
+                    >
+                      {monthName}
+                    </a>
+                  );
+                })}
+              </div>
+            </details>
+          </div>
+        )}
       </div>
 
       {creating && (
@@ -105,20 +191,110 @@ export default function DenikList() {
         </div>
       )}
 
+      {/* Search bar */}
+      <div className="glass rounded-xl p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <Search className="size-4 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Hledat v textu zápisu (fulltext)…"
+            className="flex-1 border-0 bg-transparent focus:ring-0"
+          />
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`text-xs font-mono px-2 py-1 rounded ${showFilters ? "bg-foreground text-background" : "bg-white/5 text-muted-foreground hover:bg-white/10"}`}
+          >
+            Filtry {hasFilter && "•"}
+          </button>
+          {hasFilter && (
+            <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground">
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+
+        {showFilters && (
+          <div className="space-y-2 pt-2 border-t border-white/5">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                placeholder="Od"
+                className="px-3 py-1.5 rounded-md bg-black/30 border border-white/10"
+              />
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                placeholder="Do"
+                className="px-3 py-1.5 rounded-md bg-black/30 border border-white/10"
+              />
+            </div>
+            {facets.people.length > 0 && (
+              <div>
+                <div className="text-xs uppercase font-mono text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <Users className="size-3" /> Lidé
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {facets.people.slice(0, 12).map((p) => (
+                    <button
+                      key={p.person}
+                      onClick={() => setPersonFilter(personFilter === p.person ? null : p.person)}
+                      className={`text-xs font-mono px-2 py-0.5 rounded ${personFilter === p.person ? "bg-foreground text-background" : "bg-white/5 hover:bg-white/10 text-muted-foreground"}`}
+                    >
+                      {p.person} <span className="opacity-50">{p.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {facets.tags.length > 0 && (
+              <div>
+                <div className="text-xs uppercase font-mono text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <Tag className="size-3" /> Témata
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {facets.tags.slice(0, 12).map((t) => (
+                    <button
+                      key={t.tag}
+                      onClick={() => setTagFilter(tagFilter === t.tag ? null : t.tag)}
+                      className={`text-xs font-mono px-2 py-0.5 rounded ${tagFilter === t.tag ? "bg-foreground text-background" : "bg-white/5 hover:bg-white/10 text-muted-foreground"}`}
+                    >
+                      #{t.tag} <span className="opacity-50">{t.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {loading ? (
         <div className="glass rounded-xl p-6 text-center"><Loader2 className="size-6 animate-spin mx-auto text-muted-foreground" /></div>
       ) : days.length === 0 ? (
         <div className="glass rounded-xl p-8 text-center text-muted-foreground">
-          Zatím žádné zápisy. Diktuj nebo napiš něco — tady se to objeví.
+          {hasFilter ? "Žádné zápisy nesedí na filtr." : "Zatím žádné zápisy. Diktuj nebo napiš něco — tady se to objeví."}
         </div>
       ) : (
         <div className="space-y-4">
+          {hasFilter && (
+            <div className="text-xs font-mono text-muted-foreground">
+              Nalezeno {entries.length} zápisů
+            </div>
+          )}
           {days.map(([day, dayEntries]) => {
             const dateObj = new Date(`${day}T00:00:00`);
             const label = dateObj.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
+            const fileLabel = `denik_${day}`;
             return (
               <div key={day}>
-                <div className="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-2">{label}</div>
+                <div className="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-2 flex items-center gap-2">
+                  <span>{label}</span>
+                  <span className="text-[10px] opacity-60">{fileLabel}</span>
+                </div>
                 <div className="space-y-2">
                   {dayEntries.map((e) => (
                     <a
@@ -133,21 +309,25 @@ export default function DenikList() {
                           <div className="text-sm text-muted-foreground line-clamp-2 mt-1">
                             {e.bodyMarkdown.slice(0, 200)}
                           </div>
-                          {e.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {e.tags.slice(0, 6).map((t) => (
-                                <span key={t} className="text-xs font-mono px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
-                                  #{t}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {e.status === "processing" && (
-                            <div className="text-xs text-[var(--tint-butter)] mt-2">⏳ AI strukturuje…</div>
-                          )}
-                          {e.audioPath && (
-                            <div className="text-xs text-muted-foreground mt-1">🎤 audio</div>
-                          )}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs">
+                            {e.people && e.people.length > 0 && (
+                              <span className="flex items-center gap-1 text-[var(--tint-lavender)]">
+                                <Users className="size-3" />
+                                {e.people.slice(0, 4).join(", ")}{e.people.length > 4 ? `+${e.people.length - 4}` : ""}
+                              </span>
+                            )}
+                            {e.tags.length > 0 && (
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                <Tag className="size-3" />
+                                {e.tags.slice(0, 4).map((t) => `#${t}`).join(" ")}
+                                {e.tags.length > 4 && ` +${e.tags.length - 4}`}
+                              </span>
+                            )}
+                            {e.status === "processing" && (
+                              <span className="text-[var(--tint-butter)]">⏳ AI strukturuje…</span>
+                            )}
+                            {e.audioPath && <span className="text-muted-foreground">🎤 audio</span>}
+                          </div>
                         </div>
                       </div>
                     </a>

@@ -1,0 +1,28 @@
+---
+import Shell from "../../../layouts/Shell.astro";
+import DenikMonthlyReview from "../../../components/DenikMonthlyReview";
+import { prisma } from "../../../lib/db";
+import { readSession } from "../../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const ym = Astro.params.yearMonth as string;
+if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return Astro.redirect("/denik");
+---
+
+<Shell
+  title={`Měsíční review ${ym} · Deník`}
+  username={user.username}
+  breadcrumb={[{ label: "Deník", href: "/denik" }, { label: "Měsíční review" }]}
+>
+  <div class="max-w-3xl mx-auto">
+    <DenikMonthlyReview client:load yearMonth={ym} />
+  </div>
+</Shell>
