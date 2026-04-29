@@ -1,0 +1,47 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import AwayManager from "../../components/AwayManager";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const now = new Date();
+now.setHours(0, 0, 0, 0);
+
+const events = await prisma.calendarEvent.findMany({
+  where: {
+    deletedRemotely: false,
+    type: { in: ["OOO_FULL", "OOO_TRAVEL_WORKING"] },
+    endsAt: { gte: now },
+  },
+  orderBy: { startsAt: "asc" },
+  select: {
+    id: true, title: true, type: true,
+    startsAt: true, endsAt: true, sourceUrl: true,
+  },
+});
+
+const initial = events.map((e) => ({
+  ...e,
+  startsAt: e.startsAt.toISOString(),
+  endsAt: e.endsAt.toISOString(),
+}));
+---
+
+<Shell
+  title="Dovolená a nomád · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Kalendář" }, { label: "Dovolená / nomád" }]}
+>
+  <div class="max-w-2xl">
+    <AwayManager client:load initial={initial} />
+  </div>
+</Shell>

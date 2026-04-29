@@ -204,6 +204,8 @@ export interface CreateEventInput {
   endsAt: Date;
   attendeeEmails?: string[];
   conferenceData?: boolean; // přidat Google Meet link
+  allDay?: boolean;         // pro OOO události (celodenní range)
+  outOfOffice?: boolean;    // Google native eventType=outOfOffice
 }
 
 export async function createGoogleEvent(
@@ -217,10 +219,22 @@ export async function createGoogleEvent(
     summary: input.summary,
     description: input.description,
     location: input.location,
-    start: { dateTime: input.startsAt.toISOString(), timeZone: "Europe/Prague" },
-    end: { dateTime: input.endsAt.toISOString(), timeZone: "Europe/Prague" },
     attendees: input.attendeeEmails?.map((email) => ({ email })),
   };
+
+  if (input.allDay) {
+    // Google all-day: date YYYY-MM-DD, end exclusive (= startDate + 1 den pro single-day)
+    requestBody.start = { date: input.startsAt.toISOString().slice(0, 10) };
+    // endsAt by měl být DAY AFTER last day (Google konvence)
+    requestBody.end = { date: input.endsAt.toISOString().slice(0, 10) };
+  } else {
+    requestBody.start = { dateTime: input.startsAt.toISOString(), timeZone: "Europe/Prague" };
+    requestBody.end = { dateTime: input.endsAt.toISOString(), timeZone: "Europe/Prague" };
+  }
+
+  if (input.outOfOffice) {
+    requestBody.eventType = "outOfOffice";
+  }
 
   if (input.conferenceData) {
     requestBody.conferenceData = {

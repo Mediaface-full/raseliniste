@@ -750,6 +750,9 @@ model BookingInvite {
 
   internalNote    String?
 
+  // Délka slotu v minutách — Petr volí při tvorbě (30/45/60/90/120)
+  slotDurationMin Int                 @default(60)
+
   status          BookingStatus       @default(PENDING)
   validUntil      DateTime
   reservedSlot    Json?               // {startsAt, endsAt, type}

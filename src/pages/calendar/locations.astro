@@ -1,0 +1,29 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import LocationsAdmin from "../../components/LocationsAdmin";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const locations = await prisma.location.findMany({
+  orderBy: { name: "asc" },
+});
+---
+
+<Shell
+  title="Lokace · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Kalendář" }, { label: "Lokace" }]}
+>
+  <div class="max-w-4xl">
+    <LocationsAdmin client:load initial={locations} />
+  </div>
+</Shell>

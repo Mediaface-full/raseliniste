@@ -28,6 +28,8 @@ const nav: { group: string; items: NavItem[] }[] = [
     { href: "/calendar", label: "Kalendář",  icon: "lucide:calendar",     tint: "sky",    enabled: true },
     { href: "/quickadd", label: "Rychlé zadání", icon: "lucide:zap", tint: "sky", enabled: true },
     { href: `/day/${new Date().toISOString().slice(0, 10)}`, label: "Dnes (briefing)", icon: "lucide:sun", tint: "butter", enabled: true },
+    { href: "/calendar/away", label: "Dovolená / nomád", icon: "lucide:plane", tint: "rose", enabled: true },
+    { href: "/calendar/locations", label: "Lokace", icon: "lucide:map-pin", tint: "lavender", enabled: true },
     { href: "/tasks",    label: "Úkoly",     icon: "lucide:check-square", tint: "peach",  enabled: true },
     { href: "/notes",    label: "Poznámky",  icon: "lucide:notebook-pen", tint: "mint",   enabled: true },
     { href: "/journal",  label: "Deník",     icon: "lucide:book-open",    tint: "butter", enabled: true },
