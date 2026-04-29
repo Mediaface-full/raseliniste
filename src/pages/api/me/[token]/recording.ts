@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@/lib/db";
 import { saveUpload } from "@/lib/uploads";
-import { transcribeAudio } from "@/lib/audio-transcribe";
+import { processRecording } from "@/lib/process-recording";
 
 export const prerender = false;
 
@@ -131,32 +131,16 @@ export const POST: APIRoute = async ({ request, params, clientAddress }) => {
     },
   });
 
-  // Synchronní transcribe (Gemini)
-  try {
-    const result = await transcribeAudio({
-      audio: audioBuf,
-      mimeType: audioFile.type || "audio/webm",
-      recordingType: typeStr,
-      projectContext: invitation.project.description,
-    });
-    await prisma.projectRecording.update({
-      where: { id: recording.id },
-      data: {
-        transcript: result.transcript,
-        analysis: result.analysis as unknown as object,
-        status: "processed",
-      },
-    });
-    return Response.json({ ok: true, recordingId: recording.id });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await prisma.projectRecording.update({
-      where: { id: recording.id },
-      data: { status: "error", processingError: msg.slice(0, 1000) },
-    });
-    return Response.json(
-      { error: `Audio se uložilo, ale AI zpracování selhalo: ${msg}` },
-      { status: 500 },
-    );
-  }
+  // Fire-and-forget AI zpracování — host dostane OK hned ("nahráno, díky!"),
+  // AI běží na pozadí. Petr v Studna admin uvidí status processed / error
+  // až bude hotovo (viz polling v UI).
+  void processRecording({
+    recordingId: recording.id,
+    audio: audioBuf,
+    mimeType: audioFile.type || "audio/webm",
+    type: typeStr,
+    projectContext: invitation.project.description,
+  });
+
+  return Response.json({ ok: true, recordingId: recording.id, status: "processing" });
 };

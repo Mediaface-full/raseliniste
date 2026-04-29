@@ -241,8 +241,19 @@ export async function transcribeAudio(params: {
     );
   }
 
+  // Defenzivně: pokud transcript chybí, zkus alternativy nebo akceptuj prázdný.
+  // Místo throwu uložíme co máme + přilepíme info do summary, ať uživatel
+  // dostane aspoň částečnou hodnotu.
   if (typeof parsed.transcript !== "string") {
-    throw new Error("Gemini výstup neobsahuje pole 'transcript'.");
+    const altTranscript =
+      typeof parsed.text === "string" ? parsed.text :
+      typeof parsed.full_text === "string" ? parsed.full_text :
+      typeof parsed.content === "string" ? parsed.content : "";
+    parsed.transcript = altTranscript;
+    if (!altTranscript) {
+      parsed.summary = (parsed.summary ? `${parsed.summary}\n\n` : "") +
+        `⚠ Gemini nevrátil přepis (audio bylo možná tiché, příliš krátké, nebo v nepodporovaném formátu). Surový JSON output je v processingError.`;
+    }
   }
 
   // Defensivní defaulty (pokud Gemini něco vynechá)

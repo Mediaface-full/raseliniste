@@ -60,18 +60,28 @@ export default function StudnaDetail({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("feed");
 
-  async function load() {
-    setLoading(true);
+  async function load(showSpinner = true) {
+    if (showSpinner) setLoading(true);
     try {
       const res = await fetch(`/api/studna/${projectId}`);
       const data = await res.json();
       if (res.ok) setProject(data.project);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId]);
+
+  // Polling: pokud existuje processing recording, refresh každých 5 s (bez loading flash).
+  useEffect(() => {
+    if (!project) return;
+    const hasProcessing = project.recordings.some((r) => r.status === "processing");
+    if (!hasProcessing) return;
+    const interval = setInterval(() => load(false), 5000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project]);
 
   if (loading) {
     return (
