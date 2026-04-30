@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Loader2, Mic, Waves, Users, AudioLines } from "lucide-react";
+import { Plus, Loader2, Mic, Waves, Users, AudioLines, Activity } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
@@ -45,6 +45,9 @@ export default function StudnaList() {
         <div className="text-sm text-muted-foreground flex-1">
           {projects.length} projekt{projects.length === 1 ? "" : projects.length < 5 ? "y" : "ů"}
         </div>
+        <Button variant="outline" onClick={() => (window.location.href = "/studna/aktivita")}>
+          <Activity /> Aktivita
+        </Button>
         <Button variant="outline" onClick={() => (window.location.href = "/studna/nahravka")}>
           <Mic /> Nahrávat
         </Button>

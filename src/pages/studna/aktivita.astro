@@ -1,0 +1,165 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// Posledních 200 záznamů napříč všemi neaktivovanými projekty Gideona
+const recordings = await prisma.projectRecording.findMany({
+  where: {
+    project: { userId: session.uid },
+  },
+  select: {
+    id: true,
+    projectId: true,
+    project: { select: { name: true } },
+    authorName: true,
+    isOwner: true,
+    type: true,
+    status: true,
+    audioDurationSec: true,
+    transcript: true,
+    createdAt: true,
+  },
+  orderBy: { createdAt: "desc" },
+  take: 200,
+});
+
+function snippet(t: string | null, len = 200): string {
+  if (!t) return "";
+  const s = t.replace(/\s+/g, " ").trim();
+  return s.length <= len ? s : s.slice(0, len).replace(/\s+\S*$/, "") + "…";
+}
+
+function fmtDuration(sec: number | null): string {
+  if (!sec || sec <= 0) return "";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}:${s.toString().padStart(2, "0")}` : `${s}s`;
+}
+
+function fmtRelative(d: Date): string {
+  const diffMs = Date.now() - d.getTime();
+  const min = Math.round(diffMs / 60_000);
+  if (min < 1) return "právě teď";
+  if (min < 60) return `před ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `před ${h} h`;
+  const days = Math.round(h / 24);
+  if (days < 7) return `před ${days} dny`;
+  return d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" });
+}
+
+// Sgrupování per den (DD.MM.YYYY) — vizuálně oddělené sekce
+type Group = { dateKey: string; dateLabel: string; items: typeof recordings };
+const groups: Group[] = [];
+for (const r of recordings) {
+  const d = r.createdAt;
+  const dateKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  let g = groups.find((x) => x.dateKey === dateKey);
+  if (!g) {
+    const today = new Date();
+    const isToday =
+      d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate();
+    const yest = new Date(Date.now() - 86_400_000);
+    const isYest =
+      d.getFullYear() === yest.getFullYear() &&
+      d.getMonth() === yest.getMonth() &&
+      d.getDate() === yest.getDate();
+    const label = isToday
+      ? "Dnes"
+      : isYest
+        ? "Včera"
+        : d.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
+    g = { dateKey, dateLabel: label, items: [] };
+    groups.push(g);
+  }
+  g.items.push(r);
+}
+---
+
+<Shell
+  title="Aktivita · Studna · Rašeliniště"
+  username={user.username}
+  heading="Aktivita ve Studně"
+  breadcrumb={[{ label: "Studna", href: "/studna" }, { label: "Aktivita" }]}
+>
+  <div class="space-y-4">
+    <div class="glass rounded-xl p-3 flex flex-wrap items-center gap-2">
+      <div class="text-sm text-muted-foreground flex-1">
+        Posledních {recordings.length} {recordings.length === 1 ? "záznam" : recordings.length < 5 ? "záznamy" : "záznamů"}
+      </div>
+      <a
+        href="/studna"
+        class="text-xs font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-white/5"
+      >
+        <Icon name="lucide:arrow-left" class="size-3" /> zpět na Studnu
+      </a>
+    </div>
+
+    {recordings.length === 0 ? (
+      <div class="glass rounded-xl p-8 text-center text-muted-foreground">
+        Zatím žádné nahrávky. Až někdo něco nahraje, objeví se to tady.
+      </div>
+    ) : (
+      <div class="space-y-6">
+        {groups.map((g) => (
+          <div>
+            <h3 class="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-2 px-1">
+              {g.dateLabel}
+            </h3>
+            <div class="space-y-2">
+              {g.items.map((r) => (
+                <a
+                  href={`/studna/${r.projectId}#rec-${r.id}`}
+                  class="glass rounded-xl p-4 flex flex-col gap-1.5 hover:bg-white/5 transition block"
+                >
+                  <div class="flex items-baseline gap-2 flex-wrap">
+                    <span class="font-medium text-sm">{r.authorName}</span>
+                    {r.isOwner && (
+                      <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-[var(--tint-sky)]/20 text-[var(--tint-sky)]">
+                        Já
+                      </span>
+                    )}
+                    {r.type === "BRIEF" && (
+                      <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-[var(--tint-mint)]/20 text-[var(--tint-mint)]">
+                        Brief
+                      </span>
+                    )}
+                    {r.status !== "processed" && (
+                      <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">
+                        {r.status}
+                      </span>
+                    )}
+                    <span class="text-xs text-muted-foreground font-mono ml-auto">
+                      {fmtRelative(r.createdAt)}{r.audioDurationSec ? ` · ${fmtDuration(r.audioDurationSec)}` : ""}
+                    </span>
+                  </div>
+                  <div class="text-xs text-muted-foreground/80 font-mono">
+                    📂 {r.project.name}
+                  </div>
+                  {r.transcript && (
+                    <div class="text-sm text-foreground/85 italic leading-relaxed line-clamp-3">
+                      „{snippet(r.transcript, 200)}"
+                    </div>
+                  )}
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</Shell>

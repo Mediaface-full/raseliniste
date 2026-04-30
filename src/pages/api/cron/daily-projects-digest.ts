@@ -9,15 +9,18 @@ export const prerender = false;
  * Denní souhrn aktivit ve Studně.
  *
  * Synology Task Scheduler:
- *   - Každý den 18:00
+ *   - Každý den 7:00 ráno
  *   - curl -X POST https://www.raseliniste.cz/api/cron/daily-projects-digest
  *          -H "x-cron-key: <CRON_SECRET>"
  *
  * Logika:
- *   1. Vezme všechny záznamy z dnešního dne (00:00 → teď)
+ *   1. Vezme všechny záznamy z posledních 24 h (now-24h → now)
  *   2. Sgrupuje podle projektu (jen těch, co mají includeInDigest=true)
  *   3. Pokud nic nepřibylo → e-mail se neposílá
  *   4. Jinak: pošle souhrn na User.notificationEmail / env.NOTIFICATION_EMAIL
+ *
+ * Předmět: "Rašeliniště · Studna — N nových nahrávek (Jméno, Jméno)"
+ * Tělo: per-projekt blok, každý záznam → autor + čas + 200 znaků z transkriptu.
  */
 
 interface RecordingForDigest {
@@ -26,12 +29,14 @@ interface RecordingForDigest {
   type: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   analysis: any;
+  transcript: string;
+  audioDurationSec: number | null;
   createdAt: Date;
 }
 
-function dayBoundsToday(): { from: Date; to: Date } {
+function last24hBounds(): { from: Date; to: Date } {
   const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   return { from, to: now };
 }
 
@@ -42,14 +47,14 @@ export const POST: APIRoute = async ({ request, url }) => {
     return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  // Volitelně override datumu přes ?date=YYYY-MM-DD (pro testování)
+  // Volitelně override datumu přes ?date=YYYY-MM-DD (pro testování — vezme celý ten den)
   const qDate = url.searchParams.get("date");
   let from: Date, to: Date;
   if (qDate) {
     from = new Date(`${qDate}T00:00:00`);
     to = new Date(`${qDate}T23:59:59`);
   } else {
-    ({ from, to } = dayBoundsToday());
+    ({ from, to } = last24hBounds());
   }
 
   const users = await prisma.user.findMany({
@@ -85,6 +90,8 @@ export const POST: APIRoute = async ({ request, url }) => {
         isOwner: true,
         type: true,
         analysis: true,
+        transcript: true,
+        audioDurationSec: true,
         createdAt: true,
       },
       orderBy: { createdAt: "asc" },
@@ -110,20 +117,43 @@ export const POST: APIRoute = async ({ request, url }) => {
     }
 
     const html = renderDigestHtml(projects, byProject);
-    const dateLabel = from.toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric" });
-    const subject = `[Rašeliniště · Studna] Denní souhrn — ${dateLabel}`;
+    // Sgrupuj autory přes všechny projekty (max 4 jména v subjectu, jinak "+N")
+    const allAuthors = new Set<string>();
+    for (const r of recordings) allAuthors.add(r.authorName);
+    const authorList = Array.from(allAuthors);
+    const authorSubj = authorList.length <= 4
+      ? authorList.join(", ")
+      : `${authorList.slice(0, 4).join(", ")} +${authorList.length - 4}`;
+    const subject = `Studna — ${recordings.length} ${plural(recordings.length, "nová nahrávka", "nové nahrávky", "nových nahrávek")} (${authorSubj})`;
 
     const result = await sendMail({
       to: to_email,
       subject,
       html,
-      text: `Souhrn projektů ke dni ${dateLabel}. ${recordings.length} nových záznamů.`,
+      text: `${recordings.length} nových záznamů za posledních 24 h. Otevři https://www.raseliniste.cz/studna/aktivita`,
     });
     summaries.push({ user: user.username, sent: result.ok, reason: result.ok ? undefined : (result as { error: string }).error });
   }
 
   return Response.json({ ok: true, processed: summaries });
 };
+
+function snippet(text: string, len = 200): string {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  if (t.length <= len) return t;
+  return t.slice(0, len).replace(/\s+\S*$/, "") + "…";
+}
+
+function fmtDuration(sec: number | null): string {
+  if (!sec || sec <= 0) return "";
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}:${s.toString().padStart(2, "0")} min` : `${s} s`;
+}
+
+function fmtTime(d: Date): string {
+  return d.toLocaleString("cs-CZ", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "numeric" });
+}
 
 function renderDigestHtml(
   projects: { id: string; name: string }[],
@@ -134,34 +164,31 @@ function renderDigestHtml(
 
   for (const [projectId, recs] of byProject) {
     const projectName = projectMap.get(projectId) ?? "Neznámý projekt";
-    const standard = recs.filter((r) => r.type === "STANDARD");
-    const briefs = recs.filter((r) => r.type === "BRIEF");
 
-    const authors = new Map<string, number>();
-    for (const r of recs) authors.set(r.authorName, (authors.get(r.authorName) ?? 0) + 1);
-    const authorsList = Array.from(authors.entries())
-      .map(([n, c]) => `${escapeHtml(n)} (${c}×)`)
-      .join(", ");
-
-    const topBullets: string[] = [];
-    for (const r of recs.slice(0, 3)) {
-      const thoughts = r.analysis?.thoughts;
-      if (Array.isArray(thoughts) && thoughts.length > 0) {
-        const high = thoughts.filter((t: { importance?: string }) => t.importance === "high");
-        const top = (high.length > 0 ? high : thoughts).slice(0, 2);
-        for (const t of top) {
-          topBullets.push(`<li><em>${escapeHtml(r.authorName)}:</em> ${escapeHtml(t.text)}</li>`);
-        }
-      }
+    const items: string[] = [];
+    for (const r of recs) {
+      const meta = [fmtTime(r.createdAt), r.type === "BRIEF" ? "BRIEF" : null, fmtDuration(r.audioDurationSec)]
+        .filter(Boolean)
+        .join(" · ");
+      const preview = snippet(r.transcript, 200);
+      items.push(`
+        <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div style="font-size:14px;color:#fff;margin-bottom:2px;">
+            <strong>${escapeHtml(r.authorName)}</strong>
+            <span style="color:#9a8f82;font-family:ui-monospace,monospace;font-size:12px;margin-left:6px;">${escapeHtml(meta)}</span>
+          </div>
+          ${preview ? `<div style="font-size:13px;color:#c9c2b6;line-height:1.55;font-style:italic;">„${escapeHtml(preview)}"</div>` : `<div style="font-size:12px;color:#6b665f;">(žádný přepis)</div>`}
+        </div>
+      `);
     }
 
     rows.push(`
       <div style="border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:18px;margin-bottom:14px;background:#241f1b;">
-        <div style="font-family:Georgia,serif;font-size:18px;color:#fff;margin-bottom:6px;">${escapeHtml(projectName)}</div>
-        <div style="font-size:13px;color:#9a8f82;margin-bottom:10px;font-family:ui-monospace,monospace;">
-          ${standard.length} záznam${countWord(standard.length)}${briefs.length > 0 ? ` · ${briefs.length} brief${countWord(briefs.length)}` : ""} · ${escapeHtml(authorsList)}
+        <div style="font-family:Georgia,serif;font-size:18px;color:#fff;margin-bottom:4px;">${escapeHtml(projectName)}</div>
+        <div style="font-size:12px;color:#9a8f82;margin-bottom:14px;font-family:ui-monospace,monospace;">
+          ${recs.length} ${plural(recs.length, "záznam", "záznamy", "záznamů")}
         </div>
-        ${topBullets.length > 0 ? `<ul style="margin:0;padding-left:18px;color:#e8e3d9;font-size:14px;line-height:1.55;">${topBullets.join("")}</ul>` : ""}
+        ${items.join("")}
       </div>
     `);
   }
@@ -174,11 +201,11 @@ function renderDigestHtml(
       Rašeliniště · Studna
     </div>
     <h1 style="font-family:Georgia,serif;font-size:24px;margin:0 0 18px;color:#fff;letter-spacing:-0.01em;">
-      Denní souhrn projektů
+      Co se ve Studně dělo za posledních 24 h
     </h1>
     ${rows.join("")}
     <div style="font-size:11px;color:#6b665f;font-family:ui-monospace,monospace;margin-top:18px;">
-      Otevři <a href="https://www.raseliniste.cz/studna" style="color:#b8763c;">/studna</a> pro detail.
+      Plný výpis: <a href="https://www.raseliniste.cz/studna/aktivita" style="color:#b8763c;">/studna/aktivita</a>
     </div>
   </div>
 </body>
@@ -194,8 +221,8 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function countWord(n: number): string {
-  if (n === 1) return "";
-  if (n >= 2 && n <= 4) return "y";
-  return "ů";
+function plural(n: number, one: string, few: string, many: string): string {
+  if (n === 1) return one;
+  if (n >= 2 && n <= 4) return few;
+  return many;
 }
