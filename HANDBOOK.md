@@ -385,7 +385,7 @@ Sdílené projektové boxíky s hlasovými záznamy.
   - **BRIEF** (Pro 2.5 hluboká analýza s glossary/actors/decision_history, max 90 min, file upload, audio nikdy nemizí)
 - **AI rozbor:** strukturovaný JSON s `summary`, `key_themes`, `thoughts[]` (importance + rationale + category), `open_questions`, `sentiment`, `intensity_signals` (+ brief: `glossary`, `actors`, `decision_history`)
 - **Project summary** — Pro model nad všemi recordings (briefy primární kontext) — strukturovaný markdown dokument o stavu projektu
-- **Cron:** `daily-projects-digest` (18:00 — souhrn nepošle pokud nic nepřibylo), `cleanup-audio` (03:00 — STANDARD older 14d & not pinned)
+- **Cron:** `daily-projects-digest` (**7:00 ráno** — okno posledních 24 h, 200znakové náhledy z transkriptu, předmět "Studna — N nových nahrávek (autoři)", patička link na `/studna/aktivita`; pokud nic nepřibylo, mail neposílá), `cleanup-audio` (03:00 — STANDARD older 14d & not pinned)
 - **Onboarding PDFs** — 2 šablony (Standard + Brief) generované přes `@react-pdf/renderer`, owner si stáhne v admin a pošle hostovi mailem
 
 ### 🚧 Kalendář & Bookingy (fáze 1a hotová — Google sync; 1b+2+3+4 v plánu)
@@ -693,7 +693,7 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | Method | Path | Auth | Query |
 |---|---|---|---|
 | POST | `/api/cron/monthly-health-report` | **x-cron-key** | `?from&to` (override; jinak předchozí celý měsíc) |
-| POST | `/api/cron/daily-projects-digest` | **x-cron-key** | `?date=YYYY-MM-DD` (override; jinak dnes) |
+| POST | `/api/cron/daily-projects-digest` | **x-cron-key** | `?date=YYYY-MM-DD` (override celého toho dne; jinak posledních 24 h) |
 | POST | `/api/cron/cleanup-audio` | **x-cron-key** | — (smaže STANDARD audio >14d, pokud není pinned) |
 | POST | `/api/cron/sync-calendars` | **x-cron-key** | — (Google primary, à 5 min) |
 | POST | `/api/cron/sync-contacts` | **x-cron-key** | — (Google People, denně 04:00) |
@@ -1093,7 +1093,7 @@ Detail v `Návody/03-crony.pdf`. Krátký výpis:
 | 3 | nightly-briefing | denně 22:00 |
 | 4 | retry-stuck-recordings (Studna) | každých 15 min |
 | 5 | cleanup-audio (Studna) | denně 03:00 |
-| 6 | daily-projects-digest (Studna) | denně 18:00 |
+| 6 | daily-projects-digest (Studna) | denně **7:00 ráno** (okno posledních 24 h) |
 | 7 | monthly-health-report | poslední den měsíce 23:00 |
 | 8 | cleanup-expired-invites (Bookingy) | denně 01:00 |
 | 9 | cleanup-task-audio-batches | denně 02:30 |

@@ -62,7 +62,7 @@ Osobní informační systém Petra „Gideona" Periny. Single-user, max security
 - `/me/<guestToken>` public host page s MediaRecorder + countdown 10 min
 - Audio transkripce přes Vertex Flash (krátké) / Pro (briefy nad 18 MB přes Files API)
 - Onboarding PDFs (2 verze: standard + brief, NotoSans, logo G)
-- Cron entries: `daily-projects-digest` 18:00, `cleanup-audio` 03:00 *(NEnastaveno v DSM)*
+- Cron entries: `daily-projects-digest` 7:00 ráno (24h okno), `cleanup-audio` 03:00 *(NEnastaveno v DSM)*
 
 **Kalendář fáze 1a** — Google Calendar + Contacts sync:
 - Schema: 7 nových modelů + Contact extension (isClient/isFriend/isFamily/booking + google fields)
@@ -192,7 +192,7 @@ curl -I http://localhost:3333/login
 
 **P-1 vedle Kalendáře:**
 - DSM Reverse Proxy: zvýšit Send/Read-Timeout na 600s pro dlouhé briefy Studny
-- DSM Task Scheduler: 5 cron úloh (sync-calendars 5min, sync-contacts 04:00, daily-projects-digest 18:00, cleanup-audio 03:00, monthly-health-report poslední den měsíce, později nightly-briefing 22:00)
+- DSM Task Scheduler: 5 cron úloh (sync-calendars 5min, sync-contacts 04:00, daily-projects-digest 7:00, cleanup-audio 03:00, monthly-health-report poslední den měsíce, později nightly-briefing 22:00)
 - Tasks UX: kalendářní view, inline edit, drag, due date picker
 - Tasks pull-sync z Todoistu
 

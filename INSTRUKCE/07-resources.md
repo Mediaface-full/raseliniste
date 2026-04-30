@@ -160,7 +160,7 @@ Detail per úloha + curl command v `Návody/03-crony.pdf`. Krátký přehled:
 3. nightly-briefing (denně 22:00)
 4. retry-stuck-recordings — Studna (každých 15 min)
 5. cleanup-audio — Studna (denně 03:00)
-6. daily-projects-digest — Studna (denně 18:00)
+6. daily-projects-digest — Studna (denně **7:00 ráno**, okno posledních 24 h, 200znakové náhledy z transkriptu, link na `/studna/aktivita`)
 7. monthly-health-report (poslední den měsíce 23:00)
 8. cleanup-expired-invites — Bookingy (denně 01:00)
 9. cleanup-task-audio-batches — Ozvěna úkoly (denně 02:30)
