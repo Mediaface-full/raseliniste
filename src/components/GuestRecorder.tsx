@@ -35,7 +35,29 @@ export default function GuestRecorder({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [briefMode, setBriefMode] = useState(false);
   const [briefFile, setBriefFile] = useState<File | null>(null);
+  const [micPermission, setMicPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
   const protection = useRecordingProtection();
+
+  // Detekce stavu mic permission — ukáže hint Blance/guestům, ať klikli "Při každé návštěvě"
+  // místo "Tentokrát" (Android) nebo nastavili Safari Settings (iOS).
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.permissions) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // @ts-expect-error - "microphone" není v TS lib.dom typu PermissionName
+        const status = await navigator.permissions.query({ name: "microphone" });
+        if (cancelled) return;
+        setMicPermission(status.state as "granted" | "denied" | "prompt");
+        status.onchange = () => {
+          if (!cancelled) setMicPermission(status.state as "granted" | "denied" | "prompt");
+        };
+      } catch {
+        // Safari na iOS někdy `microphone` neumí query — necháme "unknown"
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -246,6 +268,18 @@ export default function GuestRecorder({
             <div className="text-xs text-muted-foreground/80 max-w-sm leading-relaxed text-center">
               {recordingProtectionTip(protection.wakeLockSupported)}
             </div>
+
+            {micPermission === "prompt" && (
+              <div className="rounded-md border border-[var(--tint-butter)]/40 bg-[var(--tint-butter)]/10 text-xs px-3 py-2 max-w-sm leading-relaxed text-left">
+                <strong>Než klikneš:</strong> prohlížeč se zeptá na povolení mikrofonu. Zvol{" "}
+                <strong>„Povolit při každé návštěvě"</strong> (Android) nebo povol v Nastavení Safari → Webové stránky → Mikrofon (iOS), ať se neptá pokaždé.
+              </div>
+            )}
+            {micPermission === "denied" && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 text-xs px-3 py-2 max-w-sm leading-relaxed text-left">
+                <strong>Mikrofon je zablokovaný.</strong> Otevři nastavení prohlížeče pro tuhle stránku a povol mikrofon — pak refresh.
+              </div>
+            )}
 
             {selected?.canRecordBrief && (
               <button
