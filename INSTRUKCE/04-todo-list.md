@@ -25,6 +25,18 @@
    - Lag 24h (GCP fakturuje s denním zpožděním)
    - Detail v memory `todo_gcp_billing.md` (varianta B)
 
+6. **Staging prostředí + smoke test + rollback** (odloženo — teď není čas/prostor)
+   - Cíl: nikdy nenasadit rozbitou verzi produkčním uživatelům (Blanka & spol.)
+   - Plný návod už je sepsaný v `INSTRUKCE/08-deploy-testing.md`
+   - K udělání:
+     - `docker-compose.staging.yml` (druhý stack na NASu, port 3334, vlastní DB)
+     - DSM Reverse Proxy: `staging.raseliniste.cz` → `localhost:3334`
+     - `scripts/smoke.sh` — bash skript co projede klíčové stránky a hlavičky
+     - Rollback procedura: tag `:rollback` před každým deployem
+   - Resource: ~400 MB RAM + ~1 GB disk na NASu (DS718+ to zvládne)
+   - Alternativa pro zatím: lokální dev na Macu před push + smoke test po deployi na prod (90 % ochrany za 0 % NAS resources)
+   - Aktivovat až bude víc uživatelů / víc změn najednou
+
 ## ✅ Hotové (recent commits, čeká na push/deploy)
 
 Top 10 commitů od posledního stable bodu, viz `01-aktualni-stav.md` pro plný seznam.
