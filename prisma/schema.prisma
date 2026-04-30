@@ -240,6 +240,10 @@ model Contact {
   isFamily            Boolean        @default(false)
   defaultBookingMode  BookingMode?
 
+  // Narozeniny — stačí den a měsíc (rok obvykle neznámý)
+  birthMonth   Int?
+  birthDay     Int?
+
   importedFrom String?        // "vcard" | "manual" | "google"
   externalId   String?        // UID z vCard, pokud má
 

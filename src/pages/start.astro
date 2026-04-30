@@ -3,6 +3,7 @@ import Base from "../layouts/Base.astro";
 import { Icon } from "astro-icon/components";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
+import { svatekDne } from "../lib/jmenny-kalendar";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -56,7 +57,42 @@ const tiles: Tile[] = [
   },
 ];
 
-const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
+const today = new Date();
+const todayStr = today.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
+const svatek = svatekDne(today);
+
+// Narozeniny dnes + nadcházejících 7 dní
+const dnesM = today.getMonth() + 1;
+const dnesD = today.getDate();
+const contactsWithBirthday = await prisma.contact.findMany({
+  where: {
+    userId: session.uid,
+    birthMonth: { not: null },
+    birthDay: { not: null },
+  },
+  select: { displayName: true, firstName: true, birthMonth: true, birthDay: true },
+});
+
+// Spočti "kolik dní do narozenin" pro každého a vyfiltruj 0..7
+function daysUntil(month: number, day: number): number {
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  let target = new Date(today.getFullYear(), month - 1, day);
+  if (target < t) target = new Date(today.getFullYear() + 1, month - 1, day);
+  return Math.round((target.getTime() - t.getTime()) / 86_400_000);
+}
+
+const birthdaysSoon = contactsWithBirthday
+  .map((c) => ({
+    name: c.firstName?.trim() || c.displayName,
+    month: c.birthMonth!,
+    day: c.birthDay!,
+    days: daysUntil(c.birthMonth!, c.birthDay!),
+  }))
+  .filter((b) => b.days <= 7)
+  .sort((a, b) => a.days - b.days);
+
+const birthdayToday = birthdaysSoon.filter((b) => b.days === 0);
+const birthdayUpcoming = birthdaysSoon.filter((b) => b.days > 0 && b.days <= 7);
 ---
 
 <Base
@@ -66,7 +102,7 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
   manifestPath="/manifest-start.json"
 >
   <main class="min-h-screen flex flex-col">
-    <!-- Topbar (jen pokud ne v PWA standalone módu) -->
+    <!-- Topbar -->
     <div class="border-b border-white/5 px-4 py-3 flex items-center gap-3">
       <a href="/" class="text-xs font-mono text-muted-foreground hover:text-foreground">← Dashboard</a>
       <span class="text-xs font-mono text-muted-foreground">{user.username}</span>
@@ -75,13 +111,35 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
       </a>
     </div>
 
-    <div class="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
-      <div class="w-full max-w-lg space-y-6">
-        <header class="text-center">
-          <div class="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-1">
-            {today}
+    <!-- Content — zarovnáno nahoru, ne na střed (nemusí se scrollovat) -->
+    <div class="flex-1 px-4 sm:px-6 pt-6 pb-8">
+      <div class="w-full max-w-lg mx-auto space-y-5">
+        <header class="text-center space-y-2">
+          {/* Svátek + narozeniny — info pruh nad datem */}
+          <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs">
+            {svatek && (
+              <span class="text-muted-foreground">
+                Svátek má <strong class="text-foreground">{svatek}</strong>
+              </span>
+            )}
+            {birthdayToday.length > 0 && (
+              <span class="text-[var(--tint-rose)]">
+                🎂 <strong>{birthdayToday.map((b) => b.name).join(", ")}</strong>
+                {" má dnes narozeniny"}
+              </span>
+            )}
+          </div>
+
+          <div class="text-xs uppercase tracking-widest font-mono text-muted-foreground">
+            {todayStr}
           </div>
           <h1 class="text-3xl tracking-tight">Co teď?</h1>
+
+          {birthdayUpcoming.length > 0 && (
+            <div class="text-[11px] text-muted-foreground/80">
+              Tento týden: {birthdayUpcoming.map((b) => `${b.name} (${b.day}.${b.month}.)`).join(" · ")}
+            </div>
+          )}
         </header>
 
         <div class="grid grid-cols-2 gap-3">
@@ -126,6 +184,16 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
             );
           })}
         </div>
+
+        <!-- Plnošířkové tlačítko Dashboard — proklik do hlavního systému -->
+        <a
+          href="/"
+          class="glass rounded-2xl px-5 py-4 flex items-center justify-center gap-3 hover:bg-white/5 active:scale-[0.99] transition"
+        >
+          <Icon name="lucide:layout-dashboard" class="size-5 text-[var(--tint-sky)]" />
+          <span class="text-base font-semibold tracking-tight">Dashboard</span>
+          <Icon name="lucide:arrow-right" class="size-4 text-muted-foreground" />
+        </a>
 
         <div class="text-center text-xs font-mono text-muted-foreground/60">
           Tip: <strong>Sdílet → Přidat na plochu</strong> = ikona Rašeliniště

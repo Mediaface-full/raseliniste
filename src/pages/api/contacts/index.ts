@@ -22,6 +22,8 @@ const CreateBody = z.object({
   lastName: z.string().max(100).optional().nullable(),
   note: z.string().max(2000).optional().nullable(),
   isVip: z.boolean().optional().default(false),
+  birthMonth: z.number().int().min(1).max(12).optional().nullable(),
+  birthDay: z.number().int().min(1).max(31).optional().nullable(),
   phones: z.array(PhoneInput).default([]),
   emails: z.array(EmailInput).default([]),
 });
@@ -86,6 +88,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       lastName: body.lastName ?? null,
       note: body.note ?? null,
       isVip: body.isVip,
+      birthMonth: body.birthMonth ?? null,
+      birthDay: body.birthDay ?? null,
       importedFrom: "manual",
       phones: { create: normalizedPhones },
       emails: {

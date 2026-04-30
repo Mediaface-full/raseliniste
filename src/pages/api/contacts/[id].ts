@@ -12,6 +12,8 @@ const PatchBody = z.object({
   lastName: z.string().max(100).nullable().optional(),
   note: z.string().max(2000).nullable().optional(),
   isVip: z.boolean().optional(),
+  birthMonth: z.number().int().min(1).max(12).nullable().optional(),
+  birthDay: z.number().int().min(1).max(31).nullable().optional(),
   phones: z
     .array(z.object({ number: z.string(), label: z.string().nullable().optional() }))
     .optional(),
@@ -73,6 +75,8 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
       ...(body.lastName !== undefined ? { lastName: body.lastName } : {}),
       ...(body.note !== undefined ? { note: body.note } : {}),
       ...(body.isVip !== undefined ? { isVip: body.isVip } : {}),
+      ...(body.birthMonth !== undefined ? { birthMonth: body.birthMonth } : {}),
+      ...(body.birthDay !== undefined ? { birthDay: body.birthDay } : {}),
     },
     include: { phones: true, emails: true },
   });

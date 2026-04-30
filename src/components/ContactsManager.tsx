@@ -10,6 +10,8 @@ interface Contact {
   lastName: string | null;
   note: string | null;
   isVip: boolean;
+  birthMonth: number | null;
+  birthDay: number | null;
   importedFrom: string | null;
   phones: { id: string; number: string; label: string | null }[];
   emails: { id: string; email: string; label: string | null }[];
@@ -288,6 +290,8 @@ function ContactEditor({ contact, onClose }: EditorProps) {
   const [lastName, setLastName] = useState(contact?.lastName ?? "");
   const [note, setNote] = useState(contact?.note ?? "");
   const [isVip, setIsVip] = useState(contact?.isVip ?? false);
+  const [birthDay, setBirthDay] = useState(contact?.birthDay?.toString() ?? "");
+  const [birthMonth, setBirthMonth] = useState(contact?.birthMonth?.toString() ?? "");
   const [phones, setPhones] = useState(
     contact?.phones.map((p) => ({ number: p.number, label: p.label ?? "" })) ?? [{ number: "", label: "mobile" }]
   );
@@ -300,12 +304,16 @@ function ContactEditor({ contact, onClose }: EditorProps) {
   async function save() {
     setError(null);
     setSaving(true);
+    const bd = parseInt(birthDay, 10);
+    const bm = parseInt(birthMonth, 10);
     const payload = {
       displayName: displayName.trim() || [firstName, lastName].filter(Boolean).join(" ") || "(bez jména)",
       firstName: firstName.trim() || null,
       lastName: lastName.trim() || null,
       note: note.trim() || null,
       isVip,
+      birthDay: Number.isFinite(bd) && bd >= 1 && bd <= 31 ? bd : null,
+      birthMonth: Number.isFinite(bm) && bm >= 1 && bm <= 12 ? bm : null,
       phones: phones.filter((p) => p.number.trim()).map((p) => ({
         number: p.number.trim(),
         label: p.label || null,
@@ -372,6 +380,36 @@ function ContactEditor({ contact, onClose }: EditorProps) {
             <Star className="size-4" style={{ color: "var(--tint-rose)" }} fill={isVip ? "currentColor" : "none"} />
             <span className="text-sm">VIP — firewall → zvláštní projekt + okamžitý email</span>
           </label>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              Narozeniny (den / měsíc — rok není potřeba)
+            </label>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={1}
+                max={31}
+                placeholder="den"
+                value={birthDay}
+                onChange={(e) => setBirthDay(e.target.value)}
+                className="w-20 font-mono text-center"
+              />
+              <span className="self-center text-muted-foreground">.</span>
+              <Input
+                type="number"
+                min={1}
+                max={12}
+                placeholder="měsíc"
+                value={birthMonth}
+                onChange={(e) => setBirthMonth(e.target.value)}
+                className="w-20 font-mono text-center"
+              />
+              <span className="self-center text-xs text-muted-foreground">
+                {birthDay && birthMonth ? `(${birthDay}.${birthMonth}.)` : ""}
+              </span>
+            </div>
+          </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
