@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, X } from "lucide-react";
+import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, X, Lock, EyeOff } from "lucide-react";
+import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 interface Project {
   id: string;
@@ -34,6 +35,7 @@ export default function GuestRecorder({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [briefMode, setBriefMode] = useState(false);
   const [briefFile, setBriefFile] = useState<File | null>(null);
+  const protection = useRecordingProtection();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -98,6 +100,7 @@ export default function GuestRecorder({
       };
       mr.start();
       startedAtRef.current = Date.now();
+      await protection.start();
       tickRef.current = window.setInterval(() => {
         const ms = Date.now() - startedAtRef.current;
         setElapsedMs(ms);
@@ -136,6 +139,11 @@ export default function GuestRecorder({
 
     const finalMs = Date.now() - startedAtRef.current;
     const blob = new Blob(audioChunksRef.current, { type: mr.mimeType });
+    const warning = protection.stop(blob, finalMs);
+    if (warning && !confirm(`${warning}\n\nChceš přesto poslat co máš?`)) {
+      setPhase("idle");
+      return;
+    }
     await uploadAudio(blob, "STANDARD", Math.round(finalMs / 1000));
   }
 
@@ -235,6 +243,9 @@ export default function GuestRecorder({
             <div className="text-xs text-muted-foreground font-mono">
               max 10 min · auto-stop
             </div>
+            <div className="text-xs text-muted-foreground/80 max-w-sm leading-relaxed text-center">
+              {recordingProtectionTip(protection.wakeLockSupported)}
+            </div>
 
             {selected?.canRecordBrief && (
               <button
@@ -320,6 +331,23 @@ export default function GuestRecorder({
             <div className="text-xs text-muted-foreground font-mono">
               uplynulo {elapsedMin}:{elapsedSec}
             </div>
+            <div className="flex items-center gap-3 text-[10px] font-mono">
+              {protection.wakeLockActive && (
+                <span className="text-[var(--tint-sage)] flex items-center gap-1">
+                  <Lock className="size-3" /> obrazovka uzamčena proti spánku
+                </span>
+              )}
+              {protection.hiddenDurations.length > 0 && (
+                <span className="text-[var(--tint-rose)] flex items-center gap-1">
+                  <EyeOff className="size-3" /> přerušeno {protection.hiddenDurations.length}×
+                </span>
+              )}
+            </div>
+            {protection.hiddenDurations.length > 0 && (
+              <div className="rounded-md border border-[var(--tint-rose)]/40 bg-[var(--tint-rose)]/10 text-xs px-3 py-2 max-w-xs">
+                ⚠ Přepnul jsi mimo stránku — část záznamu může chybět.
+              </div>
+            )}
             <button
               onClick={() => stopRecording(false)}
               className="mt-2 px-6 py-3 rounded-md bg-foreground/90 text-background font-medium flex items-center gap-2"

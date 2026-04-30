@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio } from "lucide-react";
+import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, Lock, EyeOff } from "lucide-react";
+import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 interface Project {
   id: string;
@@ -29,6 +30,7 @@ export default function OwnerRecorder({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [briefMode, setBriefMode] = useState(false);
   const [briefFile, setBriefFile] = useState<File | null>(null);
+  const protection = useRecordingProtection();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -83,6 +85,7 @@ export default function OwnerRecorder({
       };
       mr.start();
       startedAtRef.current = Date.now();
+      await protection.start();
       tickRef.current = window.setInterval(() => {
         const ms = Date.now() - startedAtRef.current;
         setElapsedMs(ms);
@@ -105,6 +108,11 @@ export default function OwnerRecorder({
     await stop;
     const finalMs = Date.now() - startedAtRef.current;
     const blob = new Blob(audioChunksRef.current, { type: mr.mimeType });
+    const warning = protection.stop(blob, finalMs);
+    if (warning && !confirm(`${warning}\n\nChceš přesto pokračovat a nahrát co máš?`)) {
+      setPhase("idle");
+      return;
+    }
     await upload(blob, "STANDARD", Math.round(finalMs / 1000));
   }
 
@@ -175,6 +183,11 @@ export default function OwnerRecorder({
             <div className="text-xs text-muted-foreground font-mono">
               max 10 min · auto-stop · {ownerName}
             </div>
+            {!compact && (
+              <div className="text-xs text-muted-foreground/80 max-w-sm leading-relaxed text-center">
+                {recordingProtectionTip(protection.wakeLockSupported)}
+              </div>
+            )}
             <button
               onClick={() => setBriefMode(true)}
               className="mt-3 text-xs font-mono text-muted-foreground hover:text-foreground underline"
@@ -242,6 +255,23 @@ export default function OwnerRecorder({
             </div>
             <div className="font-mono text-4xl tabular-nums">{remM}:{remS}</div>
             <div className="text-xs text-muted-foreground font-mono">uplynulo {elM}:{elS}</div>
+            <div className="flex items-center gap-3 text-[10px] font-mono">
+              {protection.wakeLockActive && (
+                <span className="text-[var(--tint-sage)] flex items-center gap-1">
+                  <Lock className="size-3" /> obrazovka uzamčena proti spánku
+                </span>
+              )}
+              {protection.hiddenDurations.length > 0 && (
+                <span className="text-[var(--tint-rose)] flex items-center gap-1">
+                  <EyeOff className="size-3" /> přerušeno {protection.hiddenDurations.length}×
+                </span>
+              )}
+            </div>
+            {protection.hiddenDurations.length > 0 && (
+              <div className="rounded-md border border-[var(--tint-rose)]/40 bg-[var(--tint-rose)]/10 text-xs px-3 py-2 max-w-xs">
+                ⚠ Přepnul jsi mimo Studnu — část záznamu může chybět.
+              </div>
+            )}
             <button
               onClick={stopRecording}
               className="mt-2 px-6 py-3 rounded-md bg-foreground/90 text-background font-medium flex items-center gap-2"

@@ -160,7 +160,10 @@ ${transcript}
       contents: prompt,
       config: {
         temperature: 0.2,
-        maxOutputTokens: 4000,
+        // 12 000 tokenů ≈ ~9 000 slov / cca 50 úkolů s detaily.
+        // Pro Petrovu salvu (10-30 úkolů) bohatě stačí. Předtím 4 000
+        // selhávalo na truncated JSON u dlouhých diktátů.
+        maxOutputTokens: 12_000,
         responseMimeType: "application/json",
       },
     }),
@@ -171,15 +174,29 @@ ${transcript}
     throw new Error("Extrakce úkolů: Vertex vrátil prázdný výstup.");
   }
 
+  // Odstraní markdown wrapper kdyby ho Vertex přidal
+  const cleaned = raw.startsWith("```")
+    ? raw.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, "").trim()
+    : raw;
+
   let parsed: { tasks?: unknown[] };
   try {
-    // Odstraní markdown wrapper kdyby ho Vertex přidal
-    const cleaned = raw.startsWith("```")
-      ? raw.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, "").trim()
-      : raw;
     parsed = JSON.parse(cleaned);
-  } catch (e) {
-    throw new Error(`Extrakce úkolů: nelze parse JSON — ${e instanceof Error ? e.message : String(e)}. Prvních 200 znaků: ${raw.slice(0, 200)}`);
+  } catch {
+    // Pokus o opravu truncated JSON — když token limit byl vyčerpán
+    // uprostřed úkolu, oříznou se neúplné konce a doplní zavírací
+    // závorky tak, aby aspoň prvních N úkolů bylo zachráněno.
+    const repaired = repairTruncatedTasksJson(cleaned);
+    if (repaired) {
+      try {
+        parsed = JSON.parse(repaired);
+        console.warn(`[task-extract] truncated JSON opraven, obnoveno ${(parsed.tasks ?? []).length} úkolů`);
+      } catch (e2) {
+        throw new Error(`Extrakce úkolů: nelze parse JSON ani po pokusu o opravu — ${e2 instanceof Error ? e2.message : String(e2)}. Prvních 200 znaků: ${raw.slice(0, 200)}`);
+      }
+    } else {
+      throw new Error(`Extrakce úkolů: nelze parse JSON. Prvních 200 znaků: ${raw.slice(0, 200)}`);
+    }
   }
 
   if (!parsed.tasks || !Array.isArray(parsed.tasks)) {
@@ -200,4 +217,38 @@ ${transcript}
       ? t.assignedToContactName
       : null,
   }));
+}
+
+/**
+ * Pokus o opravu truncated JSON odpovědi z `extractTaskProposals`.
+ *
+ * Vstup: useknutý JSON typu:
+ *   { "tasks": [ { "title": "X", "tags": ["a", "b" <- konec
+ *
+ * Strategie:
+ *   1. Najdi poslední validní `}` (uzavření úkolu) následované `,` nebo `]`
+ *   2. Ořež všechno za touto závorkou
+ *   3. Uzavři pole `]` a objekt `}`
+ *
+ * Vrátí opravený JSON string, nebo null pokud oprava není možná
+ * (např. první úkol je useknutý).
+ */
+function repairTruncatedTasksJson(raw: string): string | null {
+  // Najdi poslední `},` (= konec úkolu kterému následuje další)
+  // nebo poslední `}` (= konec úkolu uvnitř pole)
+  const lastValidEnd = Math.max(raw.lastIndexOf("},"), raw.lastIndexOf("} "));
+  if (lastValidEnd < 0) {
+    // Žádný úkol kompletní — nelze obnovit
+    return null;
+  }
+
+  // Vezmi vše do konce posledního validního úkolu (bez čárky)
+  const truncatedAt = raw.lastIndexOf("}", lastValidEnd + 1) + 1;
+  let prefix = raw.slice(0, truncatedAt).trim();
+
+  // Odstraň trailing comma kdyby tam zůstala
+  if (prefix.endsWith(",")) prefix = prefix.slice(0, -1);
+
+  // Doplň zavírací `]` a `}` pro celý objekt
+  return prefix + "]}";
 }

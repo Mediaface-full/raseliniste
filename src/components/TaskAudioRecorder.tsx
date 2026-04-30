@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, Square, Loader2, AlertTriangle, Upload, FileAudio } from "lucide-react";
+import { Mic, Square, Loader2, AlertTriangle, Upload, Lock, EyeOff } from "lucide-react";
+import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 const TICK_MS = 250;
 const LIMIT_OPTIONS = [
@@ -23,6 +24,7 @@ export default function TaskAudioRecorder() {
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [limitMin, setLimitMin] = useState<number>(10);
+  const protection = useRecordingProtection();
 
   useEffect(() => { setLimitMin(loadLimit()); }, []);
 
@@ -65,11 +67,17 @@ export default function TaskAudioRecorder() {
       mr.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, { type: mr.mimeType });
         const finalMs = Date.now() - startedAtRef.current;
+        const warning = protection.stop(blob, finalMs);
+        if (warning && !confirm(`${warning}\n\nChceš přesto pokračovat a nahrát co máš?`)) {
+          setPhase("idle");
+          return;
+        }
         await upload(blob, Math.round(finalMs / 1000));
       };
 
       mr.start();
       startedAtRef.current = Date.now();
+      await protection.start();
       setPhase("recording");
       setElapsedMs(0);
 
@@ -164,11 +172,14 @@ export default function TaskAudioRecorder() {
             <div className="text-xs text-muted-foreground font-mono">
               auto-stop po {limitMin} min
             </div>
+            <div className="text-xs text-muted-foreground/80 max-w-sm leading-relaxed text-center">
+              {recordingProtectionTip(protection.wakeLockSupported)}
+            </div>
             <button
               onClick={() => briefInputRef.current?.click()}
               className="mt-2 text-xs font-mono text-muted-foreground hover:text-foreground underline"
             >
-              Nahrát soubor →
+              <Upload className="inline size-3 mr-1" />Nahrát soubor →
             </button>
             <input
               ref={briefInputRef}
@@ -201,6 +212,23 @@ export default function TaskAudioRecorder() {
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
+            <div className="flex items-center gap-3 text-[10px] font-mono">
+              {protection.wakeLockActive && (
+                <span className="text-[var(--tint-sage)] flex items-center gap-1">
+                  <Lock className="size-3" /> obrazovka uzamčena proti spánku
+                </span>
+              )}
+              {protection.hiddenDurations.length > 0 && (
+                <span className="text-[var(--tint-rose)] flex items-center gap-1">
+                  <EyeOff className="size-3" /> přerušeno {protection.hiddenDurations.length}×
+                </span>
+              )}
+            </div>
+            {protection.hiddenDurations.length > 0 && (
+              <div className="rounded-md border border-[var(--tint-rose)]/40 bg-[var(--tint-rose)]/10 text-xs px-3 py-2 max-w-xs">
+                ⚠ Přepnul jsi mimo stránku — část záznamu může chybět.
+              </div>
+            )}
             <button
               onClick={stopRecording}
               className="mt-2 px-6 py-3 rounded-md bg-foreground/90 text-background font-medium flex items-center gap-2"

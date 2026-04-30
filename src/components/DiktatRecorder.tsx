@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, Square, Loader2, AlertTriangle, Upload, CheckSquare, BookOpen } from "lucide-react";
+import { Mic, Square, Loader2, AlertTriangle, Upload, CheckSquare, BookOpen, Lock, Eye, EyeOff } from "lucide-react";
+import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 const TICK_MS = 250;
 const MODE_KEY = "diktat-mode";
@@ -54,6 +55,7 @@ export default function DiktatRecorder() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const protection = useRecordingProtection();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -105,11 +107,19 @@ export default function DiktatRecorder() {
       mr.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, { type: mr.mimeType });
         const finalMs = Date.now() - startedAtRef.current;
+        // Protection check — varovat pokud audio nesedí na uplynulý čas
+        // nebo byl tab v background
+        const warning = protection.stop(blob, finalMs);
+        if (warning && !confirm(`${warning}\n\nChceš přesto pokračovat a nahrát co máš?`)) {
+          setPhase("idle");
+          return;
+        }
         await upload(blob, Math.round(finalMs / 1000));
       };
 
       mr.start();
       startedAtRef.current = Date.now();
+      await protection.start(); // wake lock + visibility tracking
       setPhase("recording");
       setElapsedMs(0);
 
@@ -232,6 +242,9 @@ export default function DiktatRecorder() {
               ))}
             </div>
             <div className="text-xs text-muted-foreground font-mono">auto-stop po {limitMin} min</div>
+            <div className="text-xs text-muted-foreground/80 max-w-sm leading-relaxed">
+              {recordingProtectionTip(protection.wakeLockSupported)}
+            </div>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="mt-2 text-xs font-mono text-muted-foreground hover:text-foreground underline"
@@ -264,6 +277,26 @@ export default function DiktatRecorder() {
             <div className="w-full max-w-xs h-1.5 rounded-full bg-white/10 overflow-hidden">
               <div className="h-full bg-destructive transition-all" style={{ width: `${progressPercent}%` }} />
             </div>
+            {/* Wake lock + visibility status */}
+            <div className="flex items-center gap-3 text-[10px] font-mono">
+              {protection.wakeLockActive ? (
+                <span className="text-[var(--tint-sage)] flex items-center gap-1">
+                  <Lock className="size-3" /> obrazovka uzamčena proti spánku
+                </span>
+              ) : protection.wakeLockSupported ? (
+                <span className="text-muted-foreground/60">wake lock nedostupný</span>
+              ) : null}
+              {protection.hiddenDurations.length > 0 && (
+                <span className="text-[var(--tint-rose)] flex items-center gap-1">
+                  <EyeOff className="size-3" /> přerušeno {protection.hiddenDurations.length}×
+                </span>
+              )}
+            </div>
+            {protection.hiddenDurations.length > 0 && (
+              <div className="rounded-md border border-[var(--tint-rose)]/40 bg-[var(--tint-rose)]/10 text-xs px-3 py-2 max-w-xs">
+                ⚠ Přepnul jsi mimo Ozvěnu — část záznamu může chybět (iOS suspenduje appku v background).
+              </div>
+            )}
             <button
               onClick={stopRecording}
               className="mt-2 px-6 py-3 rounded-md bg-foreground/90 text-background font-medium flex items-center gap-2"
