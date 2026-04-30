@@ -151,6 +151,14 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
     <div class="flex flex-col min-w-0 gap-3">
       <header class="glass rounded-xl h-14 px-3 lg:px-5 flex items-center gap-3">
         <SidebarToggle client:load />
+        <a
+          href="/start"
+          class="size-8 rounded-md hover:bg-white/5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          aria-label="Zpět na úvodní obrazovku"
+          title="Úvodní obrazovka"
+        >
+          <Icon name="lucide:home" class="size-4" />
+        </a>
         <div class="flex items-center gap-2 text-sm text-muted-foreground">
           {breadcrumb.length === 0 ? (
             <span class="text-foreground">{heading ?? title}</span>

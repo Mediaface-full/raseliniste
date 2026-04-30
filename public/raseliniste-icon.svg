@@ -1,51 +1,76 @@
 <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rašeliniště">
   <defs>
-    <radialGradient id="rb-bg" cx="50%" cy="65%" r="80%">
-      <stop offset="0%" stop-color="#1a1f3a"/>
-      <stop offset="60%" stop-color="#10122a"/>
+    <radialGradient id="rb-bg" cx="50%" cy="60%" r="80%">
+      <stop offset="0%" stop-color="#1a2540"/>
+      <stop offset="60%" stop-color="#10182a"/>
       <stop offset="100%" stop-color="#08091c"/>
     </radialGradient>
-    <radialGradient id="rb-sun" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#fff4d6"/>
-      <stop offset="35%" stop-color="#fcd0a3"/>
-      <stop offset="75%" stop-color="#f5a05e"/>
-      <stop offset="100%" stop-color="#e87a3a"/>
+    <radialGradient id="rb-leaves-1" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#bef2a3"/>
+      <stop offset="60%" stop-color="#7ed27a"/>
+      <stop offset="100%" stop-color="#3d8a4f"/>
+    </radialGradient>
+    <radialGradient id="rb-leaves-2" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#d8f5c0"/>
+      <stop offset="60%" stop-color="#92d985"/>
+      <stop offset="100%" stop-color="#4ea05a"/>
+    </radialGradient>
+    <radialGradient id="rb-leaves-3" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#a8e58f"/>
+      <stop offset="60%" stop-color="#6cc269"/>
+      <stop offset="100%" stop-color="#327a3f"/>
     </radialGradient>
     <radialGradient id="rb-glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#fcd0a3" stop-opacity="0.6"/>
-      <stop offset="60%" stop-color="#fcd0a3" stop-opacity="0.2"/>
-      <stop offset="100%" stop-color="#fcd0a3" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#bef2a3" stop-opacity="0.55"/>
+      <stop offset="60%" stop-color="#bef2a3" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#bef2a3" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="rb-trunk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9a6b3f"/>
+      <stop offset="100%" stop-color="#5a3d22"/>
+    </linearGradient>
     <linearGradient id="rb-mist" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18"/>
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.16"/>
       <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
     </linearGradient>
   </defs>
 
-  <!-- Pozadí (záměrně bez rounded corners — iOS ořízne podle systémové masky) -->
+  <!-- Pozadí (iOS si ořízne podle systémové masky) -->
   <rect width="180" height="180" fill="url(#rb-bg)"/>
 
-  <!-- Mlha nad horizontem (rašeliniště feeling) -->
-  <rect x="0" y="92" width="180" height="42" fill="url(#rb-mist)"/>
+  <!-- Jemná mlha nad zemí -->
+  <rect x="0" y="120" width="180" height="40" fill="url(#rb-mist)"/>
 
-  <!-- Vzdálená horská silueta (decentní, jen pro hloubku) -->
-  <path d="M 0 118 Q 30 108 55 112 T 110 110 T 180 116 L 180 118 Z"
-        fill="#1a2050" opacity="0.7"/>
+  <!-- Aura kolem stromu (zelený glow) -->
+  <circle cx="90" cy="78" r="72" fill="url(#rb-glow)"/>
 
-  <!-- Glow kolem slunce -->
-  <circle cx="90" cy="92" r="56" fill="url(#rb-glow)"/>
+  <!-- Země (decentní oblouček) -->
+  <ellipse cx="90" cy="158" rx="68" ry="6" fill="#1a2050" opacity="0.55"/>
 
-  <!-- Slunce -->
-  <circle cx="90" cy="92" r="34" fill="url(#rb-sun)"/>
+  <!-- Kmen stromu -->
+  <path d="M 84 156 Q 86 130 88 110 Q 90 98 92 110 Q 94 130 96 156 Z"
+        fill="url(#rb-trunk)"/>
+  <!-- Drobné větvičky -->
+  <path d="M 88 100 Q 78 95 72 88" stroke="#7a553a" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M 92 100 Q 102 96 109 90" stroke="#7a553a" stroke-width="2" fill="none" stroke-linecap="round"/>
 
-  <!-- Odraz slunce ve vodě — tři vlnky pod sluncem -->
-  <g>
-    <ellipse cx="90" cy="138" rx="44" ry="2.2" fill="#f5a05e" opacity="0.55"/>
-    <ellipse cx="90" cy="146" rx="34" ry="1.6" fill="#f5a05e" opacity="0.4"/>
-    <ellipse cx="90" cy="153" rx="24" ry="1.2" fill="#f5a05e" opacity="0.28"/>
-    <ellipse cx="90" cy="159" rx="16" ry="0.9" fill="#f5a05e" opacity="0.18"/>
-  </g>
+  <!-- Tři koruny (vrstvené koule) -->
+  <circle cx="68" cy="92" r="26" fill="url(#rb-leaves-3)"/>
+  <circle cx="112" cy="88" r="28" fill="url(#rb-leaves-2)"/>
+  <circle cx="90" cy="62" r="32" fill="url(#rb-leaves-1)"/>
 
-  <!-- Hladina vody (subtle horizontal line) -->
-  <line x1="14" y1="129" x2="166" y2="129" stroke="#7dd3fc" stroke-width="0.6" opacity="0.25"/>
+  <!-- Květy / drobné lístečky highlight -->
+  <circle cx="78" cy="54" r="3" fill="#fbcfe8" opacity="0.95"/>
+  <circle cx="102" cy="48" r="2.5" fill="#fdf3a1" opacity="0.95"/>
+  <circle cx="116" cy="74" r="2.8" fill="#fbcfe8" opacity="0.9"/>
+  <circle cx="60" cy="84" r="2.4" fill="#fdf3a1" opacity="0.9"/>
+  <circle cx="92" cy="80" r="2.2" fill="#fbcfe8" opacity="0.9"/>
+  <circle cx="124" cy="96" r="2" fill="#fdf3a1" opacity="0.85"/>
+  <circle cx="56" cy="100" r="2.2" fill="#fbcfe8" opacity="0.85"/>
+
+  <!-- Padající lístečky kolem -->
+  <path d="M 36 110 q 2 -3 5 -1 q -1 3 -5 1 z" fill="#7ed27a" opacity="0.7"/>
+  <path d="M 148 122 q 2 -3 5 -1 q -1 3 -5 1 z" fill="#92d985" opacity="0.7"/>
+  <path d="M 30 138 q 2 -3 5 -1 q -1 3 -5 1 z" fill="#a8e58f" opacity="0.55"/>
+  <path d="M 150 148 q 2 -3 5 -1 q -1 3 -5 1 z" fill="#7ed27a" opacity="0.55"/>
 </svg>

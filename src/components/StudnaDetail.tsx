@@ -827,7 +827,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             onChange={(e) => setIncludeInDigest(e.target.checked)}
             className="size-4"
           />
-          Zahrnout do denního souhrnu (e-mail v 18:00)
+          Zahrnout do denního souhrnu (e-mail v 7:00 ráno)
         </label>
         <div className="flex gap-2 pt-2 border-t border-white/5">
           <Button onClick={save} disabled={saving}>
