@@ -2,9 +2,25 @@
 
 # Projekt raseliniste — osobní informační systém
 
-Tento soubor se automaticky načte každou novou Claude Code session. Obsahuje vše, co potřebuješ vědět pro práci na tomto projektu.
+Tento soubor se automaticky načte každou novou Claude Code session.
 
-## Kontext
+## ⚠️ ČTI NEJDŘÍV: `INSTRUKCE/00-START-HERE.md`
+
+Ten dokument má aktuální orientaci, klíčová pravidla a navigaci. **Tento CLAUDE.md je z dubna 2026 a může být v některých detailech zastaralý** — `INSTRUKCE/` se aktualizuje průběžně.
+
+Plný onboarding seznam (čti v pořadí):
+- `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
+- `INSTRUKCE/01-aktualni-stav.md` — recent commits, co je nasazeno
+- `INSTRUKCE/02-architektura.md` — stack, klíčová rozhodnutí
+- `INSTRUKCE/03-moduly.md` — všechny moduly, URL, status
+- `INSTRUKCE/04-todo-list.md` — co se má dělat
+- `INSTRUKCE/05-styl-prace.md` — Gideon profile, komunikace
+- `INSTRUKCE/06-troubleshooting.md` — známé pasti
+- `INSTRUKCE/07-resources.md` — kde co je
+
+---
+
+## Kontext (původní zápis duben 2026)
 
 - **Majitel:** Petr Perina (jediný uživatel systému)
 - **Repo name:** `raseliniste` (GitHub)
