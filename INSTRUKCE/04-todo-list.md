@@ -1,62 +1,66 @@
-# 04 — TODO list (2026-04-30)
+# 04 — TODO list (2026-04-30 večer)
 
 ## 🟧 Aktivní (čeká na zpracování)
 
-### Na produkci jako další (po push 900caec)
+### Push + deploy 17 commitů z dnešní session
+1. **`git push`** — od 2899ed4 dál čeká 17 commitů na produkci
+2. **Na NASu pgvector swap:** `docker compose pull postgres && docker compose up -d --force-recreate postgres` (pgvector je drop-in superset, data ve volume zůstávají)
+3. **`~/deploy.sh`** — pull image + migrate (přidá tabulku `RagChunk`)
+4. **DSM Task Scheduler:** přesunout cron `daily-projects-digest` z **18:00 na 7:00**
+5. **Test po deployi:**
+   - /start na mobilu — strom ikona, narozeniny, dashboard tlačítko
+   - VIP link sám sobě → „Gíďo, máš misi" + datum picker (min +2 dny)
+   - Vytvořit deníkový zápis → otevřít /zeptat-se → položit dotaz
+   - Smoke check: `/api/diagnose/studna`
 
-1. **Push aktuálních commitů** + `~/deploy.sh` — Gideon zatím nepushnul.
-2. **Otestovat /start** na mobilu — uložit PWA ikonu „Rašeliniště" (úsvit) na plochu.
-3. **GCP Budget Alert** — Gideon si zařídí v GCP Console (1 minuta, žádný kód). Detail v memory `todo_gcp_billing.md`.
+### GCP Budget Alert
+6. **GCP Budget Alert** — Gideon si zařídí v GCP Console (1 minuta, žádný kód). Detail v memory `todo_gcp_billing.md`.
 
-### Ve frontě k implementaci (Gideon je pojmenoval, čeká na další session)
-
-4. **„Zeptat se" dlaždice na /start** — AI dotaz nad deníky + úkoly přes pgvector embeddings.
-   - Nová DB extension `vector` v Postgresu
-   - Sloupec `JournalEntry.embedding vector(768)` + `Task.embedding vector(768)`
-   - Embedding při uložení přes Gemini `text-embedding-004`
-   - Backfill script pro existující záznamy
-   - Search endpoint: cosine similarity → top 10 → Gemini Pro odpověď
-   - UI: textarea + mikrofon + odpověď s citacemi
-   - Cost: ~80 Kč/měs při 5 dotazech denně
-
-5. **GCP Cloud Billing API integrace** (volitelné, jen pokud Budget Alerts nestačí)
-   - Reálné fakturační údaje z GCP vedle našeho odhadu v `/settings/ai-usage`
-   - Service account permission `roles/billing.viewer`
-   - Lag 24h (GCP fakturuje s denním zpožděním)
+### Volitelné větší úlohy
+7. **GCP Cloud Billing API integrace** (jen pokud Budget Alerts nestačí)
+   - Reálné fakturační údaje vedle našeho odhadu v `/settings/ai-usage`
+   - `roles/billing.viewer` service account permission, lag 24 h
    - Detail v memory `todo_gcp_billing.md` (varianta B)
 
-6. **Staging prostředí + smoke test + rollback** (odloženo — teď není čas/prostor)
-   - Cíl: nikdy nenasadit rozbitou verzi produkčním uživatelům (Blanka & spol.)
-   - Plný návod už je sepsaný v `INSTRUKCE/08-deploy-testing.md`
-   - K udělání:
-     - `docker-compose.staging.yml` (druhý stack na NASu, port 3334, vlastní DB)
-     - DSM Reverse Proxy: `staging.raseliniste.cz` → `localhost:3334`
-     - `scripts/smoke.sh` — bash skript co projede klíčové stránky a hlavičky
-     - Rollback procedura: tag `:rollback` před každým deployem
-   - Resource: ~400 MB RAM + ~1 GB disk na NASu (DS718+ to zvládne)
-   - Alternativa pro zatím: lokální dev na Macu před push + smoke test po deployi na prod (90 % ochrany za 0 % NAS resources)
+8. **Staging prostředí + smoke test + rollback** (odloženo)
+   - Plný návod už je v `INSTRUKCE/08-deploy-testing.md`
+   - Resource: ~400 MB RAM + ~1 GB disk na NASu
    - Aktivovat až bude víc uživatelů / víc změn najednou
 
-## ✅ Hotové (recent commits, čeká na push/deploy)
+## ✅ Hotové dnes (1 session, 17 commitů)
 
-Top 10 commitů od posledního stable bodu, viz `01-aktualni-stav.md` pro plný seznam.
-
-- `900caec` — /start sjednocená vstupní stránka + nová ikona „úsvit"
-- `4d251a3` — Sans nadpisy default + větší /settings sekce + aktivní cog + skrýt CANCELED
-- `c649dd6` — Wake Lock + visibility + JSON repair (4 recordery)
-- `1838095` — Settings landing s dlaždicemi (sidebar zmenšen na 1 položku)
-- `00086dd` — Editovatelné AI prompty
-- `2f32fac` — Studna fire-and-forget Promise pinning (vyřešený TODO)
+```
+d044886  feat(rag): modul "Zeptat se" — pgvector + Gemini RAG
+c91f5f6  feat(firewall): zobraz požadovaný termín u VIP vzkazů
+e7552a1  copy(thanks): VIP intro 'Děj se vůle Gideonova'
+ecc0dae  feat(call-log): VIP texty + thanks 'Zadej další misi'
+575ec70  copy(call-log): hint pro dřív Urgent
+2f0c723  fix: oddělit ikony Petr/hosté + vokativ + +2 dny + 'Gíďo, máš misi'
+221ea51  feat(call-log): VIP varianta jako oddělená entita + termín
+8b369ea  feat(studna): dlaždice projektů + zapamatuj poslední
+a937839  perf(start): Promise.all + index narozenin
+92763f4  feat(start): strom ikona + home button + cron text 7:00
+886722c  docs: aktualizace cronu 18:00 → 7:00
+96979ad  feat(studna): denní digest 7:00 + stránka Aktivita
+51aa74c  feat(start): svátek + narozeniny + DASHBOARD + layout nahoru
+475865b  docs(todo): staging odloženo do TODO
+c0ab132  docs: INSTRUKCE/08-deploy-testing.md
+b4dd3a4  feat(guest-recorder): hint pro mic permission
+2899ed4  fix(security): Permissions-Policy microphone=(self)
+```
 
 ## 🟡 Nice-to-have (long-term backlog)
 
 V memory nebo v dřívějších návrzích, ne urgentní:
 
+- **Backfill RAG indexu** pro existující data (Petr aktuálně nechce, jen nové od deployu)
+- **Reindex tlačítko** v admin (až bude potřeba)
+- **Cleanup orphan RagChunks** cronem (smazaný zdroj → vyřadit chunky)
+- **Mikrofon na /zeptat-se** (Wake Lock + transkripce, hlasový dotaz)
 - **Per-projekt ikona Studny** (vlastní logo + dynamický apple-touch-icon per host link)
 - **Automatický backup DB** (nightly pg_dump → druhý NAS / Backblaze B2)
 - **Push notifikace** pro VIP firewall vzkazy (Web Push nebo Telegram bot)
 - **Editovat ostatní prompty v /settings/ai-prompts** (capture-classifier, journal-redact, letter-redact, event-classifier, event-parser, health-analyze) — momentálně hardcoded
-- **AI chat s RAG** napříč všemi daty (Recordings + Entries + Health + Studna) — širší scope než „Zeptat se"
 - **Health detail per metrika** (klikneš na KPI → samostatná detailní analýza)
 - **Recurring úkoly** (nebo nechat na Todoistu)
 - **Capture iPhone Shortcut** — JSON body připravený, dořešit reference shortcut
@@ -78,12 +82,12 @@ V memory nebo v dřívějších návrzích, ne urgentní:
 - `MEMORY.md` — index všech persistent records
 - `user_profile.md` — Gideon profile
 - `design_preferences.md` — design history (4 zamítnuté pokusy)
-- `todo_studna_async_still_failing.md` — VYŘEŠENO commit 2f32fac (zachováno pro audit)
+- `todo_studna_async_still_failing.md` — VYŘEŠENO commit 2f32fac
 - `todo_gcp_billing.md` — GCP Billing 3 vrstvy
 
 ## 📋 Pravidlo pro práci s TODO
 
 1. **Nepřidávej** vlastní položky bez Gideonova zadání.
 2. **Aktualizuj** tento soubor po každé větší sadě commitů.
-3. **Když Gideon zmíní novou věc** která nepatří k aktuální práci, přidej ji buď sem nebo do memory (přes Write tool do `/Users/petrperina/.claude/projects/.../memory/todo_xxx.md`) + odkaz v MEMORY.md.
+3. **Když Gideon zmíní novou věc** která nepatří k aktuální práci, přidej ji buď sem nebo do memory.
 4. **Před koncem session** zhrň co jsi udělala, na čem pracuješ, a co je další krok. Ulož významné změny do `01-aktualni-stav.md`.
