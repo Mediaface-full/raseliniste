@@ -23,8 +23,23 @@ export default function OwnerRecorder({
   onSuccess?: () => void;
   compact?: boolean;
 }) {
-  const [selectedId, setSelectedId] = useState(projects[0]?.id ?? "");
+  // Default = poslední vybraný projekt z localStorage (pokud existuje a je v seznamu),
+  // jinak první. Petr má víc projektů → nepříjemné scrollovat select pokaždé.
+  const [selectedId, setSelectedId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const last = window.localStorage.getItem("studna-last-project-id");
+      if (last && projects.some((p) => p.id === last)) return last;
+    }
+    return projects[0]?.id ?? "";
+  });
   const selected = projects.find((p) => p.id === selectedId);
+
+  function pickProject(id: string) {
+    setSelectedId(id);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("studna-last-project-id", id);
+    }
+  }
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -150,21 +165,36 @@ export default function OwnerRecorder({
     <div className="space-y-4">
       {projects.length > 1 && (
         <div className="glass-strong rounded-xl p-4">
-          <label className="block text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono mb-1.5">
-            Do kterého projektu nahráváš?
-          </label>
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            disabled={phase !== "idle"}
-            className="w-full px-3 py-2.5 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-base"
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+          <div className="flex items-baseline justify-between mb-2">
+            <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono">
+              Do kterého projektu nahráváš?
+            </label>
+            <span className="text-[10px] font-mono text-muted-foreground/60">
+              {projects.length} projekt{projects.length === 1 ? "" : projects.length < 5 ? "y" : "ů"}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {projects.map((p) => {
+              const isActive = p.id === selectedId;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => pickProject(p.id)}
+                  disabled={phase !== "idle"}
+                  className={`text-left rounded-lg px-3 py-2.5 text-sm transition border ${
+                    isActive
+                      ? "bg-[var(--tint-mint)]/20 border-[var(--tint-mint)]/60 text-foreground"
+                      : "bg-background/30 border-border/40 hover:bg-white/5 text-muted-foreground"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <div className="font-medium leading-snug truncate">{p.name}</div>
+                </button>
+              );
+            })}
+          </div>
           {selected?.description && (
-            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{selected.description}</p>
+            <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{selected.description}</p>
           )}
         </div>
       )}
