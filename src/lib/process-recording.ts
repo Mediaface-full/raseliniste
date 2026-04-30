@@ -71,6 +71,30 @@ export async function processRecording(params: {
         },
       });
       console.log(`[process-recording] ${params.recordingId} processed OK in ${Date.now() - entry.startedAt}ms`);
+
+      // RAG indexace (fire-and-forget, vlastní pinning v rag.ts)
+      try {
+        const { indexEntity } = await import("./rag");
+        const rec = await prisma.projectRecording.findUnique({
+          where: { id: params.recordingId },
+          select: { project: { select: { userId: true } } },
+        });
+        if (rec?.project.userId) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const summary = (result.analysis as any)?.summary ?? "";
+          const indexText = [result.transcript, summary].filter(Boolean).join("\n\n");
+          if (indexText.trim()) {
+            void indexEntity({
+              userId: rec.project.userId,
+              sourceType: "studna",
+              sourceId: params.recordingId,
+              text: indexText,
+            });
+          }
+        }
+      } catch (ragErr) {
+        console.warn(`[process-recording] RAG index skip:`, ragErr instanceof Error ? ragErr.message : ragErr);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`[process-recording] ${params.recordingId} failed:`, msg);

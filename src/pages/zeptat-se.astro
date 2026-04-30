@@ -1,0 +1,55 @@
+---
+import Shell from "../layouts/Shell.astro";
+import AskWidget from "../components/AskWidget";
+import { prisma } from "../lib/db";
+import { readSession } from "../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// Statistika indexu (kolik chunků přes všechny zdroje)
+const totalChunks = await prisma.ragChunk.count({
+  where: { userId: session.uid },
+});
+
+const bySource = await prisma.ragChunk.groupBy({
+  by: ["sourceType"],
+  where: { userId: session.uid },
+  _count: { _all: true },
+});
+const sourceMap = new Map(bySource.map((b) => [b.sourceType, b._count._all]));
+---
+
+<Shell
+  title="Zeptat se · Rašeliniště"
+  username={user.username}
+  heading="Zeptat se"
+  breadcrumb={[{ label: "Zeptat se" }]}
+>
+  <div class="max-w-2xl space-y-4">
+    <div class="glass rounded-xl p-4 text-sm text-muted-foreground">
+      <div class="flex items-baseline gap-3 flex-wrap">
+        <span class="font-mono uppercase text-[10px] tracking-widest">Indexováno</span>
+        <span><strong class="text-foreground">{totalChunks}</strong> chunků</span>
+        <span class="text-muted-foreground/60">·</span>
+        <span>📓 deníky <strong class="text-foreground">{sourceMap.get("journal") ?? 0}</strong></span>
+        <span>✅ úkoly <strong class="text-foreground">{sourceMap.get("task") ?? 0}</strong></span>
+        <span>🌊 Studna <strong class="text-foreground">{sourceMap.get("studna") ?? 0}</strong></span>
+      </div>
+      {totalChunks === 0 && (
+        <p class="mt-2 text-xs leading-relaxed">
+          Index je prázdný — nové zápisy (deník, úkoly, Studna nahrávky) se zaindexují automaticky
+          když je vytvoříš. Staré zápisy nebudou prohledatelné dokud nespustíš backfill.
+        </p>
+      )}
+    </div>
+
+    <AskWidget client:load />
+  </div>
+</Shell>

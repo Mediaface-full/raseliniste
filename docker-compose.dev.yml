@@ -2,7 +2,7 @@
 # Data perzistentní v named volume `raseliniste_postgres_dev_data`.
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: raseliniste_db_dev
     restart: unless-stopped
     environment:

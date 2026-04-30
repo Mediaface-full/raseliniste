@@ -71,3 +71,8 @@ export const FAST_MODEL = "gemini-2.5-flash";
 
 // Pro hlubší úvahu — zdravotní analýzy, budoucí komplexní agenty.
 export const ANALYSIS_MODEL = "gemini-2.5-pro";
+
+// Embedding model pro RAG („Zeptat se"). 768 dim výstup, schválně menší než 3072
+// aby se vešel do pgvector indexu (HNSW max 2000 dim) a šetřil místo.
+export const EMBEDDING_MODEL = "text-embedding-004";
+export const EMBEDDING_DIM = 768;

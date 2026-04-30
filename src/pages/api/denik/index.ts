@@ -76,5 +76,21 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     },
   });
 
+  // RAG indexace (fire-and-forget)
+  try {
+    const { indexEntity } = await import("@/lib/rag");
+    const indexText = [entry.title ?? "", entry.bodyMarkdown].filter(Boolean).join("\n\n");
+    if (indexText.trim()) {
+      void indexEntity({
+        userId: session.uid,
+        sourceType: "journal",
+        sourceId: entry.id,
+        text: indexText,
+      });
+    }
+  } catch {
+    /* nikdy neblokuj odpověď */
+  }
+
   return Response.json({ entry });
 };

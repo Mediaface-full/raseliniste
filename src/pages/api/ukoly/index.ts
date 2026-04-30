@@ -94,5 +94,22 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     },
     include: { assignedToContact: { select: { id: true, displayName: true } } },
   });
+
+  // RAG indexace (fire-and-forget)
+  try {
+    const { indexEntity } = await import("@/lib/rag");
+    const indexText = [task.title, task.notes ?? "", task.rawSnippet ?? ""].filter(Boolean).join("\n\n");
+    if (indexText.trim()) {
+      void indexEntity({
+        userId: session.uid,
+        sourceType: "task",
+        sourceId: task.id,
+        text: indexText,
+      });
+    }
+  } catch {
+    /* nikdy neblokuj odpověď */
+  }
+
   return Response.json({ task });
 };
