@@ -27,17 +27,14 @@ const VIP_TEXTS = {
   appleTitle: "Gíďo, máš misi",
   // Personalizované oslovení — "Ahoj, Karle"
   greetingPrefix: "Ahoj,",
-  // Petr text dodá; toto je placeholder ať nezůstane prázdné
-  heading: "Chceš něco po Gideonovi?",
-  intro:
-    "Napiš mu sem, na co nemá zapomenout. Vrátí se k tomu — a pokud máš " +
-    "konkrétní termín, klidně ho rovnou doplň, propíše se mu jako deadline.",
+  heading: "Zadej Gíďovi, máš misi.",
+  intro: "Pošli mu to a trochu mu rozčeř svět.",
   messagePlaceholder: "S čím voláš?",
   dueDateLabel: "Do kdy to potřebuješ (volitelné)",
   dueDateHint: "Termín nejdřív za 2 dny. Pokud to potřebuješ dřív, zaškrtni níže Urgent.",
   urgentLabel: "Je to urgentní",
   urgentSub: "Gideonovi přijde notifikace ihned.",
-  submit: "Odeslat vzkaz",
+  submit: "Vypusť Gíďu",
   footer: "tvoje IP a čas budou zaznamenány",
 };
 
@@ -247,7 +244,10 @@ const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
           body: JSON.stringify(body),
         });
         if (res.ok) {
-          window.location.href = "/call-log/thanks";
+          // Předáváme phone v URL aby thanks detekovalo VIP a mohlo nabídnout
+          // tlačítko "Zadej další misi" zpět na původní personalizovaný link.
+          const phoneEnc = encodeURIComponent(String(body.phone ?? ""));
+          window.location.href = phoneEnc ? `/call-log/thanks?phone=${phoneEnc}` : "/call-log/thanks";
           return;
         }
         const data = await res.json().catch(() => ({}));

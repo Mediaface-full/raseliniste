@@ -1,28 +1,109 @@
 ---
 import Base from "../../layouts/Base.astro";
+import { prisma } from "../../lib/db";
+import { normalizePhone } from "../../lib/phone";
+
+// =============================================================================
+// TEXTY — Petr edituje zde. VIP a ne-VIP jsou ZÁMĚRNĚ ODDĚLENÉ varianty.
+// =============================================================================
+
+const NONVIP_TEXTS = {
+  pageTitle: "Vzkaz odeslán",
+  appleTitle: "Vzkaz Gideonovi",
+  heading: "Vzkaz doručen",
+  intro:
+    "Požadavek eviduji a ozvu se hned, jak se k němu dostanu. " +
+    "Gideon je momentálně zaneprázdněn soustředěnou prací, pak se ozve.",
+};
+
+const VIP_TEXTS = {
+  pageTitle: "Mise vypuštěna",
+  appleTitle: "Gíďo, máš misi",
+  // Petr texty doladí; placeholder ať to není prázdné
+  heading: "Mise vypuštěna ✦",
+  intro:
+    "Gíďa už ví. Vrátí se k tobě jak nejdřív bude moct. " +
+    "Mezitím — kdyby tě napadlo něco dalšího, klidně mu pošli další misi.",
+  nextMission: "Zadej další misi",
+};
+
+// =============================================================================
+// SERVER LOGIKA — detekce VIP podle telefonu (předaného z formuláře v ?phone=)
+// =============================================================================
+
+const url = new URL(Astro.request.url);
+const rawPhone =
+  url.searchParams.get("phone") ??
+  url.searchParams.get("tel") ??
+  "";
+
+let matchedIsVip = false;
+let matchedFirstName: string | null = null;
+const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
+if (normalizedPhone) {
+  try {
+    const hit = await prisma.phone.findFirst({
+      where: { number: normalizedPhone },
+      include: { contact: true },
+    });
+    if (hit?.contact) {
+      matchedIsVip = hit.contact.isVip;
+      matchedFirstName =
+        hit.contact.firstName?.trim() ||
+        hit.contact.displayName.split(" ")[0] ||
+        null;
+    }
+  } catch {
+    // DB výpadek → fallback na ne-VIP
+  }
+}
+
+const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
+const appleIconPath = "/apple-touch-icon.png"; // G logo (i pro VIP)
+
+// Tlačítko "Zadej další misi" odkazuje zpět na /call-log s zachovaným phone+name,
+// ať si VIP nemusí znovu vyplňovat.
+let nextMissionHref = "/call-log";
+if (matchedIsVip && rawPhone) {
+  const params = new URLSearchParams();
+  params.set("phone", rawPhone);
+  if (matchedFirstName) params.set("name", matchedFirstName);
+  nextMissionHref = `/call-log?${params.toString()}`;
+}
 ---
 
 <Base
-  title="Vzkaz odeslán"
-  appleTitle="Vzkaz Gideonovi"
+  title={T.pageTitle}
+  appleTitle={T.appleTitle}
   appleCapable={true}
+  appleIconPath={appleIconPath}
 >
   <div class="min-h-screen px-4 pt-16 pb-10 relative z-10">
     <div class="w-full max-w-sm mx-auto text-center">
       <div class="glass-strong rounded-xl p-8">
         <img
-          src="/apple-touch-icon.png"
+          src={appleIconPath}
           alt="Gideon"
           width="64"
           height="64"
           class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
         />
-        <div class="text-3xl mb-2 text-[var(--tint-sage)]">✓</div>
-        <h1 class="font-serif text-3xl tracking-tight mb-3">Vzkaz doručen</h1>
+        <div class={`text-3xl mb-2 ${matchedIsVip ? "text-[var(--tint-rose)]" : "text-[var(--tint-sage)]"}`}>
+          {matchedIsVip ? "✦" : "✓"}
+        </div>
+        <h1 class="font-serif text-3xl tracking-tight mb-3">{T.heading}</h1>
         <p class="text-sm text-muted-foreground leading-relaxed">
-          Požadavek eviduji a ozvu se hned, jak se k němu dostanu.
-          Gideon je momentálně zaneprázdněn soustředěnou prací, pak se ozve.
+          {T.intro}
         </p>
+
+        {matchedIsVip && (
+          <a
+            href={nextMissionHref}
+            class="mt-6 inline-block w-full py-3 rounded-md bg-[var(--tint-rose)]/20 border border-[var(--tint-rose)]/40 text-foreground font-medium text-base hover:bg-[var(--tint-rose)]/30 transition"
+          >
+            {VIP_TEXTS.nextMission}
+          </a>
+        )}
       </div>
     </div>
   </div>
