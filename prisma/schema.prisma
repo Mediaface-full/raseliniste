@@ -263,6 +263,7 @@ model Contact {
 
   @@index([userId])
   @@index([userId, isVip])
+  @@index([userId, birthMonth, birthDay])
   @@index([userId, isClient])
   @@index([userId, isFriend])
 }

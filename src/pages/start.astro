@@ -8,10 +8,21 @@ import { svatekDne } from "../lib/jmenny-kalendar";
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
 
-const user = await prisma.user.findUnique({
-  where: { id: session.uid },
-  select: { username: true },
-});
+// User + kontakty s narozeninami paralelně (předtím sériově → 2× round-trip do DB)
+const [user, contactsWithBirthday] = await Promise.all([
+  prisma.user.findUnique({
+    where: { id: session.uid },
+    select: { username: true },
+  }),
+  prisma.contact.findMany({
+    where: {
+      userId: session.uid,
+      birthMonth: { not: null },
+      birthDay: { not: null },
+    },
+    select: { displayName: true, firstName: true, birthMonth: true, birthDay: true },
+  }),
+]);
 if (!user) return Astro.redirect("/login");
 
 type Tile = {
@@ -61,19 +72,7 @@ const today = new Date();
 const todayStr = today.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
 const svatek = svatekDne(today);
 
-// Narozeniny dnes + nadcházejících 7 dní
-const dnesM = today.getMonth() + 1;
-const dnesD = today.getDate();
-const contactsWithBirthday = await prisma.contact.findMany({
-  where: {
-    userId: session.uid,
-    birthMonth: { not: null },
-    birthDay: { not: null },
-  },
-  select: { displayName: true, firstName: true, birthMonth: true, birthDay: true },
-});
-
-// Spočti "kolik dní do narozenin" pro každého a vyfiltruj 0..7
+// Spočti "kolik dní do narozenin" pro každého kontaktu (data už načtená výše paralelně)
 function daysUntil(month: number, day: number): number {
   const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   let target = new Date(today.getFullYear(), month - 1, day);
