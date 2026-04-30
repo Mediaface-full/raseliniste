@@ -41,7 +41,15 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  // microphone=(self) — povoluje mikrofon pro NAŠE stránky (Studna, Ozvěna, /me/<token>),
+  //   blokuje pro všechny embed/iframe.
+  // camera=() — blokováno (zatím nepotřebujeme).
+  // geolocation=() — blokováno (geolocation v Shortcutu jde přes JSON, ne browser API).
+  // PŘEDTÍM: microphone=() = úplný block. iOS Safari to ignoroval, Android Chrome
+  // striktně dodržoval → klienti na Androidu (Blanka) viděli stránku ale tap na mikrofon
+  // nereagoval. Standard W3C Permissions-Policy: () = empty allowlist = blokováno všem
+  // včetně self. Pro povolení same-origin musí být (self).
+  "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
 };
 

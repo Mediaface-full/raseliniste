@@ -103,6 +103,13 @@ sudo docker exec raseliniste_db psql -U raseliniste -d raseliniste \
 - `import { PrismaClient } from "@prisma/client"` nefunguje v Prisma 7 (CommonJS).
 - Heal step skipped, ale `prisma migrate deploy` proběhne OK. Známý bug.
 
+### 18. Permissions-Policy `microphone=()` blokuje mikrofon na Androidu
+- **Symptom:** klient na Androidu (Blanka) otevře `/me/<token>`, stránka se načte, ale tap na mikrofon nereaguje. Na iPhonu funguje normálně.
+- **Příčina:** W3C Permissions-Policy: `microphone=()` = empty allowlist = **blokováno všem včetně same-origin**. iOS Safari to historicky ignoroval (lenient impl), Android Chrome dodržuje striktně.
+- **Fix:** v `src/middleware.ts` musí být `microphone=(self)` (povolení pro vlastní origin) — `()` blokuje totálně.
+- **Jak se to stalo:** původní scaffold měl `microphone=()` z paranoie, Petr testoval jen na iPhonu → bug ležel od commitu 8f1bdfa, projevil se až při guestech na Androidu.
+- **Pravidlo:** `()` použij JEN na features které opravdu nikdy nechceš (camera, geolocation). Pro mikrofon (Studna, Ozvěna, /me/) musí být `(self)`.
+
 ## Co dělat když se nějak ztratíš
 
 1. Otevři `INSTRUKCE/00-START-HERE.md` znovu
