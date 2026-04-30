@@ -174,9 +174,9 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
             <Icon name="lucide:search" class="size-4" />
             <span class="hidden md:inline font-mono text-xs">⌘K</span>
           </button>
-          <button type="button" class="size-8 rounded-md hover:bg-white/5 flex items-center justify-center text-muted-foreground transition-colors" aria-label="Nastavení">
+          <a href="/settings" class="size-8 rounded-md hover:bg-white/5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label="Nastavení">
             <Icon name="lucide:settings" class="size-4" />
-          </button>
+          </a>
         </div>
       </header>
 

@@ -45,6 +45,13 @@ export const GET: APIRoute = async ({ cookies }) => {
   if (!session) return Response.json({ error: "UNAUTHENTICATED" }, { status: 401 });
 
   const invites = await prisma.bookingInvite.findMany({
+    where: {
+      // Schovej zrušené a expirované — Gideon je nepotřebuje vidět v listu.
+      // Když chce historii, dohledá v DB. Aktivní jsou: PENDING/VIEWED/RESERVED/CONFIRMED.
+      status: { notIn: ["CANCELED", "EXPIRED"] },
+      // Plus skryj EVERGREEN šablonu pro /schuzka — to je interní template, ne pozvánka
+      NOT: { internalNote: "schuzka-public-evergreen" },
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
     include: {
