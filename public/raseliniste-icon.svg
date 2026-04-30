@@ -1,0 +1,51 @@
+<svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rašeliniště">
+  <defs>
+    <radialGradient id="rb-bg" cx="50%" cy="65%" r="80%">
+      <stop offset="0%" stop-color="#1a1f3a"/>
+      <stop offset="60%" stop-color="#10122a"/>
+      <stop offset="100%" stop-color="#08091c"/>
+    </radialGradient>
+    <radialGradient id="rb-sun" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff4d6"/>
+      <stop offset="35%" stop-color="#fcd0a3"/>
+      <stop offset="75%" stop-color="#f5a05e"/>
+      <stop offset="100%" stop-color="#e87a3a"/>
+    </radialGradient>
+    <radialGradient id="rb-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fcd0a3" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#fcd0a3" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#fcd0a3" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rb-mist" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Pozadí (záměrně bez rounded corners — iOS ořízne podle systémové masky) -->
+  <rect width="180" height="180" fill="url(#rb-bg)"/>
+
+  <!-- Mlha nad horizontem (rašeliniště feeling) -->
+  <rect x="0" y="92" width="180" height="42" fill="url(#rb-mist)"/>
+
+  <!-- Vzdálená horská silueta (decentní, jen pro hloubku) -->
+  <path d="M 0 118 Q 30 108 55 112 T 110 110 T 180 116 L 180 118 Z"
+        fill="#1a2050" opacity="0.7"/>
+
+  <!-- Glow kolem slunce -->
+  <circle cx="90" cy="92" r="56" fill="url(#rb-glow)"/>
+
+  <!-- Slunce -->
+  <circle cx="90" cy="92" r="34" fill="url(#rb-sun)"/>
+
+  <!-- Odraz slunce ve vodě — tři vlnky pod sluncem -->
+  <g>
+    <ellipse cx="90" cy="138" rx="44" ry="2.2" fill="#f5a05e" opacity="0.55"/>
+    <ellipse cx="90" cy="146" rx="34" ry="1.6" fill="#f5a05e" opacity="0.4"/>
+    <ellipse cx="90" cy="153" rx="24" ry="1.2" fill="#f5a05e" opacity="0.28"/>
+    <ellipse cx="90" cy="159" rx="16" ry="0.9" fill="#f5a05e" opacity="0.18"/>
+  </g>
+
+  <!-- Hladina vody (subtle horizontal line) -->
+  <line x1="14" y1="129" x2="166" y2="129" stroke="#7dd3fc" stroke-width="0.6" opacity="0.25"/>
+</svg>

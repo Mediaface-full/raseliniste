@@ -36,6 +36,10 @@ type Phase = "idle" | "recording" | "uploading" | "redirecting" | "error";
 
 function loadMode(): Mode {
   if (typeof window === "undefined") return "task";
+  // 1) URL parametr má přednost (z dlaždic na /start)
+  const urlMode = new URLSearchParams(window.location.search).get("mode");
+  if (urlMode === "journal" || urlMode === "task") return urlMode;
+  // 2) Jinak persistence z localStorage (předchozí volba)
   const v = window.localStorage.getItem(MODE_KEY);
   return v === "journal" ? "journal" : "task";
 }

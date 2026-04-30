@@ -1,0 +1,136 @@
+---
+import Base from "../layouts/Base.astro";
+import { Icon } from "astro-icon/components";
+import { prisma } from "../lib/db";
+import { readSession } from "../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+type Tile = {
+  href: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  tint: "peach" | "mint" | "lavender" | "sky" | "sage" | "butter" | "rose" | "pink";
+  disabled?: boolean;
+  badge?: string;
+};
+
+const tiles: Tile[] = [
+  {
+    href: "/ozvena?mode=journal",
+    title: "Deník",
+    subtitle: "Nadiktovat deníkový zápis",
+    icon: "lucide:book-open",
+    tint: "butter",
+  },
+  {
+    href: "/ozvena?mode=task",
+    title: "Úkoly",
+    subtitle: "Nadiktovat úkoly (AI rozdělí)",
+    icon: "lucide:check-square",
+    tint: "peach",
+  },
+  {
+    href: "/studna/nahravka",
+    title: "Studna",
+    subtitle: "Nahrávka do projektu",
+    icon: "lucide:waves",
+    tint: "mint",
+  },
+  {
+    href: "#zeptat-se-coming-soon",
+    title: "Zeptat se",
+    subtitle: "AI prohlédne deníky a úkoly",
+    icon: "lucide:message-circle-question",
+    tint: "lavender",
+    disabled: true,
+    badge: "brzy",
+  },
+];
+
+const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
+---
+
+<Base
+  title="Rašeliniště"
+  appleTitle="Rašeliniště"
+  appleCapable={true}
+  manifestPath="/manifest-start.json"
+>
+  <main class="min-h-screen flex flex-col">
+    <!-- Topbar (jen pokud ne v PWA standalone módu) -->
+    <div class="border-b border-white/5 px-4 py-3 flex items-center gap-3">
+      <a href="/" class="text-xs font-mono text-muted-foreground hover:text-foreground">← Dashboard</a>
+      <span class="text-xs font-mono text-muted-foreground">{user.username}</span>
+      <a href="/settings" class="ml-auto text-xs font-mono text-muted-foreground hover:text-foreground" aria-label="Nastavení">
+        <Icon name="lucide:settings" class="size-4" />
+      </a>
+    </div>
+
+    <div class="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
+      <div class="w-full max-w-lg space-y-6">
+        <header class="text-center">
+          <div class="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-1">
+            {today}
+          </div>
+          <h1 class="text-3xl tracking-tight">Co teď?</h1>
+        </header>
+
+        <div class="grid grid-cols-2 gap-3">
+          {tiles.map((tile) => {
+            const Tag = tile.disabled ? "div" : "a";
+            return (
+              <Tag
+                href={tile.disabled ? undefined : tile.href}
+                class={`glass rounded-2xl p-5 relative overflow-hidden flex flex-col items-start gap-2 min-h-[140px] transition ${
+                  tile.disabled
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-white/5 active:scale-[0.98]"
+                }`}
+                style={`--c: var(--tint-${tile.tint});`}
+              >
+                <div
+                  class="absolute -top-12 -right-12 size-32 rounded-full blur-2xl pointer-events-none"
+                  style="background: color-mix(in oklch, var(--c) 28%, transparent);"
+                ></div>
+
+                <div
+                  class="size-12 rounded-xl grid place-items-center"
+                  style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
+                >
+                  <Icon name={tile.icon} class="size-6" />
+                </div>
+
+                <div class="relative mt-auto">
+                  <div class="text-base font-semibold tracking-tight flex items-center gap-2">
+                    {tile.title}
+                    {tile.badge && (
+                      <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">
+                        {tile.badge}
+                      </span>
+                    )}
+                  </div>
+                  <div class="text-xs text-muted-foreground mt-0.5 leading-snug">
+                    {tile.subtitle}
+                  </div>
+                </div>
+              </Tag>
+            );
+          })}
+        </div>
+
+        <div class="text-center text-xs font-mono text-muted-foreground/60">
+          Tip: <strong>Sdílet → Přidat na plochu</strong> = ikona Rašeliniště
+        </div>
+      </div>
+    </div>
+  </main>
+</Base>
