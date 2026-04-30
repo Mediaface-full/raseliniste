@@ -32,7 +32,8 @@ INSTRUKCE/
 ├── 04-todo-list.md             ← co se má dělat
 ├── 05-styl-prace.md            ← jak Gideon pracuje, co očekává
 ├── 06-troubleshooting.md       ← známé problémy + diagnostika
-└── 07-resources.md             ← kde co je (repo, NAS, doména, soubory)
+├── 07-resources.md             ← kde co je (repo, NAS, doména, soubory)
+└── 08-deploy-testing.md        ← jak nerozbít produkci (staging, smoke test, rollback)
 ```
 
 **Plus existující projektové dokumenty** (na ně narazíš v repo root):
