@@ -10,6 +10,7 @@ interface CallLogItem {
   message: string;
   isUrgent: boolean;
   wasVip: boolean;
+  requestedDueAt: string | null;
   todoistTaskId: string | null;
   todoistError: string | null;
   mailSentAt: string | null;
@@ -116,6 +117,11 @@ export default function FirewallLog() {
                       {l.isUrgent && (
                         <span className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded bg-[var(--tint-butter)]/20 text-[var(--tint-butter)]">
                           Urgent
+                        </span>
+                      )}
+                      {l.requestedDueAt && (
+                        <span className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded bg-[var(--tint-rose)]/20 text-[var(--tint-rose)]">
+                          📅 do {new Date(l.requestedDueAt).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" })}
                         </span>
                       )}
                     </div>
