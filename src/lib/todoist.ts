@@ -35,6 +35,7 @@ export interface CreateTaskInput {
   section_id?: string;
   priority?: 1 | 2 | 3 | 4;
   due_string?: string; // "today", "tomorrow at 9am", ...
+  due_date?: string;   // "YYYY-MM-DD" — přesné datum, přebíjí due_string
   labels?: string[];
 }
 

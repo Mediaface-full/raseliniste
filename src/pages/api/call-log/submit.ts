@@ -13,6 +13,9 @@ const Body = z.object({
   phone: z.string().min(3).max(30),
   message: z.string().min(3).max(1000),
   isUrgent: z.boolean().optional().default(false),
+  // VIP-only termín splnění (YYYY-MM-DD). Server stejně ignoruje pokud volající
+  // není VIP — proti pokusu o privilege bypass přes nezavolaný formulář.
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   website: z.string().optional(), // honeypot
 });
 
@@ -79,6 +82,21 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   const contact = phoneRecord?.contact ?? null;
   const wasVip = contact?.isVip ?? false;
 
+  // Datum splnění je VIP-only privilegium. Pokud volající není VIP, ignoruj
+  // (mohl by ho podsunout v requestu i když na ne-VIP variantě stránky pole není).
+  let requestedDueAt: Date | null = null;
+  if (wasVip && body.dueDate) {
+    const parsed = new Date(`${body.dueDate}T00:00:00`);
+    if (!isNaN(parsed.getTime())) {
+      // Sanity check: nezveme do minulosti, max 2 roky dopředu
+      const now = new Date();
+      const maxFuture = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate());
+      if (parsed >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && parsed <= maxFuture) {
+        requestedDueAt = parsed;
+      }
+    }
+  }
+
   // Vytvoř CallLog (snapshot)
   const callLog = await prisma.callLog.create({
     data: {
@@ -89,6 +107,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       message: body.message.trim(),
       isUrgent: body.isUrgent,
       wasVip,
+      requestedDueAt,
       ip,
       userAgent: ua,
     },
@@ -123,6 +142,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         "",
         `Číslo: ${prettyPhone}`,
         contact ? `Kontakt: ${contact.displayName}${wasVip ? " (VIP)" : ""}` : "Neznámé číslo",
+        requestedDueAt ? `📅 **Termín požadovaný od VIP:** ${requestedDueAt.toLocaleDateString("cs-CZ")}` : "",
         body.isUrgent ? "⚠️ Označeno jako **urgentní**" : "",
         `Přijato: ${new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague" })}`,
         `Firewall: https://www.raseliniste.cz/firewall`,
@@ -130,12 +150,23 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         .filter(Boolean)
         .join("\n");
 
+      // Termín:
+      //   1. VIP zadal konkrétní datum  → due_date YYYY-MM-DD
+      //   2. VIP nebo urgent bez data   → due_string "today"
+      //   3. Ostatní                    → bez termínu
+      const dueArgs: { due_date?: string; due_string?: string } = {};
+      if (requestedDueAt) {
+        dueArgs.due_date = requestedDueAt.toISOString().slice(0, 10);
+      } else if (wasVip || body.isUrgent) {
+        dueArgs.due_string = "today";
+      }
+
       const task = await createTask(token, {
         content,
         description,
         project_id: projectId,
         priority,
-        due_string: wasVip || body.isUrgent ? "today" : undefined,
+        ...dueArgs,
         labels: ["firewall", wasVip ? "vip" : "vyruseni"],
       });
       todoistTaskId = task.id;

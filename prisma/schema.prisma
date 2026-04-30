@@ -308,6 +308,10 @@ model CallLog {
   isUrgent     Boolean   @default(false)
   wasVip       Boolean   @default(false) // snapshot v době přijetí
 
+  // VIP-only: požadovaný termín splnění, propíše se do Todoist jako due_date.
+  // Volitelný — VIP může nechat prázdné a Gideon si termín nastaví sám.
+  requestedDueAt DateTime?
+
   ip           String?
   userAgent    String?
 
