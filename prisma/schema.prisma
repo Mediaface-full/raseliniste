@@ -230,6 +230,10 @@ model Contact {
 
   displayName  String
   firstName    String?
+  // 5. pád (vokativ) pro oslovení v emailech a na /call-log VIP variantě.
+  // Volitelné — pokud chybí, použije se algoritmus s výjimkami; pokud algoritmus
+  // selže (cizí jméno apod.), fallback na firstName v 1. pádu.
+  firstNameVocative String?
   lastName     String?
   note         String?
   isVip        Boolean        @default(false)

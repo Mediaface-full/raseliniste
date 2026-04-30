@@ -7,6 +7,7 @@ interface Contact {
   id: string;
   displayName: string;
   firstName: string | null;
+  firstNameVocative: string | null;
   lastName: string | null;
   note: string | null;
   isVip: boolean;
@@ -287,6 +288,7 @@ interface EditorProps {
 function ContactEditor({ contact, onClose }: EditorProps) {
   const [displayName, setDisplayName] = useState(contact?.displayName ?? "");
   const [firstName, setFirstName] = useState(contact?.firstName ?? "");
+  const [firstNameVocative, setFirstNameVocative] = useState(contact?.firstNameVocative ?? "");
   const [lastName, setLastName] = useState(contact?.lastName ?? "");
   const [note, setNote] = useState(contact?.note ?? "");
   const [isVip, setIsVip] = useState(contact?.isVip ?? false);
@@ -309,6 +311,7 @@ function ContactEditor({ contact, onClose }: EditorProps) {
     const payload = {
       displayName: displayName.trim() || [firstName, lastName].filter(Boolean).join(" ") || "(bez jména)",
       firstName: firstName.trim() || null,
+      firstNameVocative: firstNameVocative.trim() || null,
       lastName: lastName.trim() || null,
       note: note.trim() || null,
       isVip,
@@ -373,6 +376,20 @@ function ContactEditor({ contact, onClose }: EditorProps) {
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Příjmení</label>
               <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
             </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              Oslovení (5. pád) — jen VIP
+            </label>
+            <Input
+              value={firstNameVocative}
+              onChange={(e) => setFirstNameVocative(e.target.value)}
+              placeholder={firstName ? `např. „${firstName.endsWith("a") ? firstName.slice(0, -1) + "o" : firstName + "e"}"` : ""}
+            />
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
+              Pokud necháš prázdné, systém zkusí odhadnout. Vyplň jen u jmen co algoritmus zkazí.
+            </p>
           </div>
 
           <label className="flex items-center gap-2 cursor-pointer py-1">

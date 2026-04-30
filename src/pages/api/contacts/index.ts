@@ -19,6 +19,7 @@ const EmailInput = z.object({
 const CreateBody = z.object({
   displayName: z.string().min(1).max(200),
   firstName: z.string().max(100).optional().nullable(),
+  firstNameVocative: z.string().max(100).optional().nullable(),
   lastName: z.string().max(100).optional().nullable(),
   note: z.string().max(2000).optional().nullable(),
   isVip: z.boolean().optional().default(false),
@@ -85,6 +86,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       userId: session.uid,
       displayName: body.displayName,
       firstName: body.firstName ?? null,
+      firstNameVocative: body.firstNameVocative ?? null,
       lastName: body.lastName ?? null,
       note: body.note ?? null,
       isVip: body.isVip,

@@ -84,14 +84,15 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
   // Datum splnění je VIP-only privilegium. Pokud volající není VIP, ignoruj
   // (mohl by ho podsunout v requestu i když na ne-VIP variantě stránky pole není).
+  // Min = dnes + 2 dny (Gideon potřebuje rezervu).
   let requestedDueAt: Date | null = null;
   if (wasVip && body.dueDate) {
     const parsed = new Date(`${body.dueDate}T00:00:00`);
     if (!isNaN(parsed.getTime())) {
-      // Sanity check: nezveme do minulosti, max 2 roky dopředu
       const now = new Date();
+      const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
       const maxFuture = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate());
-      if (parsed >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && parsed <= maxFuture) {
+      if (parsed >= minDate && parsed <= maxFuture) {
         requestedDueAt = parsed;
       }
     }

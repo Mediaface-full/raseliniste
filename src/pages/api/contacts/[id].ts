@@ -9,6 +9,7 @@ export const prerender = false;
 const PatchBody = z.object({
   displayName: z.string().min(1).max(200).optional(),
   firstName: z.string().max(100).nullable().optional(),
+  firstNameVocative: z.string().max(100).nullable().optional(),
   lastName: z.string().max(100).nullable().optional(),
   note: z.string().max(2000).nullable().optional(),
   isVip: z.boolean().optional(),
@@ -72,6 +73,7 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
     data: {
       ...(body.displayName !== undefined ? { displayName: body.displayName } : {}),
       ...(body.firstName !== undefined ? { firstName: body.firstName } : {}),
+      ...(body.firstNameVocative !== undefined ? { firstNameVocative: body.firstNameVocative } : {}),
       ...(body.lastName !== undefined ? { lastName: body.lastName } : {}),
       ...(body.note !== undefined ? { note: body.note } : {}),
       ...(body.isVip !== undefined ? { isVip: body.isVip } : {}),

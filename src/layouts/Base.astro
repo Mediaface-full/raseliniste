@@ -10,9 +10,21 @@ interface Props {
   appleTitle?: string;          // název pod ikonou na ploše iPhone
   appleCapable?: boolean;        // otevřít jako "appka" bez Safari chromu
   manifestPath?: string;         // PWA manifest cesta (pokud máme)
+  // Override pro apple-touch-icon. Default = G logo (sdílená ikona pro
+  // /call-log, /me/<token> a další veřejné stránky pro hosty/klienty).
+  // /start si přepisuje na /tree-touch-icon.png — strom má JEN Petr na své
+  // osobní úvodní stránce.
+  appleIconPath?: string;
 }
 
-const { title, description = "", appleTitle, appleCapable = false, manifestPath } = Astro.props;
+const {
+  title,
+  description = "",
+  appleTitle,
+  appleCapable = false,
+  manifestPath,
+  appleIconPath = "/apple-touch-icon.png",
+} = Astro.props;
 ---
 
 <!doctype html>
@@ -25,7 +37,7 @@ const { title, description = "", appleTitle, appleCapable = false, manifestPath 
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0a0920" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href={appleIconPath} />
     {appleTitle && <meta name="apple-mobile-web-app-title" content={appleTitle} />}
     {appleCapable && <meta name="apple-mobile-web-app-capable" content="yes" />}
     {appleCapable && <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />}
