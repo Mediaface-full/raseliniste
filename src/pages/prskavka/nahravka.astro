@@ -13,18 +13,19 @@ const user = await prisma.user.findUnique({
 });
 if (!user) return Astro.redirect("/login");
 
+// Filter — jen Prskavka projekty (osobní)
 const projects = await prisma.projectBox.findMany({
-  where: { userId: session.uid, archivedAt: null, isPrivate: false },
+  where: { userId: session.uid, archivedAt: null, isPrivate: true },
   select: { id: true, name: true, description: true },
   orderBy: { name: "asc" },
 });
 ---
 
 <Shell
-  title="Nahrávka · Studánka"
+  title="Nahrávka · Prskavka"
   username={user.username}
-  heading="Nahrávka"
-  breadcrumb={[{ label: "Studánka", href: "/studna" }, { label: "Nahrávka" }]}
+  heading="Nahrávka — Prskavka"
+  breadcrumb={[{ label: "Prskavka", href: "/prskavka" }, { label: "Nahrávka" }]}
 >
   <div class="max-w-md mx-auto">
     <OwnerRecorder

@@ -69,6 +69,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         userId: user.id,
         archivedAt: null,
         includeInDigest: true,
+        isPrivate: false, // Prskavka (osobní) NEPATŘÍ do digestu — Petr by si emailoval sám sobě
       },
       select: { id: true, name: true },
     });

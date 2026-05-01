@@ -13,15 +13,28 @@ interface Project {
   _count: { recordings: number; invitations: number };
 }
 
-export default function StudnaList() {
+export type ProjectListMode = "studanka" | "prskavka";
+
+export default function StudnaList({ mode = "studanka" }: { mode?: ProjectListMode } = {}) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
+  // Mode-specific URL prefixy. Detail projektu (/studna/<id>) je sdílený
+  // pro obě varianty — projekt je jen DB řádek s isPrivate flagem.
+  const isPrivate = mode === "prskavka";
+  const apiUrl = isPrivate ? "/api/studna?private=1" : "/api/studna";
+  const aktivitaUrl = isPrivate ? "/prskavka/aktivita" : "/studna/aktivita";
+  const nahravkaUrl = isPrivate ? "/prskavka/nahravka" : "/studna/nahravka";
+  const tint = isPrivate ? "butter" : "butter"; // Prskavka i Studánka = teplý odstín
+  const emptyMsg = isPrivate
+    ? "Zatím žádný osobní projekt. Vytvoř první klikem na Nový projekt."
+    : "Zatím žádné projekty. Vytvoř první klikem na Nový projekt.";
+
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/studna");
+      const res = await fetch(apiUrl);
       const data = await res.json();
       if (res.ok) setProjects(data.projects);
     } finally {
@@ -29,7 +42,7 @@ export default function StudnaList() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [apiUrl]);
 
   if (loading) {
     return (
@@ -45,10 +58,10 @@ export default function StudnaList() {
         <div className="text-sm text-muted-foreground flex-1">
           {projects.length} projekt{projects.length === 1 ? "" : projects.length < 5 ? "y" : "ů"}
         </div>
-        <Button variant="outline" onClick={() => (window.location.href = "/studna/aktivita")}>
+        <Button variant="outline" onClick={() => (window.location.href = aktivitaUrl)}>
           <Activity /> Aktivita
         </Button>
-        <Button variant="outline" onClick={() => (window.location.href = "/studna/nahravka")}>
+        <Button variant="outline" onClick={() => (window.location.href = nahravkaUrl)}>
           <Mic /> Nahrávat
         </Button>
         <Button onClick={() => setCreating(true)}>
@@ -58,6 +71,7 @@ export default function StudnaList() {
 
       {creating && (
         <NewProjectForm
+          isPrivate={isPrivate}
           onCancel={() => setCreating(false)}
           onCreated={(p) => {
             setCreating(false);
@@ -68,7 +82,7 @@ export default function StudnaList() {
 
       {projects.length === 0 ? (
         <div className="glass rounded-xl p-8 text-center text-muted-foreground">
-          Zatím žádné projekty. Vytvoř první klikem na <strong>Nový projekt</strong>.
+          {emptyMsg}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -113,9 +127,11 @@ export default function StudnaList() {
 }
 
 function NewProjectForm({
+  isPrivate = false,
   onCancel,
   onCreated,
 }: {
+  isPrivate?: boolean;
   onCancel: () => void;
   onCreated: (p: Project) => void;
 }) {
@@ -136,6 +152,7 @@ function NewProjectForm({
           name: name.trim(),
           homeTitle: homeTitle.trim() || null,
           description: description.trim() || null,
+          isPrivate,
         }),
       });
       const data = await res.json();

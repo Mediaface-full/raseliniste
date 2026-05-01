@@ -12,14 +12,20 @@ const Body = z.object({
   description: z.string().max(2000).nullable().optional(),
   extractionPrompt: z.string().max(8000).nullable().optional(),
   includeInDigest: z.boolean().optional(),
+  isPrivate: z.boolean().optional(),
 });
 
-export const GET: APIRoute = async ({ cookies }) => {
+export const GET: APIRoute = async ({ cookies, url }) => {
   const session = await readSession(cookies);
   if (!session) return Response.json({ error: "UNAUTHENTICATED" }, { status: 401 });
 
+  // Filter dle modulu:
+  //   ?private=1 → jen Prskavka projekty (osobní)
+  //   bez parametru / =0 → jen Studánka (sdílené s klienty)
+  const isPrivate = url.searchParams.get("private") === "1";
+
   const projects = await prisma.projectBox.findMany({
-    where: { userId: session.uid, archivedAt: null },
+    where: { userId: session.uid, archivedAt: null, isPrivate },
     include: {
       _count: {
         select: { recordings: true, invitations: true },
@@ -51,6 +57,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       description: body.description ?? null,
       extractionPrompt: body.extractionPrompt ?? null,
       includeInDigest: body.includeInDigest ?? true,
+      isPrivate: body.isPrivate ?? false,
     },
   });
 

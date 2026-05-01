@@ -13,11 +13,10 @@ const user = await prisma.user.findUnique({
 });
 if (!user) return Astro.redirect("/login");
 
-// Posledních 200 záznamů napříč všemi STUDÁNKA (sdílené) projekty Gideona.
-// Prskavka má vlastní /prskavka/aktivita.
+// Posledních 200 záznamů PRSKAVKA (osobní) projekty Gideona.
 const recordings = await prisma.projectRecording.findMany({
   where: {
-    project: { userId: session.uid, isPrivate: false },
+    project: { userId: session.uid, isPrivate: true },
   },
   select: {
     id: true,
@@ -60,7 +59,6 @@ function fmtRelative(d: Date): string {
   return d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" });
 }
 
-// Sgrupování per den (DD.MM.YYYY) — vizuálně oddělené sekce
 type Group = { dateKey: string; dateLabel: string; items: typeof recordings };
 const groups: Group[] = [];
 for (const r of recordings) {
@@ -91,10 +89,10 @@ for (const r of recordings) {
 ---
 
 <Shell
-  title="Aktivita · Studánka · Rašeliniště"
+  title="Aktivita · Prskavka · Rašeliniště"
   username={user.username}
-  heading="Aktivita ve Studánce"
-  breadcrumb={[{ label: "Studánka", href: "/studna" }, { label: "Aktivita" }]}
+  heading="Aktivita v Prskavce"
+  breadcrumb={[{ label: "Prskavka", href: "/prskavka" }, { label: "Aktivita" }]}
 >
   <div class="space-y-4">
     <div class="glass rounded-xl p-3 flex flex-wrap items-center gap-2">
@@ -102,16 +100,16 @@ for (const r of recordings) {
         Posledních {recordings.length} {recordings.length === 1 ? "záznam" : recordings.length < 5 ? "záznamy" : "záznamů"}
       </div>
       <a
-        href="/studna"
+        href="/prskavka"
         class="text-xs font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-white/5"
       >
-        <Icon name="lucide:arrow-left" class="size-3" /> zpět na Studánku
+        <Icon name="lucide:arrow-left" class="size-3" /> zpět na Prskavku
       </a>
     </div>
 
     {recordings.length === 0 ? (
       <div class="glass rounded-xl p-8 text-center text-muted-foreground">
-        Zatím žádné nahrávky. Až někdo něco nahraje, objeví se to tady.
+        Zatím žádné nahrávky. Vyber projekt a něco nahrej.
       </div>
     ) : (
       <div class="space-y-6">
@@ -128,11 +126,6 @@ for (const r of recordings) {
                 >
                   <div class="flex items-baseline gap-2 flex-wrap">
                     <span class="font-medium text-sm">{r.authorName}</span>
-                    {r.isOwner && (
-                      <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-[var(--tint-sky)]/20 text-[var(--tint-sky)]">
-                        Já
-                      </span>
-                    )}
                     {r.type === "BRIEF" && (
                       <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-[var(--tint-mint)]/20 text-[var(--tint-mint)]">
                         Brief
@@ -148,7 +141,7 @@ for (const r of recordings) {
                     </span>
                   </div>
                   <div class="text-xs text-muted-foreground/80 font-mono">
-                    📂 {r.project.name}
+                    ✦ {r.project.name}
                   </div>
                   {r.transcript && (
                     <div class="text-sm text-foreground/85 italic leading-relaxed line-clamp-3">

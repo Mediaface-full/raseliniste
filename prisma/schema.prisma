@@ -540,6 +540,11 @@ model ProjectBox {
   // Notifikace v 18:00 cron — pokud false, projekt se v digestu vynechá
   includeInDigest   Boolean  @default(true)
 
+  // Prskavka modul = osobní projekty (knížky, nápady, soukromé tvoření).
+  // false = klasická Studánka (sdílená s klienty), true = Prskavka (jen Petr).
+  // Liší se jen filtrem a kde se zobrazí, jinak je chování identické.
+  isPrivate         Boolean  @default(false)
+
   invitations       ProjectInvitation[]
   recordings        ProjectRecording[]
   summaries         ProjectSummary[]
