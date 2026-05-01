@@ -47,6 +47,7 @@ model User {
   anniversaries    Anniversary[]
   checkIns         CheckIn[]
   pushSubscriptions WebPushSubscription[]
+  decisions        Decision[]
 }
 
 model WebauthnCredential {
@@ -1159,4 +1160,96 @@ model WebPushSubscription {
   lastError   String?  // pokud Apple/Google vrátí 410 (gone) nebo jiný error
 
   @@index([userId])
+}
+
+// ============================================================================
+// B&W Myš — rozhodovací systém (longitudinální sběr vstupů → AI vyhodnocení)
+// Spec: Návody / Check-in_Formular_Zadani.pdf  (přesný popis sekcí A-H, toků 1-7)
+// ============================================================================
+
+model Decision {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  nazev               String   // pracovní název pro orientaci v archivu
+  kontext             String   // "pracovni" | "osobni" | "smiseny"
+  otazka              String   @db.Text  // formulovaná jako otázka
+  varianty            Json     // String[] — minimum 3
+  predpoklady         Json     // String[] — minimum 1
+
+  deadlineRozhodnuti  DateTime
+  delkaSberuDny       Int      @default(14)
+  status              String   @default("aktivni")  // aktivni|uzavrene_jdu|uzavrene_nejdu|odlozene|archivovane
+
+  datumVytvoreni      DateTime @default(now())
+  datumUzavreni       DateTime?
+  datumRevize         DateTime?
+  // Pokud status=odlozene, kdy se má vrátit do aktivni (cron porovnává)
+  odlozenoDo          DateTime?
+
+  verdiktText         String?  @db.Text
+  coByZmeniloVerdikt  String?  @db.Text
+
+  entries             DecisionEntry[]
+  evaluations         DecisionEvaluation[]
+  reopenings          DecisionReopening[]
+
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, datumVytvoreni])
+  @@index([odlozenoDo])
+}
+
+model DecisionEntry {
+  id          String   @id @default(cuid())
+  decisionId  String
+  decision    Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  datum       DateTime @default(now())
+  nalada      Int      // 1-5
+  typVstupu   String   // "novy_fakt_zvenci" | "nova_uvaha" | "napadlo_me" | "reakce_na_udalost"
+  uhelPohledu String   @default("nevybrano")  // fakta|emoce|kritika|prinosy|alternativy|meta|nevybrano
+  obsah       String   @db.Text
+
+  // Klasifikace doplněná AI při finálním vyhodnocení (pokud uhelPohledu="nevybrano")
+  uhelPohleduAi String?
+
+  // Audio source tracking — pokud Entry vznikl z audio záznamu
+  audioPath   String?
+  audioMime   String?
+  audioBytes  Int?
+
+  @@index([decisionId, datum])
+}
+
+model DecisionEvaluation {
+  id                          String   @id @default(cuid())
+  decisionId                  String
+  decision                    Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  datum                       DateTime @default(now())
+  typ                         String   // "prubezne" | "finalni"
+  obsahStrukturovany          Json     // celý strukturovaný výstup AI (sekce A-H pro finální)
+  pocetVstupuVDobeGenerovani  Int
+
+  // AI usage tracking
+  modelName                   String?
+  promptTokens                Int?
+  outputTokens                Int?
+
+  @@index([decisionId, datum])
+}
+
+model DecisionReopening {
+  id                String   @id @default(cuid())
+  decisionId        String
+  decision          Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  datum             DateTime @default(now())
+  popisNovehoFaktu  String   @db.Text
+  schvaleno         Boolean  // uživatel sám potvrzuje že to je opravdu nový fakt
+
+  @@index([decisionId, datum])
 }

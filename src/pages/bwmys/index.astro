@@ -1,0 +1,24 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import BwMysList from "../../components/BwMysList";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="B&W Myš · Rašeliniště"
+  username={user.username}
+  heading="B&W Myš"
+  breadcrumb={[{ label: "B&W Myš" }]}
+>
+  <BwMysList client:load />
+</Shell>

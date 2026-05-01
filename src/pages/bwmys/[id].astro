@@ -1,0 +1,34 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import BwMysDetail from "../../components/BwMysDetail";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const id = Astro.params.id;
+if (!id) return Astro.redirect("/bwmys");
+
+// Server-side ověření vlastnictví (rychlý 404 bez fetch)
+const item = await prisma.decision.findFirst({
+  where: { id, userId: session.uid },
+  select: { id: true, nazev: true },
+});
+if (!item) return Astro.redirect("/bwmys");
+---
+
+<Shell
+  title={`${item.nazev} · B&W Myš`}
+  username={user.username}
+  heading={item.nazev}
+  breadcrumb={[{ label: "B&W Myš", href: "/bwmys" }, { label: item.nazev }]}
+>
+  <BwMysDetail client:load id={id} />
+</Shell>
