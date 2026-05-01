@@ -46,6 +46,7 @@ model User {
   ragChunks        RagChunk[]
   anniversaries    Anniversary[]
   checkIns         CheckIn[]
+  pushSubscriptions WebPushSubscription[]
 }
 
 model WebauthnCredential {
@@ -1134,4 +1135,28 @@ model CheckIn {
 
   @@index([userId, createdAt])
   @@index([userId, type, createdAt])
+}
+
+// ============================================================================
+// Web Push subscription (push notifikace na mobil bez WhatsApp / email)
+// ============================================================================
+
+/// Jeden device subscription (browser/PWA na konkrétním zařízení).
+/// Petr může mít víc — iPhone, iPad, desktop Chrome — každý je separátní subscription.
+model WebPushSubscription {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  endpoint    String   @unique  // URL push servisu (Apple/Google/Mozilla)
+  p256dh      String              // Base64 public key z prohlížeče
+  auth        String              // Base64 auth secret z prohlížeče
+
+  // Pro UI „Smazat tohle zařízení"
+  label       String?  // "iPhone Safari", "Mac Chrome", ručně Petr edituje
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime?
+  lastError   String?  // pokud Apple/Google vrátí 410 (gone) nebo jiný error
+
+  @@index([userId])
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendMail } from "@/lib/mailer";
 import { sendWhatsAppToUser } from "@/lib/whatsapp";
+import { sendPushToUser } from "@/lib/webpush";
 
 export const prerender = false;
 
@@ -35,7 +36,10 @@ export const POST: APIRoute = async ({ request, url }) => {
     typeParam === "lunch" || typeParam === "evening" ? typeParam : "lunch";
 
   const users = await prisma.user.findMany({
-    select: { id: true, username: true, notificationEmail: true, whatsappNumber: true },
+    select: {
+      id: true, username: true, notificationEmail: true, whatsappNumber: true,
+      _count: { select: { pushSubscriptions: true } },
+    },
   });
 
   const link = `${BASE_URL}/zijes/novy?type=${type}`;
@@ -50,13 +54,26 @@ export const POST: APIRoute = async ({ request, url }) => {
     : "Konec pracovního dne — 90 sekund kontaktu se sebou.";
   const closing = "Tady jsem, když chceš. Nemusíš.";
 
-  const results: Array<{ user: string; email: boolean; whatsapp: boolean; reason?: string }> = [];
+  const results: Array<{ user: string; push: number; email: boolean; whatsapp: boolean; reason?: string }> = [];
 
   for (const user of users) {
+    let pushSent = 0;
     let emailOk = false;
     let waOk = false;
+    const hasPush = user._count.pushSubscriptions > 0;
 
-    // Email — vždy pokud má notificationEmail
+    // 1) Web push — primární kanál (pokud má aspoň jednu subscription)
+    if (hasPush) {
+      const r = await sendPushToUser(user.id, {
+        title: subject,
+        body: `${introBody}  ${closing}`,
+        url: link,
+        tag: `zijes-${type}`,
+      });
+      pushSent = r.sent;
+    }
+
+    // 2) Email — vždy pokud má notificationEmail (záloha + audit)
     const emailTo = user.notificationEmail ?? env.NOTIFICATION_EMAIL;
     if (emailTo) {
       const html = renderHtml({ intro: introBody, link, closing, label: subject });
@@ -65,18 +82,18 @@ export const POST: APIRoute = async ({ request, url }) => {
       emailOk = r.ok;
     }
 
-    // WhatsApp — pokud má nastavené target číslo + Twilio integraci
-    if (user.whatsappNumber) {
+    // 3) WhatsApp — JEN pokud nemá web push (Petr explicitně chtěl push místo WA na mobilu)
+    if (user.whatsappNumber && !hasPush) {
       const body = `*${subject}*\n\n${introBody}\n\n${link}\n\n_${closing}_`;
       const r = await sendWhatsAppToUser(user.id, body);
       waOk = r.ok;
       if (!r.ok) {
-        results.push({ user: user.username, email: emailOk, whatsapp: false, reason: r.error });
+        results.push({ user: user.username, push: pushSent, email: emailOk, whatsapp: false, reason: r.error });
         continue;
       }
     }
 
-    results.push({ user: user.username, email: emailOk, whatsapp: waOk });
+    results.push({ user: user.username, push: pushSent, email: emailOk, whatsapp: waOk });
   }
 
   return Response.json({ ok: true, type, processed: results });

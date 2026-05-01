@@ -54,6 +54,12 @@ const schema = z.object({
   BOOKING_MAGIC_LINK_SECRET: emptyToUndef(z.string().min(16).optional()),
   // Siri Shortcut (calendar check)
   SIRI_API_TOKEN: emptyToUndef(z.string().min(16).optional()),
+  // Web Push (VAPID keys pro Apple/Google push servisy)
+  // Vygeneruj jednorázově: `npx web-push generate-vapid-keys`
+  VAPID_PUBLIC_KEY: emptyToUndef(z.string().min(80).optional()),
+  VAPID_PRIVATE_KEY: emptyToUndef(z.string().min(40).optional()),
+  // Email pro VAPID subject (push servisy chtějí kontakt na admin)
+  VAPID_SUBJECT: emptyToUndef(z.string().optional()),
 });
 
 type Env = z.infer<typeof schema>;
