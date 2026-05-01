@@ -21,6 +21,9 @@ model User {
 
   // Preferences (konfigurovatelné z /settings)
   notificationEmail String?  // kam posílat health reporty; fallback na env NOTIFICATION_EMAIL
+  // WhatsApp target — kam posílat upozornění (Petrovo vlastní číslo v E.164 formátu).
+  // Twilio credentials jsou v UserIntegration(provider="twilio").
+  whatsappNumber    String?
 
   sessions     Session[]
   passkeys     WebauthnCredential[]

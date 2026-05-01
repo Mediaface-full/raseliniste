@@ -1,0 +1,24 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import WhatsAppSettings from "../../components/WhatsAppSettings";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="WhatsApp · Nastavení · Rašeliniště"
+  username={user.username}
+  heading="WhatsApp (Twilio)"
+  breadcrumb={[{ label: "Nastavení", href: "/settings" }, { label: "WhatsApp" }]}
+>
+  <WhatsAppSettings client:load />
+</Shell>

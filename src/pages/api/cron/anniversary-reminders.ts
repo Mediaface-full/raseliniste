@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendMail } from "@/lib/mailer";
+import { sendWhatsAppToUser } from "@/lib/whatsapp";
 
 export const prerender = false;
 
@@ -135,10 +136,23 @@ export const POST: APIRoute = async ({ request }) => {
       }
     }
 
-    // WhatsApp kanál — TODO až bude integrace
+    // WhatsApp kanál — Twilio
     const whatsItems = items.filter((i) => i.channels.includes("whatsapp"));
     if (whatsItems.length > 0) {
-      console.log(`[anniversary-reminders] WhatsApp queue ${whatsItems.length} items pro ${user.username} — neimplementováno (vyber službu)`);
+      // Krátká textová verze (WA má limit 1600 znaků, raději stručně)
+      const lines = whatsItems.map((i) => {
+        const emoji = i.kind === "anniversary" ? "🕯" : "🎂";
+        const titlePart = i.yearsCount ? `${i.yearsCount}. ${i.title}` : i.title;
+        const dayPart = i.daysAhead === 0
+          ? "*DNES*"
+          : `za ${i.daysAhead} ${i.daysAhead === 1 ? "den" : i.daysAhead < 5 ? "dny" : "dní"}`;
+        return `${emoji} ${titlePart} (${i.date}) — ${dayPart}`;
+      });
+      const body = `🕯 *Rašeliniště — připomínka*\n\n${lines.join("\n")}\n\nSprav: raseliniste.cz/vyroci`;
+      const r = await sendWhatsAppToUser(user.id, body);
+      if (!r.ok) {
+        console.warn(`[anniversary-reminders] WhatsApp ${user.username}: ${r.error}`);
+      }
     }
 
     results.push({ user: user.username, sent: true, items: items.length });
