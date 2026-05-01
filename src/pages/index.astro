@@ -22,7 +22,10 @@ const unseenFirewall = await prisma.callLog.count({
   where: { userId: session.uid, seenAt: null },
 });
 
-// Plán — dnešní + zítřejší eventy
+// Plán — eventy které se konají TEĎ nebo v nejbližších 2 dnech.
+// Klíč: `endsAt > teď` (ne `>= dayStart`), aby se nezobrazily eventy
+// co dnes brzo ráno už skončily.
+const now = new Date();
 const dayStart = new Date();
 dayStart.setHours(0, 0, 0, 0);
 const dayPlus2End = new Date(dayStart);
@@ -32,7 +35,10 @@ dayPlus2End.setHours(23, 59, 59, 999);
 const upcomingEvents = await prisma.calendarEvent.findMany({
   where: {
     deletedRemotely: false,
-    AND: [{ endsAt: { gte: dayStart } }, { startsAt: { lte: dayPlus2End } }],
+    AND: [
+      { endsAt: { gte: now } },           // ještě neskončily
+      { startsAt: { lte: dayPlus2End } }, // už začaly nebo začnou v okně
+    ],
   },
   select: {
     id: true, title: true, type: true, source: true,
@@ -126,13 +132,20 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
               {upcomingEvents.map((e) => {
                 const start = new Date(e.startsAt);
                 const end = new Date(e.endsAt);
+                // Multi-day event začatý v minulosti — zobraz "Probíhá" + do kdy,
+                // nikoli původní datum začátku (mátlo).
+                const ongoing = start < dayStart;
                 return (
                   <div class="flex items-center gap-3 text-sm rounded-md px-2 py-1.5 bg-black/10">
-                    <span class="font-mono text-xs tabular w-16 shrink-0 text-muted-foreground">
-                      {fmtDay(start)}
+                    <span class={`font-mono text-xs tabular w-20 shrink-0 ${ongoing ? "text-[var(--tint-mint)]" : "text-muted-foreground"}`}>
+                      {ongoing ? "Probíhá" : fmtDay(start)}
                     </span>
                     <span class="font-mono text-xs tabular w-24 shrink-0 text-muted-foreground">
-                      {e.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
+                      {ongoing
+                        ? `do ${fmtDay(end)}`
+                        : e.allDay
+                          ? "celý den"
+                          : `${fmtTime(start)}–${fmtTime(end)}`}
                     </span>
                     <span class="flex-1 truncate">{e.title}</span>
                     {e.locationText && (
