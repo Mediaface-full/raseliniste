@@ -1,5 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
+import AnimatedG from "../../components/AnimatedG.astro";
 import { prisma } from "../../lib/db";
 import { normalizePhone } from "../../lib/phone";
 
@@ -80,13 +81,17 @@ if (matchedIsVip && rawPhone) {
   <div class="min-h-screen px-4 pt-16 pb-10 relative z-10">
     <div class="w-full max-w-sm mx-auto text-center">
       <div class="glass-strong rounded-xl p-8">
-        <img
-          src={appleIconPath}
-          alt="Gideon"
-          width="64"
-          height="64"
-          class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
-        />
+        {matchedIsVip ? (
+          <AnimatedG size={72} />
+        ) : (
+          <img
+            src={appleIconPath}
+            alt="Gideon"
+            width="64"
+            height="64"
+            class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
+          />
+        )}
         <div class={`text-3xl mb-2 ${matchedIsVip ? "text-[var(--tint-rose)]" : "text-[var(--tint-sage)]"}`}>
           {matchedIsVip ? "✦" : "✓"}
         </div>

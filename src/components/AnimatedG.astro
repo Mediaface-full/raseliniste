@@ -1,0 +1,139 @@
+---
+// Animované G logo — laser sweep + pulsující aura.
+// Použito JEN ve VIP variantě /call-log a /call-log/thanks.
+//
+// Tři vrstvy efektu:
+//   1. Pulsující fialová aura kolem (CSS keyframes na outer wrapperu)
+//   2. Pulsující glow uvnitř (SVG opacity animace)
+//   3. Laser sweep — světelný proužek co každé ~3s projíždí přes G shora dolů
+//      (SVG SMIL animace na linearGradient y1/y2)
+//
+// Velikost se ovládá přes prop `size` (default 64px).
+interface Props {
+  size?: number;
+}
+const { size = 64 } = Astro.props;
+const id = Math.random().toString(36).slice(2, 8); // unikátní ID pro gradienty
+---
+
+<div class="g-anim-aura" style={`width:${size + 16}px;height:${size + 16}px;`}>
+  <div class="g-anim-wrap" style={`width:${size}px;height:${size}px;`}>
+    <svg viewBox="0 0 180 180" class="g-anim-svg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id={`bg-${id}`} cx="50%" cy="40%" r="80%">
+          <stop offset="0%" stop-color="#2a1f4a"/>
+          <stop offset="60%" stop-color="#1a1438"/>
+          <stop offset="100%" stop-color="#0a0820"/>
+        </radialGradient>
+        <radialGradient id={`glow-${id}`} cx="50%" cy="20%" r="55%">
+          <stop offset="0%" stop-color="#c8a8ff" stop-opacity="0.55"/>
+          <stop offset="60%" stop-color="#a78bfa" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id={`letter-${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="100%" stop-color="#e8dffd"/>
+        </linearGradient>
+
+        <!-- Laser sweep gradient — animuje y1/y2 aby projížděl shora dolu -->
+        <linearGradient id={`sweep-${id}`} x1="0" y1="-0.3" x2="0" y2="0.05" gradientUnits="objectBoundingBox">
+          <stop offset="0%" stop-color="#fbcfe8" stop-opacity="0"/>
+          <stop offset="40%" stop-color="#fde68a" stop-opacity="0"/>
+          <stop offset="50%" stop-color="#fff4d6" stop-opacity="1"/>
+          <stop offset="60%" stop-color="#fde68a" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#fbcfe8" stop-opacity="0"/>
+          <animate attributeName="y1" from="-0.3" to="1.0" dur="2.8s" repeatCount="indefinite"/>
+          <animate attributeName="y2" from="0.05" to="1.35" dur="2.8s" repeatCount="indefinite"/>
+        </linearGradient>
+
+        <!-- Subtle blur filter pro laser glow -->
+        <filter id={`blur-${id}`}>
+          <feGaussianBlur stdDeviation="1.2"/>
+        </filter>
+      </defs>
+
+      <!-- Pozadí -->
+      <rect width="180" height="180" fill={`url(#bg-${id})`}/>
+
+      <!-- Pulsující glow uvnitř -->
+      <circle class="g-glow-pulse" cx="90" cy="40" r="80" fill={`url(#glow-${id})`}/>
+
+      <!-- Hlavní G -->
+      <text x="90" y="128" text-anchor="middle"
+            font-family="Georgia, 'Times New Roman', serif"
+            font-size="130" font-weight="700"
+            fill={`url(#letter-${id})`}>G</text>
+
+      <!-- Laser sweep overlay PŘES G -->
+      <text x="90" y="128" text-anchor="middle"
+            font-family="Georgia, 'Times New Roman', serif"
+            font-size="130" font-weight="700"
+            filter={`url(#blur-${id})`}
+            fill={`url(#sweep-${id})`}>G</text>
+    </svg>
+  </div>
+</div>
+
+<style>
+  .g-anim-aura {
+    margin: 0 auto 1rem;
+    position: relative;
+    border-radius: 22px;
+    display: grid;
+    place-items: center;
+    isolation: isolate;
+  }
+  /* Vnější pulsující aura kolem ikonky */
+  .g-anim-aura::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 22px;
+    background: radial-gradient(circle, rgba(167, 139, 250, 0.55), rgba(251, 207, 232, 0.2) 55%, transparent 75%);
+    filter: blur(8px);
+    z-index: -1;
+    animation: gAura 2.4s ease-in-out infinite;
+  }
+  @keyframes gAura {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50%      { opacity: 1.0;  transform: scale(1.18); }
+  }
+
+  .g-anim-wrap {
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow:
+      0 12px 36px rgba(0, 0, 0, 0.45),
+      0 0 24px rgba(167, 139, 250, 0.35);
+    position: relative;
+    animation: gFloat 4s ease-in-out infinite;
+  }
+  @keyframes gFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-2px); }
+  }
+  .g-anim-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Pulsující inner glow (SVG circle) */
+  :global(.g-glow-pulse) {
+    transform-origin: center;
+    animation: gGlowPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes gGlowPulse {
+    0%, 100% { opacity: 0.7; }
+    50%      { opacity: 1; }
+  }
+
+  /* Šetří baterku: respektuj prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    .g-anim-aura::before,
+    .g-anim-wrap,
+    :global(.g-glow-pulse) {
+      animation: none;
+    }
+  }
+</style>
