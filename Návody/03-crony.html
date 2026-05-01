@@ -34,10 +34,10 @@
 <body>
 
 <h1>Cron nastavení na NASu</h1>
-<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 11 úloh celkem.</p>
+<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 14 úloh celkem.</p>
 
 <div class="tldr">
-<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 11 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~15 minut.
+<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 14 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~20 minut.
 </div>
 
 <h2>Společné nastavení (vzor)</h2>
@@ -68,7 +68,7 @@
 <tr><td><code>poslední den měsíce</code></td><td>Run on: <strong>Monthly</strong>, Date: <strong>Last day of month</strong></td></tr>
 </table>
 
-<h2>11 úloh — checklist</h2>
+<h2>14 úloh — checklist</h2>
 
 <!-- 1 -->
 <div class="cron-card">
@@ -158,10 +158,31 @@
 <p><strong>Test:</strong> nahraj testovací deníkový zápis. Po 7 dnech by audio file mělo zmizet, ale text zápisu zůstane.</p>
 </div>
 
-<h2>Po vytvoření všech 11 — kontrola</h2>
+<div class="cron-card">
+<h3><span class="checkbox"></span>12. Raseliniste anniversary reminders (Výročí + narozeniny)</h3>
+<div class="cron-meta">denně 07:05 · POST <span class="endpoint">/api/cron/anniversary-reminders</span> · max-time 60</div>
+<p><strong>K čemu:</strong> Pošle email + WhatsApp upozornění pokud dnes + reminderDaysBefore = výročí (z /vyroci) nebo narozeniny kontaktu (z /contacts). Žádný spam — jen pokud je co poslat.</p>
+<p><strong>Test:</strong> v /vyroci založ výročí na dnešní datum s reminderDaysBefore=0 + email kanál. Spusť cron manuálně → email do schránky.</p>
+</div>
+
+<div class="cron-card">
+<h3><span class="checkbox"></span>13. Raseliniste ZIJES polední check-in (ŽIJEŠ?)</h3>
+<div class="cron-meta">denně 13:00 · POST <span class="endpoint">/api/cron/zijes-reminder?type=lunch</span> · max-time 60</div>
+<p><strong>K čemu:</strong> Polední připomínka 90sekundového check-in formuláře (interocepční nástroj). Pošle WhatsApp/email s linkem na /zijes/novy?type=lunch. Tón striktně neutrální („Tady jsem, když chceš").</p>
+<p><strong>Pozn.:</strong> URL musí mít <code>?type=lunch</code> jako query parametr. Žádné retry, žádné opakování — záměrně.</p>
+</div>
+
+<div class="cron-card">
+<h3><span class="checkbox"></span>14. Raseliniste ZIJES večerní check-in (ŽIJEŠ?)</h3>
+<div class="cron-meta">denně 18:00 · POST <span class="endpoint">/api/cron/zijes-reminder?type=evening</span> · max-time 60</div>
+<p><strong>K čemu:</strong> Stejně jako #13 ale večerní varianta — uzavírá pracovní den, pomáhá rozlišit pracovní/osobní čas.</p>
+<p><strong>Pozn.:</strong> URL musí mít <code>?type=evening</code>.</p>
+</div>
+
+<h2>Po vytvoření všech 14 — kontrola</h2>
 
 <div class="steps">
-<div class="step">DSM → Task Scheduler → seznam má 11 řádků s prefix „Raseliniste"</div>
+<div class="step">DSM → Task Scheduler → seznam má 14 řádků s prefix „Raseliniste"</div>
 <div class="step">Všechny mají sloupec Status = <strong>Enabled</strong></div>
 <div class="step">U každé pravý klik → <strong>Run</strong> → History → Last run = OK / Result code 200</div>
 <div class="step">Pro #1, #4, #10 (vysoká frekvence) zkontroluj History po 1 hodině — měl by tam být běh à 5/15 min</div>
