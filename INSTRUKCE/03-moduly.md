@@ -6,15 +6,16 @@ Stav 2026-04-30. Detail jednotlivých modulů v `Návody/*.pdf`.
 
 | Modul | URL | Status | Pozn. |
 |---|---|---|---|
-| **Start** | `/start` | ✅ NOVÉ | Sjednocená vstupní stránka pro mobil. PWA ikona „Rašeliniště" (úsvit). 4 dlaždice: Deník, Úkoly, Studna, Zeptat se (brzy). |
+| **Start** | `/start` | ✅ | Sjednocená vstupní stránka pro mobil. PWA ikona **strom** (samostatný `/tree-touch-icon.png`, JEN pro Petra). Nahoře svátek + narozeniny z kontaktů. 4 dlaždice: Deník, Úkoly, Studna, Zeptat se. Pod nimi tlačítko Dashboard přes celou šířku. Layout zarovnán nahoru (žádné scrollování na mobilu). |
 | Dashboard | `/` | ✅ | KPI karty, aktivita, sekce „Plán" (nejbližší 3 dny + porušení pravidel). |
+| **Zeptat se (RAG)** | `/zeptat-se` | ✅ NOVÉ 04-30 | AI dotaz nad indexovanými deníky / úkoly / Studna nahrávkami. pgvector + Gemini text-embedding-004 (768 dim) + Gemini 2.5 Pro generování s [N] citacemi. Auto-indexace nových zápisů. Backfill záměrně neproveden — Gideon chtěl „jen od teď". Lib `src/lib/rag.ts`. |
 
 ## 🎙️ Audio / hlasové zápisy
 
 | Modul | URL | Status | Pozn. |
 |---|---|---|---|
 | **Ozvěna** (úkoly+deník) | `/ozvena` | ✅ | Sjednocený diktát, přepínač Úkoly/Deník. URL `?mode=task` nebo `?mode=journal` přepne. PWA „Ozvěna" (legacy, stále funkční). |
-| Studna nahrávka | `/studna/nahravka` | ✅ | Owner recorder pro Gideona, výběr projektu z dropdownu. |
+| Studna nahrávka | `/studna/nahravka` | ✅ | Owner recorder pro Gideona. **Výběr projektu = grid dlaždic** (dříve dropdown), localStorage pamatuje poslední. |
 | Studna inline | `/studna/<id>` | ✅ | Recorder rovnou v detail projektu (bez dropdownu). |
 | Studna guest | `/me/<token>` | ✅ public | Klienti / hosti nahrávání, token v URL, rate limit 20/h/host. |
 
@@ -76,9 +77,10 @@ Stav 2026-04-30. Detail jednotlivých modulů v `Návody/*.pdf`.
 
 | Modul | URL | Status |
 |---|---|---|
-| Hlavní list projektů | `/studna` | ✅ |
+| Hlavní list projektů | `/studna` | ✅ Tlačítko **Aktivita** v hlavičce vedle Nahrávat / Nový projekt. |
+| **Aktivita (přehled nahrávek)** | `/studna/aktivita` | ✅ NOVÉ 04-30 Posledních 200 záznamů sgrupovaných per den (Dnes / Včera / weekday + datum). Karta = autor + badge (Já / Brief / status) + relativní čas + projekt + 200znakový náhled. |
 | Detail projektu | `/studna/<id>` | ✅ |
-| Owner nahrávka | `/studna/nahravka` | ✅ |
+| Owner nahrávka | `/studna/nahravka` | ✅ Grid dlaždic + localStorage poslední projekt |
 | Guest landing | `/me/<token>` | ✅ public |
 
 - 4 záložky v detail: Záznamy, Hosti, Souhrny, Nastavení
@@ -110,9 +112,10 @@ Stav 2026-04-30. Detail jednotlivých modulů v `Návody/*.pdf`.
 
 | Modul | URL | Status |
 |---|---|---|
-| Kontakty | `/contacts` | ✅ |
-| Firewall historie | `/firewall` | ✅ |
-| Veřejné submit | `/call-log` | ✅ public |
+| Kontakty | `/contacts` | ✅ Pole pro narozeniny (birthMonth+birthDay) + 5. pád (firstNameVocative) — manuální override pro VIP oslovení. |
+| Firewall historie | `/firewall` | ✅ U VIP vzkazů s vyplněným termínem rose badge „📅 do DD. M. RRRR". |
+| **Veřejné submit (Firewall)** | `/call-log` | ✅ public **DVĚ varianty** — NONVIP_TEXTS / VIP_TEXTS jako konstanty v souboru. VIP detekce přes `?phone=` v URL → DB lookup. VIP má: 5. pád oslovení, datum splnění (volitelné, type=date, min +2 dny → Todoist `due_date`), texty „Gíďo, máš misi" / „Vypusť Gíďu". Ne-VIP: „Gideon teď nezvedá". |
+| Thanks | `/call-log/thanks` | ✅ public Detekuje VIP přes `?phone=`. VIP: „Mise vypuštěna ✦" + tlačítko „Zadej další misi". Ne-VIP: „Vzkaz doručen". |
 | Dopisy | `/letters` | ✅ |
 | Editor dopisu | `/letters/<id>` nebo `/letters/new` | ✅ |
 | Zdraví | `/health` | ✅ |

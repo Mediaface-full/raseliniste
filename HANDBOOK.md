@@ -406,6 +406,26 @@ Sdílené projektové boxíky s hlasovými záznamy.
 - 3: DayNote UI, Briefing 22:00 → Todoist, Capture integrace pro time-binding
 - 4: OOO management, Locations admin, PWA polish
 
+### ✅ Zeptat se (RAG, hotovo 2026-04-30)
+- **Účel:** AI dotaz nad indexovanými deníky / úkoly / Studna nahrávkami. Odpověď s [N] citacemi prokliknutelnými na zdroj.
+- **Stack:**
+  - **pgvector 0.8.2** v Postgresu (image `pgvector/pgvector:pg16`)
+  - **Embedding:** Gemini `text-embedding-004`, 768 dim, asymetrický `taskType` (RETRIEVAL_DOCUMENT pro index, RETRIEVAL_QUERY pro dotaz)
+  - **Search:** cosine similarity přes `<=>` operator (raw SQL), top 8
+  - **LLM:** Gemini 2.5 Pro generuje odpověď s [N] citacemi
+- **DB:** model `RagChunk` — sourceType (journal/task/studna), sourceId, chunkIdx, text, embedding vector(768)
+- **Chunking:** 600 znaků s 100 overlapem, dělí na hranicích vět/slov
+- **Auto-indexace:** fire-and-forget s module-level Set pinningu (kritický pattern, viz #12 v INSTRUKCE/06-troubleshooting.md):
+  - `/api/denik` POST → `indexEntity('journal', ...)`
+  - `/api/ukoly` POST → `indexEntity('task', ...)`
+  - `process-recording.ts` po `status=processed` → `indexEntity('studna', ...)`
+- **API:** POST `/api/ask {question}` → `{question, answer, citations[]}`
+- **UI:** `/zeptat-se` (Astro stránka) + `AskWidget` React island (Cmd+Enter, klikatelné citace, detail s shoda %)
+- **Backfill:** záměrně neproveden — Petr explicitně řekl „jen od teď". Existující data se zaindexují až při uložení/edicí.
+- **Lib:** `src/lib/rag.ts` — chunkText, embedText, embedQuery, indexEntity, unindexEntity, searchChunks, answerQuestion, getInFlightIndexSnapshot (diagnostika)
+- **Náklady:** ~80 Kč/měs při 5 dotazech denně (Gemini text-embedding-004 free tier + Pro generation $0.001-0.005)
+- **Výhled:** přidat backfill skript, mikrofon na zeptání hlasem, reindex tlačítko, cleanup orphan chunků cronem.
+
 ### ✅ E-mail (hotovo, dual SMTP/Resend)
 - `lib/mailer.ts` — priorita: **SMTP z DB** → Resend env → log fallback
 - `Nastavení → E-mail (SMTP)` — UI pro konfiguraci SMTP (Seznam/Gmail/Outlook preset + vlastní)

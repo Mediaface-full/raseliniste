@@ -2,19 +2,24 @@
 
 ## 🟧 Aktivní (čeká na zpracování)
 
-### Push + deploy 17 commitů z dnešní session
-1. **`git push`** — od 2899ed4 dál čeká 17 commitů na produkci
-2. **Na NASu pgvector swap:** `docker compose pull postgres && docker compose up -d --force-recreate postgres` (pgvector je drop-in superset, data ve volume zůstávají)
-3. **`~/deploy.sh`** — pull image + migrate (přidá tabulku `RagChunk`)
-4. **DSM Task Scheduler:** přesunout cron `daily-projects-digest` z **18:00 na 7:00**
-5. **Test po deployi:**
-   - /start na mobilu — strom ikona, narozeniny, dashboard tlačítko
-   - VIP link sám sobě → „Gíďo, máš misi" + datum picker (min +2 dny)
-   - Vytvořit deníkový zápis → otevřít /zeptat-se → položit dotaz
-   - Smoke check: `/api/diagnose/studna`
+### Manuální akce v DSM (jen Petr)
+1. **DSM Task Scheduler:** přesunout cron `daily-projects-digest` z **18:00 na 7:00**
+   - Control Panel → Task Scheduler → najít existující úlohu → upravit hodinu
+   - Bez tohoto se digest pošle pořád večer
 
-### GCP Budget Alert
-6. **GCP Budget Alert** — Gideon si zařídí v GCP Console (1 minuta, žádný kód). Detail v memory `todo_gcp_billing.md`.
+### GCP Budget Alert (volitelné)
+2. **GCP Budget Alert** — Gideon si zařídí v GCP Console (1 minuta, žádný kód). Detail v memory `todo_gcp_billing.md`.
+
+### Test produkce
+3. **Test RAG po prvním zápisu:**
+   - Vytvořit deníkový zápis na `/denik`
+   - Otevřít `/zeptat-se` — statistika by měla skočit na „📓 deníky 1+"
+   - Položit dotaz — měl by vrátit odpověď s [1] citací
+4. **Test VIP flow:**
+   - V `/kontakty` označit testovacího kontaktu jako VIP + vyplnit telefon (svůj)
+   - Klik na 🔗 vedle kontaktu = link do clipboardu
+   - Otevřít v anonymu — měl bys vidět „Gíďo, máš misi", datum picker, „Vypusť Gíďu"
+   - Po odeslání: „Mise vypuštěna ✦" + tlačítko „Zadej další misi"
 
 ### Volitelné větší úlohy
 7. **GCP Cloud Billing API integrace** (jen pokud Budget Alerts nestačí)

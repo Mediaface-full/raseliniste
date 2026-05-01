@@ -7,7 +7,7 @@
 
 **Rašeliniště** — osobní informační systém Petra „Gideona" Periny. Single-user, max security, hostováno na Synology DS718+ v Dockeru přes ghcr.io. Doména **https://www.raseliniste.cz**.
 
-13 živých modulů (Auth, Capture, Úkoly /ukoly, Poznámky, Deník /denik, Zdraví, Kontakty, Firewall, Dopisy, Studna, Kalendář, Ozvěna /ozvena, Start /start). Plus AI tracking, AI prompty editor, diagnostika.
+14 živých modulů (Auth, Capture, Úkoly /ukoly, Poznámky, Deník /denik, Zdraví, Kontakty, Firewall, Dopisy, Studna, Kalendář, Ozvěna /ozvena, Start /start, Zeptat se /zeptat-se). Plus AI tracking, AI prompty editor, diagnostika.
 
 ## Pravidla — nepřekoč
 

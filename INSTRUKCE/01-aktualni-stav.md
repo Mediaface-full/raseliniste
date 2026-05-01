@@ -1,88 +1,134 @@
-# 01 — Aktuální stav (2026-04-30)
+# 01 — Aktuální stav (2026-04-30 večer)
 
 ## Branch + commit
 
-- **main** — produkční větev, vše co se sem pushne se přes GitHub Actions buildí do `ghcr.io`.
-- **Aktuální HEAD:** `900caec` (sjednocená /start stránka s úsvitem)
+- **main** — produkční větev
+- **Aktuální HEAD:** `9372427` (TODO update po RAG session) — pushnuto a deploynuto
+- Před tím **18 commitů** v jedné sessi (2026-04-30) bylo pushnutu najednou — viz seznam níž
 
-## Co je pushnuto / nepushnuto
-
-Po každé session zkontroluj:
-```bash
-git log --oneline origin/main..HEAD
-git status
-```
-
-Pokud `git status` ukáže "Your branch is ahead of 'origin/main' by N commits" → Gideon zatím nepushnul.
-
-**Deploy proces:** Gideon pushuje přes GitHub Desktop → GitHub Actions build (~3 min) → na NASu `~/deploy.sh` (jeden příkaz, viz RUNBOOK.md).
-
-## Posledních 25 commitů (od nejnovějšího)
+## Posledních commitů (od nejnovějšího — VŠE NA PRODUKCI po dnešním deployi)
 
 ```
-900caec feat(start): sjednocená vstupní stránka /start s dlaždicemi + nová ikona „úsvit"
-4d251a3 ux: čitelnost — sans nadpisy + větší /settings sekce + aktivní cog + skrýt zrušené pozvánky
-c649dd6 feat(recording): Wake Lock + visibility detekce + JSON repair v ext. úkolů
-1838095 ux(sidebar): zjednodušit Nastavení na 1 položku, /settings landing s dlaždicemi
-be8363d docs+security: update návodů (5 PDFs, 11 cronů, Ozvěna), rate limit booking, HANDBOOK aktualizace
-99d66b2 feat(denik): vyhledávání + měsíční review + Petr→Gideon napříč prompty
-00086dd feat(ai-prompts): editovatelné prompty z UI + Gideonův deníkový prompt jako default
-c221871 rename: /diktat → /ozvena (Gideon preferred name)
-fb07525 feat(denik+diktat): sjednocený /diktat (úkoly+deník přepínač) + nový /denik modul s audio
-2f32fac fix(studna): pinning fire-and-forget Promise + diagnostický endpoint (řeší TODO async)
-d1a8b38 feat(ai-usage): tracking všech Gemini volání + /settings/ai-usage dashboard
-97cbf5b docs: 4 PDF návody — Kalendář, Úkoly, Crony, Testy
-9f9e8af feat(ukoly): PWA pro mobil + volba délky 3/10/30 + auto-retry + Lidé/sekce v Todoistu
-8b1d94c polish(ukoly): success banner po commit + update PDF cronů na 9 úloh
-dbbb098 feat(ukoly): audio diktát úkolů — recorder + AI extrakce + review screen + commit/discard
-ed45c73 feat(ukoly): nový Task model + /ukoly UI + delegace + Todoist push (manuální flow)
-7f3a969 feat(calendar): fáze 2 — Bookingy (personalizované + univerzální + cold lead)
-2f0f680 feat(calendar): polish — Locations admin + OOO management (dovolená/nomád)
-cfc8513 feat(studna): inline recorder rovnou v /studna/<projekt> detail
-7315370 feat(studna): robustnost — retries + auto-retry stuck recordings + manuální regenerate
-7d1cb88 fix(studna): two-stage audio pipeline — vždy získáme přepis (i když analýza selže)
-7e7a033 feat(studna): asynchronní zpracování audio — upload OK hned, AI běží na pozadí
-1dc1039 fix(studna): velká audia v Vertex módu — fallback na AI Studio Files API
-70e9aa6 fix(studna): Vertex AI nepodporuje files.upload() — bezpečný error pro velké audio
-dfcdf81 feat(briefing): fáze 3 — noční briefing 22:00 + DayNote + /day UI
+9372427  docs(todo): aktualizace po 17 commitech dnešní session
+d044886  feat(rag): modul "Zeptat se" — pgvector + Gemini RAG
+c91f5f6  feat(firewall): zobraz požadovaný termín u VIP vzkazů
+e7552a1  copy(thanks): VIP intro 'Děj se vůle Gideonova'
+ecc0dae  feat(call-log): VIP texty + thanks 'Zadej další misi'
+575ec70  copy(call-log): hint pro dřív Urgent
+2f0c723  fix: oddělit ikony Petr/hosté + vokativ + +2 dny + 'Gíďo, máš misi'
+221ea51  feat(call-log): VIP varianta jako oddělená entita + termín
+8b369ea  feat(studna): dlaždice projektů + zapamatuj poslední
+a937839  perf(start): Promise.all + index narozenin
+92763f4  feat(start): strom ikona + home button + cron text 7:00
+886722c  docs: aktualizace cronu daily-projects-digest 18:00 → 7:00
+96979ad  feat(studna): denní digest 7:00 + stránka Aktivita
+51aa74c  feat(start): svátek + narozeniny + DASHBOARD + layout nahoru
+475865b  docs(todo): staging odloženo
+c0ab132  docs: INSTRUKCE/08-deploy-testing.md
+b4dd3a4  feat(guest-recorder): hint pro mic permission
+2899ed4  fix(security): Permissions-Policy microphone=(self) — Android Chrome blokoval mikrofon
 ```
 
-## Co je nasazeno na produkci?
+## Co se dnes 2026-04-30 nasadilo (VELKÝ DEPLOY)
 
-To záleží na tom, kdy Gideon naposled spustil `~/deploy.sh`. Otázka kterou si u nové session ověř — **zeptat se Gideona „je toto na produkci?"** než předpokládáš.
+### 🌳 Ikony rozdělené
+- **/start** = strom (zelený, jaro, pozitivní) — `tree-touch-icon.png` + `tree-icon-192/512.png`. Vidí JEN Petr na své úvodní stránce.
+- **/call-log a /me/<token>** = G logo (původní fialovo-modrá) — `apple-touch-icon.png` + `icon-192/512.png`. Vidí hosté/klienti.
+- Base.astro má prop `appleIconPath` (default G), /start si přepisuje na strom.
 
-Diagnostika produkce (Gideon to může spustit za tebe):
-```bash
-sudo docker compose -f /volume1/docker/raseliniste/docker-compose.yml ps
-sudo docker compose -f /volume1/docker/raseliniste/docker-compose.yml logs app --tail 50
-```
+### 🔥 Bezpečnostní fix
+- **Permissions-Policy** `microphone=()` → `microphone=(self)`. Předtím Android Chrome striktně blokoval mikrofon u klientů (Blanka). iOS Safari to ignoroval, takže se to neprojevilo, dokud nepřišel host na Androidu. Detail v gotcha #18 v `06-troubleshooting.md`.
 
-Plus webový diagnostický endpoint: **`/api/diagnose/studna`** (auth: session) — vrátí JSON s in-flight processings, stuck recordings, AI usage errors za 24h, env health.
+### 📅 Studna denní digest přesunut na 7:00
+- Cron `/api/cron/daily-projects-digest` přesunut z 18:00 na **7:00 ráno**, okno **posledních 24 h** (předtím dnešní den od 00:00).
+- 200znakové náhledy z transkriptu, předmět *„Studna — N nových nahrávek (autoři)"*, link na `/studna/aktivita`.
+- **AKCE:** Petr musí v DSM Task Scheduler změnit čas z 18:00 na 7:00 (jinak se posílá pořád večer).
 
-## Pending DB migrace
+### 🌊 Studna stránka Aktivita
+- Nová `/studna/aktivita` — posledních 200 záznamů sgrupovaných per den (Dnes / Včera / weekday).
+- Tlačítko „Aktivita" v hlavičce `/studna` vedle Nahrávat / Nový projekt.
 
-Čeká na deploy (proběhnou v entrypoint script `prisma migrate deploy`):
-```
-prisma/migrations/
-├── 20260429122113_add_journal_entries/        ← Deník
-├── 20260429162109_add_ai_prompts/             ← AI prompty editor
-├── 20260429170518_add_journal_people/         ← Vyhledávání lidí v deníku
-└── (vše předchozí už pravděpodobně applied)
-```
+### 🎯 Studna výběr projektu
+- Místo `<select>` 2-sloupcový grid dlaždic.
+- LocalStorage `studna-last-project-id` pamatuje poslední výběr.
 
-Migrace jsou idempotentní — re-deploy je bezpečný.
+### 🎂 /start: svátek + narozeniny + DASHBOARD button + layout nahoru
+- Nad datem: svátek dne (z `src/lib/jmenny-kalendar.ts`, 366 dnů, zdroj cs.wikipedia).
+- Nad datem: 🎂 Jméno má dnes narozeniny (rose tint) + tento týden seznam.
+- Pod 4 dlaždicemi: tlačítko **Dashboard** přes celou šířku (klik → /).
+- Layout zarovnán nahoru (předtím vertikálně centrovaný — na malých mobilech se muselo scrollovat).
 
-## Aktuální infrastruktura
+### 🤝 VIP modul (Gideonův Firewall) — oddělená entita
+- `/call-log` má teď **dvě varianty**: NONVIP_TEXTS a VIP_TEXTS jako konstanty na začátku souboru. Petr edituje texty na jednom místě.
+- **VIP texty (nasazeno):**
+  - Title/Apple: *„Gíďo, máš misi"*
+  - Heading: *„Zadej Gíďovi, máš misi."*
+  - Intro: *„Pošli mu to a trochu mu rozčeř svět."*
+  - Submit: *„Vypusť Gíďu"*
+  - Hint pod datumem: *„Termín nejdřív za 2 dny. Pokud to potřebuješ dřív, zaškrtni níže Urgent."*
+- **VIP datum splnění** (volitelné, type=date), min = +2 dny dopředu, max = +2 roky.
+- Datum se propíše do **Todoist `due_date` YYYY-MM-DD** + do popisu *„📅 Termín požadovaný od VIP: ..."*.
+- Datum je **VIP-only privilegium** — server ignoruje pole pokud volající nemá v DB `isVip=true`.
+- DB: `CallLog.requestedDueAt DateTime?` (migrace 20260430181432).
+
+### 🎤 Vokativ pro VIP oslovení
+- *„Ahoj, Karle"* místo *„Ahoj, Karel"*.
+- Hybrid řešení:
+  - DB pole `Contact.firstNameVocative String?` (manuální override pro výjimky)
+  - `src/lib/vokativ.ts` — tabulka 40+ výjimek + algoritmus pro běžné koncovky
+  - V `/kontakty` editoru kontaktu nové pole *„Oslovení (5. pád) — jen VIP"* s placeholderem
+- Migrace 20260430182556_add_contact_first_name_vocative.
+
+### 📩 Thanks stránka pro VIP
+- `/call-log/thanks?phone=X` detekuje VIP.
+- VIP vidí **„Mise vypuštěna ✦"** + *„Gíďa už ví. Děj se vůle Gideonova. Mezitím — kdyby tě napadlo něco dalšího, klidně mu pošli další misi."*
+- Tlačítko **„Zadej další misi"** vede zpět na `/call-log?phone=X&name=Y` (zachová kontext).
+- Ne-VIP zůstává jak byla.
+
+### 🛡 Firewall admin
+- V `/firewall` u VIP vzkazu s vyplněným termínem teď svítí rose badge: **📅 do 15. 5. 2026** vedle VIP/Urgent štítků.
+
+### 🤖 RAG modul „Zeptat se" — NOVÉ (commit d044886)
+- **Routa:** `/zeptat-se` (Astro stránka + AskWidget React island)
+- **Aktivováno** na /start dlaždici (lavender, předtím „brzy")
+- **DB:** pgvector extension + tabulka `RagChunk` (sourceType, sourceId, chunkIdx, text, embedding vector(768))
+- **Embedding:** Gemini text-embedding-004, 768 dim, asymetrický taskType (RETRIEVAL_DOCUMENT vs RETRIEVAL_QUERY)
+- **Search:** cosine similarity přes pgvector `<=>` operator (raw SQL, top 8)
+- **LLM:** Gemini 2.5 Pro generuje odpověď s [N] citacemi
+- **Auto-indexace:** nové JournalEntry / Task / ProjectRecording (po `processed`) jdou automaticky do indexu (fire-and-forget s module-level Set pinningu, jako process-recording.ts)
+- **Chunking:** 600 znaků s 100 znaky overlapem, dělí se na hranicích vět/slov
+- **Backfill:** ZÁMĚRNĚ NEPROVEDEN — Gideon explicitně řekl „jen od teď"
+- **Náklady:** ~80 Kč/měs při 5 dotazech denně
+- **Lib:** `src/lib/rag.ts` (chunkText, embedText, embedQuery, indexEntity, unindexEntity, searchChunks, answerQuestion)
+- **Postgres image:** docker-compose změněn na `pgvector/pgvector:pg16` (drop-in superset). **AKCE byla provedena:** `docker compose pull postgres && docker compose up -d --force-recreate postgres`. Pgvector 0.8.2 ověřen.
+
+## Aktuální infrastruktura (po dnešním deployi)
 
 - **App container:** `raseliniste_app` (image `ghcr.io/duchnotvor/raseliniste/app:latest`, Astro Node standalone, port 3333:3000)
-- **DB container:** `raseliniste_db` (postgres:16-alpine, port 5432, named volume `raseliniste_postgres_data_v1`)
+- **DB container:** `raseliniste_db` (`pgvector/pgvector:pg16`, pgvector 0.8.2, port 5432, named volume zachován)
 - **Reverse proxy:** Synology DSM, port 443 → localhost:3333
 - **Cert:** Let's Encrypt automatický
-- **Crony:** 11 úloh v DSM Task Scheduler (viz `Návody/03-crony.pdf`)
+- **Crony:** 11 úloh v DSM Task Scheduler (`daily-projects-digest` vyžaduje **manuální posun na 7:00**)
 
 ## Známé „čekající" akce mimo kód
 
-Pokud Gideon zmíní:
-- **Nová PWA ikona „Rašeliniště"** na ploše iPhone — má si ji uložit přes Safari → Sdílet → Přidat na plochu z `/start`. Stará ikona „Ozvěna" funguje dál.
+- **DSM Task Scheduler — daily-projects-digest přesun z 18:00 na 7:00.** Petr musí udělat ručně v DSM (Control Panel → Task Scheduler → najít úlohu → změnit hodinu).
 - **GCP Budget Alerts** — Gideon si zařídí sám v GCP Console (TODO `todo_gcp_billing.md` v memory).
-- **Push commitů z GitHub Desktop** + `~/deploy.sh` na NASu — ruční po každé sadě změn.
+- **Test RAG na produkci:** vytvořit pár deníkových zápisů + položit dotaz na `/zeptat-se`.
+- **Test VIP flow:** poslat si link sám sobě z `/kontakty` (klik na 🔗 vedle VIP kontaktu) + ověřit že vokativ + datum picker funguje.
+
+## Diagnostika produkce
+
+```bash
+# 1. Stav kontejnerů
+sudo docker compose -f /volume1/docker/raseliniste/docker-compose.yml ps
+
+# 2. App log
+sudo docker compose -f /volume1/docker/raseliniste/docker-compose.yml logs app --tail 50
+
+# 3. RAG specifické
+sudo docker exec raseliniste_db psql -U raseliniste -d raseliniste -c "SELECT extname, extversion FROM pg_extension WHERE extname='vector';"
+sudo docker exec raseliniste_db psql -U raseliniste -d raseliniste -c "SELECT \"sourceType\", COUNT(*) FROM \"RagChunk\" GROUP BY \"sourceType\";"
+```
+
+Plus webový endpoint: **`/api/diagnose/studna`** (auth: session).
