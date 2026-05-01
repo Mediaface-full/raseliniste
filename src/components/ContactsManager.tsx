@@ -8,6 +8,7 @@ interface Contact {
   displayName: string;
   firstName: string | null;
   firstNameVocative: string | null;
+  greetingOverride: string | null;
   lastName: string | null;
   note: string | null;
   isVip: boolean;
@@ -289,6 +290,7 @@ function ContactEditor({ contact, onClose }: EditorProps) {
   const [displayName, setDisplayName] = useState(contact?.displayName ?? "");
   const [firstName, setFirstName] = useState(contact?.firstName ?? "");
   const [firstNameVocative, setFirstNameVocative] = useState(contact?.firstNameVocative ?? "");
+  const [greetingOverride, setGreetingOverride] = useState(contact?.greetingOverride ?? "");
   const [lastName, setLastName] = useState(contact?.lastName ?? "");
   const [note, setNote] = useState(contact?.note ?? "");
   const [isVip, setIsVip] = useState(contact?.isVip ?? false);
@@ -312,6 +314,7 @@ function ContactEditor({ contact, onClose }: EditorProps) {
       displayName: displayName.trim() || [firstName, lastName].filter(Boolean).join(" ") || "(bez jména)",
       firstName: firstName.trim() || null,
       firstNameVocative: firstNameVocative.trim() || null,
+      greetingOverride: greetingOverride.trim() || null,
       lastName: lastName.trim() || null,
       note: note.trim() || null,
       isVip,
@@ -389,6 +392,20 @@ function ContactEditor({ contact, onClose }: EditorProps) {
             />
             <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
               Pokud necháš prázdné, systém zkusí odhadnout. Vyplň jen u jmen co algoritmus zkazí.
+            </p>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-[var(--tint-rose)] font-mono">
+              Vlastní oslovení — jen VIP (volitelné)
+            </label>
+            <Input
+              value={greetingOverride}
+              onChange={(e) => setGreetingOverride(e.target.value)}
+              placeholder='např. „Drahá dívko" nebo „Šéfe" nebo „Kamaráde"'
+            />
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
+              Když vyplníš, na /call-log VIP nahradí defaultní „Ahoj, {firstNameVocative || firstName || "Jméno"}". Celý styl je tvůj.
             </p>
           </div>
 

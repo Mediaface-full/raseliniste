@@ -27,7 +27,7 @@ const VIP_TEXTS = {
   appleTitle: "Gíďo, máš misi",
   // Personalizované oslovení — "Ahoj, Karle"
   greetingPrefix: "Ahoj,",
-  heading: "Zadej Gíďovi, máš misi.",
+  heading: "Zadej Gíďovi jeho misi.",
   intro: "Pošli mu to a trochu mu rozčeř svět.",
   messagePlaceholder: "S čím voláš?",
   dueDateLabel: "Do kdy to potřebuješ (volitelné)",
@@ -51,6 +51,7 @@ const rawPhone =
 
 let matchedFirstName: string | null = null;
 let matchedFirstNameVocative: string | null = null;
+let matchedGreetingOverride: string | null = null;
 let matchedIsVip = false;
 let phoneKnown = false;
 const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
@@ -68,14 +69,19 @@ if (normalizedPhone) {
         hit.contact.displayName.split(" ")[0] ||
         null;
       matchedFirstNameVocative = hit.contact.firstNameVocative?.trim() || null;
+      matchedGreetingOverride = hit.contact.greetingOverride?.trim() || null;
     }
   } catch {
     // DB výpadek → fallback na ne-VIP variantu
   }
 }
 
-// Vokativ pro VIP oslovení — manuální override z DB > algoritmus > 1. pád
+// Oslovení pro VIP — priorita:
+//   1. greetingOverride (vlastní string typu "Drahá dívko") → použij celý jak je
+//   2. vokativ z firstNameVocative → "Ahoj, Karle"
+//   3. algoritmus + fallback firstName
 const greetingName = matchedIsVip ? vokativ(matchedFirstName, matchedFirstNameVocative) : null;
+const customGreeting = matchedIsVip ? matchedGreetingOverride : null;
 const hidePhoneField = phoneKnown && Boolean(normalizedPhone);
 const prefillPhoneValue = normalizedPhone ?? rawPhone;
 
@@ -105,9 +111,9 @@ const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
           class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
         />
 
-        {matchedIsVip && greetingName && (
+        {matchedIsVip && (customGreeting || greetingName) && (
           <div class="text-xs uppercase tracking-[0.22em] text-[var(--tint-rose)] font-mono mb-2">
-            ⭐ {VIP_TEXTS.greetingPrefix} {greetingName}
+            ⭐ {customGreeting ? customGreeting : `${VIP_TEXTS.greetingPrefix} ${greetingName}`}
           </div>
         )}
 

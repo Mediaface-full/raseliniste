@@ -238,6 +238,10 @@ model Contact {
   // Volitelné — pokud chybí, použije se algoritmus s výjimkami; pokud algoritmus
   // selže (cizí jméno apod.), fallback na firstName v 1. pádu.
   firstNameVocative String?
+  // VIP-only: úplné vlastní oslovení (např. „drahá dívko", „kamaráde", „šéfe").
+  // Pokud je vyplněno, na /call-log VIP nahradí defaultní „Ahoj, <vokativ>"
+  // celým tímhle stringem. Necháme styl Petrovi — žádné formátování server-side.
+  greetingOverride  String?
   lastName     String?
   note         String?
   isVip        Boolean        @default(false)
