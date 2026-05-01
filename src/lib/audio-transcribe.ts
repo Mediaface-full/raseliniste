@@ -171,6 +171,10 @@ export async function transcribeAudio(params: {
   mimeType: string;
   recordingType: RecordingTypeStr;
   projectContext?: string | null;
+  // Opt-in pro Studnu: očisti přepis od citoslovcí (ehm, eee, no, jakože, ...)
+  // a zbytečných repetic. Zachová obsah a tón.
+  // Default false — Ozvěna (deník/úkoly) zachovává doslovný přepis.
+  cleanupFillers?: boolean;
 }): Promise<TranscribeResult> {
   const isBrief = params.recordingType === "BRIEF";
   const model = isBrief ? ANALYSIS_MODEL : DEFAULT_MODEL;
@@ -251,8 +255,21 @@ export async function transcribeAudio(params: {
   // STAGE 1: Pouhý přepis. Gemini dostane audio + minimální plain-text instrukci.
   // Vrátí prostý text, žádný JSON. Spolehlivé i pro dlouhé audio.
   // -------------------------------------------------------------------------
-  // Načti Stage 1 prompt z DB override (fallback na default v ai-prompts.ts)
-  const transcribePrompt = await getPrompt("ozvena-stage1-transcribe");
+  // Načti Stage 1 prompt z DB override (fallback na default v ai-prompts.ts).
+  // Pokud cleanupFillers=true (Studna), připoj instrukci o čištění výplňových slov.
+  const baseTranscribePrompt = await getPrompt("ozvena-stage1-transcribe");
+  const transcribePrompt = params.cleanupFillers
+    ? `${baseTranscribePrompt}
+
+DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
+- Vynech výplňová slova a citoslovce: "ehm", "eee", "uhm", "no", "jakože",
+  "prostě", "vlastně" (pokud jsou jen výplňová), "víš", "no a", a podobné.
+- Vynech bezprostřední repetice slov ("já já já jsem to..." → "já jsem to...",
+  "no no no" → vypustit).
+- Vynech nedokončené začátky vět které mluvčí přerušil a začal znovu.
+- ZACHOVEJ obsah, tón a všechny věcné informace. Cílem je čitelný text,
+  ne shrnutí.`
+    : baseTranscribePrompt;
 
   const stage1Start = Date.now();
   const transcribeResp = await withRetry("Stage 1 (transcribe)", () =>

@@ -59,6 +59,10 @@ export async function processRecording(params: {
         mimeType: params.mimeType,
         recordingType: params.type,
         projectContext: params.projectContext,
+        // Studna nahrávky čistíme od výplňových slov (ehm, eee, no, jakože, ...)
+        // a zbytečných repetic. Obsah a tón zůstávají. Petr má v Studně tisíce
+        // znaků přepisu — čitelnost > doslovnost.
+        cleanupFillers: true,
       });
 
       await prisma.projectRecording.update({
