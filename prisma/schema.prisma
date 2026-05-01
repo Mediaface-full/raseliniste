@@ -895,6 +895,13 @@ model Task {
   sourceBatch       TaskAudioBatch? @relation(fields: [sourceBatchId], references: [id])
   rawSnippet        String?      @db.Text
 
+  // Hierarchie — 1 úroveň (rodič + děti). Stage 2 audio extrakce může
+  // seskupit dílčí kroky pod jeden rodičovský úkol ("výlet s Matějem":
+  // rezervovat hotel, koupit lístky, vzít kameru, ...).
+  parentId          String?
+  parent            Task?        @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks          Task[]       @relation("TaskSubtasks")
+
   // Todoist push (one-way out)
   todoistTaskId     String?
   todoistProjectId  String?
@@ -908,6 +915,7 @@ model Task {
   @@index([userId, status, dueAt])
   @@index([sourceBatchId])
   @@index([assignedToContactId])
+  @@index([parentId])
 }
 
 model TaskAudioBatch {

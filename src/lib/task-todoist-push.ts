@@ -126,6 +126,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
     where: { id: taskId },
     include: {
       assignedToContact: { select: { displayName: true, firstName: true } },
+      parent: { select: { id: true, todoistTaskId: true, todoistProjectId: true } },
     },
   });
   if (!task) throw new Error("Úkol nenalezen.");
@@ -135,6 +136,22 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
       projectId: task.todoistProjectId ?? "",
       routedHow: "already pushed",
     };
+  }
+
+  // Pokud má rodiče, ten musí být pushnutý PŘED dětmi (potřebujeme jeho Todoist ID).
+  // Auto-push parent rekurzivně pokud chybí.
+  let todoistParentId: string | undefined;
+  let parentRoutedProjectId: string | undefined;
+  if (task.parentId) {
+    if (task.parent?.todoistTaskId) {
+      todoistParentId = task.parent.todoistTaskId;
+      parentRoutedProjectId = task.parent.todoistProjectId ?? undefined;
+    } else {
+      // Recurzivní push rodiče (max 1 úroveň, hierarchii máme jen 1 hloubku)
+      const parentResult = await pushTaskToTodoist(task.parentId);
+      todoistParentId = parentResult.taskId;
+      parentRoutedProjectId = parentResult.projectId || undefined;
+    }
   }
 
   const integration = await prisma.userIntegration.findUnique({
@@ -152,11 +169,15 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
   const cfg = ((integration.config as unknown) ?? {}) as { mojeUkoly?: string };
 
   // Routing
-  let projectId: string | undefined = cfg.mojeUkoly || undefined;
+  // Pokud je to subtask, MUSÍ jít do stejného projektu jako rodič (Todoist requirement).
+  // Routing podle assignee se v tom případě ignoruje — subtask dědí kontext rodiče.
+  let projectId: string | undefined = parentRoutedProjectId ?? cfg.mojeUkoly ?? undefined;
   let sectionId: string | undefined;
-  let routedHow = "default mojeUkoly";
+  let routedHow = todoistParentId
+    ? "inherited from parent"
+    : "default mojeUkoly";
 
-  if (task.assignedToContact) {
+  if (task.assignedToContact && !todoistParentId) {
     try {
       const r = await resolveAssigneeRoute(
         token,
@@ -201,6 +222,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
       description: descLines.join("\n").slice(0, 16000) || undefined,
       project_id: projectId,
       section_id: sectionId,
+      parent_id: todoistParentId, // pokud subtask, vytvoří se pod rodičem
       priority: PRIORITY_MAP[task.priority],
       due_string,
       labels,

@@ -20,6 +20,8 @@ interface Proposal {
   notes: string | null;
   rawSnippet: string;
   assignedToContactName: string | null;
+  // Hierarchie 1 úroveň — podúkoly (sami už nemohou mít subtasks)
+  subtasks?: Proposal[];
   // UI-only
   _checked: boolean;
   _id: string;          // local stable ID pro React keys
@@ -79,13 +81,22 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
     // Pokud máme proposals a ještě jsme je nezprocesovali, naplň state
     if (data.batch.status === "review" && Array.isArray(data.batch.proposalsJson)) {
       const cs = await ensureContacts();
-      const next: Proposal[] = data.batch.proposalsJson.map((p: Proposal, i: number) => ({
-        ...p,
-        _checked: true,
-        _id: `${i}`,
-        _editing: false,
-        assignedToContactId: resolveContactId(p.assignedToContactName, cs),
-      }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function hydrate(p: any, idPrefix: string): Proposal {
+        return {
+          ...p,
+          _checked: true,
+          _id: idPrefix,
+          _editing: false,
+          assignedToContactId: resolveContactId(p.assignedToContactName, cs),
+          subtasks: Array.isArray(p.subtasks)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ? p.subtasks.map((s: any, j: number) => hydrate(s, `${idPrefix}.${j}`))
+            : undefined,
+        };
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const next: Proposal[] = data.batch.proposalsJson.map((p: any, i: number) => hydrate(p, `${i}`));
       setProposals(next);
     }
   }
@@ -139,8 +150,8 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
     setCommitting(true);
     setError(null);
     try {
-      const payload = {
-        proposals: checked.map((p) => ({
+      function flatten(p: Proposal) {
+        return {
           title: p.title,
           notes: p.notes,
           dueAt: p.dueAt,
@@ -149,6 +160,14 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
           priority: p.priority,
           rawSnippet: p.rawSnippet,
           assignedToContactId: p.assignedToContactId,
+        };
+      }
+      const payload = {
+        proposals: checked.map((p) => ({
+          ...flatten(p),
+          subtasks: (p.subtasks ?? [])
+            .filter((s) => s._checked)
+            .map(flatten),
         })),
       };
       const res = await fetch(`/api/ukoly/audio/${batchId}/commit`, {
@@ -287,13 +306,45 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
       ) : (
         <div className="space-y-2">
           {proposals.map((p, idx) => (
-            <ProposalRow
-              key={p._id}
-              proposal={p}
-              contacts={contacts}
-              onChange={(patch) => setProposals((prev) => prev.map((q, i) => (i === idx ? { ...q, ...patch } : q)))}
-              onRemove={() => setProposals((prev) => prev.filter((_, i) => i !== idx))}
-            />
+            <div key={p._id} className="space-y-1">
+              <ProposalRow
+                proposal={p}
+                contacts={contacts}
+                onChange={(patch) => setProposals((prev) => prev.map((q, i) => (i === idx ? { ...q, ...patch } : q)))}
+                onRemove={() => setProposals((prev) => prev.filter((_, i) => i !== idx))}
+              />
+              {p.subtasks && p.subtasks.length > 0 && (
+                <div className="ml-7 space-y-1 border-l-2 border-[var(--tint-peach)]/30 pl-3">
+                  {p.subtasks.map((sub, sIdx) => (
+                    <ProposalRow
+                      key={sub._id}
+                      proposal={sub}
+                      contacts={contacts}
+                      isSubtask
+                      // Pokud rodič odškrtnut, sub se vizuálně tmaví ale dál edituje
+                      onChange={(patch) =>
+                        setProposals((prev) =>
+                          prev.map((q, i) =>
+                            i === idx
+                              ? { ...q, subtasks: (q.subtasks ?? []).map((s, j) => (j === sIdx ? { ...s, ...patch } : s)) }
+                              : q,
+                          ),
+                        )
+                      }
+                      onRemove={() =>
+                        setProposals((prev) =>
+                          prev.map((q, i) =>
+                            i === idx
+                              ? { ...q, subtasks: (q.subtasks ?? []).filter((_, j) => j !== sIdx) }
+                              : q,
+                          ),
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -316,17 +367,18 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
 }
 
 function ProposalRow({
-  proposal, contacts, onChange, onRemove,
+  proposal, contacts, onChange, onRemove, isSubtask = false,
 }: {
   proposal: Proposal;
   contacts: Contact[];
   onChange: (patch: Partial<Proposal>) => void;
   onRemove: () => void;
+  isSubtask?: boolean;
 }) {
   const dueObj = proposal.dueAt ? new Date(proposal.dueAt) : null;
 
   return (
-    <div className={`glass rounded-xl p-3 ${!proposal._checked ? "opacity-50" : ""}`}>
+    <div className={`${isSubtask ? "rounded-md p-2 bg-white/3" : "glass rounded-xl p-3"} ${!proposal._checked ? "opacity-50" : ""}`}>
       <div className="flex items-start gap-3">
         <button
           onClick={() => onChange({ _checked: !proposal._checked })}

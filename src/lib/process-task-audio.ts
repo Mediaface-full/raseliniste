@@ -29,6 +29,9 @@ export interface TaskProposal {
   rawSnippet: string;
   // Délka jména/slug — Petr v review může vybrat z dropdownu kontaktů
   assignedToContactName: string | null;
+  // Hierarchie 1 úroveň — pokud rodič má dílčí kroky, jsou tady.
+  // Subtask sám subtasks NEMÁ (zakázáno v promptu).
+  subtasks?: TaskProposal[];
 }
 
 // Module-level reference holder — chrání před GC fire-and-forget Promise.
@@ -203,20 +206,40 @@ ${transcript}
     return [];
   }
 
-  // Validace + sanitizace každého proposalu
+  // Validace + sanitizace + plochá kopie subtask polí (1 úroveň, ostatní zahodit)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return parsed.tasks.map((t: any): TaskProposal => ({
-    title: String(t.title ?? "").slice(0, 200) || "(bez názvu)",
-    dueAt: typeof t.dueAt === "string" && t.dueAt.length > 0 ? t.dueAt : null,
-    dueIsTime: Boolean(t.dueIsTime),
-    tags: Array.isArray(t.tags) ? t.tags.filter((x: unknown) => typeof x === "string").slice(0, 8) : [],
-    priority: ["low", "normal", "high"].includes(t.priority) ? t.priority : "normal",
-    notes: typeof t.notes === "string" && t.notes.length > 0 ? t.notes.slice(0, 500) : null,
-    rawSnippet: String(t.rawSnippet ?? "").slice(0, 300),
-    assignedToContactName: typeof t.assignedToContactName === "string" && t.assignedToContactName.length > 0
-      ? t.assignedToContactName
-      : null,
-  }));
+  function sanitizeOne(t: any, allowSubtasks: boolean): TaskProposal {
+    const proposal: TaskProposal = {
+      title: String(t.title ?? "").slice(0, 200) || "(bez názvu)",
+      dueAt: typeof t.dueAt === "string" && t.dueAt.length > 0 ? t.dueAt : null,
+      dueIsTime: Boolean(t.dueIsTime),
+      tags: Array.isArray(t.tags) ? t.tags.filter((x: unknown) => typeof x === "string").slice(0, 8) : [],
+      priority: ["low", "normal", "high"].includes(t.priority) ? t.priority : "normal",
+      notes: typeof t.notes === "string" && t.notes.length > 0 ? t.notes.slice(0, 500) : null,
+      rawSnippet: String(t.rawSnippet ?? "").slice(0, 300),
+      assignedToContactName: typeof t.assignedToContactName === "string" && t.assignedToContactName.length > 0
+        ? t.assignedToContactName
+        : null,
+    };
+    if (allowSubtasks && Array.isArray(t.subtasks) && t.subtasks.length > 0) {
+      // Striktně 1 úroveň — children dostanou allowSubtasks=false
+      const subs = t.subtasks
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((s: any) => s && typeof s === "object")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((s: any) => sanitizeOne(s, false))
+        .slice(0, 20); // sanity max 20 podúkolů na rodiče
+      // Pokud má JEN 1 subtask, povýšit ho na samostatný úkol
+      // (řešení: vrátit pole 1 element bez parent struktury — ale na úrovni výše).
+      // V tomto sanitize-one místo toho prostě necháme subtasks=[1] a UI/commit
+      // si poradí. Tady jen zachováme strukturu jak ji AI dala.
+      if (subs.length > 0) proposal.subtasks = subs;
+    }
+    return proposal;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return parsed.tasks.map((t: any) => sanitizeOne(t, true));
 }
 
 /**
