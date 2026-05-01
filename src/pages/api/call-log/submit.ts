@@ -137,7 +137,13 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       const who = contact?.displayName ?? prettyPhone;
       const priority: 1 | 2 | 3 | 4 = wasVip ? 4 : body.isUrgent ? 3 : 2;
 
-      const content = `${wasVip ? "⭐ VIP: " : ""}Zavolat zpět ${who}`;
+      // Title úkolu v Todoistu:
+      //   - VIP   = mise/úkol → "⭐ Karel: <obsah zprávy zhuštěný>"
+      //             Petr v Todoist liste vidí O ČEM úkol je, ne koho volat.
+      //   - NeVIP = klasický callback → "Zavolat zpět X" (případně ⚠️ pro urgent).
+      const content = wasVip
+        ? `⭐ ${who}: ${truncateForTitle(body.message.trim(), 80)}`
+        : `${body.isUrgent ? "⚠️ " : ""}Zavolat zpět ${who}`;
       const description = [
         `**${body.message.trim()}**`,
         "",
@@ -255,4 +261,14 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * Zhuštění zprávy pro title úkolu v Todoistu — max N znaků, dělí na hranici slova,
+ * přidá výpustku „…". Použito jen pro VIP misi (kontext úkolu jako title).
+ */
+function truncateForTitle(s: string, max: number): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max).replace(/\s+\S*$/, "") + "…";
 }
