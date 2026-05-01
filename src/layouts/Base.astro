@@ -15,6 +15,9 @@ interface Props {
   // /start si přepisuje na /tree-touch-icon.png — strom má JEN Petr na své
   // osobní úvodní stránce.
   appleIconPath?: string;
+  // Open Graph image pro WhatsApp/Facebook/Telegram link preview.
+  // Default = G logo (1200×1200 stačí, social media si rescaluje).
+  ogImagePath?: string;
 }
 
 const {
@@ -24,7 +27,12 @@ const {
   appleCapable = false,
   manifestPath,
   appleIconPath = "/apple-touch-icon.png",
+  ogImagePath = appleIconPath,
 } = Astro.props;
+
+// Plná URL pro og:image (WhatsApp/Meta vyžaduje absolutní)
+const baseUrl = "https://www.raseliniste.cz";
+const ogImageUrl = ogImagePath.startsWith("http") ? ogImagePath : `${baseUrl}${ogImagePath}`;
 ---
 
 <!doctype html>
@@ -42,6 +50,15 @@ const {
     {appleCapable && <meta name="apple-mobile-web-app-capable" content="yes" />}
     {appleCapable && <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />}
     {manifestPath && <link rel="manifest" href={manifestPath} />}
+
+    {/* Open Graph (WhatsApp/Telegram/Facebook link preview) */}
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description || title} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:image" content={ogImageUrl} />
+
     <title>{title}</title>
   </head>
   <body class="min-h-screen bg-base-100 text-base-content antialiased">
