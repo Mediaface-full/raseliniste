@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, Mic } from "lucide-react";
+import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, Mic, Trash2 } from "lucide-react";
 import { Button } from "./ui/Button";
 import BwMysAudioRecorder from "./BwMysAudioRecorder";
 
@@ -73,6 +73,19 @@ export default function BwMysDetail({ id }: { id: string }) {
   const [closeDialog, setCloseDialog] = useState<"jdu" | "nejdu" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  async function deleteDecision() {
+    if (!d) return;
+    const ok = confirm(`Opravdu smazat rozhodnutí „${d.nazev}"?\n\nTato akce je nevratná — smaže VŠE: zarámování, ${d.entries.length} zápisů, ${d.evaluations.length} vyhodnocení a verdikt.`);
+    if (!ok) return;
+    const res = await fetch(`/api/bwmys/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      window.location.href = "/bwmys";
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setErr(data.error ?? "Smazání selhalo.");
+    }
+  }
+
   async function runEvaluation(typ: "prubezne" | "finalni") {
     setErr(null);
     setEvaluating(typ);
@@ -131,11 +144,18 @@ export default function BwMysDetail({ id }: { id: string }) {
   return (
     <div className="space-y-4">
       {/* Hlavička */}
-      <div className="glass-strong rounded-xl p-4 space-y-2">
+      <div className="glass-strong rounded-xl p-4 space-y-2 relative">
+        <button
+          onClick={deleteDecision}
+          className="absolute top-3 right-3 p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+          title="Smazat celé rozhodnutí (nevratné)"
+        >
+          <Trash2 className="size-4" />
+        </button>
         <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
           {d.kontext} · status {d.status}
         </div>
-        <h1 className="font-serif text-2xl">{d.nazev}</h1>
+        <h1 className="font-serif text-2xl pr-10">{d.nazev}</h1>
         <p className="text-base italic text-foreground/85">„{d.otazka}"</p>
         <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-mono">
           <span className={days < 0 ? "text-destructive" : days < 3 ? "text-[var(--tint-butter)]" : "text-muted-foreground"}>
