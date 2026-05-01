@@ -151,18 +151,19 @@ V `/volume1/docker/raseliniste/.env`:
 | `NOTIFICATION_FROM` + `NOTIFICATION_EMAIL` | Mail odesílatel + globální fallback příjemce |
 | `CRON_SECRET` | x-cron-key auth pro DSM cron tasky |
 
-## Crony v DSM Task Scheduler (11 úloh)
+## Crony v DSM Task Scheduler (12 úloh)
 
 Detail per úloha + curl command v `Návody/03-crony.pdf`. Krátký přehled:
 
 1. sync-calendars (každých 5 min)
 2. sync-contacts (denně 04:00)
 3. nightly-briefing (denně 22:00)
-4. retry-stuck-recordings — Studna (každých 15 min)
-5. cleanup-audio — Studna (denně 03:00)
-6. daily-projects-digest — Studna (denně **7:00 ráno**, okno posledních 24 h, 200znakové náhledy z transkriptu, link na `/studna/aktivita`)
+4. retry-stuck-recordings — Studánka (každých 15 min)
+5. cleanup-audio — Studánka (denně 03:00)
+6. daily-projects-digest — Studánka (denně **7:00 ráno**, okno posledních 24 h, 200znakové náhledy z transkriptu, link na `/studna/aktivita`)
 7. monthly-health-report (poslední den měsíce 23:00)
 8. cleanup-expired-invites — Bookingy (denně 01:00)
 9. cleanup-task-audio-batches — Ozvěna úkoly (denně 02:30)
 10. retry-stuck-task-batches — Ozvěna úkoly (každých 5 min)
 11. cleanup-journal-audio — Deník (denně 03:15)
+12. **anniversary-reminders — Výročí + narozeniny kontaktů (denně 7:05 ráno, email + WhatsApp)** ← NOVÉ 2026-05-01

@@ -713,6 +713,7 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | Method | Path | Auth | Query |
 |---|---|---|---|
 | POST | `/api/cron/monthly-health-report` | **x-cron-key** | `?from&to` (override; jinak předchozí celý měsíc) |
+| POST | `/api/cron/anniversary-reminders` | **x-cron-key** | — (denně 7:05; pošle email/WhatsApp pokud dnes + reminderDaysBefore = výročí/narozeniny) |
 | POST | `/api/cron/daily-projects-digest` | **x-cron-key** | `?date=YYYY-MM-DD` (override celého toho dne; jinak posledních 24 h) |
 | POST | `/api/cron/cleanup-audio` | **x-cron-key** | — (smaže STANDARD audio >14d, pokud není pinned) |
 | POST | `/api/cron/sync-calendars` | **x-cron-key** | — (Google primary, à 5 min) |
@@ -1119,6 +1120,7 @@ Detail v `Návody/03-crony.pdf`. Krátký výpis:
 | 9 | cleanup-task-audio-batches | denně 02:30 |
 | 10 | retry-stuck-task-batches | každých 5 min |
 | 11 | cleanup-journal-audio | denně 03:15 |
+| 12 | **anniversary-reminders** | denně **7:05 ráno** (email + WhatsApp upozornění na výročí a narozeniny kontaktů) |
 
 ## Důležité architektonické změny
 
