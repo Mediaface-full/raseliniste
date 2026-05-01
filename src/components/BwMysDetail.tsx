@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, Mic, Trash2 } from "lucide-react";
+import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, Mic, Trash2, Pencil, X, Save, Sparkles } from "lucide-react";
 import { Button } from "./ui/Button";
+import { Input } from "./ui/Input";
 import BwMysAudioRecorder from "./BwMysAudioRecorder";
 
 interface Decision {
@@ -69,8 +70,10 @@ export default function BwMysDetail({ id }: { id: string }) {
   const [showFraming, setShowFraming] = useState(false);
   const [adding, setAdding] = useState(false);
   const [audioRecording, setAudioRecording] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [evaluating, setEvaluating] = useState<"prubezne" | "finalni" | null>(null);
-  const [closeDialog, setCloseDialog] = useState<"jdu" | "nejdu" | null>(null);
+  const [closeDialog, setCloseDialog] = useState<"jdu" | "nejdu" | "odlozit" | "vic-dat" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   async function deleteDecision() {
@@ -145,13 +148,24 @@ export default function BwMysDetail({ id }: { id: string }) {
     <div className="space-y-4">
       {/* Hlavička */}
       <div className="glass-strong rounded-xl p-4 space-y-2 relative">
-        <button
-          onClick={deleteDecision}
-          className="absolute top-3 right-3 p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
-          title="Smazat celé rozhodnutí (nevratné)"
-        >
-          <Trash2 className="size-4" />
-        </button>
+        <div className="absolute top-3 right-3 flex items-center gap-1">
+          {d.status === "aktivni" && (
+            <button
+              onClick={() => setEditing(true)}
+              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition"
+              title="Upravit zarámování"
+            >
+              <Pencil className="size-4" />
+            </button>
+          )}
+          <button
+            onClick={deleteDecision}
+            className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
+            title="Smazat celé rozhodnutí (nevratné)"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
         <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
           {d.kontext} · status {d.status}
         </div>
@@ -257,6 +271,12 @@ export default function BwMysDetail({ id }: { id: string }) {
                   <Button variant="outline" onClick={() => setCloseDialog("nejdu")}>
                     ✗ Nejdu
                   </Button>
+                  <Button variant="outline" onClick={() => setCloseDialog("odlozit")}>
+                    ⏸ Odložit
+                  </Button>
+                  <Button variant="ghost" onClick={() => setCloseDialog("vic-dat")}>
+                    Potřebuju víc dat
+                  </Button>
                 </div>
               )}
             </details>
@@ -299,25 +319,36 @@ export default function BwMysDetail({ id }: { id: string }) {
         />
       )}
 
-      {d.status !== "aktivni" && d.verdiktText && (
-        <div className="glass-strong rounded-xl p-4 border-l-4 border-[var(--tint-sage)]">
-          <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-1">
-            Verdikt ({d.status})
-          </div>
-          <div className="text-base whitespace-pre-wrap">{d.verdiktText}</div>
-          {d.coByZmeniloVerdikt && (
-            <div className="mt-3 pt-3 border-t border-white/5">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono mb-1">
-                Co by mohlo verdikt překlopit
+      {d.status !== "aktivni" && (
+        <div className="glass-strong rounded-xl p-4 border-l-4 border-[var(--tint-sage)] space-y-3">
+          {d.verdiktText && (
+            <>
+              <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+                Verdikt ({d.status})
               </div>
-              <div className="text-sm text-muted-foreground/90 italic">{d.coByZmeniloVerdikt}</div>
-            </div>
+              <div className="text-base whitespace-pre-wrap">{d.verdiktText}</div>
+              {d.coByZmeniloVerdikt && (
+                <div className="pt-3 border-t border-white/5">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono mb-1">
+                    Co by mohlo verdikt překlopit
+                  </div>
+                  <div className="text-sm text-muted-foreground/90 italic">{d.coByZmeniloVerdikt}</div>
+                </div>
+              )}
+            </>
           )}
+          <div className="pt-3 border-t border-white/5">
+            <Button variant="outline" onClick={() => setReopening(true)}>
+              ↻ Znovu otevřít (přes nový fakt)
+            </Button>
+          </div>
         </div>
       )}
 
       {adding && <NewEntryModal decisionId={d.id} onClose={(reload) => { setAdding(false); if (reload) load(); }} />}
       {audioRecording && <BwMysAudioRecorder decisionId={d.id} onClose={(created) => { setAudioRecording(false); if (created) load(); }} />}
+      {editing && <EditFramingModal decision={d} onClose={(reload) => { setEditing(false); if (reload) load(); }} />}
+      {reopening && <ReopenDialog decision={d} onClose={(reload) => { setReopening(false); if (reload) load(); }} />}
     </div>
   );
 }
@@ -601,7 +632,7 @@ function BulletGroup({ label, items }: { label: string; items?: string[] }) {
 // Close decision dialog (Tok 5)
 // ============================================================================
 
-function CloseDecisionDialog({ decision, onClose, mode }: { decision: Decision; onClose: (r: boolean) => void; mode: "jdu" | "nejdu" }) {
+function CloseDecisionDialog({ decision, onClose, mode }: { decision: Decision; onClose: (r: boolean) => void; mode: "jdu" | "nejdu" | "odlozit" | "vic-dat" }) {
   // Pokud je poslední evaluation finální, vytáhni AI doporučení jako prefill
   const lastFinal = decision.evaluations.find((ev) => ev.typ === "finalni");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -610,28 +641,214 @@ function CloseDecisionDialog({ decision, onClose, mode }: { decision: Decision; 
   const [verdikt, setVerdikt] = useState(ai?.doporuceni ?? "");
   const [coBy, setCoBy] = useState(ai?.coByPreklopilo ?? "");
   const [revize, setRevize] = useState(ai?.doporuceneDatumRevize ?? new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10));
+  // Odložit
+  const [odlozenoDo, setOdlozenoDo] = useState(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
+  // Víc dat
+  const [novyDeadline, setNovyDeadline] = useState(new Date(new Date(decision.deadlineRozhodnuti).getTime() + 14 * 86400000).toISOString().slice(0, 10));
+  const [novaDelkaSberu, setNovaDelkaSberu] = useState(decision.delkaSberuDny + 14);
+
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function save() {
-    if (!verdikt.trim() || !coBy.trim()) {
-      setErr("Verdikt a 'co by ho překlopilo' jsou povinné.");
-      return;
-    }
     setSaving(true); setErr(null);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let payload: any;
+      if (mode === "jdu" || mode === "nejdu") {
+        if (!verdikt.trim() || !coBy.trim()) {
+          setErr("Verdikt a 'co by ho překlopilo' jsou povinné.");
+          return;
+        }
+        payload = {
+          status: mode === "jdu" ? "uzavrene_jdu" : "uzavrene_nejdu",
+          verdiktText: verdikt.trim(),
+          coByZmeniloVerdikt: coBy.trim(),
+          datumRevize: new Date(revize).toISOString(),
+        };
+      } else if (mode === "odlozit") {
+        if (!odlozenoDo) { setErr("Vyber datum, do kdy odložit."); return; }
+        payload = {
+          status: "odlozene",
+          odlozenoDo: new Date(odlozenoDo).toISOString(),
+        };
+      } else {
+        // vic-dat — zůstává aktivní, jen prodloužit deadline / sběr
+        payload = {
+          deadlineRozhodnuti: new Date(novyDeadline).toISOString(),
+          delkaSberuDny: novaDelkaSberu,
+        };
+      }
+      const res = await fetch(`/api/bwmys/${decision.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error ?? "Uložení selhalo."); return; }
+      onClose(true);
+    } finally { setSaving(false); }
+  }
+
+  const titleMap = {
+    "jdu": "✓ Uzavřít: Jdu do toho",
+    "nejdu": "✗ Uzavřít: Nejdu",
+    "odlozit": "⏸ Odložit rozhodnutí",
+    "vic-dat": "Potřebuji víc dat — prodloužit",
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
+      <div className="glass-strong rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="font-serif text-lg">{titleMap[mode]}</div>
+
+        {(mode === "jdu" || mode === "nejdu") && (
+          <>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Text verdiktu
+              </label>
+              <textarea
+                value={verdikt}
+                onChange={(e) => setVerdikt(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Co by mohlo verdikt překlopit *
+              </label>
+              <textarea
+                value={coBy}
+                onChange={(e) => setCoBy(e.target.value)}
+                rows={2}
+                placeholder="Konkrétní nový fakt zvenčí — ne emoce, ne pochybnost"
+                className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Datum revize
+              </label>
+              <input
+                type="date"
+                value={revize}
+                onChange={(e) => setRevize(e.target.value)}
+                className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm"
+              />
+            </div>
+          </>
+        )}
+
+        {mode === "odlozit" && (
+          <>
+            <div className="text-sm text-muted-foreground">
+              Rozhodnutí se schová z aktivního seznamu. V určený den se automaticky vrátí.
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Vrátit zpět dne
+              </label>
+              <input
+                type="date"
+                value={odlozenoDo}
+                onChange={(e) => setOdlozenoDo(e.target.value)}
+                min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+                className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm"
+              />
+            </div>
+          </>
+        )}
+
+        {mode === "vic-dat" && (
+          <>
+            <div className="text-sm text-muted-foreground">
+              Rozhodnutí zůstane aktivní, ale prodloužím deadline + délku sběru.
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Nový deadline
+              </label>
+              <input
+                type="date"
+                value={novyDeadline}
+                onChange={(e) => setNovyDeadline(e.target.value)}
+                min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+                className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                Délka sběru (dnů)
+              </label>
+              <input
+                type="number"
+                min={1} max={180}
+                value={novaDelkaSberu}
+                onChange={(e) => setNovaDelkaSberu(parseInt(e.target.value, 10) || 14)}
+                className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm"
+              />
+            </div>
+          </>
+        )}
+
+        {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">{err}</div>}
+
+        <div className="flex gap-2 pt-2">
+          <Button onClick={save} disabled={saving}>
+            {saving ? <><Loader2 className="animate-spin" /> Ukládám…</> : <>Potvrdit a uzavřít</>}
+          </Button>
+          <Button variant="ghost" onClick={() => onClose(false)}>Zrušit</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Edit zarámování modal — Tok 1 alternative (úprava existujícího)
+// ============================================================================
+
+function EditFramingModal({ decision, onClose }: { decision: Decision; onClose: (r: boolean) => void }) {
+  const [nazev, setNazev] = useState(decision.nazev);
+  const [otazka, setOtazka] = useState(decision.otazka);
+  const [kontext, setKontext] = useState<string>(decision.kontext);
+  const [varianty, setVarianty] = useState<string[]>([...decision.varianty]);
+  const [predpoklady, setPredpoklady] = useState<string[]>([...decision.predpoklady]);
+  const [deadlineDate, setDeadlineDate] = useState(new Date(decision.deadlineRozhodnuti).toISOString().slice(0, 10));
+  const [delkaSberuDny, setDelkaSberuDny] = useState(decision.delkaSberuDny);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save() {
+    setErr(null);
+    if (!otazka.trim().endsWith("?")) { setErr("Otázka musí končit otazníkem."); return; }
+    const variantyClean = varianty.map((v) => v.trim()).filter(Boolean);
+    if (variantyClean.length < 3) { setErr("Minimum 3 varianty."); return; }
+    const predpokladyClean = predpoklady.map((p) => p.trim()).filter(Boolean);
+    if (predpokladyClean.length < 1) { setErr("Minimum 1 předpoklad."); return; }
+    if (new Date(deadlineDate) < new Date(new Date().toDateString())) { setErr("Deadline musí být v budoucnosti."); return; }
+
+    setSaving(true);
     try {
       const res = await fetch(`/api/bwmys/${decision.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          status: mode === "jdu" ? "uzavrene_jdu" : "uzavrene_nejdu",
-          verdiktText: verdikt.trim(),
-          coByZmeniloVerdikt: coBy.trim(),
-          datumRevize: new Date(revize).toISOString(),
+          nazev: nazev.trim(),
+          kontext,
+          otazka: otazka.trim(),
+          varianty: variantyClean,
+          predpoklady: predpokladyClean,
+          deadlineRozhodnuti: new Date(deadlineDate).toISOString(),
+          delkaSberuDny,
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setErr(data.error ?? "Uzavření selhalo."); return; }
+      if (!res.ok) { setErr(data.error ?? "Uložení selhalo."); return; }
       onClose(true);
     } finally { setSaving(false); }
   }
@@ -639,52 +856,223 @@ function CloseDecisionDialog({ decision, onClose, mode }: { decision: Decision; 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
       <div className="glass-strong rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <div className="font-serif text-lg">
-          {mode === "jdu" ? "✓ Uzavřít: Jdu do toho" : "✗ Uzavřít: Nejdu"}
+        <div className="flex items-center justify-between">
+          <h3 className="font-serif text-lg">Upravit zarámování</h3>
+          <button onClick={() => onClose(false)} className="p-1 hover:bg-white/5 rounded">
+            <X className="size-4" />
+          </button>
         </div>
 
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-            Text verdiktu
-          </label>
-          <textarea
-            value={verdikt}
-            onChange={(e) => setVerdikt(e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
-          />
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Název</label>
+          <Input value={nazev} onChange={(e) => setNazev(e.target.value)} />
         </div>
 
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-            Co by mohlo verdikt překlopit *
-          </label>
-          <textarea
-            value={coBy}
-            onChange={(e) => setCoBy(e.target.value)}
-            rows={2}
-            placeholder="Konkrétní nový fakt zvenčí — ne emoce, ne pochybnost"
-            className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
-          />
-        </div>
-
-        <div>
-          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-            Datum revize
-          </label>
-          <input
-            type="date"
-            value={revize}
-            onChange={(e) => setRevize(e.target.value)}
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Kontext</label>
+          <select
+            value={kontext}
+            onChange={(e) => setKontext(e.target.value)}
             className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm"
+          >
+            <option value="pracovni">Pracovní</option>
+            <option value="osobni">Osobní</option>
+            <option value="smiseny">Smíšený</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Otázka (musí končit ?)</label>
+          <textarea
+            value={otazka}
+            onChange={(e) => setOtazka(e.target.value)}
+            rows={2}
+            className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
           />
+        </div>
+
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono mb-1.5 block">
+            Varianty (min 3)
+          </label>
+          <div className="space-y-1.5">
+            {varianty.map((v, i) => (
+              <div key={i} className="flex gap-2">
+                <span className="font-mono text-xs text-muted-foreground self-center w-4">{i + 1}.</span>
+                <Input
+                  value={v}
+                  onChange={(e) => {
+                    const next = [...varianty];
+                    next[i] = e.target.value;
+                    setVarianty(next);
+                  }}
+                />
+                {varianty.length > 3 && (
+                  <button onClick={() => setVarianty(varianty.filter((_, idx) => idx !== i))} className="p-1 text-muted-foreground hover:text-destructive">
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => setVarianty([...varianty, ""])}
+              className="text-xs font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              <Plus className="size-3" /> přidat
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono mb-1.5 block">
+            Předpoklady (min 1)
+          </label>
+          <div className="space-y-1.5">
+            {predpoklady.map((p, i) => (
+              <div key={i} className="flex gap-2">
+                <span className="font-mono text-xs text-muted-foreground self-center w-4">{i + 1}.</span>
+                <Input
+                  value={p}
+                  onChange={(e) => {
+                    const next = [...predpoklady];
+                    next[i] = e.target.value;
+                    setPredpoklady(next);
+                  }}
+                />
+                {predpoklady.length > 1 && (
+                  <button onClick={() => setPredpoklady(predpoklady.filter((_, idx) => idx !== i))} className="p-1 text-muted-foreground hover:text-destructive">
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => setPredpoklady([...predpoklady, ""])}
+              className="text-xs font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              <Plus className="size-3" /> přidat
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Deadline</label>
+            <Input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Délka sběru (dnů)</label>
+            <Input type="number" min={1} max={180} value={delkaSberuDny} onChange={(e) => setDelkaSberuDny(parseInt(e.target.value, 10) || 14)} />
+          </div>
         </div>
 
         {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">{err}</div>}
 
         <div className="flex gap-2 pt-2">
           <Button onClick={save} disabled={saving}>
-            {saving ? <><Loader2 className="animate-spin" /> Ukládám…</> : <>Potvrdit a uzavřít</>}
+            {saving ? <><Loader2 className="animate-spin" /> Ukládám…</> : <><Save /> Uložit</>}
+          </Button>
+          <Button variant="ghost" onClick={() => onClose(false)}>Zrušit</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Re-export Sparkles aby ho TS nehlásil jako nepoužívaný (používáme v BwMysNew).
+export { Sparkles };
+
+// ============================================================================
+// Reopen dialog (Tok 6) — povinný popis nového faktu + potvrzení že to není nálada
+// ============================================================================
+
+function ReopenDialog({ decision, onClose }: { decision: Decision; onClose: (r: boolean) => void }) {
+  const [popis, setPopis] = useState("");
+  const [schvaleno, setSchvaleno] = useState(false);
+  const [novyDeadline, setNovyDeadline] = useState(new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save() {
+    setErr(null);
+    if (popis.trim().length < 5) { setErr("Popis nového faktu musí mít alespoň 5 znaků."); return; }
+    if (!schvaleno) { setErr("Musíš potvrdit, že je to opravdu nový fakt zvenčí."); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/bwmys/${decision.id}/reopen`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          popisNovehoFaktu: popis.trim(),
+          schvaleno: true,
+          novyDeadline: new Date(novyDeadline).toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error ?? "Znovuotevření selhalo."); return; }
+      onClose(true);
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
+      <div className="glass-strong rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-serif text-lg">↻ Znovu otevřít rozhodnutí</h3>
+          <button onClick={() => onClose(false)} className="p-1 hover:bg-white/5 rounded">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="text-sm text-muted-foreground rounded-md bg-[var(--tint-butter)]/10 border border-[var(--tint-butter)]/30 p-3">
+          <strong>Pravidlo nevracení:</strong> uzavřené rozhodnutí lze znovu otevřít POUZE
+          přes konkrétní nový fakt zvenčí — NE přes pochybnost, náladu, opakovanou úvahu.
+        </div>
+
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+            Co se konkrétně změnilo? Jaký nový fakt přišel? *
+          </label>
+          <textarea
+            value={popis}
+            onChange={(e) => setPopis(e.target.value)}
+            rows={4}
+            placeholder='např. „Klient potvrdil rozpočet 200k", „Prodal jsem byt", „Marie souhlasila"'
+            className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
+          />
+        </div>
+
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+            Nový deadline (default +14 dní)
+          </label>
+          <input
+            type="date"
+            value={novyDeadline}
+            onChange={(e) => setNovyDeadline(e.target.value)}
+            min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
+            className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm"
+          />
+        </div>
+
+        <label className="flex items-start gap-2 cursor-pointer text-sm rounded-md border border-[var(--tint-rose)]/30 bg-[var(--tint-rose)]/5 p-3">
+          <input
+            type="checkbox"
+            checked={schvaleno}
+            onChange={(e) => setSchvaleno(e.target.checked)}
+            className="size-4 mt-0.5"
+          />
+          <span>
+            Potvrzuji, že je to <strong>opravdu nový fakt zvenčí</strong>, ne pochybnost,
+            ne nálada, ne opakovaná úvaha.
+          </span>
+        </label>
+
+        {err && <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">{err}</div>}
+
+        <div className="flex gap-2 pt-2">
+          <Button onClick={save} disabled={saving || !schvaleno || popis.trim().length < 5}>
+            {saving ? <><Loader2 className="animate-spin" /> Otevírám…</> : <>Znovu otevřít</>}
           </Button>
           <Button variant="ghost" onClick={() => onClose(false)}>Zrušit</Button>
         </div>

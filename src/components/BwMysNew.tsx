@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Save, X, Plus, ChevronLeft, ChevronRight, Briefcase, Heart, Layers } from "lucide-react";
+import { Loader2, Save, X, Plus, ChevronLeft, ChevronRight, Briefcase, Heart, Layers, Sparkles } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
@@ -18,7 +18,39 @@ export default function BwMysNew() {
   });
   const [delkaSberuDny, setDelkaSberuDny] = useState(14);
   const [saving, setSaving] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  async function suggestVariants() {
+    setErr(null);
+    if (!otazka.trim().endsWith("?")) {
+      setErr("Nejdřív zadej otázku (krok 2).");
+      return;
+    }
+    const current = varianty.map((v) => v.trim()).filter(Boolean);
+    if (current.length < 1) {
+      setErr("Zadej aspoň 1 variantu, AI doplní další.");
+      return;
+    }
+    setSuggesting(true);
+    try {
+      const res = await fetch("/api/bwmys/suggest-variants", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ otazka: otazka.trim(), soucasneVarianty: current }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErr(data.error ?? "AI návrh selhal.");
+        return;
+      }
+      // Doplň AI varianty na konec, ponechej existující
+      const combined = [...current, ...(data.varianty as string[])];
+      setVarianty(combined);
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   function next() { setErr(null); setStep((s) => Math.min(STEPS.length - 1, s + 1)); }
   function back() { setErr(null); setStep((s) => Math.max(0, s - 1)); }
@@ -169,13 +201,24 @@ export default function BwMysNew() {
                   )}
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={() => setVarianty([...varianty, ""])}
-                className="text-xs font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-              >
-                <Plus className="size-3" /> přidat variantu
-              </button>
+              <div className="flex flex-wrap items-center gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setVarianty([...varianty, ""])}
+                  className="text-xs font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                >
+                  <Plus className="size-3" /> přidat variantu
+                </button>
+                <button
+                  type="button"
+                  onClick={suggestVariants}
+                  disabled={suggesting}
+                  className="text-xs font-mono text-[var(--tint-lavender)] hover:text-foreground inline-flex items-center gap-1 disabled:opacity-50"
+                >
+                  {suggesting ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                  {suggesting ? "AI přemýšlí…" : "Navrhnout další (AI)"}
+                </button>
+              </div>
             </div>
             <p className="text-[11px] text-muted-foreground mt-2">
               Tip: nemysli jen binárně (jdu/nejdu). Zkus odložení, menší verzi, delegování.
