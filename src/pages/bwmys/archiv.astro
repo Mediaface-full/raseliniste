@@ -1,0 +1,126 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const url = new URL(Astro.request.url);
+const statusFilter = url.searchParams.get("status") ?? "all";
+const kontextFilter = url.searchParams.get("kontext") ?? "all";
+
+const where: Record<string, unknown> = {
+  userId: session.uid,
+  status: { in: ["uzavrene_jdu", "uzavrene_nejdu", "odlozene", "archivovane"] },
+};
+if (statusFilter !== "all") where.status = statusFilter;
+if (kontextFilter !== "all") where.kontext = kontextFilter;
+
+const items = await prisma.decision.findMany({
+  where,
+  orderBy: { datumUzavreni: "desc" },
+  select: {
+    id: true, nazev: true, otazka: true, kontext: true, status: true,
+    datumUzavreni: true, verdiktText: true,
+  },
+});
+
+const STATUS_LABEL: Record<string, { label: string; tint: string }> = {
+  uzavrene_jdu: { label: "Šlo do toho", tint: "sage" },
+  uzavrene_nejdu: { label: "Nešlo do toho", tint: "rose" },
+  odlozene: { label: "Odložené", tint: "butter" },
+  archivovane: { label: "Archivováno", tint: "lavender" },
+};
+---
+
+<Shell
+  title="Archiv · B&W Myš · Rašeliniště"
+  username={user.username}
+  heading="Archiv"
+  breadcrumb={[{ label: "B&W Myš", href: "/bwmys" }, { label: "Archiv" }]}
+>
+  <div class="space-y-4">
+    {/* Filtry */}
+    <div class="glass rounded-xl p-3 flex flex-wrap items-center gap-2">
+      <a
+        href="/bwmys"
+        class="text-xs font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-1 rounded hover:bg-white/5 mr-2"
+      >
+        <Icon name="lucide:arrow-left" class="size-3" /> aktivní
+      </a>
+      <span class="text-xs text-muted-foreground">Filtr status:</span>
+      {["all", "uzavrene_jdu", "uzavrene_nejdu", "odlozene"].map((s) => (
+        <a
+          href={`/bwmys/archiv?status=${s}${kontextFilter !== "all" ? `&kontext=${kontextFilter}` : ""}`}
+          class={`text-xs px-2 py-1 rounded font-mono ${statusFilter === s ? "bg-[var(--tint-sky)]/20 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          {s === "all" ? "vše" : STATUS_LABEL[s]?.label ?? s}
+        </a>
+      ))}
+      <span class="text-xs text-muted-foreground ml-2">Kontext:</span>
+      {["all", "pracovni", "osobni", "smiseny"].map((k) => (
+        <a
+          href={`/bwmys/archiv?kontext=${k}${statusFilter !== "all" ? `&status=${statusFilter}` : ""}`}
+          class={`text-xs px-2 py-1 rounded font-mono ${kontextFilter === k ? "bg-[var(--tint-lavender)]/20 text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          {k}
+        </a>
+      ))}
+    </div>
+
+    {items.length === 0 ? (
+      <div class="glass rounded-xl p-8 text-center text-muted-foreground text-sm">
+        V archivu nic není dle těchto filtrů.
+      </div>
+    ) : (
+      <div class="space-y-2">
+        {items.map((it) => {
+          const st = STATUS_LABEL[it.status] ?? { label: it.status, tint: "muted-foreground" };
+          return (
+            <a
+              href={`/bwmys/${it.id}`}
+              class="glass rounded-xl p-4 flex flex-col gap-1.5 hover:bg-white/5 transition block"
+            >
+              <div class="flex items-baseline gap-2 flex-wrap">
+                <span class="font-medium text-sm">{it.nazev}</span>
+                <span
+                  class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded"
+                  style={`background: color-mix(in oklch, var(--tint-${st.tint}) 18%, transparent); color: var(--tint-${st.tint});`}
+                >
+                  {st.label}
+                </span>
+                <span class="text-[10px] font-mono text-muted-foreground/60 ml-auto">
+                  {it.datumUzavreni ? new Date(it.datumUzavreni).toLocaleDateString("cs-CZ") : "—"}
+                </span>
+              </div>
+              <div class="text-xs italic text-muted-foreground/90 line-clamp-1">{it.otazka}</div>
+              {it.verdiktText && (
+                <div class="text-sm text-foreground/85 line-clamp-2 mt-1">
+                  {it.verdiktText}
+                </div>
+              )}
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] font-mono text-muted-foreground/60">{it.kontext}</span>
+                <a
+                  href={`/api/bwmys/${it.id}/export`}
+                  class="text-[10px] font-mono text-[var(--tint-sky)] hover:underline ml-auto"
+                  onclick="event.stopPropagation();"
+                >
+                  ⬇ export MD
+                </a>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</Shell>

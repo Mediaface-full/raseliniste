@@ -151,7 +151,7 @@ V `/volume1/docker/raseliniste/.env`:
 | `NOTIFICATION_FROM` + `NOTIFICATION_EMAIL` | Mail odesílatel + globální fallback příjemce |
 | `CRON_SECRET` | x-cron-key auth pro DSM cron tasky |
 
-## Crony v DSM Task Scheduler (14 úloh)
+## Crony v DSM Task Scheduler (15 úloh)
 
 Detail per úloha + curl command v `Návody/03-crony.pdf`. Krátký přehled:
 
@@ -169,3 +169,4 @@ Detail per úloha + curl command v `Návody/03-crony.pdf`. Krátký přehled:
 12. **anniversary-reminders — Výročí + narozeniny kontaktů (denně 7:05 ráno, email + WhatsApp)** ← NOVÉ 2026-05-01
 13. **zijes-reminder ?type=lunch — ŽIJEŠ? polední check-in (denně 13:00, email + WhatsApp, neutrální tón)** ← NOVÉ 2026-05-01
 14. **zijes-reminder ?type=evening — ŽIJEŠ? večerní check-in (denně 18:00, email + WhatsApp, neutrální tón)** ← NOVÉ 2026-05-01
+15. **bwmys-tick — B&W Myš denní tick (denně 7:10, deadline alerts, sběr uplynul, datum revize, auto-návrat odložených)** ← NOVÉ 2026-05-01

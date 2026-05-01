@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, Mic } from "lucide-react";
 import { Button } from "./ui/Button";
+import BwMysAudioRecorder from "./BwMysAudioRecorder";
 
 interface Decision {
   id: string;
@@ -67,6 +68,7 @@ export default function BwMysDetail({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [showFraming, setShowFraming] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [audioRecording, setAudioRecording] = useState(false);
   const [evaluating, setEvaluating] = useState<"prubezne" | "finalni" | null>(null);
   const [closeDialog, setCloseDialog] = useState<"jdu" | "nejdu" | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -246,7 +248,10 @@ export default function BwMysDetail({ id }: { id: string }) {
       {d.status === "aktivni" && (
         <div className="glass-strong rounded-xl p-3 sticky bottom-4 flex flex-wrap gap-2">
           <Button onClick={() => setAdding(true)}>
-            <Plus /> Přidat zápis
+            <Plus /> Zápis textem
+          </Button>
+          <Button variant="outline" onClick={() => setAudioRecording(true)}>
+            <Mic /> Nadiktovat
           </Button>
           <Button
             variant="outline"
@@ -292,6 +297,7 @@ export default function BwMysDetail({ id }: { id: string }) {
       )}
 
       {adding && <NewEntryModal decisionId={d.id} onClose={(reload) => { setAdding(false); if (reload) load(); }} />}
+      {audioRecording && <BwMysAudioRecorder decisionId={d.id} onClose={(created) => { setAudioRecording(false); if (created) load(); }} />}
     </div>
   );
 }
