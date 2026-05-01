@@ -334,12 +334,12 @@ export const PROMPT_LABELS: Record<PromptModule, { label: string; tint: string; 
     description: "Reflexivní pohled na měsíc napříč deníkovými zápisy (vzorce, lidé, vývoj). Pracuje jen s METADATA + POZNÁMKY EDITORA.",
   },
   "studna-standard": {
-    label: "Studna — STANDARD analýza",
+    label: "Studánka — STANDARD analýza",
     tint: "mint",
     description: "Krátké hlasové záznamy v projektech. Flash model.",
   },
   "studna-brief": {
-    label: "Studna — BRIEF analýza",
+    label: "Studánka — BRIEF analýza",
     tint: "mint",
     description: "Dlouhé klíčové briefy v projektech (30-90 min). Pro model.",
   },

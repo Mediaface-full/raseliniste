@@ -29,7 +29,7 @@ const SOURCE_META: Record<string, { label: string; icon: typeof BookOpen; tint: 
     href: (id) => `/ukoly#task-${id}`,
   },
   studna: {
-    label: "Studna",
+    label: "Studánka",
     icon: Waves,
     tint: "mint",
     href: (id) => `/studna/aktivita#rec-${id}`,

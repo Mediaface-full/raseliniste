@@ -19,7 +19,7 @@ export const prerender = false;
  *   3. Pokud nic nepřibylo → e-mail se neposílá
  *   4. Jinak: pošle souhrn na User.notificationEmail / env.NOTIFICATION_EMAIL
  *
- * Předmět: "Rašeliniště · Studna — N nových nahrávek (Jméno, Jméno)"
+ * Předmět: "Studánka — N nových nahrávek (Jméno, Jméno)"
  * Tělo: per-projekt blok, každý záznam → autor + čas + 200 znaků z transkriptu.
  */
 
@@ -124,7 +124,7 @@ export const POST: APIRoute = async ({ request, url }) => {
     const authorSubj = authorList.length <= 4
       ? authorList.join(", ")
       : `${authorList.slice(0, 4).join(", ")} +${authorList.length - 4}`;
-    const subject = `Studna — ${recordings.length} ${plural(recordings.length, "nová nahrávka", "nové nahrávky", "nových nahrávek")} (${authorSubj})`;
+    const subject = `Studánka — ${recordings.length} ${plural(recordings.length, "nová nahrávka", "nové nahrávky", "nových nahrávek")} (${authorSubj})`;
 
     const result = await sendMail({
       to: to_email,
@@ -198,7 +198,7 @@ function renderDigestHtml(
 <body style="margin:0;padding:0;background:#1a1714;color:#e8e3d9;font-family:-apple-system,BlinkMacSystemFont,'Geist','Segoe UI',sans-serif;line-height:1.55;">
   <div style="max-width:640px;margin:0 auto;padding:24px 20px;">
     <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b8763c;font-family:ui-monospace,monospace;margin-bottom:6px;">
-      Rašeliniště · Studna
+      Rašeliniště · Studánka
     </div>
     <h1 style="font-family:Georgia,serif;font-size:24px;margin:0 0 18px;color:#fff;letter-spacing:-0.01em;">
       Co se ve Studně dělo za posledních 24 h

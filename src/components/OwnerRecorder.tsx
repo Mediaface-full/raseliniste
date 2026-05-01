@@ -65,13 +65,13 @@ export default function OwnerRecorder({
     return (
       <div className="glass-strong rounded-xl p-6 text-center">
         <p className="text-sm text-muted-foreground mb-4">
-          Nemáš zatím žádný projekt. Vytvoř první ve Studně.
+          Nemáš zatím žádný projekt. Vytvoř první ve Studánce.
         </p>
         <a
           href="/studna"
           className="inline-block px-4 py-2 rounded-md bg-foreground/90 text-background text-sm font-medium"
         >
-          Otevřít Studnu
+          Otevřít Studánku
         </a>
       </div>
     );
@@ -299,7 +299,7 @@ export default function OwnerRecorder({
             </div>
             {protection.hiddenDurations.length > 0 && (
               <div className="rounded-md border border-[var(--tint-rose)]/40 bg-[var(--tint-rose)]/10 text-xs px-3 py-2 max-w-xs">
-                ⚠ Přepnul jsi mimo Studnu — část záznamu může chybět.
+                ⚠ Přepnul jsi mimo Studánku — část záznamu může chybět.
               </div>
             )}
             <button

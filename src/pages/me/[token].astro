@@ -43,8 +43,8 @@ if (token) {
 }
 
 // Apple home title — pokud má 1 projekt, použij jeho homeTitle/name (max 12 char celkem),
-// jinak generický "Studna".
-let appleTitle = "Studna";
+// jinak generický "Studánka".
+let appleTitle = "Studánka";
 if (projects.length === 1) {
   const p = projects[0];
   appleTitle = p.homeTitle ? `G: ${p.homeTitle}` : `G: ${p.name.slice(0, 9)}`;
@@ -52,7 +52,7 @@ if (projects.length === 1) {
 ---
 
 <Base
-  title={guest ? `Studna · ${guest.name}` : "Studna"}
+  title={guest ? `Studánka · ${guest.name}` : "Studánka"}
   appleTitle={appleTitle}
   appleCapable={true}
 >
@@ -78,12 +78,12 @@ if (projects.length === 1) {
           <div class="mb-6 text-center">
             <img
               src="/apple-touch-icon.png"
-              alt="Studna"
+              alt="Studánka"
               width="64"
               height="64"
               class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
             />
-            <h1 class="font-serif text-3xl tracking-tight">Studna</h1>
+            <h1 class="font-serif text-3xl tracking-tight">Studánka</h1>
             <p class="mt-2 text-sm text-muted-foreground leading-relaxed">
               Nahrávárna pro projekty, do kterých tě Petr pozval.
             </p>

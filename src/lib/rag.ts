@@ -313,7 +313,7 @@ export async function answerQuestion(params: {
   const sourceLabels: Record<RagSource, string> = {
     journal: "Deník",
     task: "Úkol",
-    studna: "Studna",
+    studna: "Studánka",
   };
 
   // Sestav kontext pro LLM (každý chunk má pořadové ID, na které se odkazuje v citacích)
@@ -323,7 +323,7 @@ export async function answerQuestion(params: {
 
   const prompt = `Jsi asistent Gideona — odpovídej česky, stručně a věcně.
 
-Použij POUZE následující úryvky z Gideonových deníků, úkolů a Studna nahrávek.
+Použij POUZE následující úryvky z Gideonových deníků, úkolů a Studánka nahrávek.
 Když odpovídáš, **odkazuj se na úryvky čísly v hranatých závorkách**, např. [1], [2].
 Pokud ti úryvky neumožňují odpovědět spolehlivě, řekni to upřímně.
 

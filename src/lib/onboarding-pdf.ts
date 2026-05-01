@@ -254,7 +254,7 @@ function PageWelcome(d: OnboardingData, opts: { brandText: string; title: string
     // Co si má představit
     h(Text, { style: styles.h2 }, "Co si pod tím představit"),
     h(Text, { style: styles.para },
-      "Studna je sdílená nahrávárna pro tým. Když tě napadne myšlenka, postřeh, otázka nebo nápad k projektu, otevřeš odkaz výše a hlasem to nahraješ. Mluvíš normálně, jako bys to říkal po telefonu Petrovi.",
+      "Studánka je sdílená nahrávárna pro tým. Když tě napadne myšlenka, postřeh, otázka nebo nápad k projektu, otevřeš odkaz výše a hlasem to nahraješ. Mluvíš normálně, jako bys to říkal po telefonu Petrovi.",
     ),
     h(Text, { style: styles.para },
       "Umělá inteligence záznam přepíše a vytáhne z něj klíčové body. Petr si to pak v klidu projde. Nemusíš nic psát.",
@@ -365,7 +365,7 @@ function PageHowToRecord(d: OnboardingData, opts: { includeBriefUpload: boolean 
 // -----------------------------------------------------------------------------
 function StandardPdf(d: OnboardingData): ReactElement {
   return h(Document, null,
-    PageWelcome(d, { brandText: "Rašeliniště · Studna", title: "Vítej v projektu" }),
+    PageWelcome(d, { brandText: "Rašeliniště · Studánka", title: "Vítej v projektu" }),
     PageHowToRecord(d, { includeBriefUpload: false }),
   );
 }
@@ -375,7 +375,7 @@ function StandardPdf(d: OnboardingData): ReactElement {
 // -----------------------------------------------------------------------------
 function BriefPdf(d: OnboardingData): ReactElement {
   return h(Document, null,
-    PageWelcome(d, { brandText: "Rašeliniště · Studna · Klíčový brief", title: "Vítej v projektu" }),
+    PageWelcome(d, { brandText: "Rašeliniště · Studánka · Klíčový brief", title: "Vítej v projektu" }),
     PageBriefInfo(d),
     PageHowToRecord(d, { includeBriefUpload: true }),
   );

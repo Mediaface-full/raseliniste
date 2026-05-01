@@ -15,10 +15,10 @@ if (!user) return Astro.redirect("/login");
 ---
 
 <Shell
-  title="Studna · Rašeliniště"
+  title="Studánka · Rašeliniště"
   username={user.username}
-  heading="Studna"
-  breadcrumb={[{ label: "Studna" }]}
+  heading="Studánka"
+  breadcrumb={[{ label: "Studánka" }]}
 >
   <StudnaList client:load />
 </Shell>
