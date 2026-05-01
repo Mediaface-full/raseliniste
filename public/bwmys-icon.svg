@@ -5,88 +5,54 @@
       <stop offset="60%" stop-color="#1a1a25"/>
       <stop offset="100%" stop-color="#08081c"/>
     </radialGradient>
-    <radialGradient id="bw-glow" cx="50%" cy="50%" r="55%">
-      <stop offset="0%" stop-color="#c8a8ff" stop-opacity="0.28"/>
-      <stop offset="60%" stop-color="#a78bfa" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
-    </radialGradient>
   </defs>
 
-  <!-- Pozadí + jemná aura -->
   <rect width="180" height="180" fill="url(#bw-bg)"/>
-  <circle cx="90" cy="90" r="80" fill="url(#bw-glow)"/>
 
-  <!-- ============================================================
-       Dvě myšky honící se dokola (cirkulární kompozice).
-       Každá zaujímá půlkruh — hlava jedné u ocasu druhé.
-       ============================================================ -->
+  <!-- Skupina rotovaná o -90° aby vertikální dělící S-křivka byla správně:
+       (klasický yin-yang má S vertikálně, černá ZAUJÍMÁ HORNÍ polovinu) -->
+  <g transform="rotate(-90 90 90)">
+    <!-- Bílý podklad celého kruhu -->
+    <circle cx="90" cy="90" r="70" fill="#f4f4f6"/>
 
-  <!-- ============ ČERNÁ MYŠ (horní polovina) ============ -->
-  <g>
-    <!-- Tělíčko (kompaktní oblé) -->
-    <ellipse cx="60" cy="65" rx="22" ry="17"
-             fill="#0d0d12" stroke="#3a3a4a" stroke-width="1.5"
-             transform="rotate(-15 60 65)"/>
+    <!-- Klasická yin-yang černá kapka — large=1 sweep=1,1,0 z W3C example -->
+    <path d="M 90 20
+             a 70 70 0 1 1 0 140
+             a 35 35 0 1 1 0 -70
+             a 35 35 0 1 0 0 -70 Z"
+          fill="#0d0d12"/>
 
-    <!-- Hlavička (kruh napojený na tělo) -->
-    <circle cx="40" cy="58" r="13" fill="#0d0d12" stroke="#3a3a4a" stroke-width="1.5"/>
-
-    <!-- Špičatý čenich -->
-    <path d="M 28 60 L 22 56 L 28 53 Z" fill="#0d0d12" stroke="#3a3a4a" stroke-width="1"/>
-
-    <!-- Ucho (špičaté nahoru) -->
-    <path d="M 36 47 L 32 36 L 44 42 Z"
-          fill="#0d0d12" stroke="#3a3a4a" stroke-width="1"/>
-    <!-- Vnitřek ucha (růžový) -->
-    <path d="M 37 45 L 36 39 L 41 42 Z" fill="#fbcfe8" opacity="0.85"/>
-
-    <!-- Oko -->
-    <circle cx="38" cy="56" r="2.2" fill="#fff"/>
-    <circle cx="38" cy="56" r="1.1" fill="#0d0d12"/>
-
-    <!-- Růžový čumáček na špičce -->
-    <circle cx="22" cy="56" r="1.5" fill="#fbcfe8"/>
-
-    <!-- Ocas — vychází zezadu, vlní se podél kruhu doprava-dolů -->
-    <path d="M 80 70 Q 110 75 130 95 Q 145 115 140 138"
-          stroke="#0d0d12" stroke-width="3" fill="none" stroke-linecap="round"/>
-
-    <!-- Tlapičky (jen špičky pod tělem) -->
-    <ellipse cx="50" cy="83" rx="3" ry="2" fill="#0d0d12"/>
-    <ellipse cx="68" cy="85" rx="3" ry="2" fill="#0d0d12"/>
+    <!-- Vnější rámeček -->
+    <circle cx="90" cy="90" r="70" fill="none" stroke="#3a3a4a" stroke-width="2.5"/>
   </g>
 
-  <!-- ============ BÍLÁ MYŠ (spodní polovina, rotace 180°) ============ -->
-  <g transform="rotate(180 90 90)">
-    <!-- Tělíčko -->
-    <ellipse cx="60" cy="65" rx="22" ry="17"
-             fill="#f4f4f6" stroke="#c8c8d0" stroke-width="1.5"
-             transform="rotate(-15 60 65)"/>
+  <!-- Po rotaci -90°: BÍLÁ kapka je VPRAVO, ČERNÁ je VLEVO.
+       Petr chce ČERNOU NAHOŘE → potřebuju rotaci ne -90° ale +90°. Jde o to.
+       Vyřeším přes druhou rotaci o -180° celého wrapperu. -->
 
-    <!-- Hlavička -->
-    <circle cx="40" cy="58" r="13" fill="#f4f4f6" stroke="#c8c8d0" stroke-width="1.5"/>
+  <!-- Detaily MYŠÍ — pozice v původním souřadnicovém systému.
+       Černá hlava je nahoře (na pozici malého kruhu cx=90 cy=55 PO CELKOVÉ ROTACI).
+       Před rotací -90° byl horní malý kruh na (155, 90) → teď po rotaci na (90, 25)... no počkat. -->
 
-    <!-- Špičatý čenich -->
-    <path d="M 28 60 L 22 56 L 28 53 Z" fill="#f4f4f6" stroke="#c8c8d0" stroke-width="1"/>
+  <!-- Oko bílé (na černé kapce nahoře) -->
+  <circle cx="90" cy="55" r="9" fill="#f4f4f6"/>
+  <circle cx="90" cy="55" r="3" fill="#0d0d12"/>
 
-    <!-- Ucho -->
-    <path d="M 36 47 L 32 36 L 44 42 Z"
-          fill="#f4f4f6" stroke="#c8c8d0" stroke-width="1"/>
-    <path d="M 37 45 L 36 39 L 41 42 Z" fill="#fbcfe8" opacity="0.85"/>
+  <!-- Oko černé (na bílé kapce dole) -->
+  <circle cx="90" cy="125" r="9" fill="#1a1a25"/>
+  <circle cx="90" cy="125" r="3" fill="#f4f4f6"/>
 
-    <!-- Oko (kontrastní k bílé) -->
-    <circle cx="38" cy="56" r="2.2" fill="#1a1a25"/>
-    <circle cx="38" cy="56" r="1.1" fill="#fff"/>
+  <!-- ČERNÁ MYŠ ucho — nahoru z černé hlavy -->
+  <path d="M 64 30 L 56 12 L 78 22 Z"
+        fill="#0d0d12" stroke="#3a3a4a" stroke-width="1.2"/>
+  <path d="M 66 28 L 62 16 L 74 23 Z" fill="#fbcfe8" opacity="0.85"/>
+  <!-- Černá myš čumák -->
+  <circle cx="55" cy="68" r="2.6" fill="#fbcfe8"/>
 
-    <!-- Čumáček -->
-    <circle cx="22" cy="56" r="1.5" fill="#a78bfa"/>
-
-    <!-- Ocas -->
-    <path d="M 80 70 Q 110 75 130 95 Q 145 115 140 138"
-          stroke="#c8c8d0" stroke-width="3" fill="none" stroke-linecap="round"/>
-
-    <!-- Tlapičky -->
-    <ellipse cx="50" cy="83" rx="3" ry="2" fill="#f4f4f6" stroke="#c8c8d0" stroke-width="0.6"/>
-    <ellipse cx="68" cy="85" rx="3" ry="2" fill="#f4f4f6" stroke="#c8c8d0" stroke-width="0.6"/>
-  </g>
+  <!-- BÍLÁ MYŠ ucho — dolu z bílé hlavy -->
+  <path d="M 116 150 L 124 168 L 102 158 Z"
+        fill="#f4f4f6" stroke="#c8c8d0" stroke-width="1.2"/>
+  <path d="M 114 152 L 118 164 L 106 157 Z" fill="#fbcfe8" opacity="0.85"/>
+  <!-- Bílá myš čumák -->
+  <circle cx="125" cy="112" r="2.6" fill="#a78bfa"/>
 </svg>
