@@ -1,0 +1,87 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const id = Astro.params.id;
+if (!id) return Astro.redirect("/zijes");
+
+const item = await prisma.checkIn.findFirst({
+  where: { id, userId: session.uid },
+});
+if (!item) return Astro.redirect("/zijes");
+
+const typeLabel = item.type === "lunch" ? "Polední" : "Večerní";
+const dateStr = item.createdAt.toLocaleDateString("cs-CZ", {
+  weekday: "long", day: "numeric", month: "long", year: "numeric",
+});
+const timeStr = item.createdAt.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
+
+const blocks = [
+  {
+    title: "Tělo",
+    rows: [
+      { label: "Naposledy jedl", value: item.lastMealAt, fallback: "nepamatoval si" },
+      { label: "Naposledy pil vodu", value: item.lastWaterAt, fallback: "nepamatoval si" },
+      { label: "Co cítil v těle", value: item.bodyFeeling, fallback: "—" },
+    ],
+  },
+  {
+    title: "Mysl",
+    rows: [
+      { label: "Nálada", value: item.mood !== null ? `${item.mood} / 10` : null, fallback: "—" },
+      { label: "Co dnes vyšlo", value: item.whatWorked, fallback: "—" },
+    ],
+  },
+  {
+    title: "Vztahy a vzorce",
+    rows: [
+      { label: "Mluvil s blízkými", value: item.contacts, fallback: "—" },
+      { label: "Reagoval starým vzorcem", value: item.oldPattern, fallback: "—" },
+    ],
+  },
+];
+---
+
+<Shell
+  title={`${typeLabel} check-in · ŽIJEŠ?`}
+  username={user.username}
+  heading={`${typeLabel} check-in`}
+  breadcrumb={[{ label: "ŽIJEŠ?", href: "/zijes" }, { label: dateStr }]}
+>
+  <div class="max-w-lg mx-auto space-y-4">
+    <div class="text-xs font-mono text-muted-foreground text-center">
+      {dateStr} · {timeStr}
+    </div>
+
+    {blocks.map((b) => (
+      <div class="glass rounded-xl p-4 space-y-3">
+        <div class="text-[10px] uppercase tracking-[0.22em] text-muted-foreground font-mono">
+          {b.title}
+        </div>
+        {b.rows.map((r) => (
+          <div class="flex items-baseline gap-3 text-sm">
+            <span class="text-xs text-muted-foreground/80 font-mono w-32 shrink-0">{r.label}</span>
+            <span class="flex-1">
+              {r.value ?? <em class="text-muted-foreground/60">{r.fallback}</em>}
+            </span>
+          </div>
+        ))}
+      </div>
+    ))}
+
+    <a href="/zijes" class="inline-flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground">
+      <Icon name="lucide:arrow-left" class="size-3" /> zpět na archiv
+    </a>
+  </div>
+</Shell>

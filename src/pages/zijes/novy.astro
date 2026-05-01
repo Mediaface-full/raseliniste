@@ -1,0 +1,34 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import CheckInForm from "../../components/CheckInForm";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// Type podle ?type=lunch nebo ?type=evening (z notifikačního linku).
+// Fallback: podle aktuální hodiny — do 16:00 lunch, jinak evening.
+const url = new URL(Astro.request.url);
+const typeParam = url.searchParams.get("type");
+const hour = new Date().getHours();
+const type: "lunch" | "evening" =
+  typeParam === "lunch" || typeParam === "evening"
+    ? typeParam
+    : (hour < 16 ? "lunch" : "evening");
+---
+
+<Shell
+  title="ŽIJEŠ? · Rašeliniště"
+  username={user.username}
+  heading="ŽIJEŠ?"
+  breadcrumb={[{ label: "ŽIJEŠ?", href: "/zijes" }, { label: "Nový check-in" }]}
+>
+  <CheckInForm client:load defaultType={type} />
+</Shell>

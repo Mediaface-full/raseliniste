@@ -714,6 +714,7 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 |---|---|---|---|
 | POST | `/api/cron/monthly-health-report` | **x-cron-key** | `?from&to` (override; jinak předchozí celý měsíc) |
 | POST | `/api/cron/anniversary-reminders` | **x-cron-key** | — (denně 7:05; pošle email/WhatsApp pokud dnes + reminderDaysBefore = výročí/narozeniny) |
+| POST | `/api/cron/zijes-reminder` | **x-cron-key** | `?type=lunch\|evening` (denně 13:00 a 18:00; ŽIJEŠ? check-in připomínka) |
 | POST | `/api/cron/daily-projects-digest` | **x-cron-key** | `?date=YYYY-MM-DD` (override celého toho dne; jinak posledních 24 h) |
 | POST | `/api/cron/cleanup-audio` | **x-cron-key** | — (smaže STANDARD audio >14d, pokud není pinned) |
 | POST | `/api/cron/sync-calendars` | **x-cron-key** | — (Google primary, à 5 min) |
@@ -1121,6 +1122,8 @@ Detail v `Návody/03-crony.pdf`. Krátký výpis:
 | 10 | retry-stuck-task-batches | každých 5 min |
 | 11 | cleanup-journal-audio | denně 03:15 |
 | 12 | **anniversary-reminders** | denně **7:05 ráno** (email + WhatsApp upozornění na výročí a narozeniny kontaktů) |
+| 13 | **zijes-reminder ?type=lunch** | denně **13:00** (ŽIJEŠ? polední check-in, neutrální tón) |
+| 14 | **zijes-reminder ?type=evening** | denně **18:00** (ŽIJEŠ? večerní check-in, neutrální tón) |
 
 ## Důležité architektonické změny
 

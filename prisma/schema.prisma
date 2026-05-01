@@ -45,6 +45,7 @@ model User {
   journalEntries   JournalEntry[]
   ragChunks        RagChunk[]
   anniversaries    Anniversary[]
+  checkIns         CheckIn[]
 }
 
 model WebauthnCredential {
@@ -1100,4 +1101,37 @@ model Anniversary {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, month, day])
+}
+
+// ============================================================================
+// ŽIJEŠ? — Check-in formulář pro pravidelnou sebereflexi (2× denně 13:00/18:00)
+// Interocepční nástroj. PDF specifikace: docs ze 2026-05-01.
+// Žádná penalizace, žádné streaks, žádná gamifikace.
+// ============================================================================
+
+model CheckIn {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        String   // "lunch" (polední 13:00) | "evening" (večerní 18:00)
+
+  // Blok 1 — Tělo
+  // "HH:MM" string (jednodušší než TIME, povoluje null = "nepamatuju si")
+  lastMealAt   String?
+  lastWaterAt  String?
+  bodyFeeling  String?  @db.Text   // krátký text nebo "nevím"
+
+  // Blok 2 — Mysl
+  mood         Int?                // 1-10
+  whatWorked   String?  @db.Text   // krátký text nebo "nic"
+
+  // Blok 3 — Vztahy a vzorce
+  contacts     String?  @db.Text   // jména nebo "ne"
+  oldPattern   String?  @db.Text   // krátký text nebo "ne"
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, type, createdAt])
 }
