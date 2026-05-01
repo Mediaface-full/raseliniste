@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Search, Star, Trash2, Upload, Phone as PhoneIcon, Mail, Save, X, Link as LinkIcon } from "lucide-react";
+import { Loader2, Plus, Search, Star, Trash2, Upload, Phone as PhoneIcon, Mail, Save, X, Link as LinkIcon, MessageCircle } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
@@ -14,6 +14,8 @@ interface Contact {
   isVip: boolean;
   birthMonth: number | null;
   birthDay: number | null;
+  birthdayReminderDaysBefore: number | null;
+  birthdayReminderChannels: string[];
   importedFrom: string | null;
   phones: { id: string; number: string; label: string | null }[];
   emails: { id: string; email: string; label: string | null }[];
@@ -296,6 +298,11 @@ function ContactEditor({ contact, onClose }: EditorProps) {
   const [isVip, setIsVip] = useState(contact?.isVip ?? false);
   const [birthDay, setBirthDay] = useState(contact?.birthDay?.toString() ?? "");
   const [birthMonth, setBirthMonth] = useState(contact?.birthMonth?.toString() ?? "");
+  const [bdayRemind, setBdayRemind] = useState<number>(
+    contact?.birthdayReminderDaysBefore ?? -1,
+  );
+  const [bdayChEmail, setBdayChEmail] = useState((contact?.birthdayReminderChannels ?? []).includes("email"));
+  const [bdayChWhats, setBdayChWhats] = useState((contact?.birthdayReminderChannels ?? []).includes("whatsapp"));
   const [phones, setPhones] = useState(
     contact?.phones.map((p) => ({ number: p.number, label: p.label ?? "" })) ?? [{ number: "", label: "mobile" }]
   );
@@ -320,6 +327,11 @@ function ContactEditor({ contact, onClose }: EditorProps) {
       isVip,
       birthDay: Number.isFinite(bd) && bd >= 1 && bd <= 31 ? bd : null,
       birthMonth: Number.isFinite(bm) && bm >= 1 && bm <= 12 ? bm : null,
+      birthdayReminderDaysBefore: bdayRemind >= 0 ? bdayRemind : null,
+      birthdayReminderChannels: [
+        ...(bdayChEmail ? ["email"] : []),
+        ...(bdayChWhats ? ["whatsapp"] : []),
+      ],
       phones: phones.filter((p) => p.number.trim()).map((p) => ({
         number: p.number.trim(),
         label: p.label || null,
@@ -443,6 +455,37 @@ function ContactEditor({ contact, onClose }: EditorProps) {
                 {birthDay && birthMonth ? `(${birthDay}.${birthMonth}.)` : ""}
               </span>
             </div>
+            {birthDay && birthMonth && (
+              <div className="mt-2 space-y-1.5">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">
+                  Upozornění na narozeniny
+                </label>
+                <select
+                  value={bdayRemind}
+                  onChange={(e) => setBdayRemind(parseInt(e.target.value, 10))}
+                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm"
+                >
+                  <option value={-1}>Bez upozornění</option>
+                  <option value={0}>V den narozenin (jen popřát)</option>
+                  <option value={3}>3 dny předem</option>
+                  <option value={7}>Týden předem (čas na dárek)</option>
+                  <option value={14}>2 týdny předem</option>
+                </select>
+                {bdayRemind >= 0 && (
+                  <div className="space-y-1 pl-2 border-l-2 border-[var(--tint-rose)]/30">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm">
+                      <input type="checkbox" checked={bdayChEmail} onChange={(e) => setBdayChEmail(e.target.checked)} className="size-4" />
+                      <Mail className="size-4 text-[var(--tint-sky)]" /> Email
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm opacity-60">
+                      <input type="checkbox" checked={bdayChWhats} onChange={(e) => setBdayChWhats(e.target.checked)} className="size-4" />
+                      <MessageCircle className="size-4 text-[var(--tint-mint)]" /> WhatsApp
+                      <span className="text-[10px] font-mono text-muted-foreground">(brzy)</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div>

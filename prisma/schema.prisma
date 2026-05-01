@@ -41,6 +41,7 @@ model User {
   taskAudioBatches TaskAudioBatch[]
   journalEntries   JournalEntry[]
   ragChunks        RagChunk[]
+  anniversaries    Anniversary[]
 }
 
 model WebauthnCredential {
@@ -255,6 +256,10 @@ model Contact {
   // Narozeniny — stačí den a měsíc (rok obvykle neznámý)
   birthMonth   Int?
   birthDay     Int?
+  // Reminder na narozeniny — null = žádné předem, 0 = jen na samý den (popřát),
+  // 7 = týden předem (čas na dárek), atd.
+  birthdayReminderDaysBefore Int?
+  birthdayReminderChannels   String[]  @default([])
 
   importedFrom String?        // "vcard" | "manual" | "google"
   externalId   String?        // UID z vCard, pokud má
@@ -1062,4 +1067,34 @@ model RagChunk {
 
   @@unique([sourceType, sourceId, chunkIdx])
   @@index([userId, sourceType])
+}
+
+// ============================================================================
+// VÝROČÍ — paměť na osobní data (svatby, výročí, zesnulí, první rande, ...)
+// ============================================================================
+
+/// Anniversary = jedna položka v Petrově osobním kalendáři vzpomínek.
+/// Není to klasický CalendarEvent — žádný iCloud sync, jen evidence v DB
+/// + reminder cron 7:00 ráno.
+model Anniversary {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String   // "Výročí svatby", "Babička †", "První rande s Marií"
+  month       Int      // 1-12
+  day         Int      // 1-31
+  // Volitelný rok = pro počítání kolikáté výročí.
+  // Např. svatba 2010 → letos 2026 = "16. Výročí svatby (3.5.)".
+  year        Int?
+  note        String?  @db.Text
+
+  // null = žádný reminder, 0 = jen na samý den, 7 = týden předem, atd.
+  reminderDaysBefore Int?
+  reminderChannels   String[] @default([]) // "email" | "whatsapp"
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, month, day])
 }

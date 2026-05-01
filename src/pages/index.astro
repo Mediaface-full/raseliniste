@@ -60,6 +60,31 @@ const activeViolations = await prisma.ruleViolation.findMany({
   take: 10,
 });
 
+// Výročí — propsání na desktop dashboard (paralelní query)
+const anniversaries = await prisma.anniversary.findMany({
+  where: { userId: session.uid },
+  select: { id: true, title: true, month: true, day: true, year: true },
+});
+const _today = new Date();
+const _todayY = _today.getFullYear();
+function _daysUntil(month: number, day: number): number {
+  const t = new Date(_todayY, _today.getMonth(), _today.getDate());
+  let target = new Date(_todayY, month - 1, day);
+  if (target < t) target = new Date(_todayY + 1, month - 1, day);
+  return Math.round((target.getTime() - t.getTime()) / 86_400_000);
+}
+const annivItems = anniversaries
+  .map((a) => {
+    const days = _daysUntil(a.month, a.day);
+    const yearsCount = a.year ? _todayY - a.year : null;
+    const label = yearsCount && yearsCount > 0 ? `${yearsCount}. ${a.title}` : a.title;
+    return { id: a.id, label, month: a.month, day: a.day, days };
+  })
+  .filter((a) => a.days <= 14)
+  .sort((a, b) => a.days - b.days);
+const annivToday = annivItems.filter((a) => a.days === 0);
+const annivUpcoming = annivItems.filter((a) => a.days > 0 && a.days <= 14);
+
 const fmtDay = (d: Date) =>
   d.toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" });
 const fmtTime = (d: Date) =>
@@ -99,6 +124,26 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
 <Shell title="Dashboard · Rašeliniště" username={user.username}>
   <div class="space-y-4">
 
+    {/* VÝRAZNÝ banner — dnešní výročí (Petr explicitně chce výrazné, ne jemné) */}
+    {annivToday.length > 0 && (
+      <div class="rounded-2xl p-4 border-2 border-[var(--tint-rose)]/50 bg-[var(--tint-rose)]/15 flex items-center gap-3 flex-wrap">
+        <div class="size-10 rounded-md grid place-items-center bg-[var(--tint-rose)]/30 text-[var(--tint-rose)] shrink-0">
+          <Icon name="lucide:calendar-heart" class="size-5" />
+        </div>
+        <div class="flex-1">
+          <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--tint-rose)] mb-0.5">
+            Dnes
+          </div>
+          {annivToday.map((a) => (
+            <div class="text-lg font-serif">🕯 {a.label}</div>
+          ))}
+        </div>
+        <a href="/vyroci" class="text-xs font-mono text-[var(--tint-rose)] hover:underline">
+          spravovat →
+        </a>
+      </div>
+    )}
+
     {/* Headline */}
     <div class="flex items-end justify-between gap-4 flex-wrap">
       <div>
@@ -108,6 +153,12 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
         <h1 class="font-serif text-[2.5rem] leading-tight tracking-tight">
           Vítej, {user.username}.
         </h1>
+        {annivUpcoming.length > 0 && (
+          <div class="mt-2 text-sm text-foreground/80">
+            <span class="text-[var(--tint-rose)]">🕯 Nadchází:</span>{" "}
+            {annivUpcoming.map((a) => `${a.label} (${a.day}.${a.month}., za ${a.days} ${a.days === 1 ? "den" : a.days < 5 ? "dny" : "dní"})`).join(" · ")}
+          </div>
+        )}
       </div>
       <div class="text-sm font-mono text-muted-foreground tabular">
         Poslední přihlášení: <span class="text-foreground">{fmt(user.lastLoginAt)}</span>

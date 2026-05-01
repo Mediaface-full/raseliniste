@@ -16,6 +16,8 @@ const PatchBody = z.object({
   isVip: z.boolean().optional(),
   birthMonth: z.number().int().min(1).max(12).nullable().optional(),
   birthDay: z.number().int().min(1).max(31).nullable().optional(),
+  birthdayReminderDaysBefore: z.number().int().min(0).max(60).nullable().optional(),
+  birthdayReminderChannels: z.array(z.enum(["email", "whatsapp"])).optional(),
   phones: z
     .array(z.object({ number: z.string(), label: z.string().nullable().optional() }))
     .optional(),
@@ -81,6 +83,8 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
       ...(body.isVip !== undefined ? { isVip: body.isVip } : {}),
       ...(body.birthMonth !== undefined ? { birthMonth: body.birthMonth } : {}),
       ...(body.birthDay !== undefined ? { birthDay: body.birthDay } : {}),
+      ...(body.birthdayReminderDaysBefore !== undefined ? { birthdayReminderDaysBefore: body.birthdayReminderDaysBefore } : {}),
+      ...(body.birthdayReminderChannels !== undefined ? { birthdayReminderChannels: body.birthdayReminderChannels } : {}),
     },
     include: { phones: true, emails: true },
   });

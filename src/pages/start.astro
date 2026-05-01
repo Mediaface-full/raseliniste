@@ -8,8 +8,8 @@ import { svatekDne } from "../lib/jmenny-kalendar";
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
 
-// User + kontakty s narozeninami paralelně (předtím sériově → 2× round-trip do DB)
-const [user, contactsWithBirthday] = await Promise.all([
+// User + kontakty s narozeninami + výročí paralelně (3× round-trip → 1)
+const [user, contactsWithBirthday, anniversaries] = await Promise.all([
   prisma.user.findUnique({
     where: { id: session.uid },
     select: { username: true },
@@ -21,6 +21,10 @@ const [user, contactsWithBirthday] = await Promise.all([
       birthDay: { not: null },
     },
     select: { displayName: true, firstName: true, birthMonth: true, birthDay: true },
+  }),
+  prisma.anniversary.findMany({
+    where: { userId: session.uid },
+    select: { id: true, title: true, month: true, day: true, year: true },
   }),
 ]);
 if (!user) return Astro.redirect("/login");
@@ -97,6 +101,21 @@ const birthdaysSoon = contactsWithBirthday
 
 const birthdayToday = birthdaysSoon.filter((b) => b.days === 0);
 const birthdayUpcoming = birthdaysSoon.filter((b) => b.days > 0 && b.days <= 7);
+
+// Výročí — formát "N. Výročí svatby (3.5.)" pokud rok zadaný, jinak "Výročí svatby (3.5.)"
+const currentYear = today.getFullYear();
+const anniversariesSoon = anniversaries
+  .map((a) => {
+    const days = daysUntil(a.month, a.day);
+    const yearsCount = a.year ? currentYear - a.year : null;
+    const label = yearsCount && yearsCount > 0 ? `${yearsCount}. ${a.title}` : a.title;
+    return { id: a.id, label, month: a.month, day: a.day, days };
+  })
+  .filter((a) => a.days <= 14)
+  .sort((a, b) => a.days - b.days);
+
+const anniversariesToday = anniversariesSoon.filter((a) => a.days === 0);
+const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.days <= 14);
 ---
 
 <Base
@@ -119,6 +138,21 @@ const birthdayUpcoming = birthdaysSoon.filter((b) => b.days > 0 && b.days <= 7);
     <!-- Content — zarovnáno nahoru, ne na střed (nemusí se scrollovat) -->
     <div class="flex-1 px-4 sm:px-6 pt-6 pb-8">
       <div class="w-full max-w-lg mx-auto space-y-5">
+
+        {/* VÝRAZNÝ banner — dnešní výročí (Petr explicitně chtěl výrazné, ne jemné) */}
+        {anniversariesToday.length > 0 && (
+          <div class="rounded-2xl p-4 border-2 border-[var(--tint-rose)]/50 bg-[var(--tint-rose)]/15 text-center space-y-1">
+            <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--tint-rose)]">
+              Dnes
+            </div>
+            {anniversariesToday.map((a) => (
+              <div class="text-lg font-serif">
+                🕯 {a.label}
+              </div>
+            ))}
+          </div>
+        )}
+
         <header class="text-center space-y-2">
           {/* Svátek + narozeniny — info pruh nad datem */}
           <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs">
@@ -140,9 +174,20 @@ const birthdayUpcoming = birthdaysSoon.filter((b) => b.days > 0 && b.days <= 7);
           </div>
           <h1 class="text-3xl tracking-tight">Co teď?</h1>
 
-          {birthdayUpcoming.length > 0 && (
-            <div class="text-[11px] text-muted-foreground/80">
-              Tento týden: {birthdayUpcoming.map((b) => `${b.name} (${b.day}.${b.month}.)`).join(" · ")}
+          {(birthdayUpcoming.length > 0 || anniversariesUpcoming.length > 0) && (
+            <div class="text-xs text-foreground/80 space-y-0.5 pt-1">
+              {anniversariesUpcoming.length > 0 && (
+                <div>
+                  <span class="text-[var(--tint-rose)]">🕯 Nadchází:</span>{" "}
+                  {anniversariesUpcoming.map((a) => `${a.label} (${a.day}.${a.month}., za ${a.days} ${a.days === 1 ? "den" : a.days < 5 ? "dny" : "dní"})`).join(" · ")}
+                </div>
+              )}
+              {birthdayUpcoming.length > 0 && (
+                <div>
+                  <span class="text-muted-foreground">🎂 Tento týden:</span>{" "}
+                  {birthdayUpcoming.map((b) => `${b.name} (${b.day}.${b.month}.)`).join(" · ")}
+                </div>
+              )}
             </div>
           )}
         </header>

@@ -26,6 +26,8 @@ const CreateBody = z.object({
   isVip: z.boolean().optional().default(false),
   birthMonth: z.number().int().min(1).max(12).optional().nullable(),
   birthDay: z.number().int().min(1).max(31).optional().nullable(),
+  birthdayReminderDaysBefore: z.number().int().min(0).max(60).optional().nullable(),
+  birthdayReminderChannels: z.array(z.enum(["email", "whatsapp"])).optional(),
   phones: z.array(PhoneInput).default([]),
   emails: z.array(EmailInput).default([]),
 });
@@ -94,6 +96,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       isVip: body.isVip,
       birthMonth: body.birthMonth ?? null,
       birthDay: body.birthDay ?? null,
+      birthdayReminderDaysBefore: body.birthdayReminderDaysBefore ?? null,
+      birthdayReminderChannels: body.birthdayReminderChannels ?? [],
       importedFrom: "manual",
       phones: { create: normalizedPhones },
       emails: {

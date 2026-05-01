@@ -1,0 +1,24 @@
+---
+import Shell from "../layouts/Shell.astro";
+import AnniversaryManager from "../components/AnniversaryManager";
+import { prisma } from "../lib/db";
+import { readSession } from "../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Výročí · Rašeliniště"
+  username={user.username}
+  heading="Výročí"
+  breadcrumb={[{ label: "Výročí" }]}
+>
+  <AnniversaryManager client:load />
+</Shell>
