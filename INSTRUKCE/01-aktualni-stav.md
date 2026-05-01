@@ -1,10 +1,27 @@
-# 01 — Aktuální stav (2026-04-30 večer)
+# 01 — Aktuální stav (2026-05-01 odpoledne)
 
 ## Branch + commit
 
 - **main** — produkční větev
-- **Aktuální HEAD:** `9372427` (TODO update po RAG session) — pushnuto a deploynuto
-- Před tím **18 commitů** v jedné sessi (2026-04-30) bylo pushnutu najednou — viz seznam níž
+- 2 mega-session deploye:
+  - **2026-04-30 večer:** 18 commitů (Studánka rename, Prskavka, RAG, Call-log VIP varianta + animovaná G, vokativ, atd.)
+  - **2026-05-01 odpoledne:** 7+ commitů (Výročí, ŽIJEŠ?, Twilio WhatsApp, Web Push, podúkoly z hlasové salvy, OG image fix, fixes)
+
+## Co přibylo dnes 2026-05-01
+
+### Velké features
+- **Modul Výročí** `/vyroci` (Anniversary model, dashboard banner, „N. výročí svatby" pokud rok zadán, reminder X dní předem)
+- **Modul ŽIJEŠ?** `/zijes` (Check-in formulář, archive, mood bar, 2× denně 13:00/18:00 s neutrálním tónem)
+- **Twilio WhatsApp integrace** `/settings/whatsapp` (sandbox + production support, lib + cron napojení)
+- **Web Push notifikace** `/settings/push` (VAPID + Service Worker, automaticky vypíná WhatsApp jakmile registrován)
+- **Hierarchie úkolů** v hlasové salvě (rodič + podúkoly, AI clustering podle TÉMATU, propíše do Todoist parent_id)
+- **WhatsApp link preview fix** (Open Graph meta tagy v Base.astro)
+
+### Drobnosti / fixes
+- StudnaDetail decision_history podporuje object/string (React error #31 fix)
+- Dashboard kalendář — multi-day events ukazují „Probíhá do" místo data v minulosti
+- Studánka transcript cleanup (vyloučit ehm/eee/jakože/repetice)
+- VIP texty: heading „Zadej Gíďovi jeho misi.", placeholder „Co mu hodíš na hřbet?", animované G + nadpis hvězdičky symetrické
 
 ## Posledních commitů (od nejnovějšího — VŠE NA PRODUKCI po dnešním deployi)
 

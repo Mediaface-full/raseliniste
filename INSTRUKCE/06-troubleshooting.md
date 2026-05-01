@@ -103,6 +103,34 @@ sudo docker exec raseliniste_db psql -U raseliniste -d raseliniste \
 - `import { PrismaClient } from "@prisma/client"` nefunguje v Prisma 7 (CommonJS).
 - Heal step skipped, ale `prisma migrate deploy` proběhne OK. Známý bug.
 
+### 19. Web Push na iOS funguje JEN přes PWA na ploše
+- iOS 16.4+ povoluje `Notification` API + Push pouze pro stránky přidané jako PWA na home screen
+- V Safari (bez PWA) `'Notification' in window` vrátí false / permission denied
+- **Návod pro Petra:** Safari → Sdílet → Přidat na plochu → otevřít Z PLOCHY (ne ze Safari) → /settings/push → Povolit
+- **Widgety NE:** Safari widget / smart stack otevírá v Safari, ne v PWA → push tam neprojde
+- Android Chrome funguje bez PWA
+
+### 20. WhatsApp link preview cache
+- Když pošleš odkaz `/me/<token>` přes WhatsApp/Meta, WhatsApp si stáhne preview a cachuje na **týdny per URL**
+- Změna obsahu (rename Studna→Studánka, nová ikona) **neaktualizuje cache** automaticky
+- Řešení A: pošli link s `?v=2` (nebo libovolný query) — WhatsApp ho vezme jako jiný URL
+- Řešení B: Facebook Sharing Debugger https://developers.facebook.com/tools/debug/ → Scrape Again
+- Open Graph meta tagy v `Base.astro` (og:image plně absolutní) zajistí správný preview pro **nové** linky
+
+### 21. CRON_SECRET pro DSM Task Scheduler
+- Není v `.env`? Zkontroluj `docker compose exec raseliniste_app env | grep CRON_SECRET`
+- Pokud není ani v kontejneru, žádné crony nefungují (vrací 503)
+- Vygeneruj: `echo "CRON_SECRET=$(openssl rand -base64 32)" >> .env && sudo docker compose up -d --force-recreate app`
+- Pak ten samý řetězec do **každé** DSM Task úlohy v `-H "x-cron-key: ..."`
+- **Neposílej hodnotu nikam mimo .env** — citlivé jako heslo
+
+### 22. React error #31 v komponentě (objects as React child)
+- Symptom: stránka /studna/<id> prázdná po hydrataci, infinite loading
+- Console: `Minified React error #31; ... object with keys {decision, rationale, timestamp}`
+- Příčina: AI Stage 2 vrátila pole objektů místo stringů, render typuje `string`
+- Fix: typeof check + render obou variant (viz commit 0624d7c StudnaDetail decision_history)
+- Hledat ostatní podobné rendry kde JSX typuje primitivně z `analysis.*` — případně dát defenzivní `typeof === "object"` branch
+
 ### 18. Permissions-Policy `microphone=()` blokuje mikrofon na Androidu
 - **Symptom:** klient na Androidu (Blanka) otevře `/me/<token>`, stránka se načte, ale tap na mikrofon nereaguje. Na iPhonu funguje normálně.
 - **Příčina:** W3C Permissions-Policy: `microphone=()` = empty allowlist = **blokováno všem včetně same-origin**. iOS Safari to historicky ignoroval (lenient impl), Android Chrome dodržuje striktně.

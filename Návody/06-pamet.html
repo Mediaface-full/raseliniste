@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Paměť — co si pamatovat o Rašeliništi</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; line-height: 1.55; max-width: 720px; margin: 0 auto; padding: 24px; font-size: 10.5pt; }
+  h1 { font-family: "Iowan Old Style", Georgia, serif; font-size: 26pt; margin: 0 0 4px; line-height: 1.1; }
+  h2 { font-family: "Iowan Old Style", Georgia, serif; font-size: 16pt; margin: 28px 0 10px; padding-top: 14px; border-top: 1px solid #ddd; page-break-after: avoid; }
+  h3 { font-family: "Iowan Old Style", Georgia, serif; font-size: 12pt; margin: 18px 0 6px; page-break-after: avoid; }
+  .lede { color: #555; font-size: 11pt; margin: 6px 0 18px; }
+  code { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; background: #f0f0f3; padding: 1px 5px; border-radius: 3px; }
+  pre { background: #f5f5f7; padding: 10px 12px; border-radius: 6px; font-size: 9pt; font-family: "SF Mono", Menlo, monospace; white-space: pre-wrap; word-wrap: break-word; }
+  .warn { background: #fff3e0; padding: 12px 16px; border-left: 4px solid #f57c00; border-radius: 4px; margin: 12px 0; }
+  .tip { background: #e7f4ff; padding: 12px 16px; border-left: 4px solid #1976d2; border-radius: 4px; margin: 12px 0; font-size: 10pt; }
+  .ok { background: #e8f5e9; padding: 12px 16px; border-left: 4px solid #43a047; border-radius: 4px; margin: 12px 0; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin: 10px 0; }
+  th, td { text-align: left; padding: 6px 9px; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #666; font-weight: 600; }
+  .url { font-family: "SF Mono", Menlo, monospace; color: #1976d2; }
+</style>
+</head>
+<body>
+
+<h1>Paměť</h1>
+<p class="lede">Co si pamatovat o Rašeliništi. Tvůj osobní cheat sheet — ne pro programátory, ale pro tebe, abys nemusel pamatovat věci, které jednou nastavíš a pak na ně zapomeneš.</p>
+
+<h2>1. Tvoje osobní úvodní stránka (na ploše iPhone)</h2>
+
+<p>Adresa, kterou si přidáš na plochu iPhone:</p>
+
+<pre>https://www.raseliniste.cz/start</pre>
+
+<div class="warn">
+<strong>DŮLEŽITÉ — jak ji přidat na plochu iPhone</strong>
+<ul>
+  <li>Otevři adresu <strong>v Safari</strong> (NIKOLI v Chrome — Apple jinak nedovolí push notifikace)</li>
+  <li>Klepni <strong>Sdílet ⬆️</strong> (ikonka šipky dole uprostřed)</li>
+  <li>Posuň dolů a klepni <strong>„Přidat na plochu"</strong></li>
+  <li>Pojmenuj „Rašeliniště" → <strong>Přidat</strong></li>
+  <li>Na ploše se objeví <strong>ikona stromu</strong>. Tu jsi ty.</li>
+</ul>
+</div>
+
+<h2>2. Pravidlo: otevírej Z PLOCHY, ne ze Safari</h2>
+
+<div class="warn">
+<strong>Jakmile máš ikonu na ploše, klikej VŽDY NA NI.</strong> Nikdy znovu otevírej <code>raseliniste.cz</code> v Safari.
+</div>
+
+<p><strong>Proč:</strong></p>
+<ul>
+  <li><strong>Push notifikace fungují JEN když appku otevíráš z plochy.</strong> Apple to vyžaduje. Ze Safari ti push neprojde, ani kdyby byl povolený.</li>
+  <li>Z plochy se appka chová jako normální appka (bez Safari pruhů, fullscreen).</li>
+  <li>Ze Safari je to jen webová stránka — vše ostatní funguje stejně, kromě push.</li>
+</ul>
+
+<h2>3. Co kde najdeš (mobil)</h2>
+
+<table>
+<tr><th>Dlaždice</th><th>K čemu</th></tr>
+<tr><td><strong>Deník</strong></td><td>Nadiktuj deníkový zápis (Ozvěna)</td></tr>
+<tr><td><strong>Úkoly</strong></td><td>Nadiktuj salvu úkolů — AI je rozdělí, můžeš mít rodič + podúkoly</td></tr>
+<tr><td><strong>Studánka</strong></td><td>Nahrávky do <em>klientských</em> projektů (sdílené s lidmi)</td></tr>
+<tr><td><strong>Prskavka</strong></td><td>Nahrávky do <em>tvých osobních</em> projektů (knížka, nápady)</td></tr>
+<tr><td><strong>Zeptat se</strong></td><td>AI prohlédne deníky, úkoly a Studánku — odpověď s citacemi</td></tr>
+<tr><td><strong>ŽIJEŠ?</strong></td><td>Check-in se sebou (90 sekund) — 2× denně</td></tr>
+<tr><td><strong>Dashboard</strong></td><td>Hlavní systém (desktop pohled)</td></tr>
+</table>
+
+<h2>4. Připomínky — kdy ti co přijde</h2>
+
+<table>
+<tr><th>Kdy</th><th>Co</th><th>Kanál</th></tr>
+<tr><td>denně 7:00 ráno</td><td>Studánka — co klienti nahráli za posledních 24 h</td><td>email</td></tr>
+<tr><td>denně 7:05 ráno</td><td>Výročí + narozeniny (pokud něco)</td><td>email + push</td></tr>
+<tr><td>denně 13:00</td><td>ŽIJEŠ? polední check-in</td><td>push (mobil) + email</td></tr>
+<tr><td>denně 18:00</td><td>ŽIJEŠ? večerní check-in</td><td>push (mobil) + email</td></tr>
+<tr><td>poslední den měsíce 23:00</td><td>Měsíční health report</td><td>email</td></tr>
+</table>
+
+<div class="tip">
+<strong>WhatsApp je vypnutý ve prospěch push.</strong> Pokud chceš WhatsApp místo push (např. pro výročí), v <code>/settings/whatsapp</code> máš přepínače. Push se posílá jen pokud jsi v <code>/settings/push</code> povolil notifikace.
+</div>
+
+<h2>5. Push notifikace — jak na to (jednorázově)</h2>
+
+<div class="steps">
+<ol>
+  <li>Otevři <strong>z plochy</strong> appku Rašeliniště</li>
+  <li>Naviguj do <strong>Nastavení → Push notifikace</strong> (<span class="url">/settings/push</span>)</li>
+  <li>Klikni <strong>„Povolit & registrovat"</strong></li>
+  <li>iOS se zeptá → <strong>Allow</strong></li>
+  <li>Klikni <strong>„Poslat test"</strong> — během 3-5 sekund přijde push</li>
+  <li>Hotovo. Od teď ti všechny upozornění (ŽIJEŠ?, výročí, narozeniny) chodí jako push.</li>
+</ol>
+</div>
+
+<div class="warn">
+<strong>Pokud Apple už jednou push zakázal:</strong> Nastavení iPhone → Notifikace → najdi „Rašeliniště" v seznamu → Povolit. Pak v aplikaci znovu „Povolit & registrovat".
+</div>
+
+<h2>6. Studánka — sdílení s klienty</h2>
+
+<p>Klientovi (Blanka, Karel, …) pošli osobní link:</p>
+
+<div class="steps">
+<ol>
+  <li><span class="url">/studna</span> → otevři projekt → záložka <strong>Hosti</strong></li>
+  <li>Klikni <strong>Pozvat hosta</strong> → vyplň jméno → vygeneruje se link</li>
+  <li>Klik na <strong>Stáhnout PDF</strong> (návod jak má host nahrávat) → pošli mailem nebo přes WhatsApp</li>
+</ol>
+</div>
+
+<p><strong>Klient po obdržení:</strong></p>
+<ul>
+  <li>Otevře link → uvidí stránku „Studánka · &lt;jeho jméno&gt;"</li>
+  <li>Sdílet → Přidat na plochu (volitelné — má pak na mobilu ikonu G)</li>
+  <li>Klepne na mikrofon, mluví, klepne stop → automaticky se nahraje</li>
+  <li>Ty dostaneš email další den ráno v 7:00 s přehledem („Studánka — N nových nahrávek")</li>
+</ul>
+
+<h2>7. Gideonův Firewall (VIP linky)</h2>
+
+<p>Když chceš někomu dát právo poslat ti úkol/zprávu kterou se zaručeně podíváš:</p>
+
+<div class="steps">
+<ol>
+  <li><span class="url">/kontakty</span> → najdi kontakt → klikni <strong>★ hvězdičku</strong> (zapne VIP)</li>
+  <li>Vyplň <strong>Oslovení (5. pád)</strong> — např. „Karle" — pro hezké oslovení („⭐ Ahoj, Karle ⭐")</li>
+  <li>Volitelně <strong>Vlastní oslovení</strong> — např. „Drahá dívko" → bude místo „Ahoj, Karle"</li>
+  <li>Klikni <strong>🔗 ikonku řetízku</strong> vedle kontaktu → link se zkopíruje do schránky</li>
+  <li>Pošli ho VIP osobě (WhatsApp, mail, SMS)</li>
+</ol>
+</div>
+
+<p><strong>Co VIP uvidí:</strong> stránku „Gíďo, máš misi" s personalizovaným oslovením, polem na zprávu, volitelným <strong>termínem splnění</strong> (min +2 dny), tlačítko „Vypusť Gíďu".</p>
+
+<p><strong>Co se stane po odeslání:</strong></p>
+<ul>
+  <li>Vznikne ti úkol v <strong>Todoist</strong> v projektu „VIP" (priorita 4, due_date pokud zadali termín)</li>
+  <li>Email ti přijde <strong>okamžitě</strong> na <code>gideon@raseliniste.cz</code></li>
+  <li>Záznam je v <span class="url">/firewall</span></li>
+</ul>
+
+<h2>8. Výročí + narozeniny</h2>
+
+<p><strong>Výročí</strong> (svatba, úmrtí blízkých, první rande, …) přidáš v <span class="url">/vyroci</span>. Můžeš zadat rok → dashboard pak ukáže „16. Výročí svatby". Můžeš si nastavit upozornění X dní předem.</p>
+
+<p><strong>Narozeniny kontaktů</strong> přidáš v <span class="url">/kontakty</span> (den + měsíc, rok není potřeba). U každého můžeš nastavit:</p>
+<ul>
+  <li><strong>Bez upozornění</strong> — výchozí</li>
+  <li><strong>V den narozenin</strong> — jen popřát</li>
+  <li><strong>Týden předem</strong> — když potřebuješ koupit dárek</li>
+</ul>
+
+<p>Vše se zobrazuje <strong>na dashboardu</strong> (mobil i desktop) jako rose banner pokud je dnes výročí, plus jemný řádek „Nadchází: 16. Výročí svatby (3.5., za 5 dní)".</p>
+
+<h2>9. ŽIJEŠ? — pravidla</h2>
+
+<p>Check-in formulář, 7 otázek, 90 sekund. <strong>Dvakrát denně</strong> dostaneš push v 13:00 a 18:00.</p>
+
+<div class="ok">
+<strong>Žádná penalizace.</strong>
+<ul>
+  <li>Pokud nevyplníš → nic se neděje</li>
+  <li>Žádné streaks, žádné body, žádné statistiky</li>
+  <li>Pokud nestiháš teď → vrátíš se kdy chceš</li>
+  <li>„Tady jsem, když chceš." — to je celé</li>
+</ul>
+</div>
+
+<p>Archiv vyplnění je na <span class="url">/zijes</span> — barevný mood bar, snippety, klik na detail.</p>
+
+<h2>10. Zeptat se (AI nad tvým systémem)</h2>
+
+<p><span class="url">/zeptat-se</span> — položíš dotaz typu „Co jsem psal o Karlovi v posledním měsíci?" a AI odpoví s citacemi. Indexuje deníky, úkoly a Studánka nahrávky.</p>
+
+<p><strong>Pamatuj:</strong> indexuje se jen <em>nově vytvořený</em> obsah od deployu RAG modulu. Stará data nejsou indexovaná (záměrně — řekl jsi „jen od teď").</p>
+
+<h2>11. Když něco nefunguje</h2>
+
+<table>
+<tr><th>Problém</th><th>Řešení</th></tr>
+<tr><td>Push notifikace nepřišel</td><td>Otevíráš appku <strong>z plochy</strong>? Z Safari to nefunguje na iOS.</td></tr>
+<tr><td>iOS push odmítl</td><td>Nastavení iPhone → Notifikace → Rašeliniště → Povolit. Pak v appce znovu „Povolit".</td></tr>
+<tr><td>WhatsApp link preview ukazuje staré sluníčko</td><td>Pošli link s <code>?v=2</code> na konci (např. <code>...?v=2</code>) — WhatsApp vezme jako jiný URL a stáhne nový preview.</td></tr>
+<tr><td>Stránka se nenahrává (loading)</td><td>F12 v prohlížeči → Console → vyfoť error → pošli mi.</td></tr>
+<tr><td>Cron nedoběhl</td><td>SSH na NAS: <code>sudo docker compose logs app --tail 50</code></td></tr>
+<tr><td>Studánka detail prázdný</td><td>F12 Console — to je obvykle React error #31 (object jako child). Mrkni mi.</td></tr>
+</table>
+
+<h2>12. Diagnostika (pro Claude session)</h2>
+
+<p>Když mě zavoláš, otevři tohle a pošli URL:</p>
+
+<pre>https://www.raseliniste.cz/api/diagnose/studna</pre>
+
+<p>Vrátí JSON s in-flight processings, stuck recordings, AI errors za 24h, env health a auto-vyhodnocením s emoji 🔴/🟡/⚠.</p>
+
+<h2>13. Bezpečnost — nepošli sem</h2>
+
+<div class="warn">
+Nikdy do chatu (mně, Slack, mail) <strong>NEPOSÍLEJ:</strong>
+<ul>
+  <li>CRON_SECRET (z .env)</li>
+  <li>VAPID_PRIVATE_KEY</li>
+  <li>Twilio Auth Token</li>
+  <li>Hesla, API klíče, JWT tokeny</li>
+</ul>
+Když je v chatu, je v cache na Anthropic infrastruktuře. Pro single-user systém je riziko nízké, ale prostě to nedělej.
+</div>
+
+<h2>14. Když chceš dělat změny</h2>
+
+<p>Otevři Claude Code session ve <code>/Users/petrperina/CLOUDS/CLOUDE PROJECTS/raseliniste</code>. Claude si automaticky načte:</p>
+<ul>
+  <li><code>CLAUDE.md</code> — projektová pravidla</li>
+  <li><code>INSTRUKCE/00-START-HERE.md</code> — orientace</li>
+  <li><code>INSTRUKCE/03-moduly.md</code> — co všechno je hotové</li>
+  <li><code>INSTRUKCE/04-todo-list.md</code> — co se má dělat</li>
+  <li><code>INSTRUKCE/06-troubleshooting.md</code> — známé pasti</li>
+</ul>
+
+<p>Pak řekneš co chceš a Claude začne. Pravidla:</p>
+<ul>
+  <li>Jasně řekneš co chceš (ne moc dlouho)</li>
+  <li>Když Claude něco navrhne, řekneš ano/ne</li>
+  <li>Před deployem ti Claude pošle popis co se změní</li>
+  <li>Pak <code>git push</code> a <code>~/deploy.sh</code> na NASu</li>
+</ul>
+
+</body>
+</html>

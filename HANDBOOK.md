@@ -406,6 +406,88 @@ Sdílené projektové boxíky s hlasovými záznamy.
 - 3: DayNote UI, Briefing 22:00 → Todoist, Capture integrace pro time-binding
 - 4: OOO management, Locations admin, PWA polish
 
+### ✅ Web Push notifikace (hotovo 2026-05-01)
+- **Účel:** mobilní push notifikace nezávisle na WhatsApp (Petr explicitně chtěl push místo WA)
+- **Stack:** VAPID + Service Worker + `web-push` npm package
+- **Klíče:** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` v `.env`
+  - Vygeneruj: `npx web-push generate-vapid-keys`
+- **DB model:** `WebPushSubscription` (endpoint unique, p256dh, auth, label, lastUsedAt, lastError, cascade na User)
+- **Service Worker:** `public/sw.js` — install/activate/push/notificationclick handlery
+- **Lib:** `src/lib/webpush.ts` — `sendPushToUser(userId, payload)`, automatické čištění 410/404 subscriptions
+- **API:** `GET/POST/PUT/DELETE /api/push/subscribe` (PUT = test push)
+- **UI:** `/settings/push` — `PushSettings.tsx` React island s detekcí supported/permission, registrací, seznamem zařízení, test tlačítkem
+- **Cron integrace:** `zijes-reminder` posílá push **místo** WhatsApp pokud user má aktivní subscription. Email vždy jako záloha.
+- **iOS specifika (KRITICKÉ):**
+  - Apple od iOS 16.4+ povoluje web push **JEN pokud je stránka přidaná na plochu jako PWA** (Sdílet → Přidat na plochu)
+  - V Safari (bez PWA) push NEFUNGUJE
+  - Uživatel musí appku otevírat **Z PLOCHY**, ne ze Safari
+  - Widgety obvykle otevírají v Safari → push tam neprojde
+- **Android:** funguje v Chrome i bez PWA
+
+### ✅ ŽIJEŠ? (Check-in formulář, hotovo 2026-05-01)
+- **Účel:** interocepční nástroj pro pravidelnou sebereflexi v hyperfokusu (ADHD/CPTSD)
+- **PDF specifikace:** `Check-in_Formular_Zadani.pdf` (8 stran)
+- **DB model:** `CheckIn` (type lunch/evening, lastMealAt/lastWaterAt HH:MM strings, bodyFeeling, mood 1-10, whatWorked, contacts, oldPattern)
+- **Stránky:**
+  - `/zijes` — archiv s mood barem (rose/butter/sage), datum (Dnes/Včera/...), snippety
+  - `/zijes/novy?type=lunch|evening` — formulář (auto-detekce type podle hodiny do 16:00)
+  - `/zijes/[id]` — read-only detail
+- **Komponenta:** `CheckInForm.tsx` — sticky bottom bar, range slider 1-10, checkboxes „nepamatuju si", `Uloženo. Vrátíš se k tomu jak budeš chtít.`
+- **Cron:** `/api/cron/zijes-reminder?type=lunch|evening` denně 13:00 a 18:00
+  - Pošle push (primární) + email (záloha)
+  - WhatsApp JEN pokud nemá push subscription
+  - Tón: striktně neutrální (`Tady jsem, když chceš. Nemusíš.`)
+  - Žádné retry, žádné opakování — záměrně
+- **Pravidla z PDF (NESMÍ se porušit):**
+  - Žádná penalizace (nevyplnění = nic se nestane)
+  - Žádné streaks, body, gamifikace
+  - Žádné statistiky kompletovanosti
+  - Tón: nabídka, ne povinnost
+
+### ✅ Výročí (hotovo 2026-05-01)
+- **DB:** `Anniversary` (title, month, day, year?, note?, reminderDaysBefore?, reminderChannels[])
+- **Stránky:** `/vyroci` — list karet + editor (modal)
+- **Dashboard:** rose banner pokud je dnes výročí (na `/start` mobil i `/` desktop), jemný řádek nadcházejících (14 dní)
+- **„Kolikáté výročí":** pokud je rok zadán, ukazuje `16. Výročí svatby`
+- **Cron:** `/api/cron/anniversary-reminders` denně 7:05
+  - Plus narozeniny kontaktů (Contact.birthMonth + birthdayReminderDaysBefore)
+  - Email + push + WhatsApp podle channels[]
+- **Kontakty rozšířené:** `Contact.birthdayReminderDaysBefore`, `birthdayReminderChannels[]`
+
+### ✅ Prskavka (osobní projekty, hotovo 2026-05-01)
+- **Účel:** paralelní svět ke Studánce — tvé osobní projekty (knížky, nápady), ne pro klienty
+- **Architektura:** ŽÁDNÉ duplikování — flag `ProjectBox.isPrivate` + filter v UI/API
+- **Stránky:** `/prskavka`, `/prskavka/nahravka`, `/prskavka/aktivita`
+- **Sdílený kód:** recorder, AI pipeline, transkripce, RAG indexace, summary — vše stejné jako Studánka
+- **Filtry:**
+  - `/api/studna?private=1` → Prskavka, default → Studánka
+  - `/studna/aktivita`, `/studna/nahravka` filtruje `isPrivate: false`
+  - `daily-projects-digest` cron filter `isPrivate: false` (Petr si neemailuje sám sobě)
+- **Detail projektu** `/studna/<id>` je sdílený (jeden projekt = jedna stránka, bez ohledu na isPrivate)
+
+### ✅ Studánka (přejmenování ze Studna, 2026-05-01)
+- **UI rename napříč všemi texty:** sidebar, hlavičky, breadcrumby, email subject, RAG citace, AI prompts editor, onboarding PDF, /me/<token> guest landing
+- **URL ponecháno** `/studna/...` (bookmarky a guest linky `/me/<token>` zůstávají funkční)
+- **Class/file/var názvy ponechány** (`StudnaList`, `StudnaDetail`, `StudnaSchema`) — interní, neviditelné
+- **Cleanup citoslovcí:** `transcribeAudio()` má opt-in `cleanupFillers: true`, Studánka ho zapíná. Stage 1 prompt vyloučí ehm/eee/no/jakože/repetice. Petr může u starých nahrávek kliknout „Regenerovat" pro fresh přepis.
+
+### ✅ Gideonův Firewall (rozšířený 2026-05-01)
+- **VIP varianta `/call-log`** = oddělená entita s:
+  - Personalizovaným oslovením („⭐ Ahoj, Karle ⭐" nebo vlastní override „⭐ Drahá dívko ⭐")
+  - Polem na termín splnění (volitelné, type=date, min +2 dny dopředu)
+  - Vlastními texty (`VIP_TEXTS` const v `/call-log/index.astro`):
+    - Heading: „Zadej Gíďovi jeho misi."
+    - Submit: „Vypusť Gíďu"
+    - Placeholder textarea: „Co mu hodíš na hřbet?"
+  - Animovanou G ikonou (`AnimatedG.astro`) s laser sweep + pulsující aurou
+  - Apple title „Gíďo, máš misi"
+- **Termín splnění** propíše do Todoist `due_date` YYYY-MM-DD + popisu „📅 Termín požadovaný od VIP"
+- **Datum je VIP-only privilegium** — server ignoruje pole pokud volající nemá `isVip=true`
+- **Title v Todoistu** pro VIP úkol = `⭐ <jméno>: <prvních 80 znaků zprávy>` (NE „Zavolat zpět")
+- **Vokativ engine:** `src/lib/vokativ.ts` — tabulka 40+ výjimek + algoritmus pro běžné koncovky
+- **Contact rozšíření:** `firstNameVocative` (manuální 5. pád), `greetingOverride` (úplný custom string)
+- **Thanks page** `/call-log/thanks?phone=X` má VIP variantu „✦ Mise vypuštěna ✦" + tlačítko „Zadej další misi"
+
 ### ✅ Zeptat se (RAG, hotovo 2026-04-30)
 - **Účel:** AI dotaz nad indexovanými deníky / úkoly / Studna nahrávkami. Odpověď s [N] citacemi prokliknutelnými na zdroj.
 - **Stack:**
@@ -715,6 +797,14 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | POST | `/api/cron/monthly-health-report` | **x-cron-key** | `?from&to` (override; jinak předchozí celý měsíc) |
 | POST | `/api/cron/anniversary-reminders` | **x-cron-key** | — (denně 7:05; pošle email/WhatsApp pokud dnes + reminderDaysBefore = výročí/narozeniny) |
 | POST | `/api/cron/zijes-reminder` | **x-cron-key** | `?type=lunch\|evening` (denně 13:00 a 18:00; ŽIJEŠ? check-in připomínka) |
+| GET | `/api/push/subscribe` | session | Vrátí VAPID public key + seznam aktivních subscriptions |
+| POST | `/api/push/subscribe` | session | Uloží novou subscription (klientský PushSubscription objekt) |
+| PUT | `/api/push/subscribe` | session | Pošli test push na všechna zařízení usera |
+| DELETE | `/api/push/subscribe?id=X` | session | Smaž konkrétní subscription |
+| GET/POST | `/api/zijes` | session | List/vytvoř check-in záznam |
+| GET/POST | `/api/vyroci` | session | List/vytvoř výročí |
+| PATCH/DELETE | `/api/vyroci/:id` | session | Upravit/smazat |
+| POST | `/api/cron/anniversary-reminders` | **x-cron-key** | denně 7:05; pošle email/push/WA pokud dnes + reminderDaysBefore = výročí/narozeniny |
 | POST | `/api/cron/daily-projects-digest` | **x-cron-key** | `?date=YYYY-MM-DD` (override celého toho dne; jinak posledních 24 h) |
 | POST | `/api/cron/cleanup-audio` | **x-cron-key** | — (smaže STANDARD audio >14d, pokud není pinned) |
 | POST | `/api/cron/sync-calendars` | **x-cron-key** | — (Google primary, à 5 min) |
