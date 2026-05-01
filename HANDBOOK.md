@@ -797,6 +797,7 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | POST | `/api/cron/monthly-health-report` | **x-cron-key** | `?from&to` (override; jinak předchozí celý měsíc) |
 | POST | `/api/cron/anniversary-reminders` | **x-cron-key** | — (denně 7:05; pošle email/WhatsApp pokud dnes + reminderDaysBefore = výročí/narozeniny) |
 | POST | `/api/cron/zijes-reminder` | **x-cron-key** | `?type=lunch\|evening` (denně 13:00 a 18:00; ŽIJEŠ? check-in připomínka) |
+| POST | `/api/cron/bwmys-tick` | **x-cron-key** | denně 7:10; B&W Myš auto-návrat odložených + deadline/sber/revize notifikace |
 | GET | `/api/push/subscribe` | session | Vrátí VAPID public key + seznam aktivních subscriptions |
 | POST | `/api/push/subscribe` | session | Uloží novou subscription (klientský PushSubscription objekt) |
 | PUT | `/api/push/subscribe` | session | Pošli test push na všechna zařízení usera |
@@ -1214,6 +1215,7 @@ Detail v `Návody/03-crony.pdf`. Krátký výpis:
 | 12 | **anniversary-reminders** | denně **7:05 ráno** (email + WhatsApp upozornění na výročí a narozeniny kontaktů) |
 | 13 | **zijes-reminder ?type=lunch** | denně **13:00** (ŽIJEŠ? polední check-in, neutrální tón) |
 | 14 | **zijes-reminder ?type=evening** | denně **18:00** (ŽIJEŠ? večerní check-in, neutrální tón) |
+| 15 | **bwmys-tick** | denně **7:10** (B&W Myš — auto-návrat odložených, deadline alert 3d, sběr uplynul, datum revize) |
 
 ## Důležité architektonické změny
 

@@ -34,10 +34,10 @@
 <body>
 
 <h1>Cron nastavení na NASu</h1>
-<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 14 úloh celkem.</p>
+<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 15 úloh celkem.</p>
 
 <div class="tldr">
-<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 14 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~20 minut.
+<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 15 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~20 minut.
 </div>
 
 <h2>Společné nastavení (vzor)</h2>
@@ -68,7 +68,7 @@
 <tr><td><code>poslední den měsíce</code></td><td>Run on: <strong>Monthly</strong>, Date: <strong>Last day of month</strong></td></tr>
 </table>
 
-<h2>14 úloh — checklist</h2>
+<h2>15 úloh — checklist</h2>
 
 <!-- 1 -->
 <div class="cron-card">
@@ -179,10 +179,23 @@
 <p><strong>Pozn.:</strong> URL musí mít <code>?type=evening</code>.</p>
 </div>
 
-<h2>Po vytvoření všech 14 — kontrola</h2>
+<div class="cron-card">
+<h3><span class="checkbox"></span>15. Raseliniste BWMYS denní tick (B&amp;W Myš)</h3>
+<div class="cron-meta">denně 07:10 · POST <span class="endpoint">/api/cron/bwmys-tick</span> · max-time 60</div>
+<p><strong>K čemu:</strong> Denní údržba rozhodovacího systému B&amp;W Myš:</p>
+<ul>
+  <li>Auto-návrat odložených rozhodnutí (status <code>odlozene</code> + <code>odlozenoDo &lt;= dnes</code> → <code>aktivni</code>)</li>
+  <li>Deadline alert 3 dny předem (email + push)</li>
+  <li>Sběr uplynul (datumVytvoreni + delkaSberuDny = dnes) → notifikace „zvaž finální vyhodnocení"</li>
+  <li>Datum revize uzavřených rozhodnutí dnes → notifikace</li>
+</ul>
+<p><strong>Test:</strong> založ rozhodnutí v /bwmys s deadlinem za 2 dny, pusť cron manuálně → email/push s deadline_approaching.</p>
+</div>
+
+<h2>Po vytvoření všech 15 — kontrola</h2>
 
 <div class="steps">
-<div class="step">DSM → Task Scheduler → seznam má 14 řádků s prefix „Raseliniste"</div>
+<div class="step">DSM → Task Scheduler → seznam má 15 řádků s prefix „Raseliniste"</div>
 <div class="step">Všechny mají sloupec Status = <strong>Enabled</strong></div>
 <div class="step">U každé pravý klik → <strong>Run</strong> → History → Last run = OK / Result code 200</div>
 <div class="step">Pro #1, #4, #10 (vysoká frekvence) zkontroluj History po 1 hodině — měl by tam být běh à 5/15 min</div>
