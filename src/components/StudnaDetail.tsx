@@ -394,10 +394,35 @@ function RecordingCard({
                   <summary className="text-[11px] uppercase tracking-wider text-muted-foreground font-mono cursor-pointer">
                     Rozhodnutí ({a.decision_history.length})
                   </summary>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {a.decision_history.map((d: string, i: number) => (
-                      <li key={i} className="flex gap-2"><span>•</span> <span>{d}</span></li>
-                    ))}
+                  <ul className="mt-2 space-y-1.5 text-sm">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {a.decision_history.map((d: any, i: number) => {
+                      // AI může vrátit string (starší formát) NEBO objekt {decision, rationale, timestamp}
+                      if (typeof d === "string") {
+                        return <li key={i} className="flex gap-2"><span>•</span> <span>{d}</span></li>;
+                      }
+                      if (d && typeof d === "object") {
+                        return (
+                          <li key={i} className="flex gap-2">
+                            <span>•</span>
+                            <div className="flex-1">
+                              <div>{d.decision ?? "(bez popisu)"}</div>
+                              {d.rationale && (
+                                <div className="text-xs text-muted-foreground italic mt-0.5">
+                                  {d.rationale}
+                                </div>
+                              )}
+                              {d.timestamp && (
+                                <div className="text-[10px] font-mono text-muted-foreground/60 mt-0.5">
+                                  {d.timestamp}
+                                </div>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      }
+                      return null;
+                    })}
                   </ul>
                 </details>
               )}
