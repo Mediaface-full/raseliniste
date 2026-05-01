@@ -19,11 +19,10 @@ const NONVIP_TEXTS = {
 const VIP_TEXTS = {
   pageTitle: "Mise vypuštěna",
   appleTitle: "Gíďo, máš misi",
-  // Petr texty doladí; placeholder ať to není prázdné
-  heading: "Mise vypuštěna ✦",
-  intro:
-    "Gíďa už ví. Děj se vůle Gideonova. " +
-    "Mezitím — kdyby tě napadlo něco dalšího, klidně mu pošli další misi.",
+  heading: "✦ Mise vypuštěna ✦",
+  // Dvě věty na samostatných řádcích — první je obřadná, druhá uvolňující.
+  intro: "Gíďa už ví. Děj se vůle Gideonova.",
+  intro2: "Mezitím — kdyby tě napadlo něco dalšího, klidně mu pošli další misi.",
   nextMission: "Zadej další misi",
 };
 
@@ -95,6 +94,11 @@ if (matchedIsVip && rawPhone) {
         <p class="text-sm text-muted-foreground leading-relaxed">
           {T.intro}
         </p>
+        {matchedIsVip && VIP_TEXTS.intro2 && (
+          <p class="text-sm text-muted-foreground leading-relaxed mt-2">
+            {VIP_TEXTS.intro2}
+          </p>
+        )}
 
         {matchedIsVip && (
           <a
