@@ -763,7 +763,7 @@ Rate limit `/api/health/analyze`: **10 / 24 h** per user (Gemini Pro guard).
 | PATCH | `/api/call-log/:id` | session | `{seen: boolean}` |
 | GET | `/api/call-log/by-token` | **public** | `?t=<callLogToken>&days=14` — VIP výpis vlastních misí (otevřené + hotové N dní); on-demand Todoist sync pokud > 5 min; bez tokenu nelze získat seznam |
 | GET, POST | `/api/contacts/:id/call-log-token` | session | GET vrátí (a auto-vygeneruje) token pro VIP kontakt; POST vždy regeneruje (zruší předchozí link) |
-| POST | `/api/cron/todoist-sync` | **x-cron-key** | každých 30 min; pull změn z Todoistu → Task/CallLog (status sync + nové úkoly přidané v Todoist appce) |
+| POST | `/api/cron/todoist-sync` | **x-cron-key** | každých 5 min; pull změn z Todoistu → Task/CallLog (status sync + nové úkoly přidané v Todoist appce) |
 | POST | `/api/cron/scheduler` | **x-cron-key** | každých 5 min; JEDINÝ DSM entry — interně dispatchuje 16 úloh dle `cron-schedule.ts`; `?dryRun=1` |
 | GET | `/api/cron/scheduler` | public | seznam definic (bez stavů, žádný leak) |
 | GET | `/api/cron/status` | session | přehled posledních runů — pro Dashboard / `/start` / `/settings/crons` |
@@ -1279,7 +1279,7 @@ Detail v `Návody/03-crony.pdf`. Krátký výpis:
 | 13 | **zijes-reminder ?type=lunch** | denně **13:00** (ŽIJEŠ? polední check-in, neutrální tón) |
 | 14 | **zijes-reminder ?type=evening** | denně **18:00** (ŽIJEŠ? večerní check-in, neutrální tón) |
 | 15 | **bwmys-tick** | denně **7:10** (B&W Myš — auto-návrat odložených, deadline alert 3d, sběr uplynul, datum revize) |
-| 16 | **todoist-sync** | každých **30 min** (pull změn z Todoistu — completion → Task.completedAt + CallLog.seenAt; nové úkoly v Todoist appce → Task se source=todoist_pull; per-user incremental přes Sync API a `User.todoistSyncToken`) |
+| 16 | **todoist-sync** | každých **5 min** (pull změn z Todoistu — completion → Task.completedAt + CallLog.seenAt; nové úkoly v Todoist appce → Task se source=todoist_pull; per-user incremental přes Sync API a `User.todoistSyncToken`) |
 
 ### Cron scheduler (NOVÉ 2026-05-02) — 1 DSM entry místo 16
 

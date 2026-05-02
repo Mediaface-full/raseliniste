@@ -139,7 +139,7 @@ export const CRON_JOBS: CronJobDef[] = [
   {
     name: "todoist-sync",
     endpoint: "/api/cron/todoist-sync",
-    schedule: { type: "every", minutes: 30 },
+    schedule: { type: "every", minutes: 5 },
     description: "Todoist obousměrný sync (status + nové úkoly)",
   },
 ];

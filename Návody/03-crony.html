@@ -196,7 +196,7 @@
 
 <div class="cron-card">
 <h3><span class="checkbox"></span>16. Raseliniste Todoist obousměrný sync</h3>
-<div class="cron-meta">každých 30 min · POST <span class="endpoint">/api/cron/todoist-sync</span> · max-time 60</div>
+<div class="cron-meta">každých 5 min · POST <span class="endpoint">/api/cron/todoist-sync</span> · max-time 60</div>
 <p><strong>K čemu:</strong> Pull změn z Todoistu zpět do naší DB — Todoist je zdroj pravdy pro stav úkolů:</p>
 <ul>
   <li>Odškrtneš v Todoist → propíše se do <code>Task.completedAt</code> i <code>CallLog.seenAt</code> (mizí z VIP výpisu Giďoušových misí na <code>/call-log/thanks</code>)</li>
@@ -205,7 +205,7 @@
   <li>Update titulu / due date / labels / priority — Todoist přepíše naši lokální verzi (Petr potvrdil že Todoist je zdroj pravdy)</li>
 </ul>
 <p><strong>Jak to funguje:</strong> per-user incremental přes Todoist Sync API a <code>User.todoistSyncToken</code>. První volání = full snapshot (všechny aktivní úkoly), další = jen změny od minula. Když token resetuješ na <code>"*"</code> v DB, vyvolá full sync.</p>
-<p><strong>Schedule v DSM:</strong> Daily, Repeat every 30 minutes (ne minutely — DSM neumí cron 0,30 přímo, použij Daily + Repeat).</p>
+<p><strong>Schedule v DSM:</strong> Tahle úloha už NENÍ v DSM samostatně — spravuje ji centrální scheduler (#1 v seznamu). Frekvence 5 min je definovaná v <code>src/lib/cron-schedule.ts</code>.</p>
 <p><strong>Test:</strong> odškrtni libovolný úkol v Todoist appce → pusť cron manuálně přes <strong>Run</strong> → JSON odpověď ukáže <code>tasksCompleted</code> nebo <code>callLogsCompleted</code> &gt; 0. Otevři <code>/firewall</code> nebo VIP link a uvidíš stav.</p>
 </div>
 
@@ -215,7 +215,7 @@
 <div class="step">DSM → Task Scheduler → JEDEN řádek <strong>Raseliniste cron scheduler</strong>, Status = <strong>Enabled</strong>, Frequency = Every 5 minutes</div>
 <div class="step">Pravý klik → <strong>Run</strong> → History → Last run = OK / Result code 200</div>
 <div class="step">Otevři <code>/settings/crons</code> v aplikaci — uvidíš tabulku všech 16 úloh, jejich rozvrhy a poslední úspěch</div>
-<div class="step">Po 30 min ticku zkontroluj že vysoké frekvence (sync-calendars 5min, todoist-sync 30min) mají <code>lastSuccessAt</code> aktuální</div>
+<div class="step">Po 10 min ticku zkontroluj že vysoké frekvence (sync-calendars 5min, todoist-sync 5min) mají <code>lastSuccessAt</code> aktuální</div>
 <div class="step">Po 24 h zkontroluj že denní úlohy (sync-contacts, briefing, atd.) v <code>/settings/crons</code> mají úspěšný run za poslední den</div>
 </div>
 
