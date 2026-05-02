@@ -170,6 +170,7 @@ export default function ContactsManager() {
         <Button onClick={() => setEditing("new")}>
           <Plus /> Nový
         </Button>
+        <BackfillTokensButton onDone={load} />
       </div>
 
       {importMsg && (
@@ -676,6 +677,48 @@ function VipLinkSection({ contactId, initialToken }: { contactId: string; initia
         <div className="text-xs text-muted-foreground italic">Token zatím nevygenerován. Ulož kontakt a otevři znovu.</div>
       )}
       {err && <div className="text-xs text-destructive">{err}</div>}
+    </div>
+  );
+}
+
+// =============================================================================
+// Backfill VIP tokenů — pro VIP kontakty které byly VIP před deployem
+// callLogToken commitu (a nemají token). One-shot button v toolbaru.
+// =============================================================================
+
+function BackfillTokensButton({ onDone }: { onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ generated: number; failed: number } | null>(null);
+
+  async function run() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/contacts/backfill-tokens", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Backfill selhal.");
+        return;
+      }
+      setResult({ generated: data.generated.length, failed: data.failed.length });
+      onDone();
+      setTimeout(() => setResult(null), 5000);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button variant="ghost" onClick={run} disabled={busy} title="Vygeneruje VIP linky pro existující VIP kontakty bez tokenu">
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <LinkIcon className="size-4" />}
+        VIP tokeny
+      </Button>
+      {result && (
+        <span className="text-xs font-mono text-[var(--tint-sage)]">
+          ✓ {result.generated} nových{result.failed > 0 && `, ${result.failed} chyb`}
+        </span>
+      )}
     </div>
   );
 }
