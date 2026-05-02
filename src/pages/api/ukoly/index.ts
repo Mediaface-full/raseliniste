@@ -6,7 +6,11 @@ import { readSession } from "@/lib/session";
 export const prerender = false;
 
 /**
- * GET /api/ukoly — list úkolů aktuálního usera
+ * GET /api/ukoly — list úkolů aktuálního usera (Task tabulka + VIP mise z CallLog)
+ *
+ * VIP mise z firewallu (CallLog wasVip=true) se zobrazují jako úkoly jednotně
+ * s běžnými Task. Kliknutí na "hotovo" propíše seenAt do CallLog.
+ *
  * Query:
  *   ?status=open|done|cancelled|all (default: open)
  *   ?assignedTo=me|<contactId>|all  (default: all)
@@ -36,6 +40,19 @@ export const GET: APIRoute = async ({ cookies, url }) => {
     take: 500,
   });
 
+  // Mirror Todoist projektů — pro UI mapování id → name
+  const projectMirrors = await prisma.todoistProjectMirror.findMany({
+    where: { userId: session.uid },
+    select: { todoistId: true, name: true, color: true },
+  });
+  const projectNameById = new Map(projectMirrors.map((p) => [p.todoistId, p.name]));
+
+  // Obohatit Task o todoistProjectName
+  const tasksWithProject = tasks.map((t) => ({
+    ...t,
+    todoistProjectName: t.todoistProjectId ? (projectNameById.get(t.todoistProjectId) ?? null) : null,
+  }));
+
   // Také vrátíme všechny tagy pro filter UI
   const allTagsRaw = await prisma.task.findMany({
     where: { userId: session.uid },
@@ -51,7 +68,84 @@ export const GET: APIRoute = async ({ cookies, url }) => {
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count);
 
-  return Response.json({ tasks, tags });
+  // VIP mise z firewallu (CallLog) — sjednotit s Task view.
+  // Show open VIP missions always (when status filter is "open" or "all")
+  // a recently completed (seenAt < 14 dní zpět) když status=done/all.
+  const includeVipOpen = status === "open" || status === "all";
+  const includeVipDone = status === "done" || status === "all";
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 86400000);
+
+  const vipCalls = await prisma.callLog.findMany({
+    where: {
+      userId: session.uid,
+      wasVip: true,
+      ...(tag ? { id: "__never__" } : {}), // VIP mise nemají tagy → tag filtr je vyřadí
+      OR: [
+        ...(includeVipOpen ? [{ seenAt: null }] : []),
+        ...(includeVipDone ? [{ seenAt: { gte: fourteenDaysAgo } }] : []),
+      ],
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      message: true,
+      isUrgent: true,
+      requestedDueAt: true,
+      seenAt: true,
+      createdAt: true,
+      todoistTaskId: true,
+      contactId: true,
+      contact: { select: { displayName: true, firstName: true } },
+    },
+  });
+
+  // Map CallLog na Task-shape pro UI (typ rozliší source="vip_call_log").
+  const vipTasks = vipCalls.map((c) => ({
+    id: `callLog:${c.id}`,
+    callLogId: c.id,
+    userId: session.uid,
+    title: c.message,
+    notes: null as string | null,
+    dueAt: c.requestedDueAt,
+    dueIsTime: false,
+    tags: [] as string[],
+    status: c.seenAt ? "done" : "open",
+    priority: c.isUrgent ? "high" : "normal",
+    source: "vip_call_log",
+    todoistTaskId: c.todoistTaskId,
+    todoistProjectId: null as string | null,
+    completedAt: c.seenAt,
+    createdAt: c.createdAt,
+    updatedAt: c.seenAt ?? c.createdAt,
+    rawSnippet: null as string | null,
+    sourceBatchId: null as string | null,
+    parentId: null as string | null,
+    pushedAt: null as Date | null,
+    pushError: null as string | null,
+    assignedToContactId: c.contactId,
+    assignedToContact: c.contact ? {
+      id: c.contactId,
+      displayName: `${c.contact.firstName ?? c.contact.displayName} ⭐`,
+    } : null,
+  }));
+
+  // Sjednoceno — VIP mise nahoru pokud naléhavé, jinak chronologicky.
+  const allTasks = [...vipTasks, ...tasksWithProject].sort((a, b) => {
+    // priority high prvně
+    const pa = a.priority === "high" ? 0 : 1;
+    const pb = b.priority === "high" ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    // pak open před done
+    if (a.status !== b.status) return a.status === "open" ? -1 : 1;
+    // pak chronologicky (nejnovější top)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  return Response.json({
+    tasks: allTasks,
+    tags,
+    todoistProjects: projectMirrors,
+  });
 };
 
 const createSchema = z.object({

@@ -34,6 +34,8 @@ export interface TodoistSyncStats {
   tasksUpdated?: number;
   tasksCompleted?: number;
   callLogsCompleted?: number;
+  projectsReceived?: number;
+  projectsUpserted?: number;
   error?: string;
 }
 
@@ -81,6 +83,8 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
     tasksUpdated: 0,
     tasksCompleted: 0,
     callLogsCompleted: 0,
+    projectsReceived: 0,
+    projectsUpserted: 0,
   };
 
   const integration = await prisma.userIntegration.findUnique({
@@ -105,7 +109,7 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
 
   let response;
   try {
-    response = await syncFetch(token, startToken, ["items"]);
+    response = await syncFetch(token, startToken, ["items", "projects"]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     stats.error = msg;
@@ -212,6 +216,36 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
       // Single-item failure — neukončuj celý sync, jen loguj
       const msg = e instanceof Error ? e.message : String(e);
       console.warn(`[todoist-sync] item ${item.id} failed:`, msg);
+    }
+  }
+
+  // === PROJECTS — upsert do TodoistProjectMirror ===
+  const projects = response.projects ?? [];
+  stats.projectsReceived = projects.length;
+  for (const p of projects) {
+    try {
+      await prisma.todoistProjectMirror.upsert({
+        where: { userId_todoistId: { userId, todoistId: p.id } },
+        update: {
+          name: p.name,
+          color: p.color ?? null,
+          isInbox: p.is_inbox_project ?? false,
+          parentId: p.parent_id ?? null,
+          syncedAt: new Date(),
+        },
+        create: {
+          userId,
+          todoistId: p.id,
+          name: p.name,
+          color: p.color ?? null,
+          isInbox: p.is_inbox_project ?? false,
+          parentId: p.parent_id ?? null,
+        },
+      });
+      stats.projectsUpserted!++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[todoist-sync] project ${p.id} failed:`, msg);
     }
   }
 

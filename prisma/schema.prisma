@@ -48,6 +48,7 @@ model User {
   checkIns         CheckIn[]
   pushSubscriptions WebPushSubscription[]
   decisions        Decision[]
+  todoistProjects  TodoistProjectMirror[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -1211,6 +1212,16 @@ model Decision {
   verdiktText         String?  @db.Text
   coByZmeniloVerdikt  String?  @db.Text
 
+  // Doplněk 2 — autorství rozhodnutí (krok 2.5 ve formuláři)
+  // pro_me | pro_jineho | spolecne | nejsem_si_jisty
+  autorstvi           String   @default("pro_me")
+  autorstviKdo        String?  // text, pro koho dalšího (u pro_jineho/spolecne)
+
+  // Doplněk 2 — Tok 5: pokud uživatel chce uzavřít a poslední zápis byl
+  // v aktivovaném/staženém stavu, můžeme nabídnout odložení o 48 h.
+  odlozeneUzavreniDo  DateTime?
+  uzavrenoPresUpozorneni Boolean @default(false)
+
   entries             DecisionEntry[]
   evaluations         DecisionEvaluation[]
   reopenings          DecisionReopening[]
@@ -1233,6 +1244,11 @@ model DecisionEntry {
   uhelPohledu String   @default("nevybrano")  // fakta|emoce|kritika|prinosy|alternativy|meta|nevybrano
   obsah       String   @db.Text
 
+  // Doplněk 2 — stav nervového systému (povinné u nových zápisů)
+  // aktivovany | stazeny | klidny | nevim
+  // Default "nevim" pro existující entries při migraci.
+  stavSystemu String   @default("nevim")
+
   // Klasifikace doplněná AI při finálním vyhodnocení (pokud uhelPohledu="nevybrano")
   uhelPohleduAi String?
 
@@ -1242,6 +1258,23 @@ model DecisionEntry {
   audioBytes  Int?
 
   @@index([decisionId, datum])
+}
+
+// Mirror Todoist projektů — pull z Sync API, abychom v UI mohli zobrazit jméno
+// projektu místo cryptického ID (Task.todoistProjectId odkazuje sem).
+model TodoistProjectMirror {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  todoistId       String
+  name            String
+  color           String?
+  isInbox         Boolean   @default(false)
+  parentId        String?
+  syncedAt        DateTime  @default(now())
+
+  @@unique([userId, todoistId])
+  @@index([userId])
 }
 
 // Tracking spuštění interního cron scheduleru (1 DSM entry → dispatcher → 16 jobs).

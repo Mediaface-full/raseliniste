@@ -763,7 +763,7 @@ Rate limit `/api/health/analyze`: **10 / 24 h** per user (Gemini Pro guard).
 | PATCH | `/api/call-log/:id` | session | `{seen: boolean}` |
 | GET | `/api/call-log/by-token` | **public** | `?t=<callLogToken>&days=14` — VIP výpis vlastních misí (otevřené + hotové N dní); on-demand Todoist sync pokud > 5 min; bez tokenu nelze získat seznam |
 | GET, POST | `/api/contacts/:id/call-log-token` | session | GET vrátí (a auto-vygeneruje) token pro VIP kontakt; POST vždy regeneruje (zruší předchozí link) |
-| POST | `/api/cron/todoist-sync` | **x-cron-key** | každých 5 min; pull změn z Todoistu → Task/CallLog (status sync + nové úkoly přidané v Todoist appce) |
+| POST | `/api/cron/todoist-sync` | **x-cron-key** | každých 5 min; pull změn z Todoistu → Task/CallLog (status sync + nové úkoly + projekty do `TodoistProjectMirror` pro UI mapování) |
 | POST | `/api/cron/scheduler` | **x-cron-key** | každých 5 min; JEDINÝ DSM entry — interně dispatchuje 16 úloh dle `cron-schedule.ts`; `?dryRun=1` |
 | GET | `/api/cron/scheduler` | public | seznam definic (bez stavů, žádný leak) |
 | GET | `/api/cron/status` | session | přehled posledních runů — pro Dashboard / `/start` / `/settings/crons` |

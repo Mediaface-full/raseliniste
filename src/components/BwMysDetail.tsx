@@ -23,6 +23,10 @@ interface Decision {
   datumUzavreni: string | null;
   verdiktText: string | null;
   coByZmeniloVerdikt: string | null;
+  autorstvi: string;
+  autorstviKdo: string | null;
+  odlozeneUzavreniDo: string | null;
+  uzavrenoPresUpozorneni: boolean;
   entries: DecisionEntry[];
   evaluations: DecisionEvaluation[];
 }
@@ -34,8 +38,16 @@ interface DecisionEntry {
   typVstupu: string;
   uhelPohledu: string;
   uhelPohleduAi?: string | null;
+  stavSystemu: string;
   obsah: string;
 }
+
+const STAV_OPTIONS: { value: string; label: string; popisek: string; color: string }[] = [
+  { value: "aktivovany", label: "Aktivovaný", popisek: "neklid, tlak, zrychlení", color: "var(--tint-rose)" },
+  { value: "stazeny", label: "Stažený", popisek: "otupělost, mlha, odpojenost", color: "var(--tint-lavender)" },
+  { value: "klidny", label: "Klidný", popisek: "tělo i hlava souhlasí", color: "var(--tint-sage)" },
+  { value: "nevim", label: "Nevím", popisek: "nedokážu to rozlišit", color: "#8a8a8a" },
+];
 
 interface DecisionEvaluation {
   id: string;

@@ -23,6 +23,8 @@ interface Task {
   source: string;
   rawSnippet: string | null;
   todoistTaskId: string | null;
+  todoistProjectId: string | null;
+  todoistProjectName?: string | null;
   pushedAt: string | null;
   pushError: string | null;
   completedAt: string | null;
@@ -428,10 +430,16 @@ function TaskRow({
                 {task.tags.map((t) => `#${t}`).join(" ")}
               </span>
             )}
-            {task.todoistTaskId && (
+            {task.todoistProjectName && (
+              <span className="font-mono text-[var(--tint-sky)]">📁 {task.todoistProjectName}</span>
+            )}
+            {task.todoistTaskId && !task.todoistProjectName && (
               <span className="text-[var(--tint-sage)] font-mono">✓ Todoist</span>
             )}
-            {task.source !== "manual" && (
+            {task.source === "vip_call_log" && (
+              <span className="font-mono text-[var(--tint-rose)]">⭐ VIP firewall</span>
+            )}
+            {task.source !== "manual" && task.source !== "vip_call_log" && (
               <span className="text-muted-foreground font-mono">[{task.source}]</span>
             )}
           </div>
