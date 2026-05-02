@@ -6,6 +6,7 @@ import {
   createProject as todoistCreateProject,
   listSections as todoistListSections,
   createSection as todoistCreateSection,
+  taskPriorityToTodoist,
 } from "./todoist";
 
 /**
@@ -25,7 +26,13 @@ import {
 
 const PEOPLE_PROJECT_NAME = "Lidé"; // standardní název; lze v budoucnu konfigurovat
 
-const PRIORITY_MAP = { high: 4, normal: 2, low: 1 } as const;
+// Priority mapping je centralizován v src/lib/todoist.ts (taskPriorityToTodoist),
+// PRIORITY_MAP je lokální alias kvůli zachování signatury níže.
+const PRIORITY_MAP = {
+  high: taskPriorityToTodoist("high"),
+  normal: taskPriorityToTodoist("normal"),
+  low: taskPriorityToTodoist("low"),
+} as const;
 
 // Cache projektů + sekcí per process — Todoist API není free, 60 s TTL stačí.
 interface CacheEntry {
@@ -200,20 +207,23 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
   if (task.rawSnippet) descLines.push(`\n_„${task.rawSnippet}"_`);
   descLines.push(`\n_Z Rašeliniště — ${new Date(task.createdAt).toLocaleString("cs-CZ")} · ${routedHow}_`);
 
-  // Due
-  let due_string: string | undefined;
+  // Due — Todoist v1 má 3 oddělená pole. due_string je natural-language parser
+  // ("today", "tomorrow at 9am") → tam ISO necpat. Pro datum-only → due_date,
+  // pro datum+čas → due_datetime (RFC3339, timezone-aware).
+  let due_date: string | undefined;
+  let due_datetime: string | undefined;
   if (task.dueAt) {
     if (task.dueIsTime) {
-      // Todoist umí ISO string v due_string fieldu
-      due_string = task.dueAt.toISOString();
+      due_datetime = task.dueAt.toISOString();
     } else {
-      due_string = task.dueAt.toISOString().slice(0, 10);
+      due_date = task.dueAt.toISOString().slice(0, 10);
     }
   }
 
-  // Labels — lowercase ASCII slug
+  // Labels — diakritika removed + lowercase + slug
   const labels = ["raseliniste", ...task.tags].map((t) =>
-    t.toLowerCase().replace(/\s+/g, "-").slice(0, 30),
+    t.normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .toLowerCase().replace(/\s+/g, "-").slice(0, 30),
   );
 
   try {
@@ -224,7 +234,8 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
       section_id: sectionId,
       parent_id: todoistParentId, // pokud subtask, vytvoří se pod rodičem
       priority: PRIORITY_MAP[task.priority],
-      due_string,
+      due_date,
+      due_datetime,
       labels,
     });
 

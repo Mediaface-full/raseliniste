@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
 import { decryptSecret } from "@/lib/crypto";
-import { closeTask, reopenTask, deleteTask as todoistDeleteTask, updateTask as todoistUpdateTask, type UpdateTaskInput } from "@/lib/todoist";
+import { closeTask, reopenTask, deleteTask as todoistDeleteTask, updateTask as todoistUpdateTask, taskPriorityToTodoist, type UpdateTaskInput } from "@/lib/todoist";
 
 export const prerender = false;
 
@@ -131,13 +131,21 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
           if (d.title !== undefined) update.content = d.title;
           if (d.notes !== undefined) update.description = d.notes ?? "";
           if (d.dueAt !== undefined) {
-            // Todoist konvence: empty string odstraní due
-            update.due_date = d.dueAt ? new Date(d.dueAt).toISOString().slice(0, 10) : "";
+            if (d.dueAt === null) {
+              // Clear due — Todoist konvence: due_string="" (NE due_date="")
+              update.due_string = "";
+            } else {
+              const dt = new Date(d.dueAt);
+              if (d.dueIsTime || (owned.dueIsTime && d.dueIsTime !== false)) {
+                update.due_datetime = dt.toISOString();
+              } else {
+                update.due_date = dt.toISOString().slice(0, 10);
+              }
+            }
           }
           if (d.tags !== undefined) update.labels = d.tags;
           if (d.priority !== undefined) {
-            // Naše low/normal/high → Todoist 1-4 (4=urgent)
-            update.priority = d.priority === "high" ? 4 : d.priority === "normal" ? 2 : 1;
+            update.priority = taskPriorityToTodoist(d.priority);
           }
           if (Object.keys(update).length > 0) {
             await todoistUpdateTask(token, owned.todoistTaskId, update);

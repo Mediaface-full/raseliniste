@@ -37,9 +37,27 @@ export interface CreateTaskInput {
   section_id?: string;
   parent_id?: string;  // Todoist ID rodičovského tasku → vytvoří se jako podúkol
   priority?: 1 | 2 | 3 | 4;
-  due_string?: string; // "today", "tomorrow at 9am", ...
-  due_date?: string;   // "YYYY-MM-DD" — přesné datum, přebíjí due_string
+  due_string?: string;   // natural-language: "today", "tomorrow at 9am". Empty string "" = clear due.
+  due_date?: string;     // "YYYY-MM-DD" — all-day datum
+  due_datetime?: string; // RFC3339 / ISO 8601 — datum + čas. Přesné, timezone-aware.
   labels?: string[];
+}
+
+/**
+ * Naše Task.priority → Todoist API priority.
+ * Centrální helper, ať mapping není duplikovaný v push pipeline a edit endpointu.
+ *
+ * Naše:    Todoist:
+ *   high     4 (urgent)
+ *   normal   2 (P3)
+ *   low      1 (lowest, default v Todoist)
+ *
+ * Záměrně přeskakuje Todoist 3 — Petr používá jen 3 úrovně.
+ */
+export function taskPriorityToTodoist(p: "low" | "normal" | "high"): 1 | 2 | 3 | 4 {
+  if (p === "high") return 4;
+  if (p === "normal") return 2;
+  return 1;
 }
 
 export interface TodoistSection {
@@ -93,8 +111,9 @@ export async function createTask(token: string, input: CreateTaskInput): Promise
 export interface UpdateTaskInput {
   content?: string;
   description?: string;
-  due_string?: string | null;
-  due_date?: string | null;
+  due_string?: string | null;   // empty string "" = clear due (Todoist konvence)
+  due_date?: string | null;     // "YYYY-MM-DD" — all-day
+  due_datetime?: string | null; // RFC3339 — s časem
   priority?: 1 | 2 | 3 | 4;
   labels?: string[];
 }
@@ -111,8 +130,16 @@ export async function updateTask(token: string, taskId: string, input: UpdateTas
 }
 
 /**
- * Get single task by ID. Vrací null pokud task neexistuje (404 = completed/deleted).
- * Užitečné pro reconcile open VIP misí — Sync API completed tasky nevrací.
+ * Get single task by ID.
+ *
+ * Návratové hodnoty:
+ *   null            — Todoist 404 = task byl HARD DELETED (smazán uživatelem)
+ *   TodoistTask     — task existuje. Pole `is_completed` rozliší stav:
+ *                     - false → aktivní
+ *                     - true  → completed (odškrtnut, ale stále v Todoist DB)
+ *
+ * Důležité: Todoist v1 NEvrací 404 pro completed tasky, jen pro deleted.
+ * Pro detekci completion v reconcile pass je třeba parsovat `is_completed`.
  */
 export async function getTask(token: string, taskId: string): Promise<TodoistTask | null> {
   try {

@@ -951,6 +951,9 @@ model Task {
   @@index([assignedToContactId])
   @@index([parentId])
   @@index([userId, todoistTaskId])
+  // Unique chrání proti race conditions při dvojitém push (dva paralelní
+  // požadavky před idempotence checkem) — DB sama zabrání duplicitě.
+  @@unique([userId, todoistTaskId], map: "Task_userId_todoistTaskId_unique")
 }
 
 model TaskAudioBatch {

@@ -176,7 +176,7 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
           tags: string[];
           priority: "low" | "normal" | "high";
           status: "open" | "done" | "cancelled";
-          completedAt?: Date;
+          completedAt?: Date | null;
           todoistProjectId: string;
         } = {
           title: safeTitle,
@@ -191,6 +191,12 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
         if ((completed || deleted) && !task.completedAt && completionTime) {
           data.completedAt = completionTime;
           stats.tasksCompleted!++;
+        }
+        // Reopen v Todoistu — pokud item není completed/deleted ale my máme
+        // completedAt set z předchozího cyklu, vyčistíme. Bez toho by stav
+        // zůstal inkonzistentní mezi sync a reconcile pass.
+        if (!completed && !deleted && task.completedAt) {
+          data.completedAt = null;
         }
         await prisma.task.update({ where: { id: task.id }, data });
         stats.tasksUpdated!++;
