@@ -88,6 +88,35 @@ export async function createTask(token: string, input: CreateTaskInput): Promise
   });
 }
 
+/**
+ * Mark task as completed (close). Todoist v1: POST /tasks/:id/close
+ * Idempotent — pokud je už closed, nehází chybu.
+ */
+export async function closeTask(token: string, taskId: string): Promise<void> {
+  await call<void>(token, `/tasks/${encodeURIComponent(taskId)}/close`, { method: "POST" });
+}
+
+/**
+ * Reopen previously closed task. Todoist v1: POST /tasks/:id/reopen
+ */
+export async function reopenTask(token: string, taskId: string): Promise<void> {
+  await call<void>(token, `/tasks/${encodeURIComponent(taskId)}/reopen`, { method: "POST" });
+}
+
+/**
+ * Hard delete task. Todoist v1: DELETE /tasks/:id
+ * Pokud task neexistuje (404), ignoruj — idempotent.
+ */
+export async function deleteTask(token: string, taskId: string): Promise<void> {
+  try {
+    await call<void>(token, `/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/404/.test(msg)) return; // už neexistuje, OK
+    throw e;
+  }
+}
+
 export async function createProject(
   token: string,
   input: string | { name: string; parentId?: string | null; color?: string | null },

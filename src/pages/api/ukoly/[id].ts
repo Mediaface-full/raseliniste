@@ -2,6 +2,8 @@ import type { APIRoute } from "astro";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
+import { decryptSecret } from "@/lib/crypto";
+import { closeTask, reopenTask, deleteTask as todoistDeleteTask } from "@/lib/todoist";
 
 export const prerender = false;
 
@@ -20,13 +22,29 @@ async function ownTask(userId: string, id: string) {
   return prisma.task.findFirst({ where: { id, userId } });
 }
 
+/**
+ * Pokus o get Todoist token; null pokud integrace není.
+ */
+async function getTodoistToken(userId: string): Promise<string | null> {
+  const integration = await prisma.userIntegration.findUnique({
+    where: { userId_provider: { userId, provider: "todoist" } },
+  });
+  if (!integration) return null;
+  return decryptSecret({
+    enc: integration.tokenEnc,
+    iv: integration.tokenIv,
+    tag: integration.tokenTag,
+  });
+}
+
 export const PATCH: APIRoute = async ({ request, cookies, params }) => {
   const session = await readSession(cookies);
   if (!session) return Response.json({ error: "UNAUTHENTICATED" }, { status: 401 });
 
   const id = params.id as string;
 
-  // VIP mise — id má prefix "callLog:<uuid>". Propíšeme jen status (seenAt).
+  // VIP mise — id má prefix "callLog:<uuid>". Propíšeme jen status (seenAt) +
+  // close/reopen v Todoistu pokud má todoistTaskId.
   if (id.startsWith("callLog:")) {
     const callLogId = id.slice("callLog:".length);
     const cl = await prisma.callLog.findFirst({ where: { id: callLogId, userId: session.uid } });
@@ -41,11 +59,26 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
 
     if (d.status === "done") {
       await prisma.callLog.update({ where: { id: callLogId }, data: { seenAt: new Date() } });
+      // Propaguj do Todoistu (close)
+      if (cl.todoistTaskId) {
+        const token = await getTodoistToken(session.uid);
+        if (token) {
+          try { await closeTask(token, cl.todoistTaskId); } catch (e) {
+            console.warn("[ukoly callLog close]", e instanceof Error ? e.message : String(e));
+          }
+        }
+      }
     } else if (d.status === "open") {
       await prisma.callLog.update({ where: { id: callLogId }, data: { seenAt: null } });
+      if (cl.todoistTaskId) {
+        const token = await getTodoistToken(session.uid);
+        if (token) {
+          try { await reopenTask(token, cl.todoistTaskId); } catch (e) {
+            console.warn("[ukoly callLog reopen]", e instanceof Error ? e.message : String(e));
+          }
+        }
+      }
     }
-    // Ostatní pole (title, tags, …) u VIP misí ignorujeme — content je editovatelný
-    // jen ve firewall logu (admin) a originál CallLog nemá ekvivalentní fieldy.
     return Response.json({ ok: true, callLogId });
   }
 
@@ -62,8 +95,34 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = { ...d };
   if (d.dueAt !== undefined) data.dueAt = d.dueAt ? new Date(d.dueAt) : null;
-  if (d.status === "done" && owned.status !== "done") data.completedAt = new Date();
-  if (d.status === "open" && owned.status === "done") data.completedAt = null;
+
+  // Status změna → propagace do Todoistu (synchronně) + lokální completedAt
+  let todoistAction: "close" | "reopen" | null = null;
+  if (d.status === "done" && owned.status !== "done") {
+    data.completedAt = new Date();
+    todoistAction = "close";
+  } else if (d.status === "open" && owned.status === "done") {
+    data.completedAt = null;
+    todoistAction = "reopen";
+  }
+
+  // Propaguj do Todoistu PŘED lokálním update — aby case "Todoist fail"
+  // neukládal nekonzistentní lokální stav. Pokud Todoist selže, pokračujeme
+  // s lokálním update + uložíme do pushError pole.
+  let pushError: string | null = null;
+  if (todoistAction && owned.todoistTaskId) {
+    const token = await getTodoistToken(session.uid);
+    if (token) {
+      try {
+        if (todoistAction === "close") await closeTask(token, owned.todoistTaskId);
+        else await reopenTask(token, owned.todoistTaskId);
+      } catch (e) {
+        pushError = e instanceof Error ? e.message : String(e);
+        console.warn(`[ukoly ${todoistAction}]`, pushError);
+      }
+    }
+  }
+  if (pushError) data.pushError = `${todoistAction} fail: ${pushError.slice(0, 200)}`;
 
   const task = await prisma.task.update({
     where: { id },
@@ -79,13 +138,26 @@ export const DELETE: APIRoute = async ({ cookies, params }) => {
 
   const id = params.id as string;
 
-  // VIP mise nelze přes /ukoly mazat — to se dělá v /firewall.
   if (id.startsWith("callLog:")) {
     return Response.json({ error: "VIP mise smaž v /firewall" }, { status: 400 });
   }
 
   const owned = await ownTask(session.uid, id);
   if (!owned) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+
+  // Propaguj do Todoistu (DELETE) PŘED lokálním smazáním. Pokud Todoist selže,
+  // pokračujeme — alternativně bychom mohli abort, ale Petr by byl frustrovaný
+  // pokud Todoist down zablokuje lokální mazání. Idempotent (404 ignoruje).
+  if (owned.todoistTaskId) {
+    const token = await getTodoistToken(session.uid);
+    if (token) {
+      try {
+        await todoistDeleteTask(token, owned.todoistTaskId);
+      } catch (e) {
+        console.warn("[ukoly delete-todoist]", e instanceof Error ? e.message : String(e));
+      }
+    }
+  }
 
   await prisma.task.delete({ where: { id } });
   return Response.json({ ok: true });

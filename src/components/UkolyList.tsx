@@ -110,14 +110,23 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
     }
   }
 
+  // Optimistic delete bez confirm dialogu — Petr explicitně chtěl, hromadné
+  // mazání 50× confirm bylo neúnosné. Server propagace do Todoist je idempotent
+  // (404 ignoruje), takže náhodný klik je opravitelný (úkol manuálně znovu).
   async function deleteTask(id: string) {
-    if (!confirm("Opravdu smazat úkol?")) return;
-    setBusy(id);
+    // Optimistic UI removal
+    setTasks((prev) => prev.filter((t) => t.id !== id));
     try {
       const res = await fetch(`/api/ukoly/${id}`, { method: "DELETE" });
-      if (res.ok) setTasks((prev) => prev.filter((t) => t.id !== id));
-    } finally {
-      setBusy(null);
+      if (!res.ok) {
+        // Rollback při chybě
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Mazání selhalo, obnov stránku.");
+        await load();
+      }
+    } catch {
+      setError("Síťová chyba — obnov stránku.");
+      await load();
     }
   }
 

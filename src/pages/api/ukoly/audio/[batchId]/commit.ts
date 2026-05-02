@@ -128,9 +128,27 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
     },
   });
 
+  // Auto-push do Todoistu — fire-and-forget, sériově (zachová parent→child pořadí
+  // pro hierarchické úkoly). Chyby per-task se uloží do Task.pushError, zde jen logujeme.
+  void (async () => {
+    try {
+      const { pushTaskToTodoist } = await import("@/lib/task-todoist-push");
+      for (const taskId of createdTaskIds) {
+        try {
+          await pushTaskToTodoist(taskId);
+        } catch (e) {
+          console.warn(`[ukoly commit auto-push] task ${taskId} failed:`, e instanceof Error ? e.message : String(e));
+        }
+      }
+    } catch (e) {
+      console.warn("[ukoly commit auto-push] outer fail:", e instanceof Error ? e.message : String(e));
+    }
+  })();
+
   return Response.json({
     ok: true,
     createdTaskIds,
     count: createdTaskIds.length,
+    note: "Push do Todoistu běží na pozadí — projeví se do několika sekund.",
   });
 };
