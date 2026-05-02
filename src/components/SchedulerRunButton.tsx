@@ -1,15 +1,38 @@
 import { useState } from "react";
-import { Loader2, Play, RotateCw } from "lucide-react";
+import { Loader2, Play, RotateCw, RefreshCcw } from "lucide-react";
 
 /**
  * Tlačítko „Spustit teď" v /settings/crons — manuální dispatch scheduleru
  * bez nutnosti SSH curlu. Po doběhu přesměruje na refresh stránky.
  */
 export default function SchedulerRunButton() {
-  const [busy, setBusy] = useState<"run" | "dryrun" | null>(null);
+  const [busy, setBusy] = useState<"run" | "dryrun" | "reset" | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any | null>(null);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  async function resetTodoistToken() {
+    if (!confirm(
+      "Reset Todoist sync tokenu?\n\n" +
+      "Příští spuštění todoist-sync udělá FULL snapshot — naimportuje VŠECHNY tvoje aktivní Todoist úkoly do Task tabulky " +
+      "(včetně těch které už máš). Existující se updatují, žádné se nezduplikují.",
+    )) return;
+    setBusy("reset");
+    setErr(null);
+    setResetMsg(null);
+    try {
+      const res = await fetch("/api/todoist/reset-sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setErr(data.error ?? "Reset selhal.");
+        return;
+      }
+      setResetMsg(data.note ?? "Token resetován. Klikni Spustit teď.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function run(dry: boolean) {
     setBusy(dry ? "dryrun" : "run");
@@ -55,7 +78,22 @@ export default function SchedulerRunButton() {
           {busy === "dryrun" ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
           Dry-run
         </button>
+        <button
+          onClick={resetTodoistToken}
+          disabled={busy !== null}
+          className="px-3 py-1.5 rounded-md bg-[var(--tint-rose)]/10 border border-[var(--tint-rose)]/30 hover:bg-[var(--tint-rose)]/20 text-[var(--tint-rose)] text-sm flex items-center gap-1.5 transition disabled:opacity-50"
+          title="Vyresetuje Todoist sync token → příští spuštění udělá full snapshot (re-import všech úkolů)"
+        >
+          {busy === "reset" ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
+          Reset Todoist sync
+        </button>
       </div>
+
+      {resetMsg && (
+        <div className="text-xs text-[var(--tint-rose)] rounded-md border border-[var(--tint-rose)]/30 bg-[var(--tint-rose)]/[0.06] px-3 py-2">
+          {resetMsg}
+        </div>
+      )}
 
       {err && (
         <div className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
