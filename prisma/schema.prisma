@@ -1232,6 +1232,7 @@ model DecisionEvaluation {
   datum                       DateTime @default(now())
   typ                         String   // "prubezne" | "finalni"
   obsahStrukturovany          Json     // celý strukturovaný výstup AI (sekce A-H pro finální)
+  argumentsJson               Json?    // mřížka argumentů (jen pro finální), generována zvlášť
   pocetVstupuVDobeGenerovani  Int
 
   // AI usage tracking

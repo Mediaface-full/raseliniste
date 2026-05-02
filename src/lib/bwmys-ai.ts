@@ -287,6 +287,83 @@ Vrať POUZE JSON tohoto tvaru (žádný markdown wrapper, žádný komentář):
 }
 
 // ---------------------------------------------------------------------------
+// 3b. Extrakce argumentů pro mřížku (samostatný endpoint)
+// ---------------------------------------------------------------------------
+
+export interface DecisionArgument {
+  argument: string;          // stručná formulace, max 100 znaků
+  smer: number;              // -1.0 (proti) až +1.0 (pro)
+  konzistence: number;       // 0.0 až 1.0 — napříč náladami
+  cetnost: number;           // kolikrát se objevil v zápisech
+  nalady_vyskytu: number[];  // 1-5
+}
+
+export async function extractArguments(d: DecisionForAi, entries: EntryForAi[]): Promise<DecisionArgument[]> {
+  if (entries.length === 0) return [];
+
+  const prompt = `Jsi asistent pro rozhodovací analýzu. Z níže uvedených zápisů uživatele extrahuj DISTINCT argumenty (ne citace, ale shrnutí témat) a jejich pozici v rozhodovací matici.
+
+ROZHODNUTÍ:
+- Otázka: ${d.otazka}
+- Varianty: ${d.varianty.map((v, i) => `${i + 1}. ${v}`).join("; ")}
+
+ZÁPISY (${entries.length}):
+${entries.map((e, i) => `[${i + 1}] ${e.datum.toLocaleDateString("cs-CZ")} | nálada ${e.nalada} | typ ${e.typVstupu} | úhel ${e.uhelPohledu}\n${e.obsah}`).join("\n\n")}
+
+ÚKOL — vrať POUZE JSON s polem argumentů (max 12), žádný markdown wrapper:
+{
+  "arguments": [
+    {
+      "argument": "stručná formulace (max 100 znaků)",
+      "smer": -1.0 až +1.0,
+      "konzistence": 0.0 až 1.0,
+      "cetnost": int,
+      "nalady_vyskytu": [1-5]
+    }
+  ]
+}
+
+PRAVIDLA:
+- Argument = TÉMA, ne citace. 3× stejné téma = 1 argument cetnost=3.
+- Konzistence: napříč náladami 1 i 5 → vysoká (1.0). Jen v náladě 1 → 0.2.
+- Smer: AI rozhodne. „Obavy z financí" = -0.7. „Baví mě to" = +0.6.
+- Max 12 argumentů, vyber nejvýraznější.
+- Žádný terapeutický tón.`;
+
+  const ai = getGemini();
+  const response = await callTracked({
+    module: "bwmys-arguments",
+    modelName: ANALYSIS_MODEL,
+    fn: () => ai.models.generateContent({
+      model: ANALYSIS_MODEL,
+      contents: prompt,
+      config: { temperature: 0.3, maxOutputTokens: 4000, responseMimeType: "application/json" },
+    }),
+  });
+
+  const raw = (response.text ?? "").trim();
+  try {
+    const parsed = JSON.parse(raw) as { arguments?: DecisionArgument[] };
+    const arr = parsed.arguments ?? [];
+    return arr
+      .filter((a) => typeof a?.argument === "string" && a.argument.length > 0)
+      .map((a) => ({
+        argument: String(a.argument).slice(0, 120),
+        smer: Math.max(-1, Math.min(1, Number(a.smer) || 0)),
+        konzistence: Math.max(0, Math.min(1, Number(a.konzistence) || 0)),
+        cetnost: Math.max(1, Math.floor(Number(a.cetnost) || 1)),
+        nalady_vyskytu: Array.isArray(a.nalady_vyskytu)
+          ? a.nalady_vyskytu.map((n) => Number(n)).filter((n) => n >= 1 && n <= 5)
+          : [],
+      }))
+      .slice(0, 12);
+  } catch (e) {
+    void e;
+    throw new Error(`Extrakce argumentů: nelze parse JSON. Prvních 200 znaků: ${raw.slice(0, 200)}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4. Klasifikace úhlu pohledu (subprocess, volá se inline ve finalniVyhodnoceni
 //    pokud entry má uhelPohledu="nevybrano" — řešeno v API endpointu, ne tady)
 // ---------------------------------------------------------------------------

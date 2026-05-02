@@ -4,6 +4,10 @@ import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import BwMysAudioRecorder from "./BwMysAudioRecorder";
 import BwMysViz from "./BwMysViz";
+import ArgumentsGrid, { type DecisionArgument } from "./BwMysViz/ArgumentsGrid";
+import SixHatsRadar from "./BwMysViz/SixHatsRadar";
+import MoodCurve from "./BwMysViz/MoodCurve";
+import EntryTypesDonut from "./BwMysViz/EntryTypesDonut";
 
 interface Decision {
   id: string;
@@ -38,6 +42,7 @@ interface DecisionEvaluation {
   datum: string;
   typ: string;
   obsahStrukturovany: unknown;
+  argumentsJson: DecisionArgument[] | null;
   pocetVstupuVDobeGenerovani: number;
 }
 
@@ -265,7 +270,7 @@ export default function BwMysDetail({ id }: { id: string }) {
               </summary>
               <div className="mt-3">
                 {ev.typ === "finalni"
-                  ? <FinalEvalRender data={ev.obsahStrukturovany as Record<string, unknown>} />
+                  ? <FinalEvalRender data={ev.obsahStrukturovany as Record<string, unknown>} evaluation={ev} entries={d.entries} decisionId={d.id} />
                   : <MiniEvalRender data={ev.obsahStrukturovany as Record<string, unknown>} />}
               </div>
               {ev.typ === "finalni" && d.status === "aktivni" && (
@@ -478,14 +483,132 @@ function NewEntryModal({ decisionId, onClose }: { decisionId: string; onClose: (
 }
 
 // ============================================================================
+// Banner s mřížkou argumentů + 3 menší grafy nad finálním vyhodnocením
+// ============================================================================
+
+function ArgumentsBanner({
+  decisionId, evaluation, entries,
+}: {
+  decisionId: string;
+  evaluation: DecisionEvaluation;
+  entries: DecisionEntry[];
+}) {
+  const [args, setArgs] = useState<DecisionArgument[] | null>(evaluation.argumentsJson ?? null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (args !== null) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/bwmys/${decisionId}/arguments`, { method: "POST" });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) { setErr(data.error ?? "Generování selhalo."); return; }
+        setArgs(data.arguments ?? []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluation.id]);
+
+  async function regenerate() {
+    setLoading(true); setErr(null);
+    try {
+      const res = await fetch(`/api/bwmys/${decisionId}/arguments?force=1`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error ?? "Generování selhalo."); return; }
+      setArgs(data.arguments ?? []);
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div className="rounded-md border border-[var(--tint-sky)]/30 bg-[var(--tint-sky)]/[0.04] p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+          Vizuální shrnutí
+        </div>
+        <button
+          onClick={regenerate}
+          disabled={loading}
+          className="text-[10px] font-mono text-muted-foreground hover:text-foreground inline-flex items-center gap-1 disabled:opacity-50"
+          title="Přegenerovat mřížku argumentů (volá AI)"
+        >
+          <Sparkles className="size-3" /> {loading ? "generuji…" : "regenerovat"}
+        </button>
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground mb-1">
+          Mřížka argumentů
+        </div>
+        {loading && args === null && (
+          <div className="text-xs text-muted-foreground italic h-48 grid place-items-center">
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" /> Generuji argumenty…
+            </span>
+          </div>
+        )}
+        {err && (
+          <div className="text-xs text-destructive rounded-md border border-destructive/30 bg-destructive/10 p-2">
+            {err}
+          </div>
+        )}
+        {args && <ArgumentsGrid arguments={args} />}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-white/5">
+        <MiniTile title="Six Hats">
+          <SixHatsRadar entries={entries} />
+        </MiniTile>
+        <MiniTile title="Křivka nálad">
+          <MoodCurve entries={entries} />
+        </MiniTile>
+        <MiniTile title="Typy zápisů">
+          <EntryTypesDonut entries={entries} />
+        </MiniTile>
+      </div>
+    </div>
+  );
+}
+
+function MiniTile({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-md border border-white/5 bg-white/[0.02] p-2">
+      <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground mb-1">
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ============================================================================
 // Render finálního vyhodnocení (sekce A-H)
 // ============================================================================
 
-function FinalEvalRender({ data }: { data: Record<string, unknown> }) {
+function FinalEvalRender({
+  data, evaluation, entries, decisionId,
+}: {
+  data: Record<string, unknown>;
+  evaluation: DecisionEvaluation;
+  entries: DecisionEntry[];
+  decisionId: string;
+}) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const d = data as any;
   return (
     <div className="space-y-4 text-sm">
+      <ArgumentsBanner
+        decisionId={decisionId}
+        evaluation={evaluation}
+        entries={entries}
+      />
+
       <Section letter="A" title="Statistika sběru">
         <div className="text-xs space-y-1 text-muted-foreground/90">
           <div>Zápisů: <strong>{d.A_statistika?.pocetZapisu}</strong> · Rozsah: {d.A_statistika?.rozsahDni} dní</div>
