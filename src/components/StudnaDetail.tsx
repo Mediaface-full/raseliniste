@@ -485,12 +485,14 @@ function RecordingCard({
               fill={recording.isPinned ? "currentColor" : "none"}
             />
           </button>
-          {(recording.status === "error" || (recording.status === "processed" && !recording.transcript)) && (
+          {recording.audioPath && recording.status !== "processing" && (
             <button
               onClick={onRegenerate}
               disabled={busy}
               className="p-1.5 rounded hover:bg-[var(--tint-sky)]/20 transition-colors text-[var(--tint-sky)]"
-              title="Regenerovat AI analýzu z uloženého audia"
+              title={recording.status === "processed"
+                ? "Přegenerovat AI analýzu (přepis + resumé znovu z audia)"
+                : "Regenerovat AI analýzu z uloženého audia"}
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
             </button>
