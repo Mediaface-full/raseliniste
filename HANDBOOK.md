@@ -781,6 +781,9 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | POST | `/api/todoist/projects` | session | `{name, parentId? \| parentName?, color?}` — vytvoří projekt; idempotentní (case-insensitive match na name proti TodoistProjectMirror); upserts mirror po success |
 | POST | `/api/todoist/labels` | session | `{name, color?}` — vytvoří label; idempotentní vůči TodoistLabelMirror |
 | POST | `/api/todoist/bulk-setup` | session | `{projects: [{name, parentName?, color?}], labels: [{name, color?}]}` — bulk varianta s idempotencí; vrátí `{projects, labels, summary}` |
+| POST, GET | `/api/things/import` | session | POST: multipart `file` nebo JSON body s curated Things JSON (zod-validated, schema `things-export-curated`); vytvoří ThingsImport + Items se status=uploaded. GET: historie všech importů. |
+| GET, DELETE | `/api/things/import/:id` | session | GET vrátí detail + counts (`?includeItems=true` taky items). DELETE smaže (ne když status=executing). |
+| POST | `/api/things/import/:id/execute` | session | Spustí async dispatch (fire-and-forget): pro každý item migrate→Task+Todoist push, wishlist→Knowledge Entry, discard→skip. Klient pollovat GET pro progress. |
 | GET | `/api/settings/mail` | session | — |
 | POST | `/api/settings/mail` | session | `{host, port, secure, user, password, from}` (verify + save) |
 | DELETE | `/api/settings/mail` | session | — |

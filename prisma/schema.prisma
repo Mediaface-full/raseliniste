@@ -50,6 +50,7 @@ model User {
   decisions        Decision[]
   todoistProjects  TodoistProjectMirror[]
   todoistLabels    TodoistLabelMirror[]
+  thingsImports    ThingsImport[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -893,6 +894,7 @@ enum TaskSource {
   capture
   todoist_pull
   vip_call_log
+  things_import
 }
 
 enum TaskBatchStatus {
@@ -1259,6 +1261,46 @@ model DecisionEntry {
   audioBytes  Int?
 
   @@index([decisionId, datum])
+}
+
+// Things bulk import — uživatel ručně srovná Things JSON v jiné konverzaci,
+// nahraje sem strukturovaný JSON s rozhodnutími (migrate/wishlist/discard).
+// Rašeliniště to JEN zpracuje — žádná AI klasifikace.
+model ThingsImport {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  filename        String
+  rawJson         Json
+  totalCount      Int
+  migrateCount    Int
+  wishlistCount   Int
+  discardCount    Int
+  status          String    // "uploaded" | "executing" | "completed" | "failed"
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+  errorLog        Json?     // pole errorů per-item pokud něco selhalo
+
+  items           ThingsImportItem[]
+
+  @@index([userId, createdAt])
+}
+
+model ThingsImportItem {
+  id              String    @id @default(cuid())
+  importId        String
+  import          ThingsImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  thingsUuid      String
+  title           String
+  decision        String    // "migrate" | "wishlist" | "discard"
+  pushResult      String?   // "ok" | "skipped" | "error: ..."
+  pushedTaskId    String?   // Todoist task ID nebo Entry ID
+  pushedAt        DateTime?
+
+  @@unique([importId, thingsUuid])
+  @@index([importId])
 }
 
 // Mirror Todoist labelů — read-only kopie pro UI mapping a idempotenci

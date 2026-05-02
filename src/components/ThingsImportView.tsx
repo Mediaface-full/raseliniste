@@ -1,0 +1,419 @@
+import { useEffect, useRef, useState } from "react";
+import { Upload, Loader2, CheckCircle2, AlertTriangle, Trash2, ListOrdered, X } from "lucide-react";
+import { Button } from "./ui/Button";
+
+/**
+ * UI pro Things bulk import.
+ *
+ * Tři stavy:
+ *   1. Žádný import → file picker
+ *   2. uploaded → preview tabulka + tlačítko "Spustit import" / "Zrušit"
+ *   3. executing/completed → progress bar + logy (polling 2s)
+ */
+
+interface ImportSummary {
+  id: string;
+  filename: string;
+  status: string;
+  totalCount: number;
+  migrateCount: number;
+  wishlistCount: number;
+  discardCount: number;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+interface ImportItem {
+  id: string;
+  thingsUuid: string;
+  title: string;
+  decision: string;
+  pushResult: string | null;
+  pushedTaskId: string | null;
+  pushedAt: string | null;
+}
+
+interface ImportDetail {
+  import: ImportSummary & { items?: ImportItem[]; errorLog?: unknown };
+  counts: {
+    total: number;
+    migrate: number;
+    wishlist: number;
+    discard: number;
+    pushedOk: number;
+    pushedSkipped: number;
+    pushedError: number;
+    pending: number;
+  };
+}
+
+export default function ThingsImportView() {
+  const [history, setHistory] = useState<ImportSummary[]>([]);
+  const [active, setActive] = useState<ImportDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [validationIssues, setValidationIssues] = useState<any[] | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pollingRef = useRef<number | null>(null);
+
+  async function loadHistory() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/things/import");
+      const data = await res.json();
+      if (res.ok) setHistory(data.imports);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadActive(id: string, includeItems = false) {
+    const res = await fetch(`/api/things/import/${id}${includeItems ? "?includeItems=true" : ""}`);
+    if (res.ok) {
+      const data = await res.json();
+      setActive(data);
+      return data as ImportDetail;
+    }
+    return null;
+  }
+
+  useEffect(() => {
+    loadHistory();
+    return () => {
+      if (pollingRef.current) window.clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  // Polling pro executing import
+  useEffect(() => {
+    if (!active || active.import.status !== "executing") {
+      if (pollingRef.current) {
+        window.clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      return;
+    }
+    pollingRef.current = window.setInterval(() => {
+      loadActive(active.import.id, true).then((d) => {
+        if (d && d.import.status !== "executing") {
+          if (pollingRef.current) {
+            window.clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          loadHistory();
+        }
+      });
+    }, 2000);
+    return () => {
+      if (pollingRef.current) {
+        window.clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [active?.import.id, active?.import.status]);
+
+  async function uploadFile(file: File) {
+    setError(null);
+    setValidationIssues(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/things/import", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Upload selhal.");
+        if (data.issues) setValidationIssues(data.issues);
+        return;
+      }
+      await loadActive(data.import.id, true);
+      await loadHistory();
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function executeNow() {
+    if (!active) return;
+    setError(null);
+    const res = await fetch(`/api/things/import/${active.import.id}/execute`, {
+      method: "POST",
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "Spuštění selhalo.");
+      return;
+    }
+    await loadActive(active.import.id, true);
+  }
+
+  async function deleteImport(id: string) {
+    if (!confirm("Smazat import? Záznamy v Task / Knowledge zůstanou pokud už proběhl.")) return;
+    const res = await fetch(`/api/things/import/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      if (active?.import.id === id) setActive(null);
+      loadHistory();
+    } else {
+      const data = await res.json();
+      setError(data.error ?? "Smazání selhalo.");
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* HEADER */}
+      <div className="glass-strong rounded-xl p-4">
+        <h1 className="font-serif text-2xl mb-2">Things bulk import</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Nahraj <strong>srovnaný JSON</strong> (po review v jiné konverzaci) — Rašeliniště ho
+          jen zpracuje. Pro každý úkol musí být <code>decision</code>: <code>migrate</code> →
+          Todoist, <code>wishlist</code> → Knowledge entry, <code>discard</code> → přeskočit.
+        </p>
+      </div>
+
+      {/* UPLOAD */}
+      {!active && (
+        <div className="glass rounded-xl p-6 text-center space-y-3">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadFile(f);
+              e.target.value = "";
+            }}
+          />
+          <Button onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? <><Loader2 className="animate-spin" /> Nahrávám…</> : <><Upload /> Vybrat curated JSON</>}
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            Schema: <code className="font-mono">source: "things-export-curated"</code>, <code className="font-mono">items[]</code> s <code className="font-mono">thingsUuid, title, decision</code>.
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">
+          <AlertTriangle className="inline size-4 mr-1" /> {error}
+          {validationIssues && (
+            <ul className="mt-2 list-disc pl-5 text-xs space-y-0.5">
+              {validationIssues.slice(0, 20).map((i, k) => (
+                <li key={k}><strong>{i.path}:</strong> {i.message}</li>
+              ))}
+              {validationIssues.length > 20 && (
+                <li>… a {validationIssues.length - 20} dalších</li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* ACTIVE IMPORT */}
+      {active && (
+        <div className="glass rounded-xl p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="font-serif text-lg">{active.import.filename}</div>
+              <div className="text-[11px] font-mono text-muted-foreground">
+                {new Date(active.import.createdAt).toLocaleString("cs-CZ")} · status{" "}
+                <span className={
+                  active.import.status === "completed" ? "text-[var(--tint-sage)]"
+                  : active.import.status === "executing" ? "text-[var(--tint-butter)]"
+                  : active.import.status === "failed" ? "text-destructive"
+                  : "text-foreground"
+                }>{active.import.status}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setActive(null)}
+              className="p-2 rounded-md hover:bg-white/5 text-muted-foreground"
+              title="Zavřít"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          {/* Counts */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            <Stat label="Total" value={active.counts.total} />
+            <Stat label="Migrate" value={active.counts.migrate} tint="sky" />
+            <Stat label="Wishlist" value={active.counts.wishlist} tint="butter" />
+            <Stat label="Discard" value={active.counts.discard} tint="muted" />
+          </div>
+
+          {/* Progress (executing) */}
+          {active.import.status === "executing" && (
+            <div className="rounded-md border border-[var(--tint-butter)]/30 bg-[var(--tint-butter)]/[0.06] p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Loader2 className="size-4 animate-spin text-[var(--tint-butter)]" />
+                Zpracovávám… {active.counts.pushedOk + active.counts.pushedSkipped + active.counts.pushedError} / {active.counts.total}
+              </div>
+              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[var(--tint-butter)] transition-all"
+                  style={{ width: `${Math.round(((active.counts.pushedOk + active.counts.pushedSkipped + active.counts.pushedError) / Math.max(1, active.counts.total)) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Completed */}
+          {active.import.status === "completed" && (
+            <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/[0.06] p-3 text-sm">
+              <CheckCircle2 className="inline size-4 mr-1 text-[var(--tint-sage)]" />
+              Hotovo · <strong>{active.counts.pushedOk}</strong> OK,{" "}
+              <strong>{active.counts.pushedSkipped}</strong> skipped,{" "}
+              {active.counts.pushedError > 0 && (
+                <strong className="text-destructive">{active.counts.pushedError} chyb</strong>
+              )}
+              {active.counts.pushedError === 0 && <span>0 chyb</span>}
+              {active.import.completedAt && (
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  Dokončeno {new Date(active.import.completedAt).toLocaleTimeString("cs-CZ")}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          {active.import.status === "uploaded" && (
+            <div className="flex gap-2">
+              <Button onClick={executeNow}>
+                <ListOrdered /> Spustit import
+              </Button>
+              <Button variant="ghost" onClick={() => deleteImport(active.import.id)}>
+                <Trash2 /> Zrušit
+              </Button>
+            </div>
+          )}
+
+          {active.import.status === "completed" && (
+            <div className="flex gap-2">
+              <Button onClick={() => (window.location.href = "/ukoly")}>
+                Otevřít /ukoly
+              </Button>
+              <Button variant="ghost" onClick={() => setActive(null)}>Zavřít</Button>
+            </div>
+          )}
+
+          {/* Items table */}
+          {active.import.items && (
+            <details className="rounded-md border border-white/5">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Položky ({active.import.items.length}) {active.counts.pushedError > 0 && (
+                  <span className="text-destructive">· {active.counts.pushedError} chyb</span>
+                )}
+              </summary>
+              <div className="max-h-96 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-[#0c1126]">
+                    <tr className="text-[10px] uppercase font-mono text-muted-foreground">
+                      <th className="text-left px-3 py-2">Title</th>
+                      <th className="text-left px-3 py-2">Decision</th>
+                      <th className="text-left px-3 py-2">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {active.import.items.map((it) => (
+                      <tr key={it.id} className="border-t border-white/5">
+                        <td className="px-3 py-1.5 max-w-md truncate">{it.title}</td>
+                        <td className="px-3 py-1.5 font-mono text-[11px]">
+                          {decisionBadge(it.decision)}
+                        </td>
+                        <td className="px-3 py-1.5 font-mono text-[11px]">
+                          {it.pushResult === "ok" && <span className="text-[var(--tint-sage)]">✓ ok</span>}
+                          {it.pushResult === "skipped" && <span className="text-muted-foreground">— skipped</span>}
+                          {it.pushResult?.startsWith("error:") && (
+                            <span className="text-destructive" title={it.pushResult}>✗ error</span>
+                          )}
+                          {it.pushResult === null && <span className="text-muted-foreground">…</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* HISTORY */}
+      <div className="glass rounded-xl p-4">
+        <h2 className="font-serif text-lg mb-3">Historie importů</h2>
+        {loading ? (
+          <div className="text-sm text-muted-foreground">Načítám…</div>
+        ) : history.length === 0 ? (
+          <div className="text-sm text-muted-foreground italic">Zatím žádný import.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-[10px] uppercase font-mono text-muted-foreground">
+              <tr>
+                <th className="text-left px-2 py-1.5">Soubor</th>
+                <th className="text-left px-2 py-1.5">Status</th>
+                <th className="text-right px-2 py-1.5">Items</th>
+                <th className="text-left px-2 py-1.5">Datum</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h) => (
+                <tr key={h.id} className="border-t border-white/5">
+                  <td className="px-2 py-2 truncate max-w-[200px]">{h.filename}</td>
+                  <td className="px-2 py-2 font-mono text-xs">{h.status}</td>
+                  <td className="px-2 py-2 text-right font-mono text-xs">
+                    {h.totalCount} ({h.migrateCount}/{h.wishlistCount}/{h.discardCount})
+                  </td>
+                  <td className="px-2 py-2 font-mono text-xs text-muted-foreground">
+                    {new Date(h.createdAt).toLocaleDateString("cs-CZ")}
+                  </td>
+                  <td className="px-2 py-2 flex gap-1 justify-end">
+                    <button
+                      onClick={() => loadActive(h.id, true)}
+                      className="p-1.5 hover:bg-white/5 rounded text-muted-foreground hover:text-foreground"
+                      title="Detail"
+                    >
+                      <ListOrdered className="size-3.5" />
+                    </button>
+                    <button
+                      onClick={() => deleteImport(h.id)}
+                      className="p-1.5 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive"
+                      title="Smazat"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, tint = "foreground" }: { label: string; value: number; tint?: "sky" | "butter" | "muted" | "foreground" }) {
+  const color =
+    tint === "sky" ? "text-[var(--tint-sky)]"
+    : tint === "butter" ? "text-[var(--tint-butter)]"
+    : tint === "muted" ? "text-muted-foreground"
+    : "text-foreground";
+  return (
+    <div className="rounded-md bg-white/[0.03] border border-white/5 p-2">
+      <div className={`font-serif text-xl ${color}`}>{value}</div>
+      <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function decisionBadge(d: string) {
+  if (d === "migrate") return <span className="text-[var(--tint-sky)]">→ migrate</span>;
+  if (d === "wishlist") return <span className="text-[var(--tint-butter)]">★ wishlist</span>;
+  if (d === "discard") return <span className="text-muted-foreground">× discard</span>;
+  return <span>{d}</span>;
+}
