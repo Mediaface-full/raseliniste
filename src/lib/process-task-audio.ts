@@ -90,8 +90,8 @@ export async function processTaskAudio(params: {
       data: { rawTranscript: transcript },
     });
 
-    // Stage 2: extrakce
-    const proposals = await extractTaskProposals(transcript);
+    // Stage 2: extrakce — předáme userId aby AI dostala dynamické tagy/kontakty
+    const proposals = await extractTaskProposals(transcript, { userId: params.userId });
 
     await prisma.taskAudioBatch.update({
       where: { id: params.batchId },
@@ -124,9 +124,12 @@ export async function processTaskAudio(params: {
 // Extrakce úkolů z přepisu — Vertex Gemini Pro, JSON output
 // ---------------------------------------------------------------------------
 
-export async function extractTaskProposals(transcript: string): Promise<TaskProposal[]> {
-  // Načti seznam kontaktů — pomáhá AI rozpoznat "pro Karla" jako delegaci
+export async function extractTaskProposals(transcript: string, opts?: { userId?: string }): Promise<TaskProposal[]> {
+  const userId = opts?.userId;
+
+  // Kontakty (delegace) — filtr na vlastníka pokud znám userId.
   const contacts = await prisma.contact.findMany({
+    where: userId ? { userId } : undefined,
     select: { displayName: true, firstName: true },
     take: 200,
   });
@@ -135,17 +138,52 @@ export async function extractTaskProposals(transcript: string): Promise<TaskProp
     ...contacts.map((c) => c.displayName),
   ])).filter((n) => n.length >= 2);
 
+  // Dynamický seznam tagů — top tagy z existujících Task + Todoist labels mirror.
+  // AI tak používá Petrovu skutečnou strukturu, ne hardcoded whitelist v promptu.
+  let preferredTags: string[] = [];
+  if (userId) {
+    try {
+      const recentTasks = await prisma.task.findMany({
+        where: { userId },
+        select: { tags: true },
+        orderBy: { createdAt: "desc" },
+        take: 500,
+      });
+      const tagCount = new Map<string, number>();
+      for (const t of recentTasks) {
+        for (const tag of t.tags) tagCount.set(tag, (tagCount.get(tag) ?? 0) + 1);
+      }
+      const labels = await prisma.todoistLabelMirror.findMany({
+        where: { userId },
+        select: { name: true },
+      });
+      for (const l of labels) {
+        const k = l.name.toLowerCase();
+        if (!tagCount.has(k)) tagCount.set(k, 0);
+      }
+      preferredTags = Array.from(tagCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([tag]) => tag)
+        .slice(0, 40);
+    } catch (e) {
+      console.warn("[task-audio] preferred tags load failed:", e instanceof Error ? e.message : String(e));
+    }
+  }
+
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
   const dayCz = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"][today.getDay()];
 
   // Načti base prompt (instrukce) z DB override / default. Runtime kontext
-  // (datum, kontakty, přepis) se připojuje níže — Petr edituje jen instrukce.
+  // (datum, kontakty, tagy, přepis) se připojuje níže — Petr edituje jen instrukce.
   const basePrompt = await getPrompt("ozvena-stage2-task");
   const prompt = `${basePrompt}
 
 KONTAKTY (pro detekci delegace, vyber přesně podle jména):
 ${contactNames.length > 0 ? contactNames.slice(0, 50).join(", ") : "(žádné)"}
+
+PREFEROVANÉ TAGY (skutečné struktury Petrova systému — vyber primárně z těchto, jen pokud ne padne přesně, klidně přidej nový):
+${preferredTags.length > 0 ? preferredTags.join(", ") : "(žádné — použij obecné kategorie z hlavního promptu)"}
 
 REFERENCE DATE: dnes je ${todayStr} (${dayCz})
 

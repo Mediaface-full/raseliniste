@@ -169,6 +169,42 @@
 <h3>Idempotence</h3>
 <p>Push je idempotent přes <code>Task.todoistTaskId</code>. Když klikneš Send 2× na ten samý úkol, vznikne v Todoistu jen jeden task. Pokud ho v Todoistu smažeš a chceš znovu, smaž ho v Rašeliništi a vytvoř znova.</p>
 
+<h2>7b. Plně obousměrná synchronizace (NOVÉ 2026-05-02)</h2>
+
+<div class="tldr">
+<strong>Princip:</strong> Todoist je tvůj primary tool, Rašeliniště je sběrna a analyzátor. Pracuj kdekoli — vše se sjedná do <strong>5 minut</strong>.
+</div>
+
+<h3>Z Rašeliniště → Todoist (okamžitě)</h3>
+<table>
+<tr><th>Akce v Rašeliništi</th><th>Co se stane v Todoistu</th></tr>
+<tr><td>Audio diktát commit</td><td>Auto-push všech úkolů s parent→children hierarchií</td></tr>
+<tr><td>Manuální create v <code>/ukoly</code></td><td>Auto-push (žádné druhé klikání)</td></tr>
+<tr><td>Edit title/notes/datum/štítků/priority</td><td>Update v Todoistu okamžitě</td></tr>
+<tr><td>Mark done</td><td>Close v Todoistu</td></tr>
+<tr><td>Reopen (vrátit done → open)</td><td>Reopen v Todoistu</td></tr>
+<tr><td>Delete</td><td>Delete v Todoistu (hard)</td></tr>
+<tr><td>VIP submit z firewallu</td><td>Vznikne task v projektu „VIP" s priorita 4</td></tr>
+</table>
+
+<h3>Z Todoistu → Rašeliniště (do 5 min)</h3>
+<table>
+<tr><th>Akce v Todoist appce</th><th>Co se stane v Rašeliništi</th></tr>
+<tr><td>Vytvořím nový úkol kdekoli</td><td>Objeví se v <code>/ukoly</code> se source=todoist_pull</td></tr>
+<tr><td>Edituju title/notes/datum/štítky</td><td>Aktualizuje se lokální Task (Todoist je zdroj pravdy)</td></tr>
+<tr><td>Odškrtnu (mark done)</td><td>Lokální Task.completedAt + zmizí z otevřených</td></tr>
+<tr><td>Reopen úkol</td><td>Vrátí se do open</td></tr>
+<tr><td>Smažu</td><td>Stejné jako odškrtnu</td></tr>
+<tr><td>Odškrtnu VIP misi</td><td>Zmizí z VIP výpisu Giďoušových misí</td></tr>
+</table>
+
+<div class="tip">
+<strong>Reconcile:</strong> Todoist Sync API completed úkoly nikdy nevrací. Proto cron každých 5 min projde všechny otevřené úkoly + VIP mise a pingne Todoist GET. Pokud 404 → completed/deleted → propíše. Pokud 200 + lokálně done → reopen. <strong>Konzistence je zaručena.</strong>
+</div>
+
+<h3>Audio diktát používá tvoji strukturu</h3>
+<p>Při audio extrakci AI dostane <strong>tvoje skutečné tagy</strong> z DB (top 40 nejpoužívanějších v posledních 500 úkolech) + <strong>všechny Todoist labely</strong> + <strong>seznam tvých kontaktů</strong>. Volí primárně z těchto, jen když nic nepasuje vymyslí nový tag. Tedy jak vyrostá tvoje struktura, AI ji respektuje.</p>
+
 <h2>8. <code>/ozvena</code> — hlasový diktát</h2>
 
 <p>Sidebar → <strong>Úkoly → Nadiktovat úkoly</strong>, nebo PWA ikona na ploše telefonu (viz dále).</p>

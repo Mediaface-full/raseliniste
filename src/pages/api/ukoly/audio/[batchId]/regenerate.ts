@@ -38,7 +38,7 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
 
     void (async () => {
       try {
-        const proposals = await extractTaskProposals(batch.rawTranscript!);
+        const proposals = await extractTaskProposals(batch.rawTranscript!, { userId: session.uid });
         await prisma.taskAudioBatch.update({
           where: { id },
           data: {

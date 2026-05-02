@@ -327,6 +327,59 @@ Samostatný modul s vlastním direct endpointem.
 - Mark done (`completedAt`), delete, filter „zobrazit hotové"
 - **Push do Todoistu** — tlačítko per úkol nebo automaticky z Triage (`pushEntryToTodoist` v `lib/todoist-push.ts`)
 - Idempotentní (`Entry.todoistTaskId` cache)
+
+### ✅ Plně obousměrná synchronizace s Todoistem (commit 7a03a96, 2026-05-02)
+
+**Princip:** Todoist je primary tool, Rašeliniště je sběrna. Petr může pracovat v obou — vše se sjedná.
+
+**Z Rašeliniště → Todoist (synchronně, user-action):**
+
+| Akce v Rašeliniště | Co se stane v Todoistu | Endpoint |
+|---|---|---|
+| Audio diktát commit (`/ozvena`) | Auto-push všech tasků (parent+children) | `audio/[batchId]/commit.ts` fire-and-forget loop |
+| Manual create v `/ukoly` | Auto-push (žádné druhé klikání) | `POST /api/ukoly` po create |
+| Edit title/notes/dueAt/labels/priority | `updateTask(token, taskId, fields)` | `PATCH /api/ukoly/:id` |
+| Mark done | `closeTask(token, taskId)` | `PATCH /api/ukoly/:id` |
+| Reopen (done→open) | `reopenTask(token, taskId)` | `PATCH /api/ukoly/:id` |
+| Delete | `deleteTask(token, taskId)` (idempotent 404) | `DELETE /api/ukoly/:id` |
+| VIP firewall submit | `createTask` v projektu vip s priority 4 + due_date | `POST /api/call-log/submit` |
+| `/ukoly` u VIP mise klik hotovo | `closeTask` na CallLog.todoistTaskId | `PATCH /api/ukoly/callLog:<id>` |
+
+**Z Todoistu → Rašeliniště (cron `todoist-sync` každých 5 min):**
+
+1. **Sync API items pull** — incremental přes `User.todoistSyncToken`
+   - Nové úkoly v Todoist appce → vytvoří `Task` se `source=todoist_pull`
+   - Update title/notes/due/labels/priority — Todoist přepíše naši kopii
+2. **Sync API projects + labels pull** — `TodoistProjectMirror` + `TodoistLabelMirror`
+3. **Reconcile pass** (klíčový — Sync API completed items NEVRACÍ):
+   - Pro každý CallLog (wasVip=true, todoistTaskId != null) a Task (todoistTaskId != null):
+     - GET `/tasks/:id` → 404 → completed/deleted v Todoist
+       - lokálně open → close (set completedAt / seenAt)
+     - GET `/tasks/:id` → 200 → aktivní v Todoist
+       - lokálně done → reopen (clear completedAt / seenAt)
+   - Pokrývá: odškrtnutí, smazání, znovu-otevření v Todoist
+   - Stats: `reconciledClosed` v sync response
+
+**VIP isolation (security audit 2026-05-02):**
+- `Contact.callLogToken @unique` (24 znaků base64url, 144 bit entropie)
+- `resolveCallLogToken`: jeden Contact + defense-in-depth `isVip=true` check
+- `loadVipMissions`: strikt `WHERE contactId = X` (žádný phone fallback od `2fb9555`)
+- Fail-closed všude: pokud token expiroval / VIP odebrán / phone nenalezen → výpis se neukáže
+- **Cross-VIP průsak fyzicky nemožný** — viz audit body 1–8 v této sekci
+
+**Audio diktát flow s dynamickými tagy + kontakty (commit 7a03a96):**
+- `extractTaskProposals(transcript, { userId })` načte:
+  - Top 40 nejpoužívanějších tagů z `Task.tags` (posledních 500 tasků)
+  - Plus všechny `TodoistLabelMirror.name`
+  - Plus 50 nejčastějších `Contact.firstName` / `displayName`
+- Předá AI jako `PREFEROVANÉ TAGY` + `KONTAKTY` runtime kontext
+- AI volí primárně z těchto, ale může přidat nový pokud nic nepasuje
+
+**Helpery v `src/lib/todoist.ts`:**
+- `createTask`, `getTask`, `updateTask`, `closeTask`, `reopenTask`, `deleteTask`
+- `listProjects`, `createProject`, `listLabels`, `createLabel`
+- `listSections`, `createSection`
+- `syncFetch` (Sync API)
 - Mapping: `TaskWhen.TODAY → due_string="today"`, `THIS_WEEK → "this week"`, `SOMEDAY → no due`
 - Labels: `capture` + `suggestedProject` + hashtags
 
