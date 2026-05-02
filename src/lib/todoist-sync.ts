@@ -138,6 +138,10 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
 
       const { dueAt, dueIsTime } = parseDue(item.due);
 
+      // Defenzivní fallback — Todoist u smazaných/archivovaných itemů občas
+      // vrací prázdný/null content; bez fallbacku by Prisma create spadl.
+      const safeTitle = (typeof item.content === "string" && item.content.trim()) || "(bez názvu)";
+
       if (task) {
         // Update existujícího Task — Todoist je zdroj pravdy
         const data: {
@@ -151,7 +155,7 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
           completedAt?: Date;
           todoistProjectId: string;
         } = {
-          title: item.content,
+          title: safeTitle,
           notes: item.description?.trim() || null,
           dueAt,
           dueIsTime,
@@ -175,7 +179,7 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
       await prisma.task.create({
         data: {
           userId,
-          title: item.content,
+          title: safeTitle,
           notes: item.description?.trim() || null,
           dueAt,
           dueIsTime,

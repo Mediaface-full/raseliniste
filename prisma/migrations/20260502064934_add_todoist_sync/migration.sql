@@ -1,11 +1,6 @@
 -- AlterEnum
+-- Postgres: ALTER TYPE ... ADD VALUE musí být odděleno od jiných statementů
+-- (Prisma migrate deploy obaluje každý soubor BEGIN/COMMIT, ale ADD VALUE
+--  v PG <= 14 padá pokud je ve stejné transakci s DDL na stejném enumu).
 ALTER TYPE "TaskSource" ADD VALUE 'todoist_pull';
 ALTER TYPE "TaskSource" ADD VALUE 'vip_call_log';
-
--- AlterTable User
-ALTER TABLE "User" ADD COLUMN "todoistSyncToken" TEXT;
-ALTER TABLE "User" ADD COLUMN "todoistSyncedAt" TIMESTAMP(3);
-ALTER TABLE "User" ADD COLUMN "todoistSyncError" TEXT;
-
--- CreateIndex
-CREATE INDEX "Task_userId_todoistTaskId_idx" ON "Task"("userId", "todoistTaskId");
