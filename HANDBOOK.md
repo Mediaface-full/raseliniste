@@ -423,17 +423,26 @@ Sdílené projektové boxíky s hlasovými záznamy.
   - POST `/api/bwmys/[id]/evaluate` body `{typ, forceLowSample?}` (mini 3+ zápisů, finální 5+ s low-sample warning, pre-finální klasifikace AI úhlů pro nevybrano entries)
   - POST `/api/bwmys/suggest-variants` body `{otazka, soucasneVarianty}` (AI návrh dalších 2-3 variant — typicky odložení, menší verze, delegování, ne-akce)
   - GET `/api/bwmys/[id]/export` (Markdown export celého rozhodnutí: zarámování + entries + evaluations + verdikt)
-- **AI lib `src/lib/bwmys-ai.ts` (4 prompty):**
+  - POST `/api/bwmys/[id]/arguments` (extrakce mřížky argumentů z poslední finální DecisionEvaluation; cache do `argumentsJson`; `?force=1` vynutí regeneraci; vrací `{arguments: [{argument, smer, konzistence, cetnost, nalady_vyskytu}]}`)
+- **AI lib `src/lib/bwmys-ai.ts` (5 promptů):**
   - `navrhniDalsiVarianty()` — Tok 1, krátký prompt
   - `miniVyhodnoceni()` — Tok 3, "zrcadlo, ne rozhodnutí" (rozložení nálad, opakující motivy, chybějící úhly, krátká poznámka)
   - `finalniVyhodnoceni()` — Tok 4, **8 sekcí A-H**: A statistika sběru (pocetZapisu, distribuceNalad, distribuceTypu, upozornění při slabém vzorku), B Six Hats analýza (6 pohledů s 2-4 odrážkami), C signál vs. šum (konzistentní/náladově skreslené/recyklované), D pre-mortem (5 nejpravděpodobnějších důvodů selhání), E 10/10/10 (10 minut/měsíců/let), F WRAP check (více variant?, otestované předpoklady?, dostatečný odstup?, plán B?), G kontextová kritéria (pracovni: obchodní/finanční/marketingový/náročnost/strategický fit; osobni: hodnoty/vztahy/čas+energie/reverzibilita/životní fáze; smiseny: oba bloky), H verdikt (doporučení, hlavní pro/proti, co by překlopilo, doporučená revize)
   - `klasifikujUhly()` — subprocess pro entries s "nevybrano", uloží do uhelPohleduAi
+  - `extractArguments()` — vizualizační vrstva (05-02), max 12 argumentů (téma ≠ citace), každý {argument, smer −1..+1, konzistence 0..1, cetnost, nalady_vyskytu}; ukládá do `DecisionEvaluation.argumentsJson`
   - **Tón striktně věcný, NE terapeutický** (PDF specifikace explicitně zakazuje "vidím že tě to trápí" apod.)
 - **UI komponenty:**
   - `BwMysList` — karty aktivních rozhodnutí (kontext ikona, počet zápisů X/5, dní do deadline, klik → detail)
   - `BwMysNew` — multi-step formulář 6 kroků (název+kontext, otázka s validací ?, varianty min 3 + AI návrh tlačítko, předpoklady min 1, termín+délka sběru, souhrn) s progress barem
   - `BwMysDetail` — hlavička (Pencil edit / Trash delete) + zarámování (sbalitelné) + časová osa zápisů (mood barevný puntík + typ + úhel) + vyhodnocení (sekce A-H render s emoji) + akční zóna (4 tlačítka: Jdu/Nejdu/Odložit/Víc dat) + close dialog s 4 módy + reopen dialog + edit framing modal + new entry modal + audio recorder modal
   - `BwMysAudioRecorder` — modal s mikrofonem (5 min limit, useRecordingProtection)
+  - **`BwMysViz/` (vizualizační vrstva 05-02)** — sbalitelná sekce „Vizuální přehled" mezi Zarámováním a Časovou osou:
+    - `SixHatsRadar` — Recharts RadarChart, 6 os, používá `effectiveUhel()` (manuální přebije AI fallback z `uhelPohleduAi`); od 1 klasifikovaného úhlu, varování na chybějící klobouky
+    - `MoodCurve` — LineChart s body obarvenými dle nálady (`MOOD_COLORS`), tooltip s prvními 50 znaky obsahu, varování při swing ≥ 3
+    - `EntryTypesDonut` — PieChart s `innerRadius`, střed = celkový počet zápisů, textový komentář dle distribuce (např. „převažují vlastní úvahy"); od 3 zápisů
+    - `ArgumentsGrid` — ScatterChart, X = smer (−1..+1), Y = konzistence (0..1), velikost = cetnost (`ZAxis`), opacity = konzistence (≥0.5 plná, <0.5 průhledná), pro = mint, proti = rose, tooltip s textem argumentu + barevné tečky nálad výskytu, 4 popisky kvadrantů
+    - `ArgumentsBanner` ve `FinalEvalRender` — auto-fetch při open, regenerate button (force=1), pod scatterem 3 menší grafy (radar/křivka/donut)
+    - Sdílené barvy v `src/lib/bwmys-colors.ts` (hex přibližně z OKLCH `--tint-*`, Recharts neumí CSS proměnné)
   - Archive `/bwmys/archiv` — filtr status (uzavrene_jdu/nejdu/odlozene/all) + filtr kontext, export MD link, klik → detail (kde je tlačítko Znovu otevřít)
 - **Cron `bwmys-tick`** (#15 v seznamu, denně 7:10):
   - Auto-návrat odložených rozhodnutí (status=odlozene + odlozenoDo<=now → status=aktivni)
@@ -843,6 +852,7 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | POST | `/api/bwmys/:id/evaluate` | session | Mini (3+) / finální (5+ s lowSample warning), AI sekce A-H, pre-klasifikace úhlů |
 | POST | `/api/bwmys/suggest-variants` | session | AI návrh dalších 2-3 variant při zakládání |
 | GET | `/api/bwmys/:id/export` | session | Markdown export celého rozhodnutí |
+| POST | `/api/bwmys/:id/arguments` | session | Extrakce mřížky argumentů (cache do `argumentsJson`, `?force=1` regenerace) |
 | GET | `/api/push/subscribe` | session | Vrátí VAPID public key + seznam aktivních subscriptions |
 | POST | `/api/push/subscribe` | session | Uloží novou subscription (klientský PushSubscription objekt) |
 | PUT | `/api/push/subscribe` | session | Pošli test push na všechna zařízení usera |
