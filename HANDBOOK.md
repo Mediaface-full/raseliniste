@@ -257,7 +257,7 @@ raseliniste/
 - **Entry** doplněn o `todoistTaskId`, `todoistProjectId` (push do Todoistu) a `completedAt` (mark done v /tasks /notes).
 
 ### Studna (sdílené projektové boxíky)
-- **ProjectBox** — `name`, `homeTitle` (max 9 znaků pro „G: …" na ploše iPhone), `description` (kontext pro AI prompt), `extractionPrompt` (volitelný override), `includeInDigest` (zda zahrnout do denního souhrnu).
+- **ProjectBox** — `name`, `homeTitle` (max 9 znaků pro „G: …" na ploše iPhone), `description` (kontext pro AI prompt), `extractionPrompt` (volitelný override), `studnaStandardPrompt`/`studnaBriefPrompt` (per-projekt Stage 2 prompt — priorita: tento override > DB global override > default v kódu; UI: sbalitelná sekce v detailu projektu Studánky/Prskavky), `includeInDigest` (zda zahrnout do denního souhrnu).
 - **GuestUser** — globální host identita per email (per owner), `guestToken` v URL `/me/<token>`. Stejný host = stejný link napříč projekty (jeden link, jedna ikona na ploše).
 - **ProjectInvitation** — many-to-many `GuestUser ↔ ProjectBox` s per-projekt permission `canRecordBrief`.
 - **ProjectRecording** — `type: STANDARD | BRIEF`, `transcript` (vždy plný), `analysis Json` (strukturovaný JSON od Gemini), `audioPath` (cleanup cron maže STANDARD po 14 dnech, briefy + pinned navždy), `isPinned`, `isOwner`, `authorName` (snapshot).
@@ -517,6 +517,7 @@ Sdílené projektové boxíky s hlasovými záznamy.
 - **URL ponecháno** `/studna/...` (bookmarky a guest linky `/me/<token>` zůstávají funkční)
 - **Class/file/var názvy ponechány** (`StudnaList`, `StudnaDetail`, `StudnaSchema`) — interní, neviditelné
 - **Cleanup citoslovcí:** `transcribeAudio()` má opt-in `cleanupFillers: true`, Studánka ho zapíná. Stage 1 prompt vyloučí ehm/eee/no/jakože/repetice. Petr může u starých nahrávek kliknout „Regenerovat" pro fresh přepis.
+- **Per-projekt custom Stage 2 prompty (NOVÉ 2026-05-02):** každý ProjectBox může mít vlastní `studnaStandardPrompt` a `studnaBriefPrompt` — přebijí globální default jen pro daný projekt (Prskavka use case: jiný typ výstupu pro osobní projekty než pro klientská brainstorm). Ukládá se přes PATCH `/api/studna/:id`, v UI v záložce Nastavení sekce „⚙ Vlastní AI prompty pro tento projekt". Pokud aktivní, v hlavičce projektu se zobrazí lavender banner.
 
 ### ✅ Gideonův Firewall (rozšířený 2026-05-01)
 - **VIP varianta `/call-log`** = oddělená entita s:

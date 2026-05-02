@@ -14,6 +14,8 @@ interface ProjectDetail {
   homeTitle: string | null;
   description: string | null;
   extractionPrompt: string | null;
+  studnaStandardPrompt: string | null;
+  studnaBriefPrompt: string | null;
   includeInDigest: boolean;
   archivedAt: string | null;
   createdAt: string;
@@ -95,8 +97,20 @@ export default function StudnaDetail({ projectId, ownerName }: { projectId: stri
     return <div className="text-muted-foreground">Projekt nenalezen.</div>;
   }
 
+  const hasCustomStudnaPrompts = Boolean(project.studnaStandardPrompt || project.studnaBriefPrompt);
+
   return (
     <div className="space-y-4">
+      {hasCustomStudnaPrompts && (
+        <div
+          className="rounded-md border border-[var(--tint-lavender)]/40 bg-[var(--tint-lavender)]/[0.08] px-3 py-2 text-[11px] font-mono text-[var(--tint-lavender)] cursor-pointer hover:bg-[var(--tint-lavender)]/[0.12]"
+          onClick={() => setTab("settings")}
+          title="Tento projekt má vlastní AI prompty pro analýzu — klikni pro úpravu"
+        >
+          ⚙ Tento projekt používá vlastní AI prompty (Studna Standard{project.studnaStandardPrompt ? " ✓" : ""}{project.studnaBriefPrompt ? ", Brief ✓" : ""})
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="glass rounded-xl p-1.5 flex gap-1">
         <TabButton active={tab === "feed"} onClick={() => setTab("feed")}>
@@ -779,6 +793,11 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
   const [homeTitle, setHomeTitle] = useState(project.homeTitle ?? "");
   const [description, setDescription] = useState(project.description ?? "");
   const [extractionPrompt, setExtractionPrompt] = useState(project.extractionPrompt ?? "");
+  const [studnaStandardPrompt, setStudnaStandardPrompt] = useState(project.studnaStandardPrompt ?? "");
+  const [studnaBriefPrompt, setStudnaBriefPrompt] = useState(project.studnaBriefPrompt ?? "");
+  const [showCustomPrompts, setShowCustomPrompts] = useState(
+    Boolean(project.studnaStandardPrompt || project.studnaBriefPrompt),
+  );
   const [includeInDigest, setIncludeInDigest] = useState(project.includeInDigest);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -794,6 +813,8 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           homeTitle: homeTitle.trim() || null,
           description: description.trim() || null,
           extractionPrompt: extractionPrompt.trim() || null,
+          studnaStandardPrompt: studnaStandardPrompt.trim() || null,
+          studnaBriefPrompt: studnaBriefPrompt.trim() || null,
           includeInDigest,
         }),
       });
@@ -846,6 +867,78 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             placeholder="Pro tento projekt zaměř pozornost zejména na…"
             className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
           />
+        </div>
+
+        {/* Per-projekt Stage 2 prompty — pokročilé, pro projekty kde standardní
+            globální analýza nestačí (jiný typ výstupu, vlastní formát). */}
+        <div className="rounded-md border border-white/5 bg-white/[0.02] p-3">
+          <button
+            type="button"
+            onClick={() => setShowCustomPrompts((v) => !v)}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              ⚙ Vlastní AI prompty pro tento projekt {(project.studnaStandardPrompt || project.studnaBriefPrompt) && "· aktivní"}
+            </span>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {showCustomPrompts ? "skrýt" : "zobrazit"}
+            </span>
+          </button>
+          {showCustomPrompts && (
+            <div className="mt-3 space-y-3">
+              <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                Přepíše globální Studna prompt POUZE pro tento projekt. Když prázdné, použije se globální
+                z <code className="font-mono">/settings/ai-prompts</code> (nebo default v kódu). Zachovej
+                JSON schéma a explicitní instrukci češtiny v textech, jinak Gemini může vrátit anglicky.
+              </p>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                    Standard (krátké záznamy, Flash model)
+                  </label>
+                  {studnaStandardPrompt && (
+                    <button
+                      type="button"
+                      onClick={() => setStudnaStandardPrompt("")}
+                      className="text-[10px] font-mono text-muted-foreground hover:text-destructive"
+                    >
+                      Resetovat na default
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={studnaStandardPrompt}
+                  onChange={(e) => setStudnaStandardPrompt(e.target.value)}
+                  rows={8}
+                  placeholder="Prázdné = použije se globální studna-standard prompt"
+                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-xs font-mono resize-y"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+                    Brief (dlouhé brief 30–90 min, Pro model)
+                  </label>
+                  {studnaBriefPrompt && (
+                    <button
+                      type="button"
+                      onClick={() => setStudnaBriefPrompt("")}
+                      className="text-[10px] font-mono text-muted-foreground hover:text-destructive"
+                    >
+                      Resetovat na default
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={studnaBriefPrompt}
+                  onChange={(e) => setStudnaBriefPrompt(e.target.value)}
+                  rows={8}
+                  placeholder="Prázdné = použije se globální studna-brief prompt"
+                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-xs font-mono resize-y"
+                />
+              </div>
+            </div>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input

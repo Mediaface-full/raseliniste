@@ -11,6 +11,8 @@ const PatchBody = z.object({
   homeTitle: z.string().max(20).nullable().optional(),
   description: z.string().max(2000).nullable().optional(),
   extractionPrompt: z.string().max(8000).nullable().optional(),
+  studnaStandardPrompt: z.string().max(16000).nullable().optional(),
+  studnaBriefPrompt: z.string().max(16000).nullable().optional(),
   includeInDigest: z.boolean().optional(),
   archive: z.boolean().optional(),
 });
@@ -81,6 +83,12 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
   if (body.homeTitle !== undefined) data.homeTitle = body.homeTitle?.slice(0, 20) ?? null;
   if (body.description !== undefined) data.description = body.description;
   if (body.extractionPrompt !== undefined) data.extractionPrompt = body.extractionPrompt;
+  if (body.studnaStandardPrompt !== undefined) {
+    data.studnaStandardPrompt = body.studnaStandardPrompt?.trim() || null;
+  }
+  if (body.studnaBriefPrompt !== undefined) {
+    data.studnaBriefPrompt = body.studnaBriefPrompt?.trim() || null;
+  }
   if (body.includeInDigest !== undefined) data.includeInDigest = body.includeInDigest;
   if (body.archive !== undefined) {
     data.archivedAt = body.archive ? new Date() : null;

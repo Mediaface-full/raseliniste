@@ -19,6 +19,7 @@ Stav 2026-05-02. Detail jednotlivých modulů v `Návody/*.pdf`.
 | Studna nahrávka | `/studna/nahravka` | ✅ | Owner recorder pro Gideona. **Výběr projektu = grid dlaždic** (dříve dropdown), localStorage pamatuje poslední. |
 | Studna inline | `/studna/<id>` | ✅ | Recorder rovnou v detail projektu (bez dropdownu). |
 | Studna guest | `/me/<token>` | ✅ public | Klienti / hosti nahrávání, token v URL, rate limit 20/h/host. |
+| **Per-projekt AI prompty** (Studna/Prskavka) | `/studna/<id>` záložka Nastavení | ✅ NOVÉ 05-02 | Každý projekt může mít vlastní `studnaStandardPrompt` + `studnaBriefPrompt` — přepíše globální Stage 2 prompt jen pro daný projekt. Use case: Prskavka osobní projekty potřebují jiný typ výstupu než klientské Studna brainstormy. Priorita: per-projekt > DB global override > default v kódu. Aktivní projekty mají v hlavičce lavender banner „⚙ Tento projekt používá vlastní AI prompty". |
 
 **Wake Lock + visibility ochrana** = ve VŠECH 4 recorderech (commit `c649dd6`). Banner před start, indikátor během, varování po stop pokud audio nesedí.
 

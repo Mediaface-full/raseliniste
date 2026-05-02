@@ -559,6 +559,12 @@ model ProjectBox {
   // AI prompt overrides (pokud null, použije se default v lib/audio-transcribe.ts)
   extractionPrompt  String?
 
+  // Per-projekt custom Studna/Prskavka prompty pro Stage 2 analýzu.
+  // Priorita: tento override > DB global override (/settings/ai-prompts) > default v kódu.
+  // Vyplňuje se v UI detailu projektu. Když null, použije se globální.
+  studnaStandardPrompt  String?  @db.Text
+  studnaBriefPrompt     String?  @db.Text
+
   // Notifikace v 18:00 cron — pokud false, projekt se v digestu vynechá
   includeInDigest   Boolean  @default(true)
 

@@ -175,13 +175,19 @@ export async function transcribeAudio(params: {
   // a zbytečných repetic. Zachová obsah a tón.
   // Default false — Ozvěna (deník/úkoly) zachovává doslovný přepis.
   cleanupFillers?: boolean;
+  // Per-projekt override Stage 2 promptu (Studna/Prskavka). Pokud null/undefined,
+  // použije se DB global override z /settings/ai-prompts, jinak default v kódu.
+  customStandardPrompt?: string | null;
+  customBriefPrompt?: string | null;
 }): Promise<TranscribeResult> {
   const isBrief = params.recordingType === "BRIEF";
   const model = isBrief ? ANALYSIS_MODEL : DEFAULT_MODEL;
 
-  // Načti prompty z DB override (s fallbackem na default v kódu).
-  // Project context se připojuje runtime — Petr edituje jen instrukce.
-  const basePrompt = await getPrompt(isBrief ? "studna-brief" : "studna-standard");
+  // Priorita promptu: per-projekt override > DB global override > default v kódu.
+  const customForType = isBrief ? params.customBriefPrompt : params.customStandardPrompt;
+  const basePrompt = (customForType && customForType.trim().length > 0)
+    ? customForType
+    : await getPrompt(isBrief ? "studna-brief" : "studna-standard");
   const prompt = params.projectContext
     ? `${basePrompt}\n\nKontext projektu: ${params.projectContext}`
     : basePrompt;

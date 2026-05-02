@@ -77,7 +77,7 @@ export const POST: APIRoute = async ({ request, params, clientAddress }) => {
       projectId_guestUserId: { projectId, guestUserId: guest.id },
     },
     include: {
-      project: { select: { id: true, name: true, description: true, archivedAt: true } },
+      project: { select: { id: true, name: true, description: true, archivedAt: true, studnaStandardPrompt: true, studnaBriefPrompt: true } },
     },
   });
   if (!invitation || invitation.project.archivedAt) {
@@ -140,6 +140,8 @@ export const POST: APIRoute = async ({ request, params, clientAddress }) => {
     mimeType: audioFile.type || "audio/webm",
     type: typeStr,
     projectContext: invitation.project.description,
+    customStandardPrompt: invitation.project.studnaStandardPrompt,
+    customBriefPrompt: invitation.project.studnaBriefPrompt,
   });
 
   return Response.json({ ok: true, recordingId: recording.id, status: "processing" });

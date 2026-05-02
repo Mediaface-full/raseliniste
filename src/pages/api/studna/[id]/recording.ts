@@ -90,6 +90,8 @@ export const POST: APIRoute = async ({ request, cookies, params, clientAddress }
     mimeType: audioFile.type || "audio/webm",
     type: typeStr,
     projectContext: project.description,
+    customStandardPrompt: project.studnaStandardPrompt,
+    customBriefPrompt: project.studnaBriefPrompt,
   });
 
   return Response.json({ ok: true, recordingId: recording.id, status: "processing" });

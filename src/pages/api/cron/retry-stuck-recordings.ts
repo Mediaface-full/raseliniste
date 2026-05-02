@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
       createdAt: { lt: cutoff },
     },
     include: {
-      project: { select: { description: true } },
+      project: { select: { description: true, studnaStandardPrompt: true, studnaBriefPrompt: true } },
     },
     take: MAX_RETRIES_PER_RUN,
     orderBy: { createdAt: "asc" },
@@ -75,6 +75,8 @@ export const POST: APIRoute = async ({ request }) => {
         mimeType: r.audioMime ?? "audio/webm",
         type: r.type as "STANDARD" | "BRIEF",
         projectContext: r.project.description,
+        customStandardPrompt: r.project.studnaStandardPrompt,
+        customBriefPrompt: r.project.studnaBriefPrompt,
       });
       results.push({ id: r.id, ageMinutes: ageMin, action: "retried" });
     } catch (e) {
