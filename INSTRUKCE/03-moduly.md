@@ -1,6 +1,6 @@
 # 03 — Moduly (přehled)
 
-Stav 2026-04-30. Detail jednotlivých modulů v `Návody/*.pdf`.
+Stav 2026-05-02. Detail jednotlivých modulů v `Návody/*.pdf`.
 
 ## 🌅 Vstupní stránka
 
@@ -9,6 +9,7 @@ Stav 2026-04-30. Detail jednotlivých modulů v `Návody/*.pdf`.
 | **Start** | `/start` | ✅ | Sjednocená vstupní stránka pro mobil. PWA ikona **strom** (samostatný `/tree-touch-icon.png`, JEN pro Petra). Nahoře svátek + narozeniny z kontaktů. 4 dlaždice: Deník, Úkoly, Studna, Zeptat se. Pod nimi tlačítko Dashboard přes celou šířku. Layout zarovnán nahoru (žádné scrollování na mobilu). |
 | Dashboard | `/` | ✅ | KPI karty, aktivita, sekce „Plán" (nejbližší 3 dny + porušení pravidel). |
 | **Zeptat se (RAG)** | `/zeptat-se` | ✅ NOVÉ 04-30 | AI dotaz nad indexovanými deníky / úkoly / Studna nahrávkami. pgvector + Gemini text-embedding-004 (768 dim) + Gemini 2.5 Pro generování s [N] citacemi. Auto-indexace nových zápisů. Backfill záměrně neproveden — Gideon chtěl „jen od teď". Lib `src/lib/rag.ts`. |
+| **B&W Myš** (rozhodovací linka) | `/bwmys` | ✅ NOVÉ 05-01 | Strukturovaný rozhodovací systém pro emocionální rozhodovací styl. Longitudinální sběr vstupů (default 14 dní) → AI vyhodnocení (sekce A-H) → uzavírací verdikt + „co by ho překlopilo". Spec: `/Users/petrperina/Downloads/rozhodovaci-system-zadani.md`. Modely: `Decision`, `DecisionEntry`, `DecisionEvaluation`, `DecisionReopening`. AI lib: `src/lib/bwmys-ai.ts` (4 prompty). Audio nahrávání zápisu (Stage 1 přepis + Stage 2 extrakce metadat). Cron `bwmys-tick` denně 7:10. Ikona dvě myšky v yin-yang (`bwmys-touch-icon.png`). |
 
 ## 🎙️ Audio / hlasové zápisy
 

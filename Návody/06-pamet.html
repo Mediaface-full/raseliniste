@@ -69,6 +69,7 @@
 <tr><td><strong>Prskavka</strong></td><td>Nahrávky do <em>tvých osobních</em> projektů (knížka, nápady)</td></tr>
 <tr><td><strong>Zeptat se</strong></td><td>AI prohlédne deníky, úkoly a Studánku — odpověď s citacemi</td></tr>
 <tr><td><strong>ŽIJEŠ?</strong></td><td>Check-in se sebou (90 sekund) — 2× denně</td></tr>
+<tr><td><strong>B&amp;W Myš</strong></td><td>Rozhodovací linka — sběr 14 dní → AI vyhodnocení → uzavřený verdikt</td></tr>
 <tr><td><strong>Dashboard</strong></td><td>Hlavní systém (desktop pohled)</td></tr>
 </table>
 
@@ -80,6 +81,7 @@
 <tr><td>denně 7:05 ráno</td><td>Výročí + narozeniny (pokud něco)</td><td>email + push</td></tr>
 <tr><td>denně 13:00</td><td>ŽIJEŠ? polední check-in</td><td>push (mobil) + email</td></tr>
 <tr><td>denně 18:00</td><td>ŽIJEŠ? večerní check-in</td><td>push (mobil) + email</td></tr>
+<tr><td>denně 7:10</td><td>B&amp;W Myš (deadline 3 dny předem, sběr uplynul, datum revize, auto-návrat odložených)</td><td>email + push</td></tr>
 <tr><td>poslední den měsíce 23:00</td><td>Měsíční health report</td><td>email</td></tr>
 </table>
 
@@ -181,6 +183,48 @@
 <p><span class="url">/zeptat-se</span> — položíš dotaz typu „Co jsem psal o Karlovi v posledním měsíci?" a AI odpoví s citacemi. Indexuje deníky, úkoly a Studánka nahrávky.</p>
 
 <p><strong>Pamatuj:</strong> indexuje se jen <em>nově vytvořený</em> obsah od deployu RAG modulu. Stará data nejsou indexovaná (záměrně — řekl jsi „jen od teď").</p>
+
+<h2>10b. B&amp;W Myš — rozhodovací linka</h2>
+
+<p>Pro emocionální rozhodnutí kdy se ti motají úvahy v hlavě. Dotáhne tě k uzavřenému verdiktu, ke kterému se nemusíš vracet.</p>
+
+<div class="steps">
+<ol>
+  <li><span class="url">/bwmys/nove</span> → multi-step formulář:
+    <ul>
+      <li><strong>Název + kontext</strong> (pracovní/osobní/smíšený)</li>
+      <li><strong>Otázka</strong> formulovaná s otazníkem („Mám rozjet podcast?")</li>
+      <li><strong>Varianty</strong> minimum 3 — tlačítko <strong>„Navrhnout AI"</strong> doplní 2-3 z odložení/menší verze/delegování</li>
+      <li><strong>Předpoklady</strong> minimum 1 (na čem rozhodnutí stojí)</li>
+      <li><strong>Deadline</strong> + délka sběru (default 14 dní)</li>
+    </ul>
+  </li>
+  <li>Po zarámování přidáváš v různých dnech a náladách <strong>zápisy</strong>:
+    <ul>
+      <li><strong>Text</strong> — formulář s nálada (1-5 barevné puntíky), typ vstupu, úhel pohledu (Six Hats)</li>
+      <li><strong>Audio</strong> — nadiktuj, AI vyextrahuje metadata (5 min limit)</li>
+    </ul>
+  </li>
+  <li>Po 3+ zápisech: <strong>Mini-vyhodnocení</strong> (zrcadlo, ne verdikt)</li>
+  <li>Po 5+ zápisech: <strong>Finální vyhodnocení</strong> (8 sekcí A-H — statistika, Six Hats, signál/šum, pre-mortem, 10/10/10, WRAP check, kontextová kritéria, verdikt)</li>
+  <li>4 akce po finálním vyhodnocení:
+    <ul>
+      <li>✓ <strong>Jdu do toho</strong> — uzavře, povinný „co by ho překlopilo" (NE emoce, jen fakt)</li>
+      <li>✗ <strong>Nejdu</strong> — totéž</li>
+      <li>⏸ <strong>Odložit</strong> — zmizí ze seznamu, vrátí se v daný den</li>
+      <li><strong>Potřebuju víc dat</strong> — prodlouží deadline + sběr</li>
+    </ul>
+  </li>
+</ol>
+</div>
+
+<div class="warn">
+<strong>Pravidlo nevracení:</strong> uzavřené rozhodnutí znovu otevřeš POUZE přes <strong>↻ Znovu otevřít</strong> v detailu, kde musíš vyplnit konkrétní nový fakt zvenčí + zaškrtnout potvrzení. Pochybnost ani nálada nestačí — to je ochrana proti nekonečnému přemítání.
+</div>
+
+<p>Archiv: <span class="url">/bwmys/archiv</span> — filtry status/kontext + export celého rozhodnutí do Markdown.</p>
+
+<p><strong>Edit zarámování</strong> jen u aktivních (Pencil ikonka v hlavičce detailu). <strong>Smazat</strong> celé rozhodnutí (Trash ikonka, kaskádově smaže vše — nevratné).</p>
 
 <h2>11. Když něco nefunguje</h2>
 

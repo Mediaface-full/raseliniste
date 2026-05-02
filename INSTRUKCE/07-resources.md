@@ -151,7 +151,7 @@ V `/volume1/docker/raseliniste/.env`:
 | `NOTIFICATION_FROM` + `NOTIFICATION_EMAIL` | Mail odesílatel + globální fallback příjemce |
 | `CRON_SECRET` | x-cron-key auth pro DSM cron tasky |
 
-## Crony v DSM Task Scheduler (15 úloh)
+## Crony v DSM Task Scheduler (15 úloh, stav 2026-05-02)
 
 Detail per úloha + curl command v `Návody/03-crony.pdf`. Krátký přehled:
 

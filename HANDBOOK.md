@@ -406,6 +406,43 @@ Sdílené projektové boxíky s hlasovými záznamy.
 - 3: DayNote UI, Briefing 22:00 → Todoist, Capture integrace pro time-binding
 - 4: OOO management, Locations admin, PWA polish
 
+### ✅ B&W Myš — rozhodovací linka (hotovo 2026-05-02)
+- **Účel:** strukturovaný rozhodovací systém pro emocionální rozhodovací styl s výkyvy nálad. Longitudinální sběr vstupů (default 14 dní) → AI vyhodnocení → uzavírací verdikt s definicí „co by ho překlopilo". Spec: `~/Downloads/rozhodovaci-system-zadani.md`.
+- **Filozofie (PDF zadání):** žádný terapeutický tón, věcný/argumentační výstup, „uzavírací funkce" (rozhodnutí vyjde jako svědek, k němuž se uživatel už nemusí v hlavě vracet). **Pravidlo nevracení** = uzavřené rozhodnutí lze otevřít POUZE přes formálně vyplněný nový fakt zvenčí, NE přes pochybnost / náladu / opakovanou úvahu.
+- **DB modely:**
+  - `Decision` (nazev, kontext pracovni|osobni|smiseny, otazka, varianty Json[], predpoklady Json[], deadlineRozhodnuti, delkaSberuDny default 14, status aktivni|uzavrene_jdu|uzavrene_nejdu|odlozene|archivovane, datumUzavreni, datumRevize, odlozenoDo, verdiktText, coByZmeniloVerdikt)
+  - `DecisionEntry` (datum, nalada 1-5, typVstupu enum {novy_fakt_zvenci, nova_uvaha, napadlo_me, reakce_na_udalost}, uhelPohledu Six Hats {fakta, emoce, kritika, prinosy, alternativy, meta, nevybrano}, obsah, audioPath/Mime/Bytes, uhelPohleduAi pro AI klasifikaci pokud nevybrano)
+  - `DecisionEvaluation` (typ prubezne|finalni, obsahStrukturovany Json — sekce A-H pro finální, modelName, promptTokens, outputTokens)
+  - `DecisionReopening` (popisNovehoFaktu, schvaleno bool — log Toku 6)
+- **API:**
+  - GET/POST `/api/bwmys` (list, vytvořit; query `?status=` nebo `?archive=1`)
+  - GET/PATCH/DELETE `/api/bwmys/[id]` (detail, edit zarámování, smazat — kaskádově vše)
+  - POST `/api/bwmys/[id]/entry` (text zápis, validace nálada+typ+obsah, vrací warnings o deadline/sber)
+  - POST `/api/bwmys/[id]/entry-audio` (multipart audio → Stage 1 transcribeAudio cleanupFillers + Stage 2 extractEntryFromTranscript → Entry s vyextrahovanou náladou/typem/úhlem/obsahem)
+  - POST `/api/bwmys/[id]/reopen` (Tok 6 znovuotevření — povinný popisNovehoFaktu min 5 znaků + schvaleno=true, posune deadline default +14 dní)
+  - POST `/api/bwmys/[id]/evaluate` body `{typ, forceLowSample?}` (mini 3+ zápisů, finální 5+ s low-sample warning, pre-finální klasifikace AI úhlů pro nevybrano entries)
+  - POST `/api/bwmys/suggest-variants` body `{otazka, soucasneVarianty}` (AI návrh dalších 2-3 variant — typicky odložení, menší verze, delegování, ne-akce)
+  - GET `/api/bwmys/[id]/export` (Markdown export celého rozhodnutí: zarámování + entries + evaluations + verdikt)
+- **AI lib `src/lib/bwmys-ai.ts` (4 prompty):**
+  - `navrhniDalsiVarianty()` — Tok 1, krátký prompt
+  - `miniVyhodnoceni()` — Tok 3, "zrcadlo, ne rozhodnutí" (rozložení nálad, opakující motivy, chybějící úhly, krátká poznámka)
+  - `finalniVyhodnoceni()` — Tok 4, **8 sekcí A-H**: A statistika sběru (pocetZapisu, distribuceNalad, distribuceTypu, upozornění při slabém vzorku), B Six Hats analýza (6 pohledů s 2-4 odrážkami), C signál vs. šum (konzistentní/náladově skreslené/recyklované), D pre-mortem (5 nejpravděpodobnějších důvodů selhání), E 10/10/10 (10 minut/měsíců/let), F WRAP check (více variant?, otestované předpoklady?, dostatečný odstup?, plán B?), G kontextová kritéria (pracovni: obchodní/finanční/marketingový/náročnost/strategický fit; osobni: hodnoty/vztahy/čas+energie/reverzibilita/životní fáze; smiseny: oba bloky), H verdikt (doporučení, hlavní pro/proti, co by překlopilo, doporučená revize)
+  - `klasifikujUhly()` — subprocess pro entries s "nevybrano", uloží do uhelPohleduAi
+  - **Tón striktně věcný, NE terapeutický** (PDF specifikace explicitně zakazuje "vidím že tě to trápí" apod.)
+- **UI komponenty:**
+  - `BwMysList` — karty aktivních rozhodnutí (kontext ikona, počet zápisů X/5, dní do deadline, klik → detail)
+  - `BwMysNew` — multi-step formulář 6 kroků (název+kontext, otázka s validací ?, varianty min 3 + AI návrh tlačítko, předpoklady min 1, termín+délka sběru, souhrn) s progress barem
+  - `BwMysDetail` — hlavička (Pencil edit / Trash delete) + zarámování (sbalitelné) + časová osa zápisů (mood barevný puntík + typ + úhel) + vyhodnocení (sekce A-H render s emoji) + akční zóna (4 tlačítka: Jdu/Nejdu/Odložit/Víc dat) + close dialog s 4 módy + reopen dialog + edit framing modal + new entry modal + audio recorder modal
+  - `BwMysAudioRecorder` — modal s mikrofonem (5 min limit, useRecordingProtection)
+  - Archive `/bwmys/archiv` — filtr status (uzavrene_jdu/nejdu/odlozene/all) + filtr kontext, export MD link, klik → detail (kde je tlačítko Znovu otevřít)
+- **Cron `bwmys-tick`** (#15 v seznamu, denně 7:10):
+  - Auto-návrat odložených rozhodnutí (status=odlozene + odlozenoDo<=now → status=aktivni)
+  - Deadline alert 3 dny předem (email + push)
+  - Sběr uplynul (datumVytvoreni + delkaSberuDny = dnes) → notifikace „zvaž finální vyhodnocení"
+  - Datum revize uzavřených dnes → notifikace
+- **Ikona:** `bwmys-touch-icon.png` (180/192/512) — dvě myšky v yin-yang kompozici (černá nahoře, bílá dole), kulaté uši s růžovými vnitřky, dvě očka s leskem, růžový/lavender čenich. SVG zdroj `public/bwmys-icon.svg`.
+- **Sidebar + /start dlaždice** lavender tint (lucide:arrow-left-right).
+
 ### ✅ Web Push notifikace (hotovo 2026-05-01)
 - **Účel:** mobilní push notifikace nezávisle na WhatsApp (Petr explicitně chtěl push místo WA)
 - **Stack:** VAPID + Service Worker + `web-push` npm package
@@ -798,6 +835,14 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | POST | `/api/cron/anniversary-reminders` | **x-cron-key** | — (denně 7:05; pošle email/WhatsApp pokud dnes + reminderDaysBefore = výročí/narozeniny) |
 | POST | `/api/cron/zijes-reminder` | **x-cron-key** | `?type=lunch\|evening` (denně 13:00 a 18:00; ŽIJEŠ? check-in připomínka) |
 | POST | `/api/cron/bwmys-tick` | **x-cron-key** | denně 7:10; B&W Myš auto-návrat odložených + deadline/sber/revize notifikace |
+| GET/POST | `/api/bwmys` | session | List rozhodnutí (?status=, ?archive=1), vytvořit nové |
+| GET/PATCH/DELETE | `/api/bwmys/:id` | session | Detail s entries+evals+reopenings, edit zarámování, kaskádové smazání |
+| POST | `/api/bwmys/:id/entry` | session | Text zápis (Tok 2), validace + warnings o deadline/sběr |
+| POST | `/api/bwmys/:id/entry-audio` | session/multipart | Audio → Stage 1 přepis + Stage 2 AI extrakce metadat → Entry |
+| POST | `/api/bwmys/:id/reopen` | session | Tok 6 znovuotevření, povinný popisNovehoFaktu + schvaleno=true |
+| POST | `/api/bwmys/:id/evaluate` | session | Mini (3+) / finální (5+ s lowSample warning), AI sekce A-H, pre-klasifikace úhlů |
+| POST | `/api/bwmys/suggest-variants` | session | AI návrh dalších 2-3 variant při zakládání |
+| GET | `/api/bwmys/:id/export` | session | Markdown export celého rozhodnutí |
 | GET | `/api/push/subscribe` | session | Vrátí VAPID public key + seznam aktivních subscriptions |
 | POST | `/api/push/subscribe` | session | Uloží novou subscription (klientský PushSubscription objekt) |
 | PUT | `/api/push/subscribe` | session | Pošli test push na všechna zařízení usera |

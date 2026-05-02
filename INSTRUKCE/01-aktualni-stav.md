@@ -1,11 +1,32 @@
-# 01 — Aktuální stav (2026-05-01 odpoledne)
+# 01 — Aktuální stav (2026-05-02)
 
 ## Branch + commit
 
 - **main** — produkční větev
-- 2 mega-session deploye:
+- 3 mega-session deploye:
   - **2026-04-30 večer:** 18 commitů (Studánka rename, Prskavka, RAG, Call-log VIP varianta + animovaná G, vokativ, atd.)
-  - **2026-05-01 odpoledne:** 7+ commitů (Výročí, ŽIJEŠ?, Twilio WhatsApp, Web Push, podúkoly z hlasové salvy, OG image fix, fixes)
+  - **2026-05-01 odpoledne:** 10+ commitů (Výročí, ŽIJEŠ?, Twilio WhatsApp, Web Push, podúkoly z hlasové salvy, OG image fix, fixes)
+  - **2026-05-01 večer / 2026-05-02:** 8 commitů (B&W Myš modul plný — fáze A+B+C, smazat tlačítko, edit zarámování, reopen, odložit/víc dat, AI návrh variant, ikona myší v yin-yang)
+
+## B&W Myš modul (2026-05-01 / 02)
+
+Strukturovaný rozhodovací systém. Spec: `~/Downloads/rozhodovaci-system-zadani.md`.
+
+**Hotové (commit 4871704):**
+- DB: Decision, DecisionEntry, DecisionEvaluation, DecisionReopening (migrace add_bwmys)
+- API: full CRUD + entry text + entry audio + evaluate + reopen + suggest-variants + export
+- AI lib `src/lib/bwmys-ai.ts`: 4 prompty (variants, mini, finální 8 sekcí A-H, klasifikace úhlů)
+- UI: BwMysList, BwMysNew (6-step), BwMysDetail (hlavička+časová osa+sekce A-H render+4 close mode), BwMysAudioRecorder
+- Stránky: /bwmys, /bwmys/nove, /bwmys/[id], /bwmys/archiv (filtry status+kontext, export MD)
+- Cron #15 bwmys-tick denně 7:10 (auto-návrat odložených, deadline alert, sběr uplynul, datum revize)
+- Sidebar + /start dlaždice (lavender)
+- Ikona dvou myší v yin-yang (`bwmys-touch-icon.png` + 192/512)
+
+**Plně dodržené pravidla z PDF spec:**
+- Žádný terapeutický tón v AI výstupech
+- Pravidlo nevracení (reopen vyžaduje schvaleno=true + popisNovehoFaktu)
+- Min 3 varianty / 1 předpoklad / otázka končí ?
+- 7 procesních toků (Tok 1-7) všechny implementované
 
 ## Co přibylo dnes 2026-05-01
 
