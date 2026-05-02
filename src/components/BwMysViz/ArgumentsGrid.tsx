@@ -1,5 +1,5 @@
 import {
-  ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer,
+  ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine,
 } from "recharts";
 import { ARGUMENT_COLORS, MOOD_COLORS } from "../../lib/bwmys-colors";
@@ -26,11 +26,20 @@ export default function ArgumentsGrid({ arguments: args }: { arguments: Decision
     );
   }
 
+  // Velikost bodu spočítáme přímo z četnosti — Recharts ZAxis/node.z je
+  // nedokumentovaný a v různých verzích se chová jinak. Tohle je deterministické.
+  const maxCetnost = Math.max(...args.map((a) => a.cetnost), 1);
   const data: Point[] = args.map((a) => ({
     ...a,
     fill: a.smer >= 0 ? ARGUMENT_COLORS.pro : ARGUMENT_COLORS.proti,
     opacity: a.konzistence >= 0.5 ? 1 : 0.4,
   }));
+
+  function radiusFor(cetnost: number): number {
+    // 5 px (cetnost=1) až 14 px (max). Lineární po sqrt aby plocha rostla úměrně počtu.
+    const norm = Math.sqrt(cetnost / maxCetnost);
+    return 5 + norm * 9;
+  }
 
   return (
     <div className="space-y-2">
@@ -56,7 +65,6 @@ export default function ArgumentsGrid({ arguments: args }: { arguments: Decision
               fontSize={10}
               label={{ value: "konzistence ↑", angle: -90, position: "insideLeft", offset: 12, fill: "#888", fontSize: 10 }}
             />
-            <ZAxis type="number" dataKey="cetnost" range={[60, 360]} />
             <ReferenceLine x={0} stroke="rgba(255,255,255,0.2)" />
             <ReferenceLine y={0.5} stroke="rgba(255,255,255,0.1)" strokeDasharray="3 3" />
             <Tooltip
@@ -84,13 +92,12 @@ export default function ArgumentsGrid({ arguments: args }: { arguments: Decision
             <Scatter
               data={data}
               shape={(props: unknown) => {
-                const p = props as { cx: number; cy: number; payload: Point; node?: { z: number } };
-                const r = Math.sqrt(((p.node?.z ?? 100) / Math.PI));
+                const p = props as { cx: number; cy: number; payload: Point };
                 return (
                   <circle
                     cx={p.cx}
                     cy={p.cy}
-                    r={r}
+                    r={radiusFor(p.payload.cetnost)}
                     fill={p.payload.fill}
                     fillOpacity={p.payload.opacity}
                     stroke="rgba(255,255,255,0.4)"

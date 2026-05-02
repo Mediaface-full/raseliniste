@@ -41,8 +41,9 @@ export default function EntryTypesDonut({ entries }: { entries: Entry[] }) {
   }
 
   return (
-    <div className="h-56 relative">
-      <ResponsiveContainer width="100%" height="85%">
+    <div className="flex flex-col">
+      <div className="h-56 relative">
+      <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
             data={data}
@@ -65,10 +66,11 @@ export default function EntryTypesDonut({ entries }: { entries: Entry[] }) {
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="absolute inset-0 grid place-items-center pointer-events-none" style={{ height: "85%" }}>
-        <div className="text-center">
-          <div className="font-serif text-2xl">{total}</div>
-          <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">zápisů</div>
+        <div className="absolute inset-0 grid place-items-center pointer-events-none">
+          <div className="text-center">
+            <div className="font-serif text-2xl">{total}</div>
+            <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">zápisů</div>
+          </div>
         </div>
       </div>
       {comment && (

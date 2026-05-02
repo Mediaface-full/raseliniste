@@ -4,6 +4,13 @@ import AnimatedG from "../../components/AnimatedG.astro";
 import { prisma } from "../../lib/db";
 import { normalizePhone } from "../../lib/phone";
 import { resolveCallLogToken } from "../../lib/call-log-token";
+import { checkPageRateLimit, getIp } from "../../lib/page-rate-limit";
+
+// Rate-limit anti-DoS: 60 req/min/IP. Veřejná stránka, neautentizovaná.
+const _ip = getIp(Astro.request, Astro.clientAddress);
+if (!checkPageRateLimit(_ip, "call-log-thanks", 60)) {
+  return new Response("Too many requests", { status: 429 });
+}
 
 // =============================================================================
 // TEXTY — Petr edituje zde. VIP a ne-VIP jsou ZÁMĚRNĚ ODDĚLENÉ varianty.
@@ -48,7 +55,8 @@ let matchedIsVip = false;
 let matchedFirstName: string | null = null;
 let matchedUserId: string | null = null;
 let tokenAuthed = false;
-let tokenContactPhone: string | null = null;
+let tokenContactId: string | null = null;
+let tokenContactPhones: string[] = [];
 
 if (rawToken) {
   try {
@@ -58,7 +66,15 @@ if (rawToken) {
       tokenAuthed = true;
       matchedFirstName = c.firstName?.trim() || c.displayName.split(" ")[0] || null;
       matchedUserId = c.userId;
-      tokenContactPhone = c.phones[0]?.number ?? null;
+      tokenContactId = c.id;
+      // Načti VŠECHNA čísla VIP — pokud zadal misi z jiného než phones[0],
+      // výpis ho jinak nezahrne. resolveCallLogToken bere jen take:1, takže
+      // doplníme druhý query.
+      const phones = await prisma.phone.findMany({
+        where: { contactId: c.id },
+        select: { number: true },
+      });
+      tokenContactPhones = phones.map((p) => p.number);
     }
   } catch {
     // ignore — fallback na phone
@@ -103,16 +119,23 @@ const DONE_DAYS = 14;
 // Výpis misí JEN pro token-ověřené VIP. Phone-only nikdy nedostane seznam.
 // Zdrojem pravdy je cron /api/cron/todoist-sync (30 min) — on-demand sync
 // jsme záměrně odstranili (blokoval stránku až 10 s při Todoist p99 latenci).
-const vipPhoneForLookup = tokenAuthed ? tokenContactPhone : null;
-if (tokenAuthed && matchedUserId && vipPhoneForLookup) {
+//
+// Match přes contactId NEBO všechna VIP čísla — VIP může mít víc telefonů
+// a zadat misi z různých.
+if (tokenAuthed && matchedUserId && tokenContactId) {
   try {
     const sinceDone = new Date(Date.now() - DONE_DAYS * 86400000);
     const calls = await prisma.callLog.findMany({
       where: {
         userId: matchedUserId,
-        phoneNumber: vipPhoneForLookup,
         wasVip: true,
         OR: [{ seenAt: null }, { seenAt: { gte: sinceDone } }],
+        AND: {
+          OR: [
+            { contactId: tokenContactId },
+            ...(tokenContactPhones.length > 0 ? [{ phoneNumber: { in: tokenContactPhones } }] : []),
+          ],
+        },
       },
       orderBy: { createdAt: "desc" },
       select: {

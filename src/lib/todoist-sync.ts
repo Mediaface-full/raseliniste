@@ -46,9 +46,23 @@ function parseTodoistDate(s: string | null | undefined): Date | null {
 function parseDue(due: TodoistSyncItem["due"]): { dueAt: Date | null; dueIsTime: boolean } {
   if (!due?.date) return { dueAt: null, dueIsTime: false };
   const hasTime = due.date.includes("T");
-  const d = new Date(due.date);
-  if (isNaN(d.getTime())) return { dueAt: null, dueIsTime: false };
-  return { dueAt: d, dueIsTime: hasTime };
+
+  if (hasTime) {
+    // Datetime string (s časem) — parsuj jak je. Todoist dodá ISO 8601 s tz info,
+    // pokud time-only bez tz, JS parsuje jako lokální (správně pro náš účel).
+    const d = new Date(due.date);
+    return isNaN(d.getTime()) ? { dueAt: null, dueIsTime: false } : { dueAt: d, dueIsTime: true };
+  }
+
+  // All-day datum "YYYY-MM-DD" — `new Date("2026-05-10")` parsuje jako UTC midnight,
+  // což v Praze (UTC+2) zobrazí jako 9. května 02:00. Musíme sestavit lokální půlnoc.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(due.date);
+  if (!m) return { dueAt: null, dueIsTime: false };
+  const [, y, mo, d] = m;
+  const localDate = new Date(parseInt(y, 10), parseInt(mo, 10) - 1, parseInt(d, 10));
+  return isNaN(localDate.getTime())
+    ? { dueAt: null, dueIsTime: false }
+    : { dueAt: localDate, dueIsTime: false };
 }
 
 function priorityFromTodoist(p: number | undefined): "low" | "normal" | "high" {

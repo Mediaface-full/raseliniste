@@ -57,7 +57,8 @@ export default function MoodCurve({ entries }: { entries: Entry[] }) {
   const swing = max - min;
 
   return (
-    <div className="h-56">
+    <div className="flex flex-col">
+      <div className="h-56">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 12, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -90,6 +91,7 @@ export default function MoodCurve({ entries }: { entries: Entry[] }) {
           />
         </LineChart>
       </ResponsiveContainer>
+      </div>
       {swing >= 3 && (
         <div className="text-[10px] font-mono text-[var(--tint-butter)] text-center pt-1">
           ⚠ velký výkyv nálady ({min}→{max}) — náladově skreslené?

@@ -5,6 +5,13 @@ import { prisma } from "../../lib/db";
 import { normalizePhone } from "../../lib/phone";
 import { vokativ } from "../../lib/vokativ";
 import { resolveCallLogToken } from "../../lib/call-log-token";
+import { checkPageRateLimit, getIp } from "../../lib/page-rate-limit";
+
+// Rate-limit anti-DoS: 60 req/min/IP. Veřejná stránka, neautentizovaná.
+const _ip = getIp(Astro.request, Astro.clientAddress);
+if (!checkPageRateLimit(_ip, "call-log-index", 60)) {
+  return new Response("Too many requests", { status: 429 });
+}
 
 // =============================================================================
 // TEXTY — Petr edituje zde. VIP a ne-VIP jsou ZÁMĚRNĚ ODDĚLENÉ entity.
