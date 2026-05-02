@@ -70,22 +70,32 @@ export default function ContactsManager() {
 
   const [copied, setCopied] = useState<string | null>(null);
   async function copyLink(c: Contact) {
-    const phone = c.phones[0]?.number ?? "";
-    const params = new URLSearchParams();
-    if (phone) params.set("phone", phone);
-    // Jméno v URL je jen hint — server si ho stejně ověří proti DB (VIP flag)
-    // a pokud kontakt není VIP, oslovení nezobrazí. Pošleme ho proto vždy,
-    // ať link funguje i kdyby se status později změnil.
-    const firstName = c.firstName?.trim() || c.displayName.split(" ")[0];
-    if (firstName) params.set("name", firstName);
     const base = typeof window !== "undefined" ? window.location.origin : "https://www.raseliniste.cz";
-    const link = `${base}/call-log?${params.toString()}`;
+    let link: string;
+
+    // Pokud má kontakt VIP token (callLogToken), preferuj TOKEN-based URL.
+    // Tento link nejen otevře zadávací formulář, ale taky zobrazí výpis
+    // Giďoušových misí (sekci kterou phone-based URL NEukazuje, kvůli
+    // bezpečnostnímu commitu 2fb9555).
+    if (c.isVip && c.callLogToken) {
+      link = `${base}/call-log?t=${encodeURIComponent(c.callLogToken)}`;
+    } else {
+      // Legacy phone-based link — pro ne-VIP nebo pro VIP bez tokenu
+      // (existující VIP před deployem callLogToken; klikni "VIP tokeny"
+      // v toolbaru pro backfill).
+      const phone = c.phones[0]?.number ?? "";
+      const params = new URLSearchParams();
+      if (phone) params.set("phone", phone);
+      const firstName = c.firstName?.trim() || c.displayName.split(" ")[0];
+      if (firstName) params.set("name", firstName);
+      link = `${base}/call-log?${params.toString()}`;
+    }
+
     try {
       await navigator.clipboard.writeText(link);
       setCopied(c.id);
       setTimeout(() => setCopied(null), 2000);
     } catch {
-      // fallback — prompt
       prompt("Zkopíruj tento odkaz:", link);
     }
   }
