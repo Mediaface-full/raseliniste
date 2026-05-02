@@ -72,6 +72,41 @@ export const CuratedFile = z.object({
 export type CuratedItemT = z.infer<typeof CuratedItem>;
 export type CuratedFileT = z.infer<typeof CuratedFile>;
 
+/**
+ * Pre-flight check — ověř že všechny migrate items mají existující projekt
+ * v TodoistProjectMirror (case-insensitive). Vrátí seznam chybějících
+ * projektů (deduplikovaný), prázdný array = OK.
+ */
+export async function preflightProjectCheck(
+  userId: string,
+  items: CuratedItemT[],
+): Promise<string[]> {
+  const migrateProjects = new Set<string>();
+  for (const item of items) {
+    if (item.decision === "migrate") {
+      const key = item.targetParent
+        ? `${item.targetParent} > ${item.targetProject}`
+        : item.targetProject;
+      migrateProjects.add(key);
+    }
+  }
+  if (migrateProjects.size === 0) return [];
+
+  const projects = await prisma.todoistProjectMirror.findMany({
+    where: { userId },
+    select: { name: true, parentId: true, todoistId: true },
+  });
+  const nameLower = new Set(projects.map((p) => p.name.toLowerCase()));
+
+  const missing: string[] = [];
+  for (const key of migrateProjects) {
+    const parts = key.split(" > ");
+    const target = (parts[parts.length - 1] ?? key).toLowerCase();
+    if (!nameLower.has(target)) missing.push(key);
+  }
+  return missing;
+}
+
 export function summarize(items: CuratedItemT[]): {
   total: number;
   migrate: number;
@@ -97,12 +132,28 @@ interface InFlight {
 }
 const inFlight = new Set<InFlight>();
 
-function priorityFromTodoist(p: number): "low" | "normal" | "high" {
-  // Things curated používá Todoist konvenci: 1=urgent, 4=lowest.
-  // (Naše Task má jen 3 úrovně, mapping konzistentní s todoist-sync.ts.)
+/**
+ * Naše curated spec: targetPriority 1 = nejvyšší, 4 = nejnižší (intuitivní).
+ * Todoist API ale: priority 4 = urgent, 1 = lowest.
+ * Při push do Todoist musíme INVERTovat: (5 - x).
+ *
+ * Pro naši Task tabulku (low/normal/high) mapujeme dle naší spec:
+ *   1 (highest) → high
+ *   2 → high
+ *   3 → normal
+ *   4 (lowest) → low
+ */
+function curatedPriorityToTaskLevel(p: number): "low" | "normal" | "high" {
   if (p === 1 || p === 2) return "high";
   if (p === 3) return "normal";
   return "low";
+}
+
+function curatedPriorityToTodoistApi(p: number): 1 | 2 | 3 | 4 {
+  // Invert: naše 1 (highest) → Todoist 4 (urgent); naše 4 (lowest) → Todoist 1
+  const inverted = 5 - p;
+  if (inverted === 1 || inverted === 2 || inverted === 3 || inverted === 4) return inverted as 1 | 2 | 3 | 4;
+  return 1; // fallback lowest
 }
 
 async function resolveProjectId(
@@ -255,19 +306,19 @@ export async function executeImport(importId: string): Promise<void> {
               dueAt,
               dueIsTime,
               tags: item.targetLabels ?? [],
-              priority: priorityFromTodoist(item.targetPriority),
+              priority: curatedPriorityToTaskLevel(item.targetPriority),
               status: "open",
               source: "things_import",
               todoistProjectId: projectId,
             },
           });
 
-          // Push do Todoistu
+          // Push do Todoistu — priorita INVERTovaná (naše 1=highest, Todoist 4=urgent)
           const todoistTask = await createTask(todoistToken, {
             content: item.title.slice(0, 500),
             description: item.notes?.trim() || undefined,
             project_id: projectId,
-            priority: item.targetPriority,
+            priority: curatedPriorityToTodoistApi(item.targetPriority),
             labels: item.targetLabels ?? [],
             due_string: dueString ?? undefined,
           });

@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
-import { executeImport } from "@/lib/things-import";
+import { executeImport, preflightProjectCheck, type CuratedFileT } from "@/lib/things-import";
 
 export const prerender = false;
 
@@ -30,6 +30,22 @@ export const POST: APIRoute = async ({ cookies, params }) => {
     return Response.json(
       { error: `Import je ve stavu "${imp.status}", nelze spustit. Smaž ho a nahraj znovu pokud chceš retry.` },
       { status: 409 },
+    );
+  }
+
+  // Pre-flight check projektů — pokud chybí, blokovat se srozumitelnou hláškou
+  const raw = imp.rawJson as unknown as CuratedFileT;
+  const missingProjects = await preflightProjectCheck(session.uid, raw.items);
+  if (missingProjects.length > 0) {
+    return Response.json(
+      {
+        error: "PROJECTS_MISSING",
+        message:
+          `V Todoistu chybí ${missingProjects.length === 1 ? "projekt" : "projekty"}: ${missingProjects.map((p) => `"${p}"`).join(", ")}. ` +
+          `Založ ${missingProjects.length === 1 ? "ho" : "je"} v Todoistu (nebo přes /settings/integrations → Bulk import) a spusť scheduler/sync, ať se ${missingProjects.length === 1 ? "natáhne" : "natáhnou"} do Todoist project mirroru. Pak zkus migraci znovu.`,
+        missingProjects,
+      },
+      { status: 422 },
     );
   }
 
