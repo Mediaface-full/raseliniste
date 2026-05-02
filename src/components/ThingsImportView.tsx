@@ -292,11 +292,14 @@ export default function ThingsImportView() {
           )}
 
           {active.import.status === "completed" && (
-            <div className="flex gap-2">
-              <Button onClick={() => (window.location.href = "/ukoly")}>
-                Otevřít /ukoly
-              </Button>
-              <Button variant="ghost" onClick={() => setActive(null)}>Zavřít</Button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Button onClick={() => (window.location.href = "/ukoly")}>
+                  Otevřít /ukoly
+                </Button>
+                <Button variant="ghost" onClick={() => setActive(null)}>Zavřít</Button>
+              </div>
+              <RemigrateToTodoistButton importId={active.import.id} onDone={() => loadActive(active.import.id, true)} />
             </div>
           )}
 
@@ -416,4 +419,91 @@ function decisionBadge(d: string) {
   if (d === "wishlist") return <span className="text-[var(--tint-butter)]">★ wishlist</span>;
   if (d === "discard") return <span className="text-muted-foreground">× discard</span>;
   return <span>{d}</span>;
+}
+
+// =============================================================================
+// Remigrate wishlist → Todoist
+// Pro import kde wishlist body skončily jako Knowledge entries místo Todoist
+// tasků. One-click oprava: auto-create projekt Wishlist, push všech wishlist
+// items, smaže duplicitní Knowledge entries.
+// =============================================================================
+
+function RemigrateToTodoistButton({ importId, onDone }: { importId: string; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [result, setResult] = useState<any | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function run() {
+    if (!confirm(
+      "Smigrovat wishlist body do Todoistu?\n\n" +
+      "Co se stane:\n" +
+      "1. Auto-create Todoist projekt 'Wishlist' (pokud chybí)\n" +
+      "2. Vytvoří Todoist task pro každou wishlist položku\n" +
+      "3. Smaže odpovídající Knowledge entries (cleanup duplicit)\n\n" +
+      "Idempotentní — když klikneš znovu, už zmigrované přeskočí.",
+    )) return;
+    setBusy(true);
+    setErr(null);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/things/import/${importId}/remigrate-to-todoist`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErr(data.error ?? "Migrace selhala.");
+        return;
+      }
+      setResult(data);
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={run}
+        disabled={busy}
+        className="w-full px-4 py-2.5 rounded-md bg-[var(--tint-sky)]/15 border border-[var(--tint-sky)]/40 hover:bg-[var(--tint-sky)]/25 text-[var(--tint-sky)] font-medium text-sm flex items-center justify-center gap-2 transition disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+        Smigrovat wishlist do Todoistu (one-click)
+      </button>
+      {err && (
+        <div className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
+          ⚠ {err}
+        </div>
+      )}
+      {result && (
+        <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/[0.08] p-3 text-xs space-y-1">
+          <div className="text-[var(--tint-sage)] font-medium">
+            ✓ Hotovo
+            {result.todoistProject.created && " · projekt Wishlist vytvořen v Todoistu"}
+          </div>
+          <div>
+            <strong>{result.summary.createdTasks}</strong> nových Todoist tasků,{" "}
+            <strong>{result.summary.deletedEntries}</strong> Knowledge entries smazaných
+            {result.summary.skippedAlreadyMigrated > 0 && `, ${result.summary.skippedAlreadyMigrated}× přeskočeno (už zmigrované)`}
+            {result.summary.failed > 0 && (
+              <span className="text-destructive">, {result.summary.failed} chyb</span>
+            )}
+          </div>
+          {result.errors && result.errors.length > 0 && (
+            <details className="text-destructive">
+              <summary className="cursor-pointer">Chyby</summary>
+              <ul className="list-disc pl-4 mt-1">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {result.errors.map((e: any, i: number) => (
+                  <li key={i}><strong>{e.title}</strong>: {e.error}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
