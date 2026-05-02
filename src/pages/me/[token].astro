@@ -1,6 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import GuestRecorder from "../../components/GuestRecorder";
+import GuestGuide from "../../components/GuestGuide";
 import { prisma } from "../../lib/db";
 
 const token = Astro.params.token;
@@ -49,6 +50,11 @@ if (projects.length === 1) {
   const p = projects[0];
   appleTitle = p.homeTitle ? `G: ${p.homeTitle}` : `G: ${p.name.slice(0, 9)}`;
 }
+
+// Guide variant — pokud guest má aspoň jednu invitation s canRecordBrief,
+// dostane brief variantu (zahrnuje i standard info). Jinak standard.
+const guideVariant: "standard" | "brief" =
+  projects.some((p) => p.canRecordBrief) ? "brief" : "standard";
 ---
 
 <Base
@@ -75,7 +81,10 @@ if (projects.length === 1) {
         </div>
       ) : (
         <>
-          <div class="mb-6 text-center">
+          <div class="mb-6 text-center relative">
+            <div class="absolute right-0 top-0">
+              <GuestGuide client:load variant={guideVariant} guestName={guest.name} />
+            </div>
             <img
               src="/apple-touch-icon.png"
               alt="Studánka"
