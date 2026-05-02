@@ -1,5 +1,6 @@
 ---
 import Shell from "../../layouts/Shell.astro";
+import SchedulerRunButton from "../../components/SchedulerRunButton";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 import { CRON_JOBS, type Schedule } from "../../lib/cron-schedule";
@@ -53,13 +54,14 @@ const latestTrigger = runs.reduce<Date | null>((acc, r) => {
   breadcrumb={[{ label: "Nastavení" }, { label: "Crony" }]}
 >
   <div class="max-w-3xl space-y-4">
-    <div class="glass-strong rounded-xl p-4">
-      <h1 class="font-serif text-2xl mb-2">Cron scheduler</h1>
+    <div class="glass-strong rounded-xl p-4 space-y-3">
+      <h1 class="font-serif text-2xl">Cron scheduler</h1>
       <p class="text-sm text-muted-foreground">
         Jeden externí DSM Task Scheduler entry volá <code class="font-mono text-xs">/api/cron/scheduler</code>
         každých 5 min. Dispatcher pak interně spouští {jobs.length} úloh dle jejich rozvrhu.
         Poslední tick: <strong>{relativeTime(latestTrigger)}</strong>.
       </p>
+      <SchedulerRunButton client:load />
     </div>
 
     <div class="glass rounded-xl overflow-hidden">
