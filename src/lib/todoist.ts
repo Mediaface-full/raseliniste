@@ -88,10 +88,62 @@ export async function createTask(token: string, input: CreateTaskInput): Promise
   });
 }
 
-export async function createProject(token: string, name: string): Promise<TodoistProject> {
+export async function createProject(
+  token: string,
+  input: string | { name: string; parentId?: string | null; color?: string | null },
+): Promise<TodoistProject> {
+  const body = typeof input === "string"
+    ? { name: input }
+    : {
+        name: input.name,
+        ...(input.parentId ? { parent_id: input.parentId } : {}),
+        ...(input.color ? { color: input.color } : {}),
+      };
   return call<TodoistProject>(token, "/projects", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(body),
+  });
+}
+
+// =============================================================================
+// Labels — Todoist personal labels (free tier) / shared labels (paid).
+// Sync API i v1 REST endpointy /labels.
+// =============================================================================
+
+export interface TodoistLabel {
+  id: string;
+  name: string;
+  color?: string;
+  order?: number;
+  is_favorite?: boolean;
+}
+
+export async function listLabels(token: string): Promise<TodoistLabel[]> {
+  const all: TodoistLabel[] = [];
+  let cursor: string | null = null;
+  type Page = { results: TodoistLabel[]; next_cursor: string | null };
+  for (let i = 0; i < 10; i++) {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+    const page: Page = await call<Page>(token, `/labels${query}`);
+    if (Array.isArray(page)) return page as unknown as TodoistLabel[];
+    if (!page?.results) break;
+    all.push(...page.results);
+    if (!page.next_cursor) break;
+    cursor = page.next_cursor;
+  }
+  return all;
+}
+
+export async function createLabel(
+  token: string,
+  input: { name: string; color?: string | null },
+): Promise<TodoistLabel> {
+  return call<TodoistLabel>(token, "/labels", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      ...(input.color ? { color: input.color } : {}),
+    }),
   });
 }
 
@@ -154,6 +206,7 @@ export interface TodoistSyncResponse {
   full_sync: boolean;
   items?: TodoistSyncItem[];
   projects?: TodoistProject[];
+  labels?: TodoistLabel[];
 }
 
 export async function syncFetch(

@@ -778,6 +778,9 @@ Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 | GET | `/api/integrations/todoist/projects` | session | — (paginovaný list z Todoist v1 API) |
 | PATCH | `/api/integrations/todoist/config` | session | `{vyruseni?, vip?, mojeUkoly?}` (project IDs) |
 | POST | `/api/integrations/todoist/test` | session | — (verify connection) |
+| POST | `/api/todoist/projects` | session | `{name, parentId? \| parentName?, color?}` — vytvoří projekt; idempotentní (case-insensitive match na name proti TodoistProjectMirror); upserts mirror po success |
+| POST | `/api/todoist/labels` | session | `{name, color?}` — vytvoří label; idempotentní vůči TodoistLabelMirror |
+| POST | `/api/todoist/bulk-setup` | session | `{projects: [{name, parentName?, color?}], labels: [{name, color?}]}` — bulk varianta s idempotencí; vrátí `{projects, labels, summary}` |
 | GET | `/api/settings/mail` | session | — |
 | POST | `/api/settings/mail` | session | `{host, port, secure, user, password, from}` (verify + save) |
 | DELETE | `/api/settings/mail` | session | — |

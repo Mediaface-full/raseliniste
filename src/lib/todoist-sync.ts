@@ -36,6 +36,8 @@ export interface TodoistSyncStats {
   callLogsCompleted?: number;
   projectsReceived?: number;
   projectsUpserted?: number;
+  labelsReceived?: number;
+  labelsUpserted?: number;
   error?: string;
 }
 
@@ -85,6 +87,8 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
     callLogsCompleted: 0,
     projectsReceived: 0,
     projectsUpserted: 0,
+    labelsReceived: 0,
+    labelsUpserted: 0,
   };
 
   const integration = await prisma.userIntegration.findUnique({
@@ -109,7 +113,7 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
 
   let response;
   try {
-    response = await syncFetch(token, startToken, ["items", "projects"]);
+    response = await syncFetch(token, startToken, ["items", "projects", "labels"]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     stats.error = msg;
@@ -246,6 +250,32 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.warn(`[todoist-sync] project ${p.id} failed:`, msg);
+    }
+  }
+
+  // === LABELS — upsert do TodoistLabelMirror ===
+  const labels = response.labels ?? [];
+  stats.labelsReceived = labels.length;
+  for (const l of labels) {
+    try {
+      await prisma.todoistLabelMirror.upsert({
+        where: { userId_todoistId: { userId, todoistId: l.id } },
+        update: {
+          name: l.name,
+          color: l.color ?? null,
+          syncedAt: new Date(),
+        },
+        create: {
+          userId,
+          todoistId: l.id,
+          name: l.name,
+          color: l.color ?? null,
+        },
+      });
+      stats.labelsUpserted!++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[todoist-sync] label ${l.id} failed:`, msg);
     }
   }
 

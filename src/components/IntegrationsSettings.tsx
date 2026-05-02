@@ -281,6 +281,9 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
         </div>
       )}
 
+      {/* Bulk import projektů + labelů */}
+      {hasToken && <TodoistBulkImport onDone={loadProjects} />}
+
       {error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">
           {error}
@@ -288,6 +291,167 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
       )}
       {saved && (
         <div className="text-xs text-[var(--tint-sage)] font-mono">Uloženo ✓</div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Bulk import — vytvoří projekty a labely v Todoistu z textového inputu
+// =============================================================================
+
+function TodoistBulkImport({ onDone }: { onDone: () => void }) {
+  const [show, setShow] = useState(false);
+  const [projectsText, setProjectsText] = useState("");
+  const [labelsText, setLabelsText] = useState("");
+  const [busy, setBusy] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [results, setResults] = useState<any | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  function parseProjects(text: string): { name: string; parentName: string | null }[] {
+    return text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split(">").map((s) => s.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+          return { name: parts[parts.length - 1], parentName: parts[parts.length - 2] };
+        }
+        return { name: parts[0] ?? line, parentName: null };
+      });
+  }
+
+  function parseLabels(text: string): { name: string }[] {
+    return text
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((name) => ({ name }));
+  }
+
+  async function submit() {
+    setBusy(true);
+    setErr(null);
+    setResults(null);
+    try {
+      const projects = parseProjects(projectsText);
+      const labels = parseLabels(labelsText);
+      if (projects.length === 0 && labels.length === 0) {
+        setErr("Nic k importu — vyplň aspoň jeden projekt nebo label.");
+        return;
+      }
+      const res = await fetch("/api/todoist/bulk-setup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ projects, labels }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErr(data.error ?? "Bulk setup selhal.");
+        return;
+      }
+      setResults(data);
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="glass rounded-xl p-4 space-y-3">
+      <button
+        onClick={() => setShow(!show)}
+        className="flex items-center justify-between w-full"
+      >
+        <h3 className="font-serif text-lg">Bulk import (projekty + labely)</h3>
+        <span className="text-xs font-mono text-muted-foreground">{show ? "skrýt" : "rozbalit"}</span>
+      </button>
+      {show && (
+        <>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Vytvoří projekty a labely v Todoistu jedním klikem. Idempotentní —
+            existující se přeskočí (case-insensitive match na name). Hodí se pro
+            první setup.
+          </p>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              Projekty (jeden na řádek; <code>Parent {">"} Child</code> pro hierarchii)
+            </label>
+            <textarea
+              value={projectsText}
+              onChange={(e) => setProjectsText(e.target.value)}
+              rows={6}
+              placeholder={"Vyrušení\nVIP\nMoje úkoly\nART76 > Knížka"}
+              className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-xs font-mono resize-y"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+              Labely (jeden na řádek nebo oddělené čárkou)
+            </label>
+            <textarea
+              value={labelsText}
+              onChange={(e) => setLabelsText(e.target.value)}
+              rows={4}
+              placeholder="capture, urgent, klient-A, dum, auto"
+              className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-xs font-mono resize-y"
+            />
+          </div>
+
+          <Button onClick={submit} disabled={busy}>
+            {busy ? <><Loader2 className="animate-spin" /> Importuji…</> : "Spustit bulk import"}
+          </Button>
+
+          {err && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 text-xs px-3 py-2">
+              {err}
+            </div>
+          )}
+
+          {results && (
+            <div className="rounded-md border border-white/10 bg-white/[0.02] p-3 text-xs space-y-2">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Výsledky</div>
+              <div>
+                <strong>Projekty:</strong> {results.summary.projectsCreated} nových, {" "}
+                {results.summary.projectsExisting} už existovalo, {" "}
+                {results.summary.projectsFailed} chyb
+              </div>
+              <div>
+                <strong>Labely:</strong> {results.summary.labelsCreated} nových, {" "}
+                {results.summary.labelsExisting} už existovalo, {" "}
+                {results.summary.labelsFailed} chyb
+              </div>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {results.projects.filter((r: any) => r.error).length > 0 && (
+                <details className="text-[var(--tint-rose)]">
+                  <summary className="cursor-pointer">Chyby projektů</summary>
+                  <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {results.projects.filter((r: any) => r.error).map((r: any) => (
+                      <li key={r.name}><strong>{r.name}</strong>: {r.error}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {results.labels.filter((r: any) => r.error).length > 0 && (
+                <details className="text-[var(--tint-rose)]">
+                  <summary className="cursor-pointer">Chyby labelů</summary>
+                  <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {results.labels.filter((r: any) => r.error).map((r: any) => (
+                      <li key={r.name}><strong>{r.name}</strong>: {r.error}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

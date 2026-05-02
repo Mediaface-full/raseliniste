@@ -49,6 +49,7 @@ model User {
   pushSubscriptions WebPushSubscription[]
   decisions        Decision[]
   todoistProjects  TodoistProjectMirror[]
+  todoistLabels    TodoistLabelMirror[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -1258,6 +1259,22 @@ model DecisionEntry {
   audioBytes  Int?
 
   @@index([decisionId, datum])
+}
+
+// Mirror Todoist labelů — read-only kopie pro UI mapping a idempotenci
+// při tvorbě nových přes /api/todoist/labels.
+model TodoistLabelMirror {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  todoistId       String
+  name            String
+  color           String?
+  syncedAt        DateTime  @default(now())
+
+  @@unique([userId, todoistId])
+  @@index([userId])
+  @@index([userId, name])
 }
 
 // Mirror Todoist projektů — pull z Sync API, abychom v UI mohli zobrazit jméno
