@@ -48,6 +48,11 @@ model User {
   checkIns         CheckIn[]
   pushSubscriptions WebPushSubscription[]
   decisions        Decision[]
+
+  // Todoist incremental sync (Sync API)
+  todoistSyncToken  String?  @db.Text
+  todoistSyncedAt   DateTime?
+  todoistSyncError  String?  @db.Text
 }
 
 model WebauthnCredential {
@@ -872,6 +877,8 @@ enum TaskSource {
   audio
   quickadd
   capture
+  todoist_pull
+  vip_call_log
 }
 
 enum TaskBatchStatus {
@@ -927,6 +934,7 @@ model Task {
   @@index([sourceBatchId])
   @@index([assignedToContactId])
   @@index([parentId])
+  @@index([userId, todoistTaskId])
 }
 
 model TaskAudioBatch {

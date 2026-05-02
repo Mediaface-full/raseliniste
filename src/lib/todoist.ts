@@ -120,6 +120,56 @@ export async function createSection(token: string, name: string, projectId: stri
   });
 }
 
+// =============================================================================
+// Sync API — incremental fetch tasků (items) napříč všemi projekty.
+// Endpoint: POST /api/v1/sync (Unified API stále podporuje sync formát).
+// První volání s sync_token="*" → full snapshot. Další s posledním tokenem
+// → jen co se změnilo (added / updated / completed / deleted).
+// =============================================================================
+
+export interface TodoistSyncItem {
+  id: string;
+  user_id?: string;
+  project_id: string;
+  section_id?: string | null;
+  parent_id?: string | null;
+  content: string;
+  description?: string;
+  priority?: 1 | 2 | 3 | 4;
+  labels?: string[];
+  due?: {
+    date?: string;       // YYYY-MM-DD nebo YYYY-MM-DDTHH:MM:SS
+    is_recurring?: boolean;
+    string?: string;
+    timezone?: string | null;
+  } | null;
+  added_at?: string;
+  completed_at?: string | null;
+  checked?: boolean;
+  is_deleted?: boolean;
+}
+
+export interface TodoistSyncResponse {
+  sync_token: string;
+  full_sync: boolean;
+  items?: TodoistSyncItem[];
+  projects?: TodoistProject[];
+}
+
+export async function syncFetch(
+  token: string,
+  syncToken: string,
+  resourceTypes: string[] = ["items", "projects"],
+): Promise<TodoistSyncResponse> {
+  return call<TodoistSyncResponse>(token, "/sync", {
+    method: "POST",
+    body: JSON.stringify({
+      sync_token: syncToken,
+      resource_types: resourceTypes,
+    }),
+  });
+}
+
 export async function testConnection(token: string): Promise<{ ok: true; projectCount: number } | { ok: false; error: string }> {
   try {
     const projects = await listProjects(token);

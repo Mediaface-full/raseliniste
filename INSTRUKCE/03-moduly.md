@@ -116,7 +116,8 @@ Stav 2026-05-02. Detail jednotlivých modulů v `Návody/*.pdf`.
 | Kontakty | `/contacts` | ✅ Pole pro narozeniny (birthMonth+birthDay) + 5. pád (firstNameVocative) — manuální override pro VIP oslovení. |
 | Firewall historie | `/firewall` | ✅ U VIP vzkazů s vyplněným termínem rose badge „📅 do DD. M. RRRR". |
 | **Veřejné submit (Firewall)** | `/call-log` | ✅ public **DVĚ varianty** — NONVIP_TEXTS / VIP_TEXTS jako konstanty v souboru. VIP detekce přes `?phone=` v URL → DB lookup. VIP má: 5. pád oslovení, datum splnění (volitelné, type=date, min +2 dny → Todoist `due_date`), texty „Gíďo, máš misi" / „Vypusť Gíďu". Ne-VIP: „Gideon teď nezvedá". |
-| Thanks | `/call-log/thanks` | ✅ public Detekuje VIP přes `?phone=`. VIP: „Mise vypuštěna ✦" + tlačítko „Zadej další misi". Ne-VIP: „Vzkaz doručen". |
+| Thanks | `/call-log/thanks` | ✅ public Detekuje VIP přes `?phone=`. VIP: „Mise vypuštěna ✦" + tlačítko „Zadej další misi" + **sekce „Giďoušovy mise"** (otevřené nahoře, sbalitelné Hotové za 14 dní; mise zmizí automaticky když je Gideon odškrtne v Todoistu). On-demand Todoist sync pokud >5 min od posledního. Ne-VIP: „Vzkaz doručen". |
+| **Todoist obousměrný sync** | cron `todoist-sync` | ✅ NOVÉ 05-02 | **Pull z Todoistu zpět do DB** (každých 30 min + on-demand z thanks). Todoist je zdroj pravdy: odškrtnutí/smazání → propíše se do `Task.completedAt` a `CallLog.seenAt` (VIP výpis). Nové úkoly přidané přímo v Todoist appce → vytvoří se `Task` se `source=todoist_pull`. Per-user incremental přes Sync API + `User.todoistSyncToken`. Lib `src/lib/todoist-sync.ts`, endpoint `/api/cron/todoist-sync`. |
 | Dopisy | `/letters` | ✅ |
 | Editor dopisu | `/letters/<id>` nebo `/letters/new` | ✅ |
 | Zdraví | `/health` | ✅ |

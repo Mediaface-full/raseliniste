@@ -759,6 +759,8 @@ Rate limit `/api/health/analyze`: **10 / 24 h** per user (Gemini Pro guard).
 | POST | `/api/call-log/submit` | **public** | `{phone, message, isUrgent?, website (honeypot)}` |
 | GET | `/api/call-log` | session | `?unseen=1` (historie pro `/firewall`) |
 | PATCH | `/api/call-log/:id` | session | `{seen: boolean}` |
+| GET | `/api/call-log/by-phone` | **public** | `?phone=...&days=14` — VIP výpis vlastních misí (otevřené + hotové N dní); on-demand Todoist sync pokud > 5 min od posledního |
+| POST | `/api/cron/todoist-sync` | **x-cron-key** | každých 30 min; pull změn z Todoistu → Task/CallLog (status sync + nové úkoly přidané v Todoist appce) |
 
 Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 
@@ -1271,6 +1273,7 @@ Detail v `Návody/03-crony.pdf`. Krátký výpis:
 | 13 | **zijes-reminder ?type=lunch** | denně **13:00** (ŽIJEŠ? polední check-in, neutrální tón) |
 | 14 | **zijes-reminder ?type=evening** | denně **18:00** (ŽIJEŠ? večerní check-in, neutrální tón) |
 | 15 | **bwmys-tick** | denně **7:10** (B&W Myš — auto-návrat odložených, deadline alert 3d, sběr uplynul, datum revize) |
+| 16 | **todoist-sync** | každých **30 min** (pull změn z Todoistu — completion → Task.completedAt + CallLog.seenAt; nové úkoly v Todoist appce → Task se source=todoist_pull; per-user incremental přes Sync API a `User.todoistSyncToken`) |
 
 ## Důležité architektonické změny
 

@@ -3,6 +3,7 @@ import Base from "../../layouts/Base.astro";
 import AnimatedG from "../../components/AnimatedG.astro";
 import { prisma } from "../../lib/db";
 import { normalizePhone } from "../../lib/phone";
+import { syncTodoistForUser } from "../../lib/todoist-sync";
 
 // =============================================================================
 // TEXTY — Petr edituje zde. VIP a ne-VIP jsou ZÁMĚRNĚ ODDĚLENÉ varianty.
@@ -39,6 +40,7 @@ const rawPhone =
 
 let matchedIsVip = false;
 let matchedFirstName: string | null = null;
+let matchedUserId: string | null = null;
 const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
 if (normalizedPhone) {
   try {
@@ -52,10 +54,86 @@ if (normalizedPhone) {
         hit.contact.firstName?.trim() ||
         hit.contact.displayName.split(" ")[0] ||
         null;
+      matchedUserId = hit.contact.userId;
     }
   } catch {
     // DB výpadek → fallback na ne-VIP
   }
+}
+
+// VIP — načti seznam misí s tichým on-demand Todoist syncem.
+// Otevřené (seenAt=null) = vidíme všechny.
+// Hotové (seenAt!=null) = jen za posledních 14 dní.
+type VipMission = {
+  id: string;
+  message: string;
+  isUrgent: boolean;
+  requestedDueAt: Date | null;
+  seenAt: Date | null;
+  createdAt: Date;
+};
+let openMissions: VipMission[] = [];
+let doneMissions: VipMission[] = [];
+const DONE_DAYS = 14;
+
+if (matchedIsVip && matchedUserId && normalizedPhone) {
+  try {
+    // On-demand sync pokud poslední byl > 5 min (dohnaní 30min cronu)
+    const u = await prisma.user.findUnique({
+      where: { id: matchedUserId },
+      select: { todoistSyncedAt: true },
+    });
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    if (!u?.todoistSyncedAt || u.todoistSyncedAt.getTime() < fiveMinAgo) {
+      // Awaitujeme aby výpis byl čerstvý — Sync API je rychlé (~200-500 ms)
+      try {
+        await syncTodoistForUser(matchedUserId);
+      } catch {
+        // ignore — pokud sync selže, ukážeme co máme v DB
+      }
+    }
+
+    const sinceDone = new Date(Date.now() - DONE_DAYS * 86400000);
+    const calls = await prisma.callLog.findMany({
+      where: {
+        userId: matchedUserId,
+        phoneNumber: normalizedPhone,
+        wasVip: true,
+        OR: [{ seenAt: null }, { seenAt: { gte: sinceDone } }],
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        message: true,
+        isUrgent: true,
+        requestedDueAt: true,
+        seenAt: true,
+        createdAt: true,
+      },
+    });
+
+    openMissions = calls.filter((c) => c.seenAt === null);
+    doneMissions = calls.filter((c) => c.seenAt !== null);
+  } catch {
+    // DB výpadek — sekci prostě skryjeme
+  }
+}
+
+function relativeTime(d: Date): string {
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "před chvílí";
+  if (min < 60) return `před ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `před ${h} h`;
+  const days = Math.floor(h / 24);
+  if (days === 1) return "včera";
+  if (days < 7) return `před ${days} dny`;
+  return d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" });
+}
+
+function formatDue(d: Date): string {
+  return d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" });
 }
 
 const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
@@ -114,6 +192,69 @@ if (matchedIsVip && rawPhone) {
           </a>
         )}
       </div>
+
+      {matchedIsVip && (openMissions.length > 0 || doneMissions.length > 0) && (
+        <div class="mt-6 text-left">
+          <h2 class="font-serif text-xl mb-3 text-center">
+            ✦ Giďoušovy mise
+          </h2>
+
+          {openMissions.length > 0 && (
+            <div class="mb-4">
+              <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2 px-1">
+                Otevřené ({openMissions.length})
+              </div>
+              <div class="space-y-2">
+                {openMissions.map((m) => (
+                  <div class="glass rounded-xl p-3 border-l-2 border-[var(--tint-rose)]/60">
+                    <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground mb-1.5">
+                      <span class="size-1.5 rounded-full bg-[var(--tint-rose)]"></span>
+                      <span>{relativeTime(m.createdAt)}</span>
+                      {m.isUrgent && (
+                        <span class="text-[var(--tint-rose)]">· naléhavé</span>
+                      )}
+                      {m.requestedDueAt && (
+                        <span>· termín {formatDue(m.requestedDueAt)}</span>
+                      )}
+                    </div>
+                    <div class="text-sm leading-relaxed whitespace-pre-wrap">
+                      {m.message}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {doneMissions.length > 0 && (
+            <details class="glass rounded-xl">
+              <summary class="cursor-pointer p-3 text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+                ✓ Hotové ({doneMissions.length}) — posledních {DONE_DAYS} dní
+              </summary>
+              <div class="px-3 pb-3 space-y-2">
+                {doneMissions.map((m) => (
+                  <div class="rounded-md p-2.5 bg-white/[0.02] opacity-60">
+                    <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground mb-1">
+                      <span class="text-[var(--tint-sage)]">✓</span>
+                      <span>{relativeTime(m.createdAt)}</span>
+                      {m.seenAt && (
+                        <span>· vyřízeno {relativeTime(m.seenAt)}</span>
+                      )}
+                    </div>
+                    <div class="text-sm leading-relaxed whitespace-pre-wrap line-through decoration-foreground/30">
+                      {m.message}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          <p class="text-[10px] font-mono text-muted-foreground/70 text-center mt-3">
+            Mise zmizí, jakmile je Gíďa odškrtne v Todoistu.
+          </p>
+        </div>
+      )}
     </div>
   </div>
 </Base>
