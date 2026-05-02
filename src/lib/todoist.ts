@@ -26,6 +26,8 @@ export interface TodoistTask {
   project_id: string;
   priority: 1 | 2 | 3 | 4; // 1 = lowest, 4 = highest (urgent)
   url: string;
+  is_completed?: boolean;  // Todoist v1 vrací u GET /tasks/:id (200 i pro completed)
+  checked?: boolean;       // alias používaný Sync API
 }
 
 export interface CreateTaskInput {
