@@ -157,11 +157,12 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
         <SidebarToggle client:load />
         <a
           href="/start"
-          class="size-8 rounded-md hover:bg-white/5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
-          aria-label="Zpět na úvodní obrazovku"
-          title="Úvodní obrazovka"
+          class="h-8 px-2 sm:px-3 rounded-md bg-[var(--tint-sky)]/10 border border-[var(--tint-sky)]/30 hover:bg-[var(--tint-sky)]/20 flex items-center gap-1.5 text-[var(--tint-sky)] transition-colors shrink-0"
+          aria-label="Zpět na úvodní obrazovku Start"
+          title="Zpět na Start"
         >
           <Icon name="lucide:home" class="size-4" />
+          <span class="text-xs font-medium hidden sm:inline">Start</span>
         </a>
         <div class="flex items-center gap-2 text-sm text-muted-foreground">
           {breadcrumb.length === 0 ? (

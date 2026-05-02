@@ -4,7 +4,7 @@ import { useRecordingProtection, recordingProtectionTip } from "./useRecordingPr
 
 type Phase = "idle" | "recording" | "uploading" | "processing" | "done" | "error";
 
-const LIMIT_SEC = 5 * 60; // 5 min max — zápisy mají být krátké
+const LIMIT_SEC = 10 * 60; // 10 min max — zápisy by měly být stručné, ale 5 min bylo občas málo
 const TICK_MS = 250;
 
 export default function BwMysAudioRecorder({
@@ -146,7 +146,7 @@ export default function BwMysAudioRecorder({
               >
                 <Mic className="size-8" />
               </button>
-              <div className="text-sm text-muted-foreground">Tap pro záznam · max 5 min</div>
+              <div className="text-sm text-muted-foreground">Tap pro záznam · max 10 min</div>
               <div className="text-xs text-muted-foreground/80 max-w-xs leading-relaxed">
                 {recordingProtectionTip(protection.wakeLockSupported)}
               </div>
