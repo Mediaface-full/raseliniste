@@ -1,0 +1,79 @@
+---
+// Sekce „Giďoušovy mise" — sdílená mezi /call-log a /call-log/thanks.
+// Renderuje se jen pro tokenAuthed VIP (caller je odpovědný za auth).
+
+import { relativeTime, formatDue, type VipMission, VIP_MISSIONS_DONE_DAYS } from "../lib/vip-missions";
+
+interface Props {
+  open: VipMission[];
+  done: VipMission[];
+  daysWindow?: number;
+}
+
+const { open, done, daysWindow = VIP_MISSIONS_DONE_DAYS } = Astro.props;
+
+const hasAny = open.length > 0 || done.length > 0;
+---
+
+{hasAny && (
+  <div class="mt-6 text-left">
+    <h2 class="font-serif text-xl mb-3 text-center">
+      ✦ Giďoušovy mise
+    </h2>
+
+    {open.length > 0 && (
+      <div class="mb-4">
+        <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2 px-1">
+          Otevřené ({open.length})
+        </div>
+        <div class="space-y-2">
+          {open.map((m) => (
+            <div class="glass rounded-xl p-3 border-l-2 border-[var(--tint-rose)]/60">
+              <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground mb-1.5">
+                <span class="size-1.5 rounded-full bg-[var(--tint-rose)]"></span>
+                <span>{relativeTime(m.createdAt)}</span>
+                {m.isUrgent && (
+                  <span class="text-[var(--tint-rose)]">· naléhavé</span>
+                )}
+                {m.requestedDueAt && (
+                  <span>· termín {formatDue(m.requestedDueAt)}</span>
+                )}
+              </div>
+              <div class="text-sm leading-relaxed whitespace-pre-wrap">
+                {m.message}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {done.length > 0 && (
+      <details class="glass rounded-xl">
+        <summary class="cursor-pointer p-3 text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+          ✓ Hotové ({done.length}) — posledních {daysWindow} dní
+        </summary>
+        <div class="px-3 pb-3 space-y-2">
+          {done.map((m) => (
+            <div class="rounded-md p-2.5 bg-white/[0.02] opacity-60">
+              <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground mb-1">
+                <span class="text-[var(--tint-sage)]">✓</span>
+                <span>{relativeTime(m.createdAt)}</span>
+                {m.seenAt && (
+                  <span>· vyřízeno {relativeTime(m.seenAt)}</span>
+                )}
+              </div>
+              <div class="text-sm leading-relaxed whitespace-pre-wrap line-through decoration-foreground/30">
+                {m.message}
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+    )}
+
+    <p class="text-[10px] font-mono text-muted-foreground/70 text-center mt-3">
+      Mise zmizí, jakmile je Gíďa odškrtne v Todoistu.
+    </p>
+  </div>
+)}

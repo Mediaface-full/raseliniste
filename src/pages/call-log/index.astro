@@ -6,6 +6,8 @@ import { normalizePhone } from "../../lib/phone";
 import { vokativ } from "../../lib/vokativ";
 import { resolveCallLogToken } from "../../lib/call-log-token";
 import { checkPageRateLimit, getIp } from "../../lib/page-rate-limit";
+import { loadVipMissions, type VipMission } from "../../lib/vip-missions";
+import VipMissionsList from "../../components/VipMissionsList.astro";
 
 // Rate-limit anti-DoS: 60 req/min/IP. Veřejná stránka, neautentizovaná.
 const _ip = getIp(Astro.request, Astro.clientAddress);
@@ -64,17 +66,47 @@ let matchedFirstNameVocative: string | null = null;
 let matchedGreetingOverride: string | null = null;
 let matchedIsVip = false;
 let phoneKnown = false;
+let tokenAuthed = false;
+let tokenUserId: string | null = null;
+let tokenContactId: string | null = null;
+let tokenContactPhones: string[] = [];
 
 // Token-based VIP cesta: pokud máme platný token, načti kontakt + telefon z DB.
 if (rawToken) {
   const c = await resolveCallLogToken(rawToken);
   if (c) {
     matchedIsVip = true;
+    tokenAuthed = true;
     phoneKnown = true;
     matchedFirstName = c.firstName?.trim() || c.displayName.split(" ")[0] || null;
     matchedFirstNameVocative = c.firstNameVocative?.trim() || null;
     matchedGreetingOverride = c.greetingOverride?.trim() || null;
     rawPhone = c.phones[0]?.number ?? rawPhone;
+    tokenUserId = c.userId;
+    tokenContactId = c.id;
+    // Načti VŠECHNA čísla VIP — match misí přes všechna, ne jen phones[0].
+    const phones = await prisma.phone.findMany({
+      where: { contactId: c.id },
+      select: { number: true },
+    });
+    tokenContactPhones = phones.map((p) => p.number);
+  }
+}
+
+// Načti VIP mise pro výpis pod formulářem (jen tokenAuthed VIP).
+let openMissions: VipMission[] = [];
+let doneMissions: VipMission[] = [];
+if (tokenAuthed && tokenUserId && tokenContactId) {
+  try {
+    const r = await loadVipMissions({
+      userId: tokenUserId,
+      contactId: tokenContactId,
+      phones: tokenContactPhones,
+    });
+    openMissions = r.open;
+    doneMissions = r.done;
+  } catch {
+    // DB výpadek — sekci skryjeme
   }
 }
 
@@ -243,6 +275,10 @@ const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
       <p class="mt-6 text-center text-[11px] text-muted-foreground font-mono tracking-wider">
         {T.footer}
       </p>
+
+      {tokenAuthed && (
+        <VipMissionsList open={openMissions} done={doneMissions} />
+      )}
     </div>
   </div>
 
