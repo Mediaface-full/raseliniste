@@ -12,6 +12,8 @@ interface Contact {
   lastName: string | null;
   note: string | null;
   isVip: boolean;
+  callLogToken: string | null;
+  callLogTokenCreatedAt: string | null;
   birthMonth: number | null;
   birthDay: number | null;
   birthdayReminderDaysBefore: number | null;
@@ -427,6 +429,10 @@ function ContactEditor({ contact, onClose }: EditorProps) {
             <span className="text-sm">VIP — firewall → zvláštní projekt + okamžitý email</span>
           </label>
 
+          {contact?.isVip && contact?.id && (
+            <VipLinkSection contactId={contact.id} initialToken={contact.callLogToken} />
+          )}
+
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
               Narozeniny (den / měsíc — rok není potřeba)
@@ -582,6 +588,94 @@ function ContactEditor({ contact, onClose }: EditorProps) {
           <Button variant="ghost" onClick={() => onClose(false)}>Zrušit</Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// =============================================================================
+// VIP link sekce — privátní URL na /call-log s tokenem
+// =============================================================================
+
+function VipLinkSection({ contactId, initialToken }: { contactId: string; initialToken: string | null }) {
+  const [token, setToken] = useState<string | null>(initialToken);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Pokud token chybí (kontakt právě označen VIP, ještě neuložen), GET ho dotáhne.
+  useEffect(() => {
+    if (token) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/contacts/${contactId}/call-log-token`);
+        const data = await res.json();
+        if (!cancelled && res.ok) setToken(data.token);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactId]);
+
+  const url = token ? `${typeof window !== "undefined" ? window.location.origin : "https://www.raseliniste.cz"}/call-log?t=${token}` : "";
+
+  async function regenerate() {
+    if (!confirm("Vygenerovat nový token? Stávající VIP link přestane fungovat — musíš ho znovu poslat.")) return;
+    setLoading(true); setErr(null);
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/call-log-token`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error ?? "Regenerace selhala."); return; }
+      setToken(data.token);
+    } finally { setLoading(false); }
+  }
+
+  async function copy() {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-[var(--tint-rose)]/30 bg-[var(--tint-rose)]/[0.05] p-3 space-y-2">
+      <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
+        VIP link (privátní)
+      </div>
+      {loading && !token ? (
+        <div className="text-xs text-muted-foreground italic flex items-center gap-2">
+          <Loader2 className="size-3 animate-spin" /> Generuji token…
+        </div>
+      ) : token ? (
+        <>
+          <div className="text-xs font-mono break-all bg-background/40 rounded px-2 py-1.5 border border-border/40">
+            {url}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={copy} disabled={loading}>
+              {copied ? "✓ Zkopírováno" : "Kopírovat link"}
+            </Button>
+            <Button variant="ghost" onClick={regenerate} disabled={loading}>
+              {loading ? <Loader2 className="size-3 animate-spin" /> : "Regenerovat"}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
+            Pošli VIPce tenhle odkaz (WhatsApp / SMS / e-mail). Otevře jim formulář
+            na zadání mise + výpis Giďoušových misí. Regenerace zruší předchozí link.
+          </p>
+        </>
+      ) : (
+        <div className="text-xs text-muted-foreground italic">Token zatím nevygenerován. Ulož kontakt a otevři znovu.</div>
+      )}
+      {err && <div className="text-xs text-destructive">{err}</div>}
     </div>
   );
 }

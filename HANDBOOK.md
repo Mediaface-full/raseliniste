@@ -246,6 +246,7 @@ raseliniste/
 - **Phone** — E.164 normalizovaný, `label` (mobile/work/home/…). `@@unique([contactId, number])` + `@@index([number])` pro O(1) lookup příchozího vzkazu.
 - **ContactEmail** — `email`, `label`.
 - **CallLog** — `phoneNumber` (E.164), `rawNumber`, `contactId?`, `message`, `isUrgent`, **`wasVip`** (snapshot), `ip`, `userAgent`, `todoistTaskId?`, `todoistError?`, `mailSentAt?`, `mailError?`, `seenAt?`.
+- **Contact.callLogToken / callLogTokenCreatedAt** — privátní VIP klíč pro `/call-log?t=<token>` a výpis Giďoušových misí. Auto-generuje se při `isVip = true`. 24 znaků base64url. Stabilní; regenerace přes UI v /contacts (zruší předchozí link). Lib `src/lib/call-log-token.ts` (`generateCallLogToken`, `ensureCallLogToken`, `regenerateCallLogToken`, `resolveCallLogToken` s defense-in-depth — pokud VIP odeberu, link přestane fungovat).
 
 ### Integrace (provider-agnostic credentials)
 - **UserIntegration** — `provider` (`todoist` | `smtp` | budoucí), AES-256-GCM šifrované creds (`tokenEnc`/`tokenIv`/`tokenTag`), `config Json?`, `lastUsedAt`, `lastError`. Klíč šifrování derivovaný ze `SESSION_SECRET`.
@@ -759,7 +760,8 @@ Rate limit `/api/health/analyze`: **10 / 24 h** per user (Gemini Pro guard).
 | POST | `/api/call-log/submit` | **public** | `{phone, message, isUrgent?, website (honeypot)}` |
 | GET | `/api/call-log` | session | `?unseen=1` (historie pro `/firewall`) |
 | PATCH | `/api/call-log/:id` | session | `{seen: boolean}` |
-| GET | `/api/call-log/by-phone` | **public** | `?phone=...&days=14` — VIP výpis vlastních misí (otevřené + hotové N dní); on-demand Todoist sync pokud > 5 min od posledního |
+| GET | `/api/call-log/by-token` | **public** | `?t=<callLogToken>&days=14` — VIP výpis vlastních misí (otevřené + hotové N dní); on-demand Todoist sync pokud > 5 min; bez tokenu nelze získat seznam |
+| GET, POST | `/api/contacts/:id/call-log-token` | session | GET vrátí (a auto-vygeneruje) token pro VIP kontakt; POST vždy regeneruje (zruší předchozí link) |
 | POST | `/api/cron/todoist-sync` | **x-cron-key** | každých 30 min; pull změn z Todoistu → Task/CallLog (status sync + nové úkoly přidané v Todoist appce) |
 
 Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.

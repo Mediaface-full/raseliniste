@@ -6,6 +6,14 @@
 1. **DSM Task Scheduler:** přesunout cron `daily-projects-digest` z **18:00 na 7:00**
    - Control Panel → Task Scheduler → najít existující úlohu → upravit hodinu
    - Bez tohoto se digest pošle pořád večer
+1b. **DSM Task Scheduler:** přidat cron `todoist-sync` **každých 30 min** (NOVÉ 2026-05-02)
+   - User-defined script:
+     ```
+     curl -fsS -X POST -H "x-cron-key: $CRON_SECRET" https://www.raseliniste.cz/api/cron/todoist-sync
+     ```
+   - Schedule: Daily, Repeat every 30 minutes
+   - Bez tohoto se odškrtnutí v Todoistu nepropíše do firewallu / VIP výpisu / Task tabulky
+1c. **První sync = full snapshot** — naimportuje všechny aktivní úkoly z Todoistu (i ty co Petr přidal mimo aplikaci) do `Task` se `source=todoist_pull`. Spustí se automaticky při prvním zavolání cronu.
 
 ### GCP Budget Alert (volitelné)
 2. **GCP Budget Alert** — Gideon si zařídí v GCP Console (1 minuta, žádný kód). Detail v memory `todo_gcp_billing.md`.

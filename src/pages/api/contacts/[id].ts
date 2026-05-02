@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
 import { normalizePhone } from "@/lib/phone";
+import { ensureCallLogToken } from "@/lib/call-log-token";
 
 export const prerender = false;
 
@@ -89,7 +90,19 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
     include: { phones: true, emails: true },
   });
 
-  return Response.json({ contact });
+  // Pokud byl nově označen jako VIP a nemá token, vygeneruj.
+  if (contact.isVip && !contact.callLogToken) {
+    await ensureCallLogToken(contact.id).catch((e) => {
+      console.warn("[contacts] ensureCallLogToken failed:", e);
+    });
+  }
+
+  // Re-fetch aby v response byl token (i pokud byl právě vygenerovaný)
+  const fresh = await prisma.contact.findUnique({
+    where: { id },
+    include: { phones: true, emails: true },
+  });
+  return Response.json({ contact: fresh });
 };
 
 export const DELETE: APIRoute = async ({ cookies, params }) => {

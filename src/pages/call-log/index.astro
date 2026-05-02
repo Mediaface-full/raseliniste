@@ -4,6 +4,7 @@ import AnimatedG from "../../components/AnimatedG.astro";
 import { prisma } from "../../lib/db";
 import { normalizePhone } from "../../lib/phone";
 import { vokativ } from "../../lib/vokativ";
+import { resolveCallLogToken } from "../../lib/call-log-token";
 
 // =============================================================================
 // TEXTY — Petr edituje zde. VIP a ne-VIP jsou ZÁMĚRNĚ ODDĚLENÉ entity.
@@ -44,7 +45,8 @@ const VIP_TEXTS = {
 // =============================================================================
 
 const url = new URL(Astro.request.url);
-const rawPhone =
+const rawToken = url.searchParams.get("t")?.trim() ?? "";
+let rawPhone =
   url.searchParams.get("phone") ??
   url.searchParams.get("tel") ??
   url.searchParams.get("from") ??
@@ -55,8 +57,22 @@ let matchedFirstNameVocative: string | null = null;
 let matchedGreetingOverride: string | null = null;
 let matchedIsVip = false;
 let phoneKnown = false;
+
+// Token-based VIP cesta: pokud máme platný token, načti kontakt + telefon z DB.
+if (rawToken) {
+  const c = await resolveCallLogToken(rawToken);
+  if (c) {
+    matchedIsVip = true;
+    phoneKnown = true;
+    matchedFirstName = c.firstName?.trim() || c.displayName.split(" ")[0] || null;
+    matchedFirstNameVocative = c.firstNameVocative?.trim() || null;
+    matchedGreetingOverride = c.greetingOverride?.trim() || null;
+    rawPhone = c.phones[0]?.number ?? rawPhone;
+  }
+}
+
 const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
-if (normalizedPhone) {
+if (!matchedIsVip && normalizedPhone) {
   try {
     const hit = await prisma.phone.findFirst({
       where: { number: normalizedPhone },
@@ -129,7 +145,7 @@ const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
       </div>
 
       <div class="glass-strong rounded-xl p-6">
-        <form id="call-log-form" data-vip={matchedIsVip ? "1" : "0"} class="space-y-4">
+        <form id="call-log-form" data-vip={matchedIsVip ? "1" : "0"} data-token={rawToken} class="space-y-4">
           <!-- honeypot -->
           <div class="hidden" aria-hidden="true">
             <label>Website: <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
@@ -255,8 +271,12 @@ const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
           body: JSON.stringify(body),
         });
         if (res.ok) {
-          // Předáváme phone v URL aby thanks detekovalo VIP a mohlo nabídnout
-          // tlačítko "Zadej další misi" zpět na původní personalizovaný link.
+          // Token přebije phone — VIP token cesta dává plný výpis Giďoušových misí.
+          const token = form.dataset.token ?? "";
+          if (token) {
+            window.location.href = `/call-log/thanks?t=${encodeURIComponent(token)}`;
+            return;
+          }
           const phoneEnc = encodeURIComponent(String(body.phone ?? ""));
           window.location.href = phoneEnc ? `/call-log/thanks?phone=${phoneEnc}` : "/call-log/thanks";
           return;

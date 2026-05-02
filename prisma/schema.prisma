@@ -272,6 +272,12 @@ model Contact {
   birthdayReminderDaysBefore Int?
   birthdayReminderChannels   String[]  @default([])
 
+  // VIP token pro /call-log (privátní link na zadávání misí + výpis Giďoušových misí).
+  // Generuje se automaticky když Contact.isVip = true. Stabilní (neměnný) dokud Petr
+  // nezvolí regenerate (tlačítko v /contacts u VIP). 24 znaků base64url.
+  callLogToken            String?    @unique
+  callLogTokenCreatedAt   DateTime?
+
   importedFrom String?        // "vcard" | "manual" | "google"
   externalId   String?        // UID z vCard, pokud má
 

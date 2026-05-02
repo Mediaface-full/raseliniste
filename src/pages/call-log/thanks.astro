@@ -4,6 +4,7 @@ import AnimatedG from "../../components/AnimatedG.astro";
 import { prisma } from "../../lib/db";
 import { normalizePhone } from "../../lib/phone";
 import { syncTodoistForUser } from "../../lib/todoist-sync";
+import { resolveCallLogToken } from "../../lib/call-log-token";
 
 // =============================================================================
 // TEXTY — Petr edituje zde. VIP a ne-VIP jsou ZÁMĚRNĚ ODDĚLENÉ varianty.
@@ -29,7 +30,12 @@ const VIP_TEXTS = {
 };
 
 // =============================================================================
-// SERVER LOGIKA — detekce VIP podle telefonu (předaného z formuláře v ?phone=)
+// SERVER LOGIKA
+//
+// VIP detekce primárně přes ?t=<callLogToken> (privátní per-VIP klíč).
+// Phone-based fallback je jen pro zobrazení VIP textů (oslovení), VÝPIS misí
+// se zobrazuje POUZE pokud je tokenem ověřený VIP — chrání seznam před
+// kýmkoliv kdo zná telefon.
 // =============================================================================
 
 const url = new URL(Astro.request.url);
@@ -37,12 +43,31 @@ const rawPhone =
   url.searchParams.get("phone") ??
   url.searchParams.get("tel") ??
   "";
+const rawToken = url.searchParams.get("t")?.trim() ?? "";
 
 let matchedIsVip = false;
 let matchedFirstName: string | null = null;
 let matchedUserId: string | null = null;
+let tokenAuthed = false;
+let tokenContactPhone: string | null = null;
+
+if (rawToken) {
+  try {
+    const c = await resolveCallLogToken(rawToken);
+    if (c) {
+      matchedIsVip = true;
+      tokenAuthed = true;
+      matchedFirstName = c.firstName?.trim() || c.displayName.split(" ")[0] || null;
+      matchedUserId = c.userId;
+      tokenContactPhone = c.phones[0]?.number ?? null;
+    }
+  } catch {
+    // ignore — fallback na phone
+  }
+}
+
 const normalizedPhone = rawPhone ? normalizePhone(rawPhone) : null;
-if (normalizedPhone) {
+if (!matchedIsVip && normalizedPhone) {
   try {
     const hit = await prisma.phone.findFirst({
       where: { number: normalizedPhone },
@@ -76,7 +101,9 @@ let openMissions: VipMission[] = [];
 let doneMissions: VipMission[] = [];
 const DONE_DAYS = 14;
 
-if (matchedIsVip && matchedUserId && normalizedPhone) {
+// Výpis misí JEN pro token-ověřené VIP. Phone-only nikdy nedostane seznam.
+const vipPhoneForLookup = tokenAuthed ? tokenContactPhone : null;
+if (tokenAuthed && matchedUserId && vipPhoneForLookup) {
   try {
     // On-demand sync pokud poslední byl > 5 min (dohnaní 30min cronu)
     const u = await prisma.user.findUnique({
@@ -97,7 +124,7 @@ if (matchedIsVip && matchedUserId && normalizedPhone) {
     const calls = await prisma.callLog.findMany({
       where: {
         userId: matchedUserId,
-        phoneNumber: normalizedPhone,
+        phoneNumber: vipPhoneForLookup,
         wasVip: true,
         OR: [{ seenAt: null }, { seenAt: { gte: sinceDone } }],
       },
@@ -139,10 +166,12 @@ function formatDue(d: Date): string {
 const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
 const appleIconPath = "/apple-touch-icon.png"; // G logo (i pro VIP)
 
-// Tlačítko "Zadej další misi" odkazuje zpět na /call-log s zachovaným phone+name,
-// ať si VIP nemusí znovu vyplňovat.
+// Tlačítko "Zadej další misi" odkazuje zpět na /call-log; přednostně přenese
+// token (čistá VIP cesta), jinak phone+name (legacy fallback).
 let nextMissionHref = "/call-log";
-if (matchedIsVip && rawPhone) {
+if (tokenAuthed && rawToken) {
+  nextMissionHref = `/call-log?t=${encodeURIComponent(rawToken)}`;
+} else if (matchedIsVip && rawPhone) {
   const params = new URLSearchParams();
   params.set("phone", rawPhone);
   if (matchedFirstName) params.set("name", matchedFirstName);

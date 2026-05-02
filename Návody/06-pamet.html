@@ -135,12 +135,12 @@
   <li><span class="url">/kontakty</span> → najdi kontakt → klikni <strong>★ hvězdičku</strong> (zapne VIP)</li>
   <li>Vyplň <strong>Oslovení (5. pád)</strong> — např. „Karle" — pro hezké oslovení („⭐ Ahoj, Karle ⭐")</li>
   <li>Volitelně <strong>Vlastní oslovení</strong> — např. „Drahá dívko" → bude místo „Ahoj, Karle"</li>
-  <li>Klikni <strong>🔗 ikonku řetízku</strong> vedle kontaktu → link se zkopíruje do schránky</li>
+  <li>Otevři kontakt znovu → najdi sekci <strong>VIP link (privátní)</strong> → klikni <strong>Kopírovat link</strong></li>
   <li>Pošli ho VIP osobě (WhatsApp, mail, SMS)</li>
 </ol>
 </div>
 
-<p><strong>Co VIP uvidí:</strong> stránku „Gíďo, máš misi" s personalizovaným oslovením, polem na zprávu, volitelným <strong>termínem splnění</strong> (min +2 dny), tlačítko „Vypusť Gíďu".</p>
+<p><strong>Co VIP uvidí:</strong> stránku „Gíďo, máš misi" s personalizovaným oslovením, polem na zprávu, volitelným <strong>termínem splnění</strong> (min +2 dny), tlačítko „Vypusť Gíďu". Po odeslání: potvrzovací stránku + <strong>výpis svých Giďoušových misí</strong> (otevřené nahoře, sbalitelné Hotové za 14 dní). Mise zmizí automaticky, jakmile je odškrtneš v Todoistu.</p>
 
 <p><strong>Co se stane po odeslání:</strong></p>
 <ul>
@@ -148,6 +148,12 @@
   <li>Email ti přijde <strong>okamžitě</strong> na <code>gideon@raseliniste.cz</code></li>
   <li>Záznam je v <span class="url">/firewall</span></li>
 </ul>
+
+<div class="warn">
+<strong>Token je privátní klíč.</strong> Každý VIP má svůj jedinečný link s 24-znakovým tokenem (např. <code>/call-log?t=Hk3pQ2nM7xR4...</code>). Kdo má link, vidí seznam misí toho VIP. Pokud token unikne nebo VIPa odebereš ze seznamu, sekce „VIP link" v kontaktu má tlačítko <strong>Regenerovat</strong> — vygeneruje nový a starý okamžitě přestane fungovat (musíš poslat nový link).
+</div>
+
+<p><strong>Pokud VIPa zruším (odeberu ★)</strong>, jeho link <strong>okamžitě přestane fungovat</strong> — endpoint kontroluje že kontakt je <em>stále</em> VIP. Při znovu-zapnutí se mu vygeneruje nový token (starý už není v DB).</p>
 
 <h2>8. Výročí + narozeniny</h2>
 

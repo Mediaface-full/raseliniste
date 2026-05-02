@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
 import { normalizePhone } from "@/lib/phone";
+import { ensureCallLogToken } from "@/lib/call-log-token";
 
 export const prerender = false;
 
@@ -107,5 +108,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     include: { phones: true, emails: true },
   });
 
-  return Response.json({ contact });
+  if (contact.isVip) {
+    await ensureCallLogToken(contact.id).catch((e) => console.warn("[contacts.create] token:", e));
+  }
+  const fresh = await prisma.contact.findUnique({
+    where: { id: contact.id },
+    include: { phones: true, emails: true },
+  });
+  return Response.json({ contact: fresh ?? contact });
 };
