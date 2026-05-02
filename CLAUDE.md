@@ -4,17 +4,22 @@
 
 Tento soubor se automaticky načte každou novou Claude Code session.
 
-## ⚠️ ČTI NEJDŘÍV: `INSTRUKCE/00-START-HERE.md`
+## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-Ten dokument má aktuální orientaci, klíčová pravidla a navigaci. **Tento CLAUDE.md je z dubna 2026 a může být v některých detailech zastaralý** — `INSTRUKCE/` se aktualizuje průběžně.
+1. **`INSTRUKCE/HANDOFF-2026-05-02-vecer.md`** ← **PRIMÁRNÍ ZDROJ pro novou session** (stav, pending TODO, kritické incidenty z předchozí session, push instrukce)
+2. `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
+3. `INSTRUKCE/04-todo-list.md` — co se má dělat (kromě toho co je v HANDOFFu)
 
-Plný onboarding seznam (čti v pořadí):
+**Tento CLAUDE.md je z dubna 2026 a může být v některých detailech zastaralý** — `INSTRUKCE/` se aktualizuje průběžně, `HANDOFF-*.md` jsou freshest.
+
+Plný onboarding seznam:
+- `INSTRUKCE/HANDOFF-2026-05-02-vecer.md` — **kritické**, čti první
 - `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
-- `INSTRUKCE/01-aktualni-stav.md` — recent commits, co je nasazeno
-- `INSTRUKCE/02-architektura.md` — stack, klíčová rozhodnutí
-- `INSTRUKCE/03-moduly.md` — všechny moduly, URL, status
-- `INSTRUKCE/04-todo-list.md` — co se má dělat
-- `INSTRUKCE/05-styl-prace.md` — Gideon profile, komunikace
+- `INSTRUKCE/01-aktualni-stav.md` — recent commits
+- `INSTRUKCE/02-architektura.md` — stack
+- `INSTRUKCE/03-moduly.md` — moduly, URL, status (rozšířeno 2026-05-02)
+- `INSTRUKCE/04-todo-list.md` — TODO seznam
+- `INSTRUKCE/05-styl-prace.md` — komunikace
 - `INSTRUKCE/06-troubleshooting.md` — známé pasti
 - `INSTRUKCE/07-resources.md` — kde co je
 

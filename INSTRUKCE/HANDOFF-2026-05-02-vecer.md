@@ -134,29 +134,42 @@ Schedule: Daily, First 00:00, Every 5 minutes, Last 23:55.
 
 ## 🟧 TODO PRO NOVOU SESSION
 
-### Vysoká priorita
-1. **Po-deploy verifikace** — sledovat reconcile zda fakt funguje pro Petra (8 VIP misí vyřízeno?)
-2. **B&W myš doplněk 2** — schema je v DB (commit `2024-05-02 dopoledne`), zbývá 7 bodů z `/Users/petrperina/Downloads/rozhodovaci-system-doplnek-2.md`:
+### 🔴 Vysoká priorita
+
+1. **Po-deploy verifikace reconcile** — sledovat zda Petrových 8 VIP misí (Lucie) zmizí z otevřených po `Spustit teď` v `/settings/crons`. Pokud ano → reconcile pass funguje. Pokud ne → další debug.
+
+2. **B&W myš doplněk 2** — schema v DB je připraveno, zbývá 7 bodů z `/Users/petrperina/Downloads/rozhodovaci-system-doplnek-2.md`:
    - UI ve formuláři zápisu — radio buttons stav (aktivovaný/stažený/klidný/nevím)
-   - UI v zarámování — krok 2.5 autorství
-   - AI sekce A2 (rozložení stavů) + F2 (autorství) + rozšíření C
-   - Tok 5 — kontrola před uzavřením (dialog 48h)
-   - Vizualizace „Mapa stavů v čase" (stacked bar)
-   - Vizualizace „Distance-from-self" (scatter, jen finální)
+   - UI v zarámování — krok 2.5 autorství (pro_me/pro_jineho/spolecne/nejsem_si_jisty)
+   - AI sekce A2 (rozložení stavů) + F2 (autorství) + rozšíření sekce C
+   - Tok 5 — kontrola před uzavřením (dialog 48h pro aktivovaný/stažený poslední zápis)
+   - Vizualizace „Mapa stavů v čase" (stacked bar, od 3. zápisu)
+   - Vizualizace „Distance-from-self" (scatter, jen finální + relevantní autorství)
    - AI prompt pro klasifikaci motivací vnitřní/vnější
 
-### Střední priorita
-3. **`/ukoly` UX vylepšení**:
-   - Bulk select + bulk delete (checkbox per řádek)
-   - TaskAudioReview discard taky bez confirm
-   - Per-task pushError badge u řádku (teď jen v rozkliknutém detailu)
-4. **Audit 4d7a618 ověření** — agent který běžel na konci session (audit Todoist schématu) může najít další chyby. Po doběhu přečíst output `/private/tmp/claude-501/-Users-petrperina-CLOUDS-CLOUDE-PROJECTS-raseliniste/12878763-10cc-47b2-857a-a1dadd8d2806/tasks/a241ac01d0b4235b1.output`.
+### 🟡 Střední priorita — z auditu Todoist (commit po `4d7a618`)
 
-### Nízká priorita / nice-to-have
-5. **Recurring tasks v Todoistu** — naše DB má jen single `dueAt`, desync při Todoist recurrence
-6. **Subtask pod completed parent** — edge case, ověřit chování
-7. **Token expirace** — co se stane v UI když Todoist token expiroval
-8. **Pre-existing TS errors** v `env.ts` patternu — drobnost, build prochází
+3. **Latent bug #4 — getTask vs reconcile komentáře** — sjednoceno v posledním commitu, ale ověřit jedním curl voláním proti reálnému Todoist API (otestovat: completed task vrací 200? deleted vrací 404?).
+
+4. **Latent bug #8 — cache fragility v `task-todoist-push.ts:53`**: po `invalidateCache` se neznovunačítají sekce. Funguje, ale fragilní pro budoucí refaktor. Zvážit přepsat na `getCache()` znovu po invalidaci.
+
+5. **Latent bug #9 — DELETE leak když Todoist down**: `DELETE /api/ukoly/:id` lokální delete proběhne i pokud Todoist API selže → leak. Není UI feedback. Fix: přidat audit log nebo retry queue.
+
+6. **Latent bug #10 — Recurring tasks v Todoistu**: naše DB má jen single `dueAt` → desync při Todoist recurrence (next instance se zkopíruje, my si myslíme že je to update starého). Známé omezení, dokumentovat v UI.
+
+### 🟡 UX vylepšení v `/ukoly`
+
+7. **Bulk select + bulk delete** (checkbox per řádek + sticky bottom bar)
+8. **TaskAudioReview discard** — taky bez confirm() dialogu
+9. **Per-task pushError badge** u řádku (teď jen v rozkliknutém detailu)
+
+### 🟢 Nice-to-have
+
+10. **Idempotency-Key header** při createTask (Todoist v1 podporuje) — eliminuje race duplikáty bez DB unique
+11. **Šém kontrakt test** — `tests/todoist-contract.ts` s ručně-spustitelnými curl voláními do reálného API, ověří všechny předpoklady (404 vs 200, due clear, atd.)
+12. **Subtask pod completed parent** — edge case, ověřit chování
+13. **Token expirace UI** — co se stane když Todoist token expiroval
+14. **Pre-existing TS errors** v `env.ts` patternu — drobnost, build prochází
 
 ---
 
