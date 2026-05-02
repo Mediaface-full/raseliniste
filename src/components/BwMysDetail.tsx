@@ -3,6 +3,7 @@ import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, 
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import BwMysAudioRecorder from "./BwMysAudioRecorder";
+import BwMysViz from "./BwMysViz";
 
 interface Decision {
   id: string;
@@ -28,6 +29,7 @@ interface DecisionEntry {
   nalada: number;
   typVstupu: string;
   uhelPohledu: string;
+  uhelPohleduAi?: string | null;
   obsah: string;
 }
 
@@ -209,6 +211,9 @@ export default function BwMysDetail({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {/* Vizuální přehled */}
+      {d.entries.length > 0 && <BwMysViz entries={d.entries} />}
 
       {/* Časová osa zápisů */}
       <div className="space-y-2">
