@@ -34,10 +34,10 @@
 <body>
 
 <h1>Cron nastavení na NASu</h1>
-<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 15 úloh celkem.</p>
+<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 16 úloh celkem.</p>
 
 <div class="tldr">
-<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 15 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~20 minut.
+<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 16 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~20 minut.
 </div>
 
 <h2>Společné nastavení (vzor)</h2>
@@ -68,7 +68,7 @@
 <tr><td><code>poslední den měsíce</code></td><td>Run on: <strong>Monthly</strong>, Date: <strong>Last day of month</strong></td></tr>
 </table>
 
-<h2>15 úloh — checklist</h2>
+<h2>16 úloh — checklist</h2>
 
 <!-- 1 -->
 <div class="cron-card">
@@ -192,13 +192,28 @@
 <p><strong>Test:</strong> založ rozhodnutí v /bwmys s deadlinem za 2 dny, pusť cron manuálně → email/push s deadline_approaching.</p>
 </div>
 
-<h2>Po vytvoření všech 15 — kontrola</h2>
+<div class="cron-card">
+<h3><span class="checkbox"></span>16. Raseliniste Todoist obousměrný sync</h3>
+<div class="cron-meta">každých 30 min · POST <span class="endpoint">/api/cron/todoist-sync</span> · max-time 60</div>
+<p><strong>K čemu:</strong> Pull změn z Todoistu zpět do naší DB — Todoist je zdroj pravdy pro stav úkolů:</p>
+<ul>
+  <li>Odškrtneš v Todoist → propíše se do <code>Task.completedAt</code> i <code>CallLog.seenAt</code> (mizí z VIP výpisu Giďoušových misí na <code>/call-log/thanks</code>)</li>
+  <li>Smazaný task v Todoist → totéž (smazaný = hotový)</li>
+  <li>Nový úkol vytvořený přímo v Todoist appce (mimo aplikaci) → vytvoří se <code>Task</code> se <code>source=todoist_pull</code> → vidíš ho v <code>/tasks</code>, AI/firewall ho zná</li>
+  <li>Update titulu / due date / labels / priority — Todoist přepíše naši lokální verzi (Petr potvrdil že Todoist je zdroj pravdy)</li>
+</ul>
+<p><strong>Jak to funguje:</strong> per-user incremental přes Todoist Sync API a <code>User.todoistSyncToken</code>. První volání = full snapshot (všechny aktivní úkoly), další = jen změny od minula. Když token resetuješ na <code>"*"</code> v DB, vyvolá full sync.</p>
+<p><strong>Schedule v DSM:</strong> Daily, Repeat every 30 minutes (ne minutely — DSM neumí cron 0,30 přímo, použij Daily + Repeat).</p>
+<p><strong>Test:</strong> odškrtni libovolný úkol v Todoist appce → pusť cron manuálně přes <strong>Run</strong> → JSON odpověď ukáže <code>tasksCompleted</code> nebo <code>callLogsCompleted</code> &gt; 0. Otevři <code>/firewall</code> nebo VIP link a uvidíš stav.</p>
+</div>
+
+<h2>Po vytvoření všech 16 — kontrola</h2>
 
 <div class="steps">
-<div class="step">DSM → Task Scheduler → seznam má 15 řádků s prefix „Raseliniste"</div>
+<div class="step">DSM → Task Scheduler → seznam má 16 řádků s prefix „Raseliniste"</div>
 <div class="step">Všechny mají sloupec Status = <strong>Enabled</strong></div>
 <div class="step">U každé pravý klik → <strong>Run</strong> → History → Last run = OK / Result code 200</div>
-<div class="step">Pro #1, #4, #10 (vysoká frekvence) zkontroluj History po 1 hodině — měl by tam být běh à 5/15 min</div>
+<div class="step">Pro #1, #4, #10, #16 (vysoká frekvence) zkontroluj History po 1 hodině — měl by tam být běh à 5/15/30 min</div>
 </div>
 
 <h2>Troubleshoot</h2>
