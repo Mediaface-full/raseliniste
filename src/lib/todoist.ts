@@ -89,6 +89,20 @@ export async function createTask(token: string, input: CreateTaskInput): Promise
 }
 
 /**
+ * Get single task by ID. Vrací null pokud task neexistuje (404 = completed/deleted).
+ * Užitečné pro reconcile open VIP misí — Sync API completed tasky nevrací.
+ */
+export async function getTask(token: string, taskId: string): Promise<TodoistTask | null> {
+  try {
+    return await call<TodoistTask>(token, `/tasks/${encodeURIComponent(taskId)}`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/404/.test(msg)) return null;
+    throw e;
+  }
+}
+
+/**
  * Mark task as completed (close). Todoist v1: POST /tasks/:id/close
  * Idempotent — pokud je už closed, nehází chybu.
  */
