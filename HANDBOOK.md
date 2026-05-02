@@ -763,6 +763,9 @@ Rate limit `/api/health/analyze`: **10 / 24 h** per user (Gemini Pro guard).
 | GET | `/api/call-log/by-token` | **public** | `?t=<callLogToken>&days=14` — VIP výpis vlastních misí (otevřené + hotové N dní); on-demand Todoist sync pokud > 5 min; bez tokenu nelze získat seznam |
 | GET, POST | `/api/contacts/:id/call-log-token` | session | GET vrátí (a auto-vygeneruje) token pro VIP kontakt; POST vždy regeneruje (zruší předchozí link) |
 | POST | `/api/cron/todoist-sync` | **x-cron-key** | každých 30 min; pull změn z Todoistu → Task/CallLog (status sync + nové úkoly přidané v Todoist appce) |
+| POST | `/api/cron/scheduler` | **x-cron-key** | každých 5 min; JEDINÝ DSM entry — interně dispatchuje 16 úloh dle `cron-schedule.ts`; `?dryRun=1` |
+| GET | `/api/cron/scheduler` | public | seznam definic (bez stavů, žádný leak) |
+| GET | `/api/cron/status` | session | přehled posledních runů — pro Dashboard / `/start` / `/settings/crons` |
 
 Rate limit `/api/call-log/submit`: **5 / 10 min per IP**.
 
@@ -1276,6 +1279,17 @@ Detail v `Návody/03-crony.pdf`. Krátký výpis:
 | 14 | **zijes-reminder ?type=evening** | denně **18:00** (ŽIJEŠ? večerní check-in, neutrální tón) |
 | 15 | **bwmys-tick** | denně **7:10** (B&W Myš — auto-návrat odložených, deadline alert 3d, sběr uplynul, datum revize) |
 | 16 | **todoist-sync** | každých **30 min** (pull změn z Todoistu — completion → Task.completedAt + CallLog.seenAt; nové úkoly v Todoist appce → Task se source=todoist_pull; per-user incremental přes Sync API a `User.todoistSyncToken`) |
+
+### Cron scheduler (NOVÉ 2026-05-02) — 1 DSM entry místo 16
+
+DSM Task Scheduler obsahuje **jeden** entry — `POST /api/cron/scheduler` každých 5 min. Dispatcher (`src/lib/cron-dispatcher.ts`) pak interně dle rozvrhu (`src/lib/cron-schedule.ts`) volá příslušné endpointy `/api/cron/<name>` přes localhost s x-cron-key.
+
+- **Idempotence:** `CronRun` tabulka per-job, kontrola `lastSuccessAt` proti aktuálnímu oknu (denní = dnes, every:Nmin = před více než N min).
+- **Tolerance:** scheduler běží každých 5 min → daily HH:MM má toleranci ±2.5 min.
+- **Fire-and-forget:** `nightly-briefing` a `monthly-health-report` se spouští bez čekání (long-running ~120 s); status se update-ne v background.
+- **Stav:** `GET /api/cron/status` (auth session) vrátí přehled posledních runů. UI `/settings/crons` má tabulku, dlaždice na Dashboard + řádek na `/start`.
+- **Manuální spuštění:** každý job má stále vlastní endpoint `/api/cron/<name>` (POST s x-cron-key) pro debug a fallback.
+- **Dry-run:** `POST /api/cron/scheduler?dryRun=1` vrátí co BY se spustilo, nic neexecutuje.
 
 ## Důležité architektonické změny
 

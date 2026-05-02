@@ -34,41 +34,43 @@
 <body>
 
 <h1>Cron nastavení na NASu</h1>
-<p class="lede">Kompletní výpis všech automatických úloh, které musí běžet na Synology DSM Task Scheduler. 16 úloh celkem.</p>
+<p class="lede"><strong>JEDEN</strong> DSM Task Scheduler entry každých 5 min volá vnitřní scheduler, který dispatchuje 16 úloh dle jejich rozvrhu. Definice rozvrhu je v kódu (<code>src/lib/cron-schedule.ts</code>), ne v DSM UI.</p>
 
 <div class="tldr">
-<strong>TL;DR:</strong> Otevři DSM <strong>Control Panel → Task Scheduler</strong> a vytvoř 16 úloh dle této tabulky. Každá úloha je <em>User-defined script</em>, user <code>root</code>, command podle vzoru níže. Zaberou ti ~20 minut.
+<strong>TL;DR:</strong> V DSM <strong>Control Panel → Task Scheduler</strong> stačí <strong>jedna úloha</strong> — viz „Vzorová úloha" níže. Vnitřně se přes <code>/api/cron/scheduler</code> spustí všech 16 jobů ve správný čas. Stav posledního běhu je vidět na Dashboardu i na <code>/start</code>.
 </div>
 
-<h2>Společné nastavení (vzor)</h2>
+<h2>Vzorová úloha (jen jedna)</h2>
 
 <div class="steps">
 <div class="step"><strong>Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script</strong></div>
-<div class="step"><strong>General:</strong> Task = název dle tabulky. User = <code>root</code>. Enabled = ✓</div>
-<div class="step"><strong>Schedule:</strong> dle sloupce „Spouštění" — viz „Schedule překlad" níže</div>
+<div class="step"><strong>General:</strong> Task = <code>Raseliniste cron scheduler</code>. User = <code>root</code>. Enabled = ✓</div>
+<div class="step"><strong>Schedule:</strong> Run on = <strong>Daily</strong>, First run time = <strong>00:00</strong>, Frequency = <strong>Every 5 minutes</strong>, Last run time = <strong>23:55</strong></div>
 <div class="step"><strong>Task Settings → Run command:</strong></div>
 </div>
 
-<pre>curl -fsS -X POST https://www.raseliniste.cz/api/cron/&lt;ENDPOINT&gt; \
+<pre>curl -fsS -X POST https://www.raseliniste.cz/api/cron/scheduler \
      -H "x-cron-key: &lt;CRON_SECRET&gt;" \
      --max-time 120</pre>
 
-<p>Zaměň <code>&lt;ENDPOINT&gt;</code> a <code>&lt;CRON_SECRET&gt;</code>.</p>
+<p>Zaměň <code>&lt;CRON_SECRET&gt;</code> hodnotou z env. Tahle jediná úloha běží každých 5 min a nahrazuje předchozích 16 separátních DSM entries.</p>
 
 <h3>Kde najdu CRON_SECRET</h3>
 <p>SSH na NAS:</p>
 <pre>sudo grep CRON_SECRET /volume1/docker/raseliniste/.env</pre>
-<p>Nebo otevři ten soubor přes File Station / SFTP.</p>
 
-<h3>Schedule překlad</h3>
-<table>
-<tr><th>Co píšeme</th><th>Co nastavit v DSM</th></tr>
-<tr><td><code>každých 5 / 15 min</code></td><td>Run on: <strong>Repeat</strong>, Frequency: <strong>Every 5 / 15 minutes</strong></td></tr>
-<tr><td><code>denně HH:MM</code></td><td>Run on: <strong>Daily</strong>, First run time: <strong>HH:MM</strong></td></tr>
-<tr><td><code>poslední den měsíce</code></td><td>Run on: <strong>Monthly</strong>, Date: <strong>Last day of month</strong></td></tr>
-</table>
+<h3>Jak vidět co se děje</h3>
+<ul>
+  <li><strong>Dashboard</strong> (<code>/</code>) má dole karta „Scheduler" se stavem (OK / Zaspaný / Chyba) a časem posledního ticku.</li>
+  <li><strong>/start</strong> má v rohu malý řádek <code>✓ crony &middot; před X min</code>.</li>
+  <li><strong>Detail</strong> všech 16 úloh: <code>/settings/crons</code> — tabulka s posledním úspěchem, stavem, počty OK/chyb.</li>
+  <li><strong>Dry-run</strong> (jen vypíše co BY se spustilo): <code>POST /api/cron/scheduler?dryRun=1</code></li>
+  <li><strong>Manuální spuštění jednoho jobu</strong>: každý má vlastní endpoint <code>/api/cron/&lt;name&gt;</code> (POST s <code>x-cron-key</code>) — funguje stále, mimo scheduler.</li>
+</ul>
 
-<h2>16 úloh — checklist</h2>
+<h2>16 úloh, které scheduler spravuje</h2>
+
+<p>Tyhle úlohy se spravují <strong>v kódu</strong> (<code>src/lib/cron-schedule.ts</code>), ne v DSM. Změna rozvrhu = commit + deploy. Zde jen referenční přehled co kdy běží a co dělá.</p>
 
 <!-- 1 -->
 <div class="cron-card">
@@ -207,13 +209,14 @@
 <p><strong>Test:</strong> odškrtni libovolný úkol v Todoist appce → pusť cron manuálně přes <strong>Run</strong> → JSON odpověď ukáže <code>tasksCompleted</code> nebo <code>callLogsCompleted</code> &gt; 0. Otevři <code>/firewall</code> nebo VIP link a uvidíš stav.</p>
 </div>
 
-<h2>Po vytvoření všech 16 — kontrola</h2>
+<h2>Po nasazení — kontrola</h2>
 
 <div class="steps">
-<div class="step">DSM → Task Scheduler → seznam má 16 řádků s prefix „Raseliniste"</div>
-<div class="step">Všechny mají sloupec Status = <strong>Enabled</strong></div>
-<div class="step">U každé pravý klik → <strong>Run</strong> → History → Last run = OK / Result code 200</div>
-<div class="step">Pro #1, #4, #10, #16 (vysoká frekvence) zkontroluj History po 1 hodině — měl by tam být běh à 5/15/30 min</div>
+<div class="step">DSM → Task Scheduler → JEDEN řádek <strong>Raseliniste cron scheduler</strong>, Status = <strong>Enabled</strong>, Frequency = Every 5 minutes</div>
+<div class="step">Pravý klik → <strong>Run</strong> → History → Last run = OK / Result code 200</div>
+<div class="step">Otevři <code>/settings/crons</code> v aplikaci — uvidíš tabulku všech 16 úloh, jejich rozvrhy a poslední úspěch</div>
+<div class="step">Po 30 min ticku zkontroluj že vysoké frekvence (sync-calendars 5min, todoist-sync 30min) mají <code>lastSuccessAt</code> aktuální</div>
+<div class="step">Po 24 h zkontroluj že denní úlohy (sync-contacts, briefing, atd.) v <code>/settings/crons</code> mají úspěšný run za poslední den</div>
 </div>
 
 <h2>Troubleshoot</h2>

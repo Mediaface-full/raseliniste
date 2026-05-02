@@ -1,0 +1,114 @@
+---
+// Scheduler status — diskrétní info o posledním běhu cron scheduleru.
+//
+// Variant "full" (Dashboard): glass karta se souhrnem + chyby
+// Variant "compact" (/start mobil): jeden řádek, neotravný
+//
+// Chyba = aspoň jeden job má lastError a žádný úspěšný run za poslední minutu.
+// Stale = poslední trigger > 10 min (scheduler měl běžet, ale neproběhl).
+
+import { prisma } from "../lib/db";
+import { CRON_JOBS } from "../lib/cron-schedule";
+
+interface Props {
+  variant?: "full" | "compact";
+}
+
+const { variant = "full" } = Astro.props;
+
+const runs = await prisma.cronRun.findMany();
+const map = new Map(runs.map((r) => [r.jobName, r]));
+
+const latestTrigger = runs.reduce<Date | null>((acc, r) => {
+  const d = r.lastTriggeredAt;
+  return !acc || d > acc ? d : acc;
+}, null);
+
+const errorJobs = CRON_JOBS
+  .map((def) => ({ def, run: map.get(def.name) }))
+  .filter(({ run }) => {
+    if (!run?.lastError) return false;
+    // Nedávno úspěch zhojil chybu?
+    if (run.lastSuccessAt && run.lastSuccessAt > new Date(Date.now() - 60_000)) return false;
+    return true;
+  });
+
+const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+const isStale = !latestTrigger || latestTrigger.getTime() < Date.now() - STALE_THRESHOLD_MS;
+const status: "ok" | "stale" | "error" = errorJobs.length > 0 ? "error" : isStale ? "stale" : "ok";
+
+function relativeTime(d: Date | null): string {
+  if (!d) return "nikdy";
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "před chvílí";
+  if (min < 60) return `před ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `před ${h} h`;
+  const days = Math.floor(h / 24);
+  return `před ${days} dny`;
+}
+
+const statusColor =
+  status === "ok" ? "var(--tint-sage)" : status === "stale" ? "var(--tint-butter)" : "var(--tint-rose)";
+const statusLabel =
+  status === "ok" ? "OK" : status === "stale" ? "Zaspaný" : "Chyba";
+const statusDot =
+  status === "ok" ? "✓" : status === "stale" ? "⏱" : "⚠";
+---
+
+{variant === "compact" ? (
+  <a
+    href="/settings/crons"
+    class="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-white/[0.03] border border-border/30 text-[11px] font-mono text-muted-foreground hover:bg-white/[0.06] transition"
+    title={status === "ok" ? `Crony: ${CRON_JOBS.length} úloh, poslední tick ${relativeTime(latestTrigger)}` : `Crony — ${statusLabel}`}
+  >
+    <span class="flex items-center gap-1.5">
+      <span style={{ color: statusColor }}>{statusDot}</span>
+      <span>crony</span>
+    </span>
+    <span class="text-foreground/60">{relativeTime(latestTrigger)}</span>
+  </a>
+) : (
+  <a
+    href="/settings/crons"
+    class="block glass rounded-xl p-3 hover:bg-white/[0.04] transition"
+  >
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 min-w-0">
+        <span
+          class="size-7 rounded-md grid place-items-center text-sm shrink-0"
+          style={{ background: `color-mix(in oklch, ${statusColor} 18%, transparent)`, color: statusColor }}
+        >
+          {statusDot}
+        </span>
+        <div class="min-w-0">
+          <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+            Scheduler
+          </div>
+          <div class="text-sm truncate">
+            {CRON_JOBS.length} úloh · poslední tick <span class="font-mono">{relativeTime(latestTrigger)}</span>
+          </div>
+        </div>
+      </div>
+      <span
+        class="text-[10px] font-mono uppercase tracking-wider shrink-0"
+        style={{ color: statusColor }}
+      >
+        {statusLabel}
+      </span>
+    </div>
+    {errorJobs.length > 0 && (
+      <div class="mt-2 pt-2 border-t border-white/5 space-y-0.5">
+        {errorJobs.slice(0, 3).map(({ def, run }) => (
+          <div class="text-[11px] font-mono text-[var(--tint-rose)]/90 truncate">
+            ⚠ {def.name}: {run?.lastError}
+          </div>
+        ))}
+        {errorJobs.length > 3 && (
+          <div class="text-[10px] text-muted-foreground">… a {errorJobs.length - 3} dalších</div>
+        )}
+      </div>
+    )}
+  </a>
+)}

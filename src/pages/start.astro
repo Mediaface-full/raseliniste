@@ -4,6 +4,7 @@ import { Icon } from "astro-icon/components";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 import { svatekDne } from "../lib/jmenny-kalendar";
+import SchedulerStatus from "../components/SchedulerStatus.astro";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -258,6 +259,8 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
           <span class="text-base font-semibold tracking-tight">Dashboard</span>
           <Icon name="lucide:arrow-right" class="size-4 text-muted-foreground" />
         </a>
+
+        <SchedulerStatus variant="compact" />
 
         <div class="text-center text-xs font-mono text-muted-foreground/60">
           Tip: <strong>Sdílet → Přidat na plochu</strong> = ikona Rašeliniště

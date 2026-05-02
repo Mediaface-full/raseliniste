@@ -1,0 +1,122 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+import { CRON_JOBS, type Schedule } from "../../lib/cron-schedule";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const runs = await prisma.cronRun.findMany();
+const map = new Map(runs.map((r) => [r.jobName, r]));
+
+function describeSchedule(s: Schedule): string {
+  switch (s.type) {
+    case "every": return `každých ${s.minutes} min`;
+    case "daily": return `denně ${String(s.hour).padStart(2, "0")}:${String(s.minute).padStart(2, "0")}`;
+    case "monthly-last-day": return `poslední den měsíce ${String(s.hour).padStart(2, "0")}:${String(s.minute).padStart(2, "0")}`;
+  }
+}
+
+function relativeTime(d: Date | null | undefined): string {
+  if (!d) return "—";
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "před chvílí";
+  if (min < 60) return `před ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `před ${h} h`;
+  const days = Math.floor(h / 24);
+  return `před ${days} dny`;
+}
+
+const jobs = CRON_JOBS.map((def) => {
+  const r = map.get(def.name);
+  const isError = !!r?.lastError && (!r.lastSuccessAt || r.lastSuccessAt < new Date(Date.now() - 60_000));
+  return { def, run: r, isError };
+});
+
+const latestTrigger = runs.reduce<Date | null>((acc, r) => {
+  return !acc || r.lastTriggeredAt > acc ? r.lastTriggeredAt : acc;
+}, null);
+---
+
+<Shell
+  title="Cron scheduler · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Nastavení" }, { label: "Crony" }]}
+>
+  <div class="max-w-3xl space-y-4">
+    <div class="glass-strong rounded-xl p-4">
+      <h1 class="font-serif text-2xl mb-2">Cron scheduler</h1>
+      <p class="text-sm text-muted-foreground">
+        Jeden externí DSM Task Scheduler entry volá <code class="font-mono text-xs">/api/cron/scheduler</code>
+        každých 5 min. Dispatcher pak interně spouští {jobs.length} úloh dle jejich rozvrhu.
+        Poslední tick: <strong>{relativeTime(latestTrigger)}</strong>.
+      </p>
+    </div>
+
+    <div class="glass rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="text-xs uppercase font-mono text-muted-foreground border-b border-white/5">
+          <tr>
+            <th class="text-left px-3 py-2.5">Úloha</th>
+            <th class="text-left px-3 py-2.5">Rozvrh</th>
+            <th class="text-left px-3 py-2.5">Poslední úspěch</th>
+            <th class="text-left px-3 py-2.5">Stav</th>
+          </tr>
+        </thead>
+        <tbody>
+          {jobs.map(({ def, run, isError }) => (
+            <tr class="border-b border-white/5">
+              <td class="px-3 py-2.5">
+                <div class="font-medium">{def.name}</div>
+                {def.description && (
+                  <div class="text-[11px] text-muted-foreground mt-0.5">{def.description}</div>
+                )}
+              </td>
+              <td class="px-3 py-2.5 font-mono text-xs text-muted-foreground">
+                {describeSchedule(def.schedule)}
+                {def.fireAndForget && <span class="block text-[10px] opacity-70">fire-and-forget</span>}
+              </td>
+              <td class="px-3 py-2.5 font-mono text-xs">
+                {relativeTime(run?.lastSuccessAt ?? null)}
+                {run && (
+                  <span class="block text-[10px] text-muted-foreground">
+                    {run.successCount}× OK · {run.errorCount}× chyba
+                  </span>
+                )}
+              </td>
+              <td class="px-3 py-2.5">
+                {isError ? (
+                  <div>
+                    <span class="text-[var(--tint-rose)] font-mono text-xs">⚠ chyba</span>
+                    <div class="text-[10px] text-[var(--tint-rose)]/80 mt-0.5 break-all">
+                      {run?.lastError}
+                    </div>
+                  </div>
+                ) : run?.lastSuccessAt ? (
+                  <span class="text-[var(--tint-sage)] font-mono text-xs">✓ OK</span>
+                ) : (
+                  <span class="text-muted-foreground font-mono text-xs">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="glass rounded-xl p-3 text-xs text-muted-foreground space-y-1.5">
+      <div><strong>Manuální spuštění úlohy:</strong> každý job má vlastní endpoint <code class="font-mono">/api/cron/&lt;name&gt;</code> (POST s <code class="font-mono">x-cron-key</code>). Slouží pro debug i mimo scheduler.</div>
+      <div><strong>Dry-run:</strong> <code class="font-mono">POST /api/cron/scheduler?dryRun=1</code> vrátí co BY se spustilo, nic neexecutuje.</div>
+      <div><strong>Definice:</strong> <code class="font-mono">src/lib/cron-schedule.ts</code> (změny v kódu, ne v DSM UI).</div>
+    </div>
+  </div>
+</Shell>

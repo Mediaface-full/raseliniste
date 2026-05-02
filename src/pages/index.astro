@@ -3,6 +3,7 @@ import Shell from "../layouts/Shell.astro";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 import { Icon } from "astro-icon/components";
+import SchedulerStatus from "../components/SchedulerStatus.astro";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -388,5 +389,8 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
         ))}
       </div>
     </section>
+
+    {/* Scheduler status — diskrétní info na konci stránky */}
+    <SchedulerStatus variant="full" />
   </div>
 </Shell>

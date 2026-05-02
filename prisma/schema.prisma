@@ -1238,6 +1238,24 @@ model DecisionEntry {
   @@index([decisionId, datum])
 }
 
+// Tracking spuštění interního cron scheduleru (1 DSM entry → dispatcher → 16 jobs).
+// Idempotence: před spuštěním job se kontroluje, zda lastSuccessAt je mimo
+// aktuální "okno" (denní = dnes, every:Nmin = před více než N min).
+model CronRun {
+  id              String    @id @default(cuid())
+  jobName         String    @unique
+  lastTriggeredAt DateTime
+  lastSuccessAt   DateTime?
+  lastError       String?   @db.Text
+  lastDurationMs  Int?
+  lastStatus      Int?      // HTTP status z dispatched endpointu
+  runCount        Int       @default(0)
+  successCount    Int       @default(0)
+  errorCount      Int       @default(0)
+
+  @@index([jobName])
+}
+
 model DecisionEvaluation {
   id                          String   @id @default(cuid())
   decisionId                  String

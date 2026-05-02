@@ -2,18 +2,24 @@
 
 ## 🟧 Aktivní (čeká na zpracování)
 
-### Manuální akce v DSM (jen Petr)
-1. **DSM Task Scheduler:** přesunout cron `daily-projects-digest` z **18:00 na 7:00**
-   - Control Panel → Task Scheduler → najít existující úlohu → upravit hodinu
-   - Bez tohoto se digest pošle pořád večer
-1b. **DSM Task Scheduler:** přidat cron `todoist-sync` **každých 30 min** (NOVÉ 2026-05-02)
-   - User-defined script:
+### Manuální akce v DSM (jen Petr) — ZÁSADNÍ ZMĚNA 2026-05-02
+
+**Cron scheduler architektura: 1 DSM entry místo 16.** Pokud máš starý cron seznam, smaž všechny úlohy s prefixem `Raseliniste …` a vytvoř jednu novou úlohu:
+
+1. **DSM Task Scheduler:** vytvořit JEDINÝ entry `Raseliniste cron scheduler`
+   - User-defined script jako root, command:
      ```
-     curl -fsS -X POST -H "x-cron-key: $CRON_SECRET" https://www.raseliniste.cz/api/cron/todoist-sync
+     curl -fsS -X POST -H "x-cron-key: $CRON_SECRET" https://www.raseliniste.cz/api/cron/scheduler --max-time 120
      ```
-   - Schedule: Daily, Repeat every 30 minutes
-   - Bez tohoto se odškrtnutí v Todoistu nepropíše do firewallu / VIP výpisu / Task tabulky
-1c. **První sync = full snapshot** — naimportuje všechny aktivní úkoly z Todoistu (i ty co Petr přidal mimo aplikaci) do `Task` se `source=todoist_pull`. Spustí se automaticky při prvním zavolání cronu.
+   - Schedule: Daily, First run 00:00, Frequency Every 5 minutes, Last run 23:55
+   - Tahle jediná úloha pak interně spouští 16 dříve oddělených cronů dle rozvrhu v kódu (`src/lib/cron-schedule.ts`)
+   - Stav vidíš na Dashboard / `/start` / `/settings/crons`
+
+2. **Smazat staré úlohy** (16 řádků s prefix `Raseliniste …`) — už nejsou potřeba, dispatcher je volá interně. **Kontrola:** v DSM zůstane jen ten jeden `Raseliniste cron scheduler` entry.
+
+3. **První tick:** po vytvoření klikni Run → response by měl být JSON s `jobsMatched` &gt; 0 (záleží na čase) a `dryRun: false`. Zkontroluj `/settings/crons` že úlohy mají `lastSuccessAt`.
+
+4. **První Todoist sync = full snapshot** — naimportuje všechny aktivní úkoly z Todoistu (i ty co Petr přidal mimo aplikaci) do `Task` se `source=todoist_pull`.
 
 ### GCP Budget Alert (volitelné)
 2. **GCP Budget Alert** — Gideon si zařídí v GCP Console (1 minuta, žádný kód). Detail v memory `todo_gcp_billing.md`.
