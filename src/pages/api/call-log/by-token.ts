@@ -1,7 +1,6 @@
 import type { APIRoute } from "astro";
 import { prisma } from "@/lib/db";
 import { resolveCallLogToken } from "@/lib/call-log-token";
-import { syncTodoistForUser } from "@/lib/todoist-sync";
 
 export const prerender = false;
 
@@ -15,8 +14,8 @@ export const prerender = false;
  * Otevřené (seenAt = null) = pořád vidí.
  * Hotové (seenAt != null) = jen za posledních N dní (default 14).
  *
- * On-demand Todoist sync pokud >5 min od posledního — výpis je tak svěží
- * i mimo 30min cron.
+ * Zdroj pravdy je cron /api/cron/todoist-sync (30 min). On-demand sync
+ * záměrně NENÍ — duplikoval by cron a blokoval response při Todoist latenci.
  */
 export const GET: APIRoute = async ({ url }) => {
   const token = url.searchParams.get("t")?.trim() ?? "";
@@ -37,18 +36,6 @@ export const GET: APIRoute = async ({ url }) => {
       done: [],
       daysWindow: days,
       note: "Kontakt nemá uložený telefon.",
-    });
-  }
-
-  // On-demand sync (best-effort, neblokovat odpověď)
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { todoistSyncedAt: true },
-  });
-  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-  if (!user?.todoistSyncedAt || user.todoistSyncedAt.getTime() < fiveMinAgo) {
-    syncTodoistForUser(userId).catch((e) => {
-      console.warn("[call-log/by-token] on-demand sync failed:", e);
     });
   }
 

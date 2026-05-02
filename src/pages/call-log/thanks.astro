@@ -3,7 +3,6 @@ import Base from "../../layouts/Base.astro";
 import AnimatedG from "../../components/AnimatedG.astro";
 import { prisma } from "../../lib/db";
 import { normalizePhone } from "../../lib/phone";
-import { syncTodoistForUser } from "../../lib/todoist-sync";
 import { resolveCallLogToken } from "../../lib/call-log-token";
 
 // =============================================================================
@@ -102,24 +101,11 @@ let doneMissions: VipMission[] = [];
 const DONE_DAYS = 14;
 
 // Výpis misí JEN pro token-ověřené VIP. Phone-only nikdy nedostane seznam.
+// Zdrojem pravdy je cron /api/cron/todoist-sync (30 min) — on-demand sync
+// jsme záměrně odstranili (blokoval stránku až 10 s při Todoist p99 latenci).
 const vipPhoneForLookup = tokenAuthed ? tokenContactPhone : null;
 if (tokenAuthed && matchedUserId && vipPhoneForLookup) {
   try {
-    // On-demand sync pokud poslední byl > 5 min (dohnaní 30min cronu)
-    const u = await prisma.user.findUnique({
-      where: { id: matchedUserId },
-      select: { todoistSyncedAt: true },
-    });
-    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-    if (!u?.todoistSyncedAt || u.todoistSyncedAt.getTime() < fiveMinAgo) {
-      // Awaitujeme aby výpis byl čerstvý — Sync API je rychlé (~200-500 ms)
-      try {
-        await syncTodoistForUser(matchedUserId);
-      } catch {
-        // ignore — pokud sync selže, ukážeme co máme v DB
-      }
-    }
-
     const sinceDone = new Date(Date.now() - DONE_DAYS * 86400000);
     const calls = await prisma.callLog.findMany({
       where: {
