@@ -255,48 +255,64 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
     }
   }
 
-  // === RECONCILE: open VIP mise + open Tasky ===
-  // Sync API vrací JEN aktivní items. Pokud Petr odškrtne misi/úkol v Todoist,
-  // sync_token incremental změny dohánět nemusí. Ručně procházíme všechny
-  // záznamy s todoistTaskId které jsou stále "open" v naší DB a pingujeme
-  // Todoist GET /tasks/:id. 404 = completed/deleted → propíšeme close stav.
+  // === RECONCILE: porovnání naší DB se skutečným stavem v Todoistu ===
+  // Sync API vrací JEN aktivní items, completed nikdy. Reconcile pingne
+  // Todoist GET /tasks/:id pro každý záznam s todoistTaskId a porovná stav.
+  //
+  // Cases:
+  //   open (lokálně) + 404 (Todoist) → completed/deleted → propíšeme close
+  //   done (lokálně) + 200 (Todoist) → reopen detekován → propíšeme open
+  //   open + 200 → konzistentní, žádná akce
+  //   done + 404 → konzistentní, žádná akce
   try {
-    const openCallLogs = await prisma.callLog.findMany({
-      where: { userId, wasVip: true, seenAt: null, todoistTaskId: { not: null } },
-      select: { id: true, todoistTaskId: true },
+    const callLogs = await prisma.callLog.findMany({
+      where: { userId, wasVip: true, todoistTaskId: { not: null } },
+      select: { id: true, todoistTaskId: true, seenAt: true },
     });
-    const openTasks = await prisma.task.findMany({
-      where: { userId, status: "open", todoistTaskId: { not: null } },
-      select: { id: true, todoistTaskId: true },
+    const tasks = await prisma.task.findMany({
+      where: { userId, todoistTaskId: { not: null } },
+      select: { id: true, todoistTaskId: true, status: true },
     });
 
-    for (const cl of openCallLogs) {
+    for (const cl of callLogs) {
       if (!cl.todoistTaskId) continue;
       try {
         const task = await getTask(token, cl.todoistTaskId);
-        if (task === null) {
-          // 404 — completed/deleted v Todoistu
+        if (task === null && cl.seenAt === null) {
+          // Todoist 404 ALE u nás otevřené → propíšeme close
           await prisma.callLog.update({
             where: { id: cl.id },
             data: { seenAt: new Date() },
           });
           stats.reconciledClosed!++;
-        } else if (task.priority === undefined) {
-          // sanity — task vrátil divný shape, neřeš
+        } else if (task !== null && cl.seenAt !== null) {
+          // Todoist 200 (= aktivní) ALE u nás zavřené → reopen detekován
+          await prisma.callLog.update({
+            where: { id: cl.id },
+            data: { seenAt: null },
+          });
+          stats.reconciledClosed!++;
         }
       } catch (e) {
         console.warn(`[todoist-sync reconcile callLog ${cl.id}]`, e instanceof Error ? e.message : String(e));
       }
     }
 
-    for (const t of openTasks) {
+    for (const t of tasks) {
       if (!t.todoistTaskId) continue;
       try {
         const task = await getTask(token, t.todoistTaskId);
-        if (task === null) {
+        if (task === null && t.status === "open") {
           await prisma.task.update({
             where: { id: t.id },
             data: { status: "done", completedAt: new Date() },
+          });
+          stats.reconciledClosed!++;
+        } else if (task !== null && t.status === "done") {
+          // Reopen v Todoistu → vrátíme i lokálně do open
+          await prisma.task.update({
+            where: { id: t.id },
+            data: { status: "open", completedAt: null },
           });
           stats.reconciledClosed!++;
         }

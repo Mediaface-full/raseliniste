@@ -205,5 +205,17 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     /* nikdy neblokuj odpověď */
   }
 
+  // Auto-push do Todoistu (fire-and-forget). Todoist je primary tool — manuální
+  // create v /ukoly se okamžitě propíše do Todoist appce, žádné druhé klikání.
+  // Chyby per-task se uloží do Task.pushError, response se neblokuje.
+  void (async () => {
+    try {
+      const { pushTaskToTodoist } = await import("@/lib/task-todoist-push");
+      await pushTaskToTodoist(task.id);
+    } catch (e) {
+      console.warn(`[ukoly create auto-push] task ${task.id} failed:`, e instanceof Error ? e.message : String(e));
+    }
+  })();
+
   return Response.json({ task });
 };

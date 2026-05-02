@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
 import { decryptSecret } from "@/lib/crypto";
-import { closeTask, reopenTask, deleteTask as todoistDeleteTask } from "@/lib/todoist";
+import { closeTask, reopenTask, deleteTask as todoistDeleteTask, updateTask as todoistUpdateTask, type UpdateTaskInput } from "@/lib/todoist";
 
 export const prerender = false;
 
@@ -106,23 +106,56 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
     todoistAction = "reopen";
   }
 
-  // Propaguj do Todoistu PŘED lokálním update — aby case "Todoist fail"
-  // neukládal nekonzistentní lokální stav. Pokud Todoist selže, pokračujeme
-  // s lokálním update + uložíme do pushError pole.
+  // Detekce content edit (title/notes/dueAt/labels/priority) — propíšeme do Todoistu.
+  // Bez toho by pull cron za 5 min přepsal naše změny zpět z Todoistu (zdroj pravdy).
+  const contentChanged =
+    d.title !== undefined ||
+    d.notes !== undefined ||
+    d.dueAt !== undefined ||
+    d.tags !== undefined ||
+    d.priority !== undefined;
+
   let pushError: string | null = null;
-  if (todoistAction && owned.todoistTaskId) {
+
+  if ((todoistAction || contentChanged) && owned.todoistTaskId) {
     const token = await getTodoistToken(session.uid);
     if (token) {
       try {
+        // 1. Status close/reopen
         if (todoistAction === "close") await closeTask(token, owned.todoistTaskId);
-        else await reopenTask(token, owned.todoistTaskId);
+        else if (todoistAction === "reopen") await reopenTask(token, owned.todoistTaskId);
+
+        // 2. Content update — title/notes/due/labels/priority
+        if (contentChanged) {
+          const update: UpdateTaskInput = {};
+          if (d.title !== undefined) update.content = d.title;
+          if (d.notes !== undefined) update.description = d.notes ?? "";
+          if (d.dueAt !== undefined) {
+            // Todoist konvence: empty string odstraní due
+            update.due_date = d.dueAt ? new Date(d.dueAt).toISOString().slice(0, 10) : "";
+          }
+          if (d.tags !== undefined) update.labels = d.tags;
+          if (d.priority !== undefined) {
+            // Naše low/normal/high → Todoist 1-4 (4=urgent)
+            update.priority = d.priority === "high" ? 4 : d.priority === "normal" ? 2 : 1;
+          }
+          if (Object.keys(update).length > 0) {
+            await todoistUpdateTask(token, owned.todoistTaskId, update);
+          }
+        }
       } catch (e) {
         pushError = e instanceof Error ? e.message : String(e);
-        console.warn(`[ukoly ${todoistAction}]`, pushError);
+        console.warn(`[ukoly patch propagace]`, pushError);
       }
     }
   }
-  if (pushError) data.pushError = `${todoistAction} fail: ${pushError.slice(0, 200)}`;
+
+  if (pushError) {
+    data.pushError = `Todoist update fail: ${pushError.slice(0, 200)}`;
+  } else if (contentChanged || todoistAction) {
+    // Vyčistit starý pushError pokud nyní propagace prošla
+    data.pushError = null;
+  }
 
   const task = await prisma.task.update({
     where: { id },

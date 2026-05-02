@@ -88,6 +88,26 @@ export async function createTask(token: string, input: CreateTaskInput): Promise
   });
 }
 
+export interface UpdateTaskInput {
+  content?: string;
+  description?: string;
+  due_string?: string | null;
+  due_date?: string | null;
+  priority?: 1 | 2 | 3 | 4;
+  labels?: string[];
+}
+
+/**
+ * Update existing task. Todoist v1: POST /tasks/:id (partial update).
+ * Pro odstranění due předej due_string="" (Todoist konvence).
+ */
+export async function updateTask(token: string, taskId: string, input: UpdateTaskInput): Promise<TodoistTask> {
+  return call<TodoistTask>(token, `/tasks/${encodeURIComponent(taskId)}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 /**
  * Get single task by ID. Vrací null pokud task neexistuje (404 = completed/deleted).
  * Užitečné pro reconcile open VIP misí — Sync API completed tasky nevrací.
