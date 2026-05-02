@@ -1,8 +1,13 @@
 /**
  * Načtení VIP misí (CallLog) pro výpis na /call-log a /call-log/thanks.
  *
- * Match: contactId NEBO phoneNumber IN (všechna čísla VIP) — VIP může mít
- * víc telefonů a zadat misi z různých.
+ * Match: STRIKTNĚ přes contactId — token resolvne právě jeden Contact záznam,
+ * a vidí jen mise navázané na něj. Phone-based fallback BYL odstraněn z důvodu
+ * teoretického průsaku: pokud by dva VIP kontakty náhodou sdílely stejné
+ * telefonní číslo, phone OR by jim ukázal mise navzájem (cross-VIP leak).
+ *
+ * Důsledek fail-closed: pokud submit endpoint někdy nezapíše contactId
+ * (data hygiene), mise nebude v výpisu — což je správně (lepší než leak).
  *
  * Zdrojem pravdy stavu (seenAt) je cron /api/cron/todoist-sync (30 min).
  */
@@ -28,7 +33,6 @@ export const VIP_MISSIONS_DONE_DAYS = 14;
 export async function loadVipMissions(params: {
   userId: string;
   contactId: string;
-  phones: string[];
   days?: number;
 }): Promise<VipMissionsResult> {
   const days = params.days ?? VIP_MISSIONS_DONE_DAYS;
@@ -38,13 +42,8 @@ export async function loadVipMissions(params: {
     where: {
       userId: params.userId,
       wasVip: true,
+      contactId: params.contactId,
       OR: [{ seenAt: null }, { seenAt: { gte: sinceDone } }],
-      AND: {
-        OR: [
-          { contactId: params.contactId },
-          ...(params.phones.length > 0 ? [{ phoneNumber: { in: params.phones } }] : []),
-        ],
-      },
     },
     orderBy: { createdAt: "desc" },
     select: {

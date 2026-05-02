@@ -113,7 +113,6 @@ if (tokenAuthed && matchedUserId && tokenContactId) {
     const r = await loadVipMissions({
       userId: matchedUserId,
       contactId: tokenContactId,
-      phones: tokenContactPhones,
     });
     openMissions = r.open;
     doneMissions = r.done;
