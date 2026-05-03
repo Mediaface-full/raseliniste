@@ -453,6 +453,7 @@ Sdílené projektové boxíky s hlasovými záznamy.
 - `/calendar` UI s react-big-calendar (default WEEK, Liquid Glass dark CSS), `/settings/integrations/google` (status, stats, sync, disconnect).
 - Cron: `/api/cron/sync-calendars` (5 min), `/api/cron/sync-contacts` (denně 04:00).
 - Sidebar: Kalendář první v Organizace.
+- **Calendar prep AI (NOVÉ 2026-05-03):** `lib/calendar-prep-ai.ts:extractCalendarPrep({title, description})` přes Gemini Flash vytáhne `prepNote` (max 200 zn) + `itemsToBring` (pole stringů) z popisu události. Hooks v upsertEvent (Google + iCloud) jsou fire-and-forget — sync neblokuje. Petr napíše do popisu eventu „vzít stan, spacák, kameru" → AI to vytáhne → DayView ukáže `📝 prepNote` pod eventem → noční briefing 22:00 agreguje napříč zítřejšími události do `itemsToBringAggregate` → ranní Todoist task má sloučený seznam co vzít. Idempotence: každý sync re-extrahuje (etag check zachován pro Google).
 
 **V plánu (fáze 1b/2/3/4 — viz brief Petra `raseliniste-kalendar-brief.md` a HANDOFF.md):**
 - 1b: iCloud CalDAV sync (syn + partnerka), pravidlový engine (15+ pravidel), `/quickadd` parser
