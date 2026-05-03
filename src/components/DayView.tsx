@@ -182,24 +182,6 @@ export default function DayView({ initial }: { initial: Initial }) {
         </div>
       )}
 
-      {/* Plán */}
-      <section className="glass rounded-xl p-5" style={{ ["--c" as string]: "var(--tint-sky)" }}>
-        <div className="flex items-center gap-2 mb-3">
-          <CalIcon className="size-4" style={{ color: "var(--c)" }} />
-          <h2 className="font-serif text-lg">Plán</h2>
-          <span className="ml-auto text-xs font-mono text-muted-foreground">
-            {events.length} {events.length === 1 ? "událost" : "události"}
-          </span>
-        </div>
-        {events.length === 0 ? (
-          <div className="text-sm text-muted-foreground italic">Žádné události.</div>
-        ) : (
-          <div className="space-y-2">
-            {events.map((e) => <EventRow key={e.id} event={e} />)}
-          </div>
-        )}
-      </section>
-
       {/* Při cestě / errands */}
       <section className="glass rounded-xl p-5" style={{ ["--c" as string]: "var(--tint-peach)" }}>
         <div className="flex items-center gap-2 mb-3">
@@ -265,6 +247,24 @@ export default function DayView({ initial }: { initial: Initial }) {
             </Button>
           </div>
         </div>
+      </section>
+
+      {/* Plán */}
+      <section className="glass rounded-xl p-5" style={{ ["--c" as string]: "var(--tint-sky)" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <CalIcon className="size-4" style={{ color: "var(--c)" }} />
+          <h2 className="font-serif text-lg">Plán</h2>
+          <span className="ml-auto text-xs font-mono text-muted-foreground">
+            {events.length} {events.length === 1 ? "událost" : "události"}
+          </span>
+        </div>
+        {events.length === 0 ? (
+          <div className="text-sm text-muted-foreground italic">Žádné události.</div>
+        ) : (
+          <div className="space-y-2">
+            {events.map((e) => <EventRow key={e.id} event={e} />)}
+          </div>
+        )}
       </section>
 
       {/* Pravidla */}

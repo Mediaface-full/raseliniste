@@ -6,6 +6,9 @@ import { readSession } from "../lib/session";
 import { svatekDne } from "../lib/jmenny-kalendar";
 import SchedulerStatus from "../components/SchedulerStatus.astro";
 import bwMysSvg from "../assets/icons/bw-mys.svg?raw";
+import miseRaketaSvg from "../assets/icons/mise-raketa.svg?raw";
+
+const todayIso = new Date().toISOString().slice(0, 10);
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -41,6 +44,7 @@ type Tile = {
 };
 
 const tiles: Tile[] = [
+  { href: `/day/${todayIso}`,     title: "Mise",      icon: "custom:mise-raketa",            tint: "sky" },
   { href: "/ozvena?mode=journal", title: "Deník",     icon: "lucide:book-open",              tint: "butter" },
   { href: "/ozvena?mode=task",    title: "Úkoly",     icon: "lucide:check-square",           tint: "peach" },
   { href: "/studna/nahravka",     title: "Studánka",  icon: "lucide:waves",                  tint: "mint" },
@@ -189,6 +193,8 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
                 >
                   {tile.icon === "custom:bw-mys" ? (
                     <Fragment set:html={bwMysSvg} />
+                  ) : tile.icon === "custom:mise-raketa" ? (
+                    <Fragment set:html={miseRaketaSvg} />
                   ) : (
                     <Icon name={tile.icon} class="size-5" />
                   )}
