@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   Bed,
+  Download,
   Heart,
   HeartPulse,
   Loader2,
@@ -132,16 +133,33 @@ export default function HealthAnalyzeModal({
 
   if (!open) return null;
 
+  function downloadMarkdown() {
+    if (!result) return;
+    const header = `# Analýza zdravotních dat\n\n` +
+      `- Období: **${from} → ${to}** (${result.meta.days} dní)\n` +
+      `- Záznamů: ${result.meta.totalSamples.toLocaleString("cs-CZ")}\n` +
+      `- Metrik s daty: ${result.meta.metricsWithData}\n` +
+      `- Model: ${result.meta.model}\n` +
+      `- Vygenerováno: ${new Date().toLocaleString("cs-CZ")}\n\n---\n\n`;
+    const blob = new Blob([header + result.text], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `health-${from}_${to}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-6 pb-6 sm:pt-10 sm:pb-10"
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4"
       style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="glass-strong rounded-xl w-full max-w-3xl">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+      <div className="glass-strong rounded-xl w-full max-w-3xl flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+        {/* Header (sticky) */}
+        <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div
               className="size-10 rounded-lg grid place-items-center"
@@ -164,8 +182,8 @@ export default function HealthAnalyzeModal({
           </Button>
         </div>
 
-        {/* Body — 2 části: konfigurace + výsledek */}
-        <div className="p-6 space-y-5">
+        {/* Body — 2 části: konfigurace + výsledek (scrollable) */}
+        <div className="p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
           {/* Date range */}
           <div className="space-y-2">
             <div className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">
@@ -284,7 +302,10 @@ export default function HealthAnalyzeModal({
                 dangerouslySetInnerHTML={{ __html: marked.parse(result.text) as string }}
               />
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <Button variant="outline" size="sm" onClick={downloadMarkdown}>
+                  <Download /> Stáhnout (.md)
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => { setResult(null); setError(null); }}>
                   Nová analýza
                 </Button>
