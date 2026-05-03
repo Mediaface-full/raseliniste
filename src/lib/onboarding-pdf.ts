@@ -192,7 +192,7 @@ function Header({ brandText, title, subtitle }: { brandText: string; title: stri
 function LinkBox({ link }: { link: string }) {
   return h(View, { style: styles.linkBox },
     h(Text, { style: styles.linkBoxTitle }, "Tvůj osobní odkaz"),
-    h(Text, { style: styles.linkBoxSub }, "Ulož si ho do oblíbených nebo na plochu telefonu. Když tě Petr přidá do dalšího projektu, uvidíš ho v nabídce — žádný nový odkaz nedostaneš."),
+    h(Text, { style: styles.linkBoxSub }, "Ulož si ho do oblíbených nebo na plochu telefonu. Když tě Gideon přidá do dalšího projektu, uvidíš ho v nabídce — žádný nový odkaz nedostaneš."),
     h(Text, { style: styles.linkText }, link),
   );
 }
@@ -223,7 +223,7 @@ function Tip(label: string, text: string) {
 }
 
 function Footer() {
-  return h(Text, { style: styles.footer }, "Děkuji, Petr · raseliniste.cz");
+  return h(Text, { style: styles.footer }, "Děkuji, Gideon · raseliniste.cz");
 }
 
 // -----------------------------------------------------------------------------
@@ -242,7 +242,7 @@ function PageWelcome(d: OnboardingData, opts: { brandText: string; title: string
 
     // Pozdrav (vyhýbá se vokativu — "Ahoj!" bez jména)
     h(Text, { style: styles.intro },
-      `Ahoj!\n\nPetr tě pozval do projektu „${d.projectName}". Tady je krátký a srozumitelný návod, jak to bude celé fungovat. Není to nic složitého.`,
+      `Ahoj!\n\nGideon tě pozval do projektu „${d.projectName}". Tady je krátký a srozumitelný návod, jak to bude celé fungovat. Není to nic složitého.`,
     ),
 
     // O projektu
@@ -254,13 +254,13 @@ function PageWelcome(d: OnboardingData, opts: { brandText: string; title: string
     // Co si má představit
     h(Text, { style: styles.h2 }, "Co si pod tím představit"),
     h(Text, { style: styles.para },
-      "Studánka je sdílená nahrávárna pro tým. Když tě napadne myšlenka, postřeh, otázka nebo nápad k projektu, otevřeš odkaz výše a hlasem to nahraješ. Mluvíš normálně, jako bys to říkal po telefonu Petrovi.",
+      "Studánka je sdílená nahrávárna pro tým. Když tě napadne myšlenka, postřeh, otázka nebo nápad k projektu, otevřeš odkaz výše a hlasem to nahraješ. Mluvíš normálně, jako bys to říkal po telefonu Gideonovi.",
     ),
     h(Text, { style: styles.para },
-      "Umělá inteligence záznam přepíše a vytáhne z něj klíčové body. Petr si to pak v klidu projde. Nemusíš nic psát.",
+      "Umělá inteligence záznam přepíše a vytáhne z něj klíčové body. Gideon si to pak v klidu projde. Nemusíš nic psát.",
     ),
     h(Text, { style: styles.para },
-      "Petr u každého záznamu vidí, kdo ho natočil — autorství se nikdy neztratí.",
+      "Gideon u každého záznamu vidí, kdo ho natočil — autorství se nikdy neztratí.",
     ),
 
     h(Footer),
@@ -277,7 +277,7 @@ function PageBriefInfo(d: OnboardingData): ReactElement {
       "Brief je delší hlasová nahrávka — typicky 30 až 90 minut — ve které vyprávíš to nejdůležitější o projektu. Mluvíš o kontextu, historii, lidech, cílech a o tom, co je teď otevřené.",
     ),
     h(Text, { style: styles.para },
-      "Slouží jako referenční materiál. Petr se k němu vrací, když potřebuje rychle nahodit kontext. AI z něj vytvoří přehledný strukturovaný dokument: souhrn, glosář pojmů, seznam aktérů, historii rozhodnutí.",
+      "Slouží jako referenční materiál. Gideon se k němu vrací, když potřebuje rychle nahodit kontext. AI z něj vytvoří přehledný strukturovaný dokument: souhrn, glosář pojmů, seznam aktérů, historii rozhodnutí.",
     ),
 
     h(Text, { style: styles.h2 }, "Co by tvůj brief měl pokrýt"),
@@ -285,7 +285,7 @@ function PageBriefInfo(d: OnboardingData): ReactElement {
     Bullet("Stručná historie — kde to začalo, jakými fázemi to prošlo."),
     Bullet("Klíčové postavy — kdo je v projektu, kdo má jakou roli, kdo o čem rozhoduje."),
     Bullet("Aktuální stav — co se teď děje, co už je rozhodnuté, co se teprve řeší."),
-    Bullet("Otevřené otázky — co je nedořešeno, kde Petr může pomoct."),
+    Bullet("Otevřené otázky — co je nedořešeno, kde Gideon může pomoct."),
     Bullet("Důležitá rozhodnutí, která padla — proč, kdy, kdo."),
     Bullet("Pojmy a zkratky, které v projektu používáme."),
 
@@ -354,7 +354,7 @@ function PageHowToRecord(d: OnboardingData, opts: { includeBriefUpload: boolean 
     Bullet("Mluv klidně, ne v hlučném prostředí — Gemini rozumí češtině moc dobře."),
     Bullet("Jeden záznam = jedna myšlenka nebo téma. Radši víc krátkých než jeden dlouhý."),
     Bullet('Nemusíš formulovat „spisovně". Stačí říct, co tě napadlo.'),
-    Bullet("Pokud zkazíš, klidně to natočíš znovu — Petr starý záznam smaže."),
+    Bullet("Pokud zkazíš, klidně to natočíš znovu — Gideon starý záznam smaže."),
 
     h(Footer),
   );

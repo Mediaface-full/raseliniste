@@ -67,7 +67,7 @@ export default function GuestGuide({
               <PwaSection />
               <Tips variant={variant} />
               <div className="pt-4 border-t border-white/5 text-center text-xs text-muted-foreground">
-                Děkuji, Petr · raseliniste.cz
+                Děkuji, Gideon · raseliniste.cz
               </div>
             </div>
           </div>
@@ -94,11 +94,11 @@ function Welcome({ variant }: { variant: "standard" | "brief" }) {
         normálně, jako bys to říkal po telefonu.
       </p>
       <p>
-        Umělá inteligence záznam přepíše a vytáhne z něj klíčové body. Petr si to
+        Umělá inteligence záznam přepíše a vytáhne z něj klíčové body. Gideon si to
         v klidu projde. <strong>Nemusíš nic psát.</strong>
       </p>
       <p>
-        U každého záznamu Petr vidí, kdo ho natočil — autorství se nikdy neztratí.
+        U každého záznamu Gideon vidí, kdo ho natočil — autorství se nikdy neztratí.
       </p>
       {variant === "brief" && (
         <div className="rounded-md border border-[var(--tint-rose)]/30 bg-[var(--tint-rose)]/[0.07] px-3 py-2.5 text-[13px]">
@@ -124,7 +124,7 @@ function BriefSection() {
         historii, lidech, cílech a o tom, co je teď otevřené.
       </p>
       <p>
-        Slouží jako referenční materiál. Petr se k němu vrací, když potřebuje
+        Slouží jako referenční materiál. Gideon se k němu vrací, když potřebuje
         rychle nahodit kontext. AI z něj vytvoří přehledný strukturovaný dokument:
         souhrn, glosář pojmů, seznam aktérů, historii rozhodnutí.
       </p>
@@ -138,7 +138,7 @@ function BriefSection() {
           <li>Stručná historie — kde to začalo, jakými fázemi to prošlo.</li>
           <li>Klíčové postavy — kdo je v projektu, kdo má jakou roli, kdo o čem rozhoduje.</li>
           <li>Aktuální stav — co se teď děje, co už je rozhodnuté, co se teprve řeší.</li>
-          <li>Otevřené otázky — co je nedořešeno, kde Petr může pomoct.</li>
+          <li>Otevřené otázky — co je nedořešeno, kde Gideon může pomoct.</li>
           <li>Důležitá rozhodnutí, která padla — proč, kdy, kdo.</li>
           <li>Pojmy a zkratky, které v projektu používáme.</li>
         </ul>
@@ -259,7 +259,7 @@ function Tips({ variant }: { variant: "standard" | "brief" }) {
         <li>Mluv klidně, ne v hlučném prostředí — Gemini rozumí češtině moc dobře.</li>
         <li>Jeden záznam = jedna myšlenka nebo téma. Radši víc krátkých než jeden dlouhý.</li>
         <li>Nemusíš formulovat „spisovně". Stačí říct, co tě napadlo.</li>
-        <li>Pokud se ti záznam nepovedl, klidně to natočíš znovu — Petr starý záznam smaže.</li>
+        <li>Pokud se ti záznam nepovedl, klidně to natočíš znovu — Gideon starý záznam smaže.</li>
       </ul>
     </section>
   );

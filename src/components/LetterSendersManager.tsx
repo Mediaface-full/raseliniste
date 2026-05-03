@@ -326,7 +326,7 @@ function SenderEditor({ sender, onChanged }: { sender: Sender; onChanged: () => 
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Plný název do hlavičky">
-          <Input value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="Petr Perina, OSVČ / ABC s.r.o." />
+          <Input value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="Petr Gideon Peřina, OSVČ / ABC s.r.o." />
         </Field>
         <Field label="IČO"><Input value={ico} onChange={(e) => setIco(e.target.value)} /></Field>
         <Field label="DIČ"><Input value={dic} onChange={(e) => setDic(e.target.value)} /></Field>

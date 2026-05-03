@@ -78,7 +78,7 @@ export default function GuestRecorder({
     return (
       <div className="glass-strong rounded-xl p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          Petr tě zatím nepozval do žádného projektu. Zkus odkaz později nebo se ho zeptej.
+          Gideon tě zatím nepozval do žádného projektu. Zkus odkaz později nebo se ho zeptej.
         </p>
       </div>
     );

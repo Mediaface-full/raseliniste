@@ -266,7 +266,7 @@ export default function LetterEditor(props: Props) {
 zde napíšeš text dopisu. Odstavce odděluj prázdným řádkem. Oslovení i závěr (S pozdravem, …) napiš sem — Gemini je zachová.
 
 S pozdravem
-Petr Perina"
+Petr Gideon Peřina"
               className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm leading-relaxed resize-y"
             />
           ) : (

@@ -317,9 +317,9 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
         <p>termín <strong>${dateStr} ${timeStr}</strong> je potvrzený. ✓</p>
         ${meetSection}
         <p>Pozvánka přijde i samostatně z Google Calendar.</p>
-        <p>Těším se,<br/>Petr</p>
+        <p>Těším se,<br/>Gideon</p>
       `,
-      text: `Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},\n\ntermín ${dateStr} ${timeStr} je potvrzený.\n${result.meetLink ? `\nMeet: ${result.meetLink}\n` : ""}\nTěším se,\nPetr`,
+      text: `Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},\n\ntermín ${dateStr} ${timeStr} je potvrzený.\n${result.meetLink ? `\nMeet: ${result.meetLink}\n` : ""}\nTěším se,\nGideon`,
     });
   }
 
@@ -352,9 +352,9 @@ export async function cancelInvite(inviteId: string): Promise<void> {
       html: `
         <p>Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},</p>
         <p>termín bohužel musím zrušit. Omlouvám se za komplikace — pošli mi novou pozvánku, najdeme jiný čas.</p>
-        <p>Petr</p>
+        <p>Gideon</p>
       `,
-      text: `Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},\n\ntermín bohužel musím zrušit. Omlouvám se. Najdeme nový čas.\n\nPetr`,
+      text: `Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},\n\ntermín bohužel musím zrušit. Omlouvám se. Najdeme nový čas.\n\nGideon`,
     });
   }
 }

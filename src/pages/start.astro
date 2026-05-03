@@ -33,7 +33,6 @@ if (!user) return Astro.redirect("/login");
 type Tile = {
   href: string;
   title: string;
-  subtitle: string;
   icon: string;
   tint: "peach" | "mint" | "lavender" | "sky" | "sage" | "butter" | "rose" | "pink";
   disabled?: boolean;
@@ -41,55 +40,13 @@ type Tile = {
 };
 
 const tiles: Tile[] = [
-  {
-    href: "/ozvena?mode=journal",
-    title: "Deník",
-    subtitle: "Nadiktovat deníkový zápis",
-    icon: "lucide:book-open",
-    tint: "butter",
-  },
-  {
-    href: "/ozvena?mode=task",
-    title: "Úkoly",
-    subtitle: "Nadiktovat úkoly (AI rozdělí)",
-    icon: "lucide:check-square",
-    tint: "peach",
-  },
-  {
-    href: "/studna/nahravka",
-    title: "Studánka",
-    subtitle: "Nahrávka do projektu",
-    icon: "lucide:waves",
-    tint: "mint",
-  },
-  {
-    href: "/prskavka/nahravka",
-    title: "Prskavka",
-    subtitle: "Osobní projekty (knížky, nápady)",
-    icon: "lucide:sparkles",
-    tint: "rose",
-  },
-  {
-    href: "/zeptat-se",
-    title: "Zeptat se",
-    subtitle: "AI prohlédne deníky, úkoly a Studánku",
-    icon: "lucide:message-circle-question",
-    tint: "lavender",
-  },
-  {
-    href: "/zijes/novy",
-    title: "ŽIJEŠ?",
-    subtitle: "Check-in se sebou (90 sekund)",
-    icon: "lucide:heart-pulse",
-    tint: "rose",
-  },
-  {
-    href: "/bwmys",
-    title: "B&W Myš",
-    subtitle: "Rozhodovací linka (sběr → verdikt)",
-    icon: "lucide:arrow-left-right",
-    tint: "lavender",
-  },
+  { href: "/ozvena?mode=journal", title: "Deník",     icon: "lucide:book-open",              tint: "butter" },
+  { href: "/ozvena?mode=task",    title: "Úkoly",     icon: "lucide:check-square",           tint: "peach" },
+  { href: "/studna/nahravka",     title: "Studánka",  icon: "lucide:waves",                  tint: "mint" },
+  { href: "/prskavka/nahravka",   title: "Prskavka",  icon: "lucide:sparkles",               tint: "rose" },
+  { href: "/zeptat-se",           title: "Zeptat se", icon: "lucide:message-circle-question", tint: "lavender" },
+  { href: "/zijes/novy",          title: "ŽIJEŠ?",    icon: "lucide:heart-pulse",            tint: "rose" },
+  { href: "/bwmys",               title: "B&W Myš",   icon: "lucide:arrow-left-right",       tint: "lavender" },
 ];
 
 const today = new Date();
@@ -213,7 +170,7 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
             return (
               <Tag
                 href={tile.disabled ? undefined : tile.href}
-                class={`glass rounded-2xl p-5 relative overflow-hidden flex flex-col items-start gap-2 min-h-[140px] transition ${
+                class={`glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition ${
                   tile.disabled
                     ? "opacity-50 cursor-not-allowed"
                     : "hover:bg-white/5 active:scale-[0.98]"
@@ -226,24 +183,19 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
                 ></div>
 
                 <div
-                  class="size-12 rounded-xl grid place-items-center"
+                  class="size-10 rounded-xl grid place-items-center"
                   style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
                 >
-                  <Icon name={tile.icon} class="size-6" />
+                  <Icon name={tile.icon} class="size-5" />
                 </div>
 
-                <div class="relative mt-auto">
-                  <div class="text-base font-semibold tracking-tight flex items-center gap-2">
-                    {tile.title}
-                    {tile.badge && (
-                      <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">
-                        {tile.badge}
-                      </span>
-                    )}
-                  </div>
-                  <div class="text-xs text-muted-foreground mt-0.5 leading-snug">
-                    {tile.subtitle}
-                  </div>
+                <div class="relative mt-auto text-base font-semibold tracking-tight flex items-center gap-2">
+                  {tile.title}
+                  {tile.badge && (
+                    <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">
+                      {tile.badge}
+                    </span>
+                  )}
                 </div>
               </Tag>
             );
