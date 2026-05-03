@@ -159,12 +159,13 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
 
       // Termín:
       //   1. VIP zadal konkrétní datum  → due_date YYYY-MM-DD
-      //   2. VIP nebo urgent bez data   → due_string "today"
-      //   3. Ostatní                    → bez termínu
+      //   2. URGENT bez data            → due_string "today" (urgent = chce dnes)
+      //   3. VIP bez termínu / ostatní  → bez termínu (Petr ho zařadí sám,
+      //      jinak by se mu Today zaplnilo všemi VIP úkoly)
       const dueArgs: { due_date?: string; due_string?: string } = {};
       if (requestedDueAt) {
         dueArgs.due_date = requestedDueAt.toISOString().slice(0, 10);
-      } else if (wasVip || body.isUrgent) {
+      } else if (body.isUrgent) {
         dueArgs.due_string = "today";
       }
 
