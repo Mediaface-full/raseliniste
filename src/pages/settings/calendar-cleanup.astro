@@ -1,0 +1,44 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import CalendarCleanupTool from "../../components/CalendarCleanupTool";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Úklid duplikátů kalendáře · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Nastavení", href: "/settings" }, { label: "Úklid kalendáře" }]}
+>
+  <div class="max-w-3xl space-y-5">
+    <div>
+      <h1 class="font-serif text-[2rem] leading-tight tracking-tight">
+        Úklid duplikátů kalendáře
+      </h1>
+      <p class="text-sm text-muted-foreground mt-1.5">
+        Najde a smaže duplicitní záznamy <code class="font-mono text-xs">CalendarEvent</code>
+        se stejným <code class="font-mono text-xs">(source, externalId)</code> — což by
+        normálně nemělo existovat. Pravděpodobný artefakt předchozího image swapu Postgres.
+      </p>
+      <p class="text-sm text-muted-foreground mt-1.5">
+        <strong>1.</strong> Klikni <em>Najít duplikáty</em> — vypíše se co se najde, ale nic se nemaže.
+        <br />
+        <strong>2.</strong> Pokud výpis sedí, klikni <em>Smazat</em>. Pro každou skupinu se zachová
+        ten s nejnovějším syncem.
+      </p>
+    </div>
+
+    <section class="glass rounded-xl p-5" style="--c: var(--tint-rose);">
+      <CalendarCleanupTool client:load />
+    </section>
+  </div>
+</Shell>
