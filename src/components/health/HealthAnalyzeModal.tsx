@@ -15,6 +15,7 @@ import { marked } from "marked";
 import { Button } from "../ui/Button";
 
 type AnalyzeResponse = {
+  id: string;
   text: string;
   meta: {
     from: string;
@@ -122,8 +123,10 @@ export default function HealthAnalyzeModal({
         setError(data.message ?? data.error ?? "Analýza selhala.");
         return;
       }
-      setResult(data);
       onSaved?.();
+      // Přesměrování na samostatnou stránku — modal je pro dlouhé reporty nepoužitelný.
+      window.location.href = `/health/analyza/${data.id}`;
+      return;
     } catch {
       setError("Síťová chyba.");
     } finally {

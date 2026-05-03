@@ -116,10 +116,9 @@ export const HealthAnalysesList = forwardRef<HealthAnalysesListHandle>((_, ref) 
                 >
                   {auto ? <CalendarClock className="size-4" /> : <User className="size-4" />}
                 </div>
-                <button
-                  type="button"
+                <a
+                  href={`/health/analyza/${a.id}`}
                   className="flex-1 min-w-0 text-left"
-                  onClick={() => setOpenId(a.id)}
                 >
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm text-foreground">
@@ -150,7 +149,7 @@ export const HealthAnalysesList = forwardRef<HealthAnalysesListHandle>((_, ref) 
                     {a.metricsWithData != null && <> · {a.metricsWithData} metrik · {a.totalSamples?.toLocaleString("cs-CZ")} záznamů</>}
                     {a.focus && <> · {a.focus.slice(0, 40)}…</>}
                   </div>
-                </button>
+                </a>
                 <Button variant="ghost" size="icon" onClick={() => onDelete(a.id)} aria-label="Smazat">
                   <Trash2 />
                 </Button>

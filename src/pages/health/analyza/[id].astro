@@ -1,0 +1,91 @@
+---
+import Shell from "../../../layouts/Shell.astro";
+import { prisma } from "../../../lib/db";
+import { readSession } from "../../../lib/session";
+import { marked } from "marked";
+import HealthAnalysisActions from "../../../components/health/HealthAnalysisActions";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const id = Astro.params.id as string;
+const analysis = await prisma.healthAnalysis.findUnique({ where: { id } });
+if (!analysis || analysis.userId !== session.uid) {
+  return Astro.redirect("/health");
+}
+
+const html = marked.parse(analysis.text) as string;
+
+const fmtDate = (d: Date) =>
+  d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" });
+const fmtDateTime = (d: Date) =>
+  d.toLocaleString("cs-CZ");
+
+const periodLabel = `${fmtDate(analysis.periodFrom)} → ${fmtDate(analysis.periodTo)}`;
+const fromIso = analysis.periodFrom.toISOString().slice(0, 10);
+const toIso = analysis.periodTo.toISOString().slice(0, 10);
+const days = Math.round(
+  (analysis.periodTo.getTime() - analysis.periodFrom.getTime()) / 86_400_000
+);
+---
+
+<Shell
+  title={`Zdravotní analýza · ${periodLabel}`}
+  username={user.username}
+  breadcrumb={[{ label: "Zdraví", href: "/health" }, { label: "Analýza" }]}
+>
+  <div class="max-w-3xl mx-auto space-y-5">
+    {/* Header */}
+    <div>
+      <div class="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono mb-1">
+        Zdravotní analýza
+      </div>
+      <h1 class="font-serif text-3xl tracking-tight">{periodLabel}</h1>
+      <div class="mt-2 text-xs font-mono text-muted-foreground tabular flex flex-wrap gap-x-3 gap-y-1">
+        <span>{days} dní</span>
+        <span>·</span>
+        <span>{(analysis.totalSamples ?? 0).toLocaleString("cs-CZ")} záznamů</span>
+        <span>·</span>
+        <span>{analysis.metricsWithData ?? 0} metrik</span>
+        <span>·</span>
+        <span>{analysis.model}</span>
+        <span>·</span>
+        <span>vygenerováno {fmtDateTime(analysis.createdAt)}</span>
+      </div>
+      {analysis.focus && (
+        <div class="mt-3 text-sm text-muted-foreground italic">
+          Pokyn: „{analysis.focus}"
+        </div>
+      )}
+    </div>
+
+    {/* Actions */}
+    <HealthAnalysisActions
+      client:load
+      id={analysis.id}
+      text={analysis.text}
+      fromIso={fromIso}
+      toIso={toIso}
+      meta={{
+        days,
+        totalSamples: analysis.totalSamples ?? 0,
+        metricsWithData: analysis.metricsWithData ?? 0,
+        model: analysis.model,
+        focus: analysis.focus,
+        createdAt: analysis.createdAt.toISOString(),
+      }}
+    />
+
+    {/* Body */}
+    <article
+      class="prose-rasel rounded-lg border border-white/10 bg-black/20 p-6 text-[15px] leading-relaxed"
+      set:html={html}
+    />
+  </div>
+</Shell>
