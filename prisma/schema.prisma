@@ -568,6 +568,11 @@ model ProjectBox {
   studnaStandardPrompt  String?  @db.Text
   studnaBriefPrompt     String?  @db.Text
 
+  // Per-projekt override Gemini modelu pro Stage 2 (analýza). Null = default
+  // chování: BRIEF=Pro, STANDARD=Flash. Pokud vyplněno (např. "gemini-2.5-pro"),
+  // použije se na všechny analýzy v projektu. Stage 1 (přepis) je vždy Flash.
+  analysisModel     String?
+
   // Notifikace v 18:00 cron — pokud false, projekt se v digestu vynechá
   includeInDigest   Boolean  @default(true)
 

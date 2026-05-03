@@ -24,7 +24,7 @@ export const POST: APIRoute = async ({ cookies, params }) => {
 
   const recording = await prisma.projectRecording.findFirst({
     where: { id, project: { userId: session.uid } },
-    include: { project: { select: { description: true, studnaStandardPrompt: true, studnaBriefPrompt: true } } },
+    include: { project: { select: { description: true, studnaStandardPrompt: true, studnaBriefPrompt: true, analysisModel: true } } },
   });
   if (!recording) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
 
@@ -63,6 +63,7 @@ export const POST: APIRoute = async ({ cookies, params }) => {
     projectContext: recording.project.description,
     customStandardPrompt: recording.project.studnaStandardPrompt,
     customBriefPrompt: recording.project.studnaBriefPrompt,
+    analysisModel: recording.project.analysisModel,
   });
 
   return Response.json({ ok: true, recordingId: id, status: "processing" });

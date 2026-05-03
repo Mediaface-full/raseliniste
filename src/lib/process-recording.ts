@@ -43,6 +43,7 @@ export async function processRecording(params: {
   projectContext: string | null;
   customStandardPrompt?: string | null;
   customBriefPrompt?: string | null;
+  analysisModel?: string | null;
 }): Promise<void> {
   // Zabal celé processing do jedné awaited Promise + drž referenci.
   const entry: InFlight = {
@@ -67,6 +68,7 @@ export async function processRecording(params: {
         cleanupFillers: true,
         customStandardPrompt: params.customStandardPrompt ?? null,
         customBriefPrompt: params.customBriefPrompt ?? null,
+        analysisModelOverride: params.analysisModel ?? null,
       });
 
       await prisma.projectRecording.update({

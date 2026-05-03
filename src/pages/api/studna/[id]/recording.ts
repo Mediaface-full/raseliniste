@@ -92,6 +92,7 @@ export const POST: APIRoute = async ({ request, cookies, params, clientAddress }
     projectContext: project.description,
     customStandardPrompt: project.studnaStandardPrompt,
     customBriefPrompt: project.studnaBriefPrompt,
+    analysisModel: project.analysisModel,
   });
 
   return Response.json({ ok: true, recordingId: recording.id, status: "processing" });

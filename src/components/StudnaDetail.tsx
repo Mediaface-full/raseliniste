@@ -16,6 +16,7 @@ interface ProjectDetail {
   extractionPrompt: string | null;
   studnaStandardPrompt: string | null;
   studnaBriefPrompt: string | null;
+  analysisModel: string | null;
   includeInDigest: boolean;
   archivedAt: string | null;
   createdAt: string;
@@ -795,6 +796,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
   const [extractionPrompt, setExtractionPrompt] = useState(project.extractionPrompt ?? "");
   const [studnaStandardPrompt, setStudnaStandardPrompt] = useState(project.studnaStandardPrompt ?? "");
   const [studnaBriefPrompt, setStudnaBriefPrompt] = useState(project.studnaBriefPrompt ?? "");
+  const [analysisModel, setAnalysisModel] = useState<string>(project.analysisModel ?? "");
   const [showCustomPrompts, setShowCustomPrompts] = useState(
     Boolean(project.studnaStandardPrompt || project.studnaBriefPrompt),
   );
@@ -813,6 +815,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           homeTitle: homeTitle.trim() || null,
           description: description.trim() || null,
           extractionPrompt: extractionPrompt.trim() || null,
+          analysisModel: analysisModel || null,
           studnaStandardPrompt: studnaStandardPrompt.trim() || null,
           studnaBriefPrompt: studnaBriefPrompt.trim() || null,
           includeInDigest,
@@ -867,6 +870,25 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             placeholder="Pro tento projekt zaměř pozornost zejména na…"
             className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
           />
+        </div>
+
+        {/* Per-projekt Gemini model pro Stage 2 (analýzu nahrávky). */}
+        <div>
+          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
+            Gemini model pro analýzu
+          </label>
+          <select
+            value={analysisModel}
+            onChange={(e) => setAnalysisModel(e.target.value)}
+            className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm"
+          >
+            <option value="">Auto (krátké = Flash, Brief = Pro) — default</option>
+            <option value="gemini-2.5-flash">Flash 2.5 — rychlejší, levnější</option>
+            <option value="gemini-2.5-pro">Pro 2.5 — pomalejší, lepší pro kreativní práci</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground/80 mt-1 leading-relaxed">
+            Použije se na všechny analýzy v tomhle projektu (Standard i Brief). Stage 1 (přepis) je vždy Flash.
+          </p>
         </div>
 
         {/* Per-projekt Stage 2 prompty — pokročilé, pro projekty kde standardní

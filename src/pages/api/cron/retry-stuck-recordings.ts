@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
       createdAt: { lt: cutoff },
     },
     include: {
-      project: { select: { description: true, studnaStandardPrompt: true, studnaBriefPrompt: true } },
+      project: { select: { description: true, studnaStandardPrompt: true, studnaBriefPrompt: true, analysisModel: true } },
     },
     take: MAX_RETRIES_PER_RUN,
     orderBy: { createdAt: "asc" },
@@ -77,6 +77,7 @@ export const POST: APIRoute = async ({ request }) => {
         projectContext: r.project.description,
         customStandardPrompt: r.project.studnaStandardPrompt,
         customBriefPrompt: r.project.studnaBriefPrompt,
+        analysisModel: r.project.analysisModel,
       });
       results.push({ id: r.id, ageMinutes: ageMin, action: "retried" });
     } catch (e) {

@@ -179,9 +179,14 @@ export async function transcribeAudio(params: {
   // použije se DB global override z /settings/ai-prompts, jinak default v kódu.
   customStandardPrompt?: string | null;
   customBriefPrompt?: string | null;
+  // Per-projekt override Gemini modelu pro Stage 2. Pokud null/undefined,
+  // použije se default: BRIEF=Pro, STANDARD=Flash.
+  analysisModelOverride?: string | null;
 }): Promise<TranscribeResult> {
   const isBrief = params.recordingType === "BRIEF";
-  const model = isBrief ? ANALYSIS_MODEL : DEFAULT_MODEL;
+  const model = (params.analysisModelOverride && params.analysisModelOverride.trim().length > 0)
+    ? params.analysisModelOverride.trim()
+    : (isBrief ? ANALYSIS_MODEL : DEFAULT_MODEL);
 
   // Priorita promptu: per-projekt override > DB global override > default v kódu.
   const customForType = isBrief ? params.customBriefPrompt : params.customStandardPrompt;
