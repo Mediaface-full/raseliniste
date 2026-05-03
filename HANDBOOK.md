@@ -311,15 +311,17 @@ Samostatný modul s vlastním direct endpointem.
   - **MapPin badge** odkaz na Apple/Google Maps
   - Nový zápis tlačítkem („Uložit 1:1" nebo „Uložit + učesat")
 
-### ✅ Zdraví (hotovo)
-- `POST /api/health-ingest` (x-api-key pro HAE, Bearer fallback)
+### ✅ Zdraví (hotovo, rozšířeno 2026-05-03)
+- `POST /api/health-ingest` (x-api-key pro HAE, Bearer fallback) — automatický feed z iPhone
+- **`POST /api/health/upload-file`** (NOVÉ 05-03) — multipart upload JSON souboru, session auth (žádný token), 50 MB cap. UI v `/settings/ingest` nahoře.
 - Univerzální tabulka pro 17 metrik + ECG
 - **Historický roční import** 3 465 metrik za ~1 s
 - **Idempotent** díky unique indexu
-- Dashboard `/health` — 6 sekcí: Přehled / Aktivita / Srdce / Spánek / Tělo / Tlak
+- Dashboard `/health` — 6 sekcí + **3 dlaždice nahoře (NOVÉ 05-03)**: poslední import (rel+abs čas, tint sage<30h/butter<72h/rose>=72h), nejnovější měření (`recordedAt`), nových za 24h
   - KPI karty s trendem, date range filter, Recharts (Line/Area/Bar/Stacked)
-- **Manuální AI analýza** — tlačítko „Analyzovat" → modal s date range + focus presety → Gemini 2.5 Pro → markdown output
-- **Historie analýz** — seznam pod dashboardem, detail modal, smazat
+- **Manuální AI analýza** — tlačítko „Analyzovat" → modal s date range + focus presety → Gemini 2.5 Pro
+- **Výsledek analýzy na samostatné stránce `/health/analyza/<id>` (NOVÉ 05-03)** — Shell layout, markdown render, tlačítka **Stáhnout (.md)** + **Vytisknout/PDF** (window.print) + Zpět. Modal po dokončení redirectne sem. Důvod: dlouhé reporty (Doporučení) byly v modalu mimo viewport.
+- **Historie analýz** — seznam pod dashboardem, klik na řádek → `/health/analyza/<id>` (ne modal), smazat
 - **Měsíční automat** — `POST /api/cron/monthly-health-report` s `x-cron-key` auth, Synology Task Scheduler, poslední den v měsíci, email přes Resend
 
 ### ✅ Úkoly (hotovo)
@@ -439,6 +441,9 @@ Sdílené projektové boxíky s hlasovými záznamy.
   - **BRIEF** (Pro 2.5 hluboká analýza s glossary/actors/decision_history, max 90 min, file upload, audio nikdy nemizí)
 - **AI rozbor:** strukturovaný JSON s `summary`, `key_themes`, `thoughts[]` (importance + rationale + category), `open_questions`, `sentiment`, `intensity_signals` (+ brief: `glossary`, `actors`, `decision_history`)
 - **Project summary** — Pro model nad všemi recordings (briefy primární kontext) — strukturovaný markdown dokument o stavu projektu
+  - **Custom prompt per projekt (NOVÉ 05-03):** `ProjectBox.projectSummaryPrompt @db.Text`. Když vyplněn, posíláme **PLNÉ transkripty** všech nahrávek (ne osekané JSON metadaty), temperature 0.6, maxOutputTokens 32k. Pro kreativní agregaci napříč nahrávkami (mapa kapitol, index osob s `#`, bílá místa, časová osa). Růžová sekce v UI s explicitním varováním že to NENÍ per-recording prompt (tam by to rozhodilo JSON parsing → recording uvázne).
+- **Per-projekt Gemini model (NOVÉ 05-03):** `ProjectBox.analysisModel`. Select Auto/Flash/Pro. Override Stage 2 modelu pro VŠECHNY analýzy v projektu (Stage 1 přepis je vždy Flash). Pro kreativní projekty → Pro 2.5.
+- **Záchrana stuck recording (NOVÉ 05-03):** `POST /api/studna/recordings/:id/mark-error` + tlačítko „zrušit" v UI vedle loaderu. Pro případy kdy Promise umřela, Gemini vrátil neplatný JSON, atd. Status → `error`, Petr může Regenerovat. Doplněk k cronu `retry-stuck-recordings` (10 min threshold).
 - **Cron:** `daily-projects-digest` (**7:00 ráno** — okno posledních 24 h, 200znakové náhledy z transkriptu, předmět "Studna — N nových nahrávek (autoři)", patička link na `/studna/aktivita`; pokud nic nepřibylo, mail neposílá), `cleanup-audio` (03:00 — STANDARD older 14d & not pinned)
 - **Onboarding PDFs** — 2 šablony (Standard + Brief) generované přes `@react-pdf/renderer`, owner si stáhne v admin a pošle hostovi mailem
 

@@ -1,12 +1,13 @@
 # 03 — Moduly (přehled)
 
-Stav 2026-05-02. Detail jednotlivých modulů v `Návody/*.pdf`.
+Stav 2026-05-03. Detail jednotlivých modulů v `Návody/*.pdf`.
 
 ## 🌅 Vstupní stránka
 
 | Modul | URL | Status | Pozn. |
 |---|---|---|---|
-| **Start** | `/start` | ✅ | Sjednocená vstupní stránka pro mobil. PWA ikona **strom** (samostatný `/tree-touch-icon.png`, JEN pro Petra). Nahoře svátek + narozeniny z kontaktů. 4 dlaždice: Deník, Úkoly, Studna, Zeptat se. Pod nimi tlačítko Dashboard přes celou šířku. Layout zarovnán nahoru (žádné scrollování na mobilu). |
+| **Start** | `/start` | ✅ AKT 05-03 | Sjednocená vstupní stránka pro mobil. PWA ikona **strom** (samostatný `/tree-touch-icon.png`, JEN pro Petra). Nahoře svátek + narozeniny z kontaktů. **8 dlaždic** (Mise, Deník, Úkoly, Studánka, Prskavka, Zeptat se, ŽIJEŠ?, Myši) — bez popisků, jen ikona+titul, kompaktní `min-h-[96px]`, 2 sloupce. Každá dlaždice unikátní pastelový tint. **Custom ikony** přes `Fragment set:html` z `src/assets/icons/*.svg` (Myši, Mise raketa). Pod dlaždicemi tlačítko Dashboard přes celou šířku. Layout zarovnán nahoru. |
+| **Mise** (today view PWA) | `/dnes` → redirect `/day/<dnešní>` | ✅ NOVÉ 05-03 | Server-side redirect na aktuální den — Petr může přidat `/dnes` na plochu mobilu, vždy se otevře dnešek (ne datum, kdy se ikona vytvořila). Cílí na DayView pod Shellem. PWA s vlastním manifestem + raketkovou ikonou je TODO. |
 | Dashboard | `/` | ✅ | KPI karty, aktivita, sekce „Plán" (nejbližší 3 dny + porušení pravidel). |
 | **Zeptat se (RAG)** | `/zeptat-se` | ✅ NOVÉ 04-30 | AI dotaz nad indexovanými deníky / úkoly / Studna nahrávkami. pgvector + Gemini text-embedding-004 (768 dim) + Gemini 2.5 Pro generování s [N] citacemi. Auto-indexace nových zápisů. Backfill záměrně neproveden — Gideon chtěl „jen od teď". Lib `src/lib/rag.ts`. |
 | **B&W Myš** (rozhodovací linka) | `/bwmys` | ✅ NOVÉ 05-01 + vizualizační vrstva 05-02 | Strukturovaný rozhodovací systém pro emocionální rozhodovací styl. Longitudinální sběr vstupů (default 14 dní) → AI vyhodnocení (sekce A-H) → uzavírací verdikt + „co by ho překlopilo". Spec: `/Users/petrperina/Downloads/rozhodovaci-system-zadani.md` + vizualizace `/Users/petrperina/Downloads/rozhodovaci-system-vizualizace.md`. Modely: `Decision`, `DecisionEntry`, `DecisionEvaluation` (+ `argumentsJson`), `DecisionReopening`. AI lib: `src/lib/bwmys-ai.ts` (5 promptů — varianty, mini, finální, klasifikace úhlů, **extrakce argumentů**). Audio nahrávání zápisu (Stage 1 přepis + Stage 2 extrakce metadat). Cron `bwmys-tick` denně 7:10. **Vizualizační vrstva (05-02):** `src/components/BwMysViz/` — Six Hats radar (Recharts), křivka nálad (s tooltipem), donut typů, **mřížka argumentů (ScatterChart smer × konzistence, velikost dle četnosti)**. Sdílené barvy v `src/lib/bwmys-colors.ts`. Endpoint `/api/bwmys/[id]/arguments` (cache do `argumentsJson`, `?force=1` regenerace). Ikona dvě myšky v yin-yang (`bwmys-touch-icon.png`). |
@@ -20,6 +21,9 @@ Stav 2026-05-02. Detail jednotlivých modulů v `Návody/*.pdf`.
 | Studna inline | `/studna/<id>` | ✅ | Recorder rovnou v detail projektu (bez dropdownu). |
 | Studna guest | `/me/<token>` | ✅ public | Klienti / hosti nahrávání, token v URL, rate limit 20/h/host. |
 | **Per-projekt AI prompty** (Studna/Prskavka) | `/studna/<id>` záložka Nastavení | ✅ NOVÉ 05-02 | Každý projekt může mít vlastní `studnaStandardPrompt` + `studnaBriefPrompt` — přepíše globální Stage 2 prompt jen pro daný projekt. Use case: Prskavka osobní projekty potřebují jiný typ výstupu než klientské Studna brainstormy. Priorita: per-projekt > DB global override > default v kódu. Aktivní projekty mají v hlavičce lavender banner „⚙ Tento projekt používá vlastní AI prompty". |
+| **Per-projekt Gemini model** | `/studna/<id>` záložka Nastavení | ✅ NOVÉ 05-03 | `ProjectBox.analysisModel` nullable. Select v UI: Auto (default — BRIEF=Pro, STANDARD=Flash) / Flash 2.5 / Pro 2.5. Override Stage 2 modelu pro VŠECHNY analýzy v projektu (Stage 1 přepis je vždy Flash, mechanická úloha). Pro kreativní projekty (knížka, podcast) → Pro 2.5. Migrace `add_projectbox_analysis_model`. |
+| **Vlastní prompt pro Souhrn projektu** | `/studna/<id>` záložka Nastavení | ✅ NOVÉ 05-03 | `ProjectBox.projectSummaryPrompt @db.Text` — přepíše hardcoded prompt v `summarizeProject` (lib `project-summary.ts`). Když vyplněn (>20 znaků), Gemini Pro dostane **PLNÉ transkripty** všech nahrávek (ne osekané `summary` + `key_themes`), temperature 0.6, maxOutputTokens 32k. Pro kreativní agregaci napříč nahrávkami (mapa kapitol, index osob s `#`, bílá místa, časová osa). Petrův pojmový mismatch z 05-03: omylem dal volnotextový „Mapa projektu" prompt do `studnaStandardPrompt` (Stage 2 per-recording, MUSÍ vrátit JSON) → recording uvázl. Růžová sekce v UI s explicitním varováním. Migrace `add_projectbox_summary_prompt`. |
+| **Záchrana stuck recordings** | tlačítko „zrušit" v UI + `POST /api/studna/recordings/:id/mark-error` | ✅ NOVÉ 05-03 | Když nahrávka uvázne ve `status="processing"` (Promise umřela při restartu, Gemini vrátil neplatný JSON kvůli custom promptu, …), Petr klikne malé tlačítko **zrušit** vedle loaderu. Status → `error`, Petr může Regenerovat. Odpadá čekání 10–25 min na cron `retry-stuck-recordings`. |
 
 **Wake Lock + visibility ochrana** = ve VŠECH 4 recorderech (commit `c649dd6`). Banner před start, indikátor během, varování po stop pokud audio nesedí.
 
@@ -60,7 +64,7 @@ Stav 2026-05-02. Detail jednotlivých modulů v `Návody/*.pdf`.
 |---|---|---|
 | Hlavní pohled | `/calendar` | ✅ |
 | Quickadd (hlas/text) | `/quickadd` | ✅ |
-| Den (briefing + DayNote) | `/day/<YYYY-MM-DD>` | ✅ |
+| Den (briefing + DayNote) | `/day/<YYYY-MM-DD>` | ✅ AKT 05-03 — listování přes `<a href>` (fungovalo jen s JS), `endsAt: gte`→`gt` (sobotní all-day už nepadá do neděle), dedup duplikátů `(source, title, startsAt, endsAt)`, hlavička má odkaz „↻ dnes". Při cestě (DayNote) **přesunuto NAD Plán**. |
 | Pozvánka | `/calendar/invite` | ✅ |
 | Klient pozvánka | `/i/<token>` | ✅ public |
 | Cold lead | `/schuzka` | ✅ public |
@@ -125,7 +129,9 @@ Stav 2026-05-02. Detail jednotlivých modulů v `Návody/*.pdf`.
 | **Calendar prep AI** | sync-calendars hook | ✅ NOVÉ 05-03 ráno | Petr napíše do Google Calendar / iCloud popisu události „vzít stan, spacák, kameru". AI (Gemini Flash) z popisu vytáhne `CalendarEvent.prepNote` (max 200 zn) + `itemsToBring` (pole stringů). DayView v `/calendar` zobrazí `📝 prepNote` pod eventem. Noční briefing 22:00 agreguje napříč zítřejšími události → ranní Todoist task má sloučený seznam co vzít. Lib `src/lib/calendar-prep-ai.ts`. Hooks v `google-calendar.ts` + `icloud-calendar.ts` fire-and-forget. Idempotence: každý sync re-extrahuje, etag check zachován. |
 | Dopisy | `/letters` | ✅ |
 | Editor dopisu | `/letters/<id>` nebo `/letters/new` | ✅ |
-| Zdraví | `/health` | ✅ |
+| Zdraví | `/health` | ✅ AKT 05-03 — 3 dlaždice nahoře: poslední import (rel+abs čas, tint sage<30h/butter<72h/rose), nejnovější měření (`recordedAt`), nových za 24h. |
+| Zdravotní analýza | `/health/analyza/<id>` | ✅ NOVÉ 05-03 — full page report (markdown render), tlačítka Stáhnout (.md) / Vytisknout-PDF (window.print) / Zpět. Modal v `HealthAnalyzeModal` po dokončení redirectne sem. Klik na řádek v Uložené analýzy taky sem (ne modal). |
+| Health JSON upload | `/settings/ingest` (sekce nahoře) | ✅ NOVÉ 05-03 — bez API tokenu, session auth, `POST /api/health/upload-file` multipart, 50 MB cap. Pro jednorázové roční importy. |
 | Capture/Triage | `/capture`, `/triage` | ✅ |
 | Poznámky | `/notes` | ✅ |
 
