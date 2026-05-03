@@ -938,7 +938,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             value={projectSummaryPrompt}
             onChange={(e) => setProjectSummaryPrompt(e.target.value)}
             rows={10}
-            placeholder="Prázdné = použije se default „senior projektový analytik" prompt. Sem napiš co od souhrnu chceš (mapu kapitol, index osob s #, bílá místa, časovou osu, …)."
+            placeholder={'Prázdné = použije se default „senior projektový analytik" prompt. Sem napiš co od souhrnu chceš (mapu kapitol, index osob s #, bílá místa, časovou osu, …).'}
             className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-xs font-mono resize-y"
           />
         </div>
