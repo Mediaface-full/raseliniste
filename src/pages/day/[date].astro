@@ -25,7 +25,9 @@ const [events, dayNotes, briefingDigest, ruleViolations] = await Promise.all([
   prisma.calendarEvent.findMany({
     where: {
       deletedRemotely: false,
-      AND: [{ endsAt: { gte: dayStart } }, { startsAt: { lte: dayEnd } }],
+      // POZOR: `gt` (ne `gte`) — Google/iCal all-day eventy mají endsAt exclusive
+      // (sobotní celodenka má endsAt = neděle 00:00), takže `gte` by ji ukázal i v neděli.
+      AND: [{ endsAt: { gt: dayStart } }, { startsAt: { lte: dayEnd } }],
     },
     orderBy: { startsAt: "asc" },
   }),
@@ -40,9 +42,20 @@ const [events, dayNotes, briefingDigest, ruleViolations] = await Promise.all([
   }),
 ]);
 
+// Dedup: stejný title+source+startsAt+endsAt = duplikát (Google někdy posílá
+// stejnou událost s různými externalId, nebo je v kalendáři skutečně dvakrát).
+// Hack ve view; root cause vyžaduje audit sync logiky.
+const seenKeys = new Set<string>();
+const dedupedEvents = events.filter((e) => {
+  const key = `${e.source}|${e.title}|${e.startsAt.getTime()}|${e.endsAt.getTime()}`;
+  if (seenKeys.has(key)) return false;
+  seenKeys.add(key);
+  return true;
+});
+
 const initial = {
   date: dateStr,
-  events: events.map((e) => ({
+  events: dedupedEvents.map((e) => ({
     ...e,
     startsAt: e.startsAt.toISOString(),
     endsAt: e.endsAt.toISOString(),

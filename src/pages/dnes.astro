@@ -1,0 +1,8 @@
+---
+// Vždy redirectne na /day/<dnešní datum> v Europe/Prague.
+// Důvod: když si Petr přidá tuhle stránku na plochu mobilu jako PWA,
+// chceme aby se po otevření vždy zobrazil aktuální den, ne datum,
+// kdy se ikona vytvořila.
+const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" });
+return Astro.redirect(`/day/${today}`, 302);
+---

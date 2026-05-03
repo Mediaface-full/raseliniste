@@ -70,11 +70,14 @@ export default function DayView({ initial }: { initial: Initial }) {
     year: "numeric",
   });
 
-  function navigateDays(delta: number) {
+  function dayHref(delta: number): string {
     const d = new Date(dateObj);
     d.setDate(d.getDate() + delta);
-    const nextDate = d.toISOString().slice(0, 10);
-    window.location.href = `/day/${nextDate}`;
+    // Lokální datum (ne toISOString — ten dělá UTC posun)
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `/day/${y}-${m}-${day}`;
   }
 
   async function addNote() {
@@ -154,26 +157,32 @@ export default function DayView({ initial }: { initial: Initial }) {
     <div className="space-y-4">
       {/* Hlavička s navigací */}
       <div className="flex items-center justify-between gap-3">
-        <button
-          onClick={() => navigateDays(-1)}
+        <a
+          href={dayHref(-1)}
           className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center"
           title="Předchozí den"
         >
           <ChevronLeft className="size-4" />
-        </button>
+        </a>
         <div className="text-center">
           <div className="text-xs uppercase tracking-widest font-mono text-muted-foreground">
             {date}
           </div>
           <h1 className="font-serif text-2xl">{dateLabel}</h1>
+          <a
+            href="/dnes"
+            className="text-[10px] uppercase tracking-widest font-mono text-[var(--tint-sky)] hover:underline"
+          >
+            ↻ dnes
+          </a>
         </div>
-        <button
-          onClick={() => navigateDays(1)}
+        <a
+          href={dayHref(1)}
           className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center"
           title="Následující den"
         >
           <ChevronRight className="size-4" />
-        </button>
+        </a>
       </div>
 
       {error && (
