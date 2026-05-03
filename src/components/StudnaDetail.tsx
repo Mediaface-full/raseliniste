@@ -927,8 +927,12 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           </div>
           <p className="text-[11px] text-muted-foreground/80 leading-relaxed mb-2">
             Sem patří „mapa projektu", „index osob", „bílá místa", „časová osa" atd. Spustí se kliknutím na
-            tlačítko <strong>Souhrn projektu</strong>. Pracuje s <strong>VŠEMI</strong> zpracovanými nahrávkami v projektu, ne s jednou.
-            Vrací markdown — <strong>nemusíš</strong> řešit JSON schéma. Petr pak může text stáhnout.
+            tlačítko <strong>Souhrn projektu</strong>. Pracuje s <strong>VŠEMI</strong> zpracovanými nahrávkami,
+            ne s jednou. Vrací markdown — <strong>nemusíš</strong> řešit JSON schéma.
+            <br />
+            <span className="text-[var(--tint-rose)]">Když je vyplněno</span>, Gemini Pro dostane <strong>plné přepisy</strong> všech nahrávek
+            (raw materiál, ne osekanou analýzu) + víc prostoru na výstup (32k tokenů). Pro kreativní práci
+            (knížka, podcast, biografie) tohle dramaticky zvedne kvalitu.
           </p>
           <textarea
             value={projectSummaryPrompt}

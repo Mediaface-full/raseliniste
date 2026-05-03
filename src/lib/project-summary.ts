@@ -75,6 +75,24 @@ export async function summarizeProject(params: {
 
   const recordingsBundle = sections.join("\n");
 
+  // Pro custom prompt path posíláme PLNÉ přepisy + AI souhrn. Default cesta
+  // (projektový analytik) si vystačí s osekanými metadaty výše. Důvod:
+  // kreativní/tvůrčí projekty (knížka, podcast, mapování biografie) potřebují
+  // raw materiál, ne jen `key_themes` a `thoughts`. Pro má 2M token context.
+  const fullSections: string[] = [];
+  for (const r of [...briefs, ...standards]) {
+    fullSections.push(
+      `--- ${r.type === "BRIEF" ? "BRIEF" : "Záznam"} od ${r.authorName} (${r.createdAt.toLocaleDateString("cs-CZ")}) ---`,
+    );
+    if (r.analysis?.summary) {
+      fullSections.push(`AI souhrn: ${r.analysis.summary}`);
+    }
+    fullSections.push("Přepis:");
+    fullSections.push(r.transcript || "(přepis chybí)");
+    fullSections.push("");
+  }
+  const fullBundle = fullSections.join("\n");
+
   // Pokud má projekt vlastní prompt, použije se on (Petr v UI). Default ↓ jinak.
   const customTrimmed = params.customPrompt?.trim();
   const useCustom = customTrimmed && customTrimmed.length > 20;
@@ -125,18 +143,21 @@ PODKLADY:
 
 ${recordingsBundle}`;
 
-  // Custom prompt — Petr napsal vlastní zadání. Připojíme jen kontext + podklady.
+  // Custom prompt — Petr napsal vlastní zadání. Posíláme PLNÉ transkripty
+  // (raw materiál pro kreativní práci), ne osekané JSON metadaty.
   const customPromptFull = useCustom
     ? `${customTrimmed}
 
 KONTEXT:
 - Název projektu: „${params.projectName}"
 ${params.projectDescription ? `- Popis: ${params.projectDescription}\n` : ""}
-PODKLADY (záznamy a jejich AI rozbory):
+PODKLADY (plné přepisy záznamů + jejich AI souhrny):
 
-${recordingsBundle}
+${fullBundle}
 
-Vrať POUZE markdown bez úvodního komentáře. Použij češtinu.`
+Vrať POUZE markdown bez úvodního komentáře. Použij češtinu. Bohatě a konkrétně,
+neosekávej. Cituj autory, kde je to relevantní. Pokud má smysl tabulky, použij
+markdown tabulky.`
     : null;
 
   const prompt = customPromptFull ?? defaultPrompt;
@@ -149,8 +170,9 @@ Vrať POUZE markdown bez úvodního komentáře. Použij češtinu.`
       model: ANALYSIS_MODEL,
       contents: prompt,
       config: {
-        temperature: 0.4,
-        maxOutputTokens: 16000,
+        temperature: useCustom ? 0.6 : 0.4,
+        // Custom prompt = kreativní práce, dej Gemini víc prostoru
+        maxOutputTokens: useCustom ? 32000 : 16000,
       },
     }),
   });
