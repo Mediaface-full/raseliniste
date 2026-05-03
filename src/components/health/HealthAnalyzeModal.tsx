@@ -157,10 +157,13 @@ export default function HealthAnalyzeModal({
     <div
       ref={backdropRef}
       className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4"
-      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)" }}
+      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(16px)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="glass-strong rounded-xl w-full max-w-3xl flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+      <div
+        className="glass-strong rounded-xl w-full max-w-3xl flex flex-col max-h-[95vh] sm:max-h-[90vh]"
+        style={{ background: "oklch(16% 0.025 260 / 0.96)" }}
+      >
         {/* Header (sticky) */}
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
