@@ -5,6 +5,7 @@ import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 import { svatekDne } from "../lib/jmenny-kalendar";
 import SchedulerStatus from "../components/SchedulerStatus.astro";
+import bwMysSvg from "../assets/icons/bw-mys.svg?raw";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -45,8 +46,8 @@ const tiles: Tile[] = [
   { href: "/studna/nahravka",     title: "Studánka",  icon: "lucide:waves",                  tint: "mint" },
   { href: "/prskavka/nahravka",   title: "Prskavka",  icon: "lucide:sparkles",               tint: "rose" },
   { href: "/zeptat-se",           title: "Zeptat se", icon: "lucide:message-circle-question", tint: "lavender" },
-  { href: "/zijes/novy",          title: "ŽIJEŠ?",    icon: "lucide:heart-pulse",            tint: "rose" },
-  { href: "/bwmys",               title: "B&W Myš",   icon: "lucide:arrow-left-right",       tint: "lavender" },
+  { href: "/zijes/novy",          title: "ŽIJEŠ?",    icon: "lucide:heart-pulse",            tint: "pink" },
+  { href: "/bwmys",               title: "Myši",      icon: "custom:bw-mys",                 tint: "sage" },
 ];
 
 const today = new Date();
@@ -183,10 +184,14 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
                 ></div>
 
                 <div
-                  class="size-10 rounded-xl grid place-items-center"
+                  class="size-10 rounded-xl grid place-items-center [&>svg]:size-5"
                   style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
                 >
-                  <Icon name={tile.icon} class="size-5" />
+                  {tile.icon === "custom:bw-mys" ? (
+                    <Fragment set:html={bwMysSvg} />
+                  ) : (
+                    <Icon name={tile.icon} class="size-5" />
+                  )}
                 </div>
 
                 <div class="relative mt-auto text-base font-semibold tracking-tight flex items-center gap-2">
