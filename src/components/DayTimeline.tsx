@@ -3,17 +3,34 @@
  *
  * Důvod existence: Petr má ADHD + CPTSD + time blindness (Russell Barkley).
  * Textový seznam událostí mu nepomáhá — potřebuje čas vidět jako PROSTOR,
- * ne jako řádky. Bloky odpovídají době, barvy typu, čára teď ukazuje pozici
- * v dni.
+ * ne jako řádky. Bloky odpovídají době, barvy podle zdroje (čí to je),
+ * čára teď ukazuje pozici v dni.
  *
- * Wabi-sabi: tlumené pastely, papírový pocit, jemné rohy, žádné neonové.
- * Tmavý režim — barvy přes oklch tinty, čitelné ale klidné.
+ * KLÍČOVÉ NÁVRHOVÉ ROZHODNUTÍ:
  *
- * Long-event handling: pokud event > 4h a překrývá kratší → kreslíme ho jako
- * background s opacitou, kratší události jdou nad něj v plné barvě.
+ * 1. **Barva podle zdroje, ne typu.** Sky = Petrův kalendář, rose = partnerka,
+ *    mint = syn, butter = sdílené/pracovní/RASELINISTE. Petr potřebuje rychle
+ *    vidět ČÍ život se v dni odehrává.
+ *
+ * 2. **Překrývající události vedle sebe v sloupcích.** Žádné renderování přes
+ *    sebe — interval-scheduling algoritmus (sweep) přiřadí sloupce.
+ *
+ * 3. **Long event (>3h) co overlapuje krátkou** = background s opacitou 40 %,
+ *    krátké přes něj plně. "Celé odpoledne se něco děje, ale tady jsou
+ *    konkrétní akce uvnitř." Petr to explicitně chtěl.
+ *
+ * 4. **Mezera 1-2 px** mezi navazujícími bloky aby splývaly.
+ *
+ * 5. **Now čára** v terakotě (tlumená teplá oranžová, oklch 70% 0.14 35),
+ *    z-50 — přes všechno.
+ *
+ * 6. **Ranní hodiny ve kterých se spí** se nezobrazují. Grid začíná od
+ *    first event − 1h (zaokrouhleno na hodinu).
+ *
+ * 7. **Čas v bloku NAD názvem** (Petr: "klient potřebuje vědět kdy, pak co").
  */
 import { useEffect, useState, useMemo } from "react";
-import { MapPin, Clock, X } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 
 interface CalendarEvent {
   id: string;
@@ -29,30 +46,15 @@ interface CalendarEvent {
   allDay: boolean;
 }
 
-// Mapování typu události na pastel tint v Rašeliništi.
-// Volba: schůzky modro-šedé (sky), rodina/syn mint, partnerka růže, OOO máslové.
-function eventTint(type: string): string {
-  switch (type) {
-    case "MEETING_PRAGUE":
-    case "MEETING_HOME":
-    case "MEETING_ELSEWHERE":
-    case "MEETING_ONLINE":
-      return "sky";
-    case "PERSONAL":
-      return "lavender";
-    case "HOCKEY_SON":
-      return "mint";
-    case "PARTNER_SHIFT":
-      return "rose";
-    case "PARTNER_VACATION":
-      return "pink";
-    case "OOO_FULL":
-      return "butter";
-    case "OOO_TRAVEL_WORKING":
-      return "peach";
-    default:
-      return "sage";
-  }
+// ----- Barva podle ZDROJE (ne typu) -----
+// Petr potřebuje rychle vidět čí život se v dni odehrává.
+// V rámci rodiny lze rozlišit typ skrze sytost — zatím jednotně.
+function sourceTint(src: string): string {
+  if (src === "ICLOUD_PARTNER") return "rose";
+  if (src === "ICLOUD_SON") return "mint";
+  if (src === "GOOGLE_PRIMARY") return "sky";
+  if (src === "RASELINISTE") return "butter";
+  return "butter";
 }
 
 function sourceLabel(src: string): string {
@@ -66,8 +68,85 @@ function fmtTime(d: Date): string {
   return d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-const HOUR_PX = 64; // px per hour — kompaktní ale čitelné
+const HOUR_PX = 64; // px per hour
 const MIN_PX = HOUR_PX / 60;
+const LEFT_GUTTER_PX = 48; // šířka pro hodinové popisky vlevo
+const BLOCK_GAP_PX = 2; // mezera mezi navazujícími bloky
+const LONG_THRESHOLD_MIN = 180; // 3h — nad tím je event "long"
+
+// ----- Sweep algoritmus pro přiřazení sloupců (interval scheduling) -----
+type ColumnAssignment<T> = { event: T; column: number; totalColumns: number; clusterId: number };
+
+function assignColumns<T extends { startsAt: string; endsAt: string }>(
+  events: T[],
+): Map<T, ColumnAssignment<T>> {
+  const sorted = [...events].sort(
+    (a, b) =>
+      new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime() ||
+      new Date(a.endsAt).getTime() - new Date(b.endsAt).getTime(),
+  );
+
+  const result = new Map<T, ColumnAssignment<T>>();
+
+  // Rozděl do clusterů — souvislých řetězců overlapů. Pro každý cluster
+  // určíme totalColumns (max paralelních eventů v libovolném okamžiku).
+  let clusterId = 0;
+  let currentCluster: T[] = [];
+  let currentClusterEnd = 0;
+
+  for (const ev of sorted) {
+    const start = new Date(ev.startsAt).getTime();
+    const end = new Date(ev.endsAt).getTime();
+    if (currentCluster.length === 0 || start < currentClusterEnd) {
+      currentCluster.push(ev);
+      if (end > currentClusterEnd) currentClusterEnd = end;
+    } else {
+      // Uzavři předchozí cluster a spočítej sloupce
+      assignClusterColumns(currentCluster, clusterId, result);
+      clusterId++;
+      currentCluster = [ev];
+      currentClusterEnd = end;
+    }
+  }
+  if (currentCluster.length > 0) {
+    assignClusterColumns(currentCluster, clusterId, result);
+  }
+
+  return result;
+}
+
+function assignClusterColumns<T extends { startsAt: string; endsAt: string }>(
+  cluster: T[],
+  clusterId: number,
+  result: Map<T, ColumnAssignment<T>>,
+): void {
+  // Greedy: každému eventu přiřaď nejmenší volný sloupec
+  // (kde žádný předchozí v tom sloupci ještě nekončí)
+  const columnEnds: number[] = []; // endTime per column
+  const assignments = new Map<T, number>();
+
+  for (const ev of cluster) {
+    const start = new Date(ev.startsAt).getTime();
+    let assigned = -1;
+    for (let i = 0; i < columnEnds.length; i++) {
+      if (columnEnds[i] <= start) {
+        assigned = i;
+        break;
+      }
+    }
+    if (assigned === -1) {
+      assigned = columnEnds.length;
+      columnEnds.push(0);
+    }
+    columnEnds[assigned] = new Date(ev.endsAt).getTime();
+    assignments.set(ev, assigned);
+  }
+
+  const totalColumns = columnEnds.length;
+  for (const [ev, col] of assignments) {
+    result.set(ev, { event: ev, column: col, totalColumns, clusterId });
+  }
+}
 
 export default function DayTimeline({
   events,
@@ -79,11 +158,10 @@ export default function DayTimeline({
   const [now, setNow] = useState(() => new Date());
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // Update aktuálního času každou minutu — čára teď se posouvá v reálu.
+  // Update aktuálního času každou minutu
   useEffect(() => {
     const tick = () => setNow(new Date());
     const interval = setInterval(tick, 60_000);
-    // Hned aktualizuj při návratu na tab
     const onVisibility = () => {
       if (document.visibilityState === "visible") tick();
     };
@@ -107,32 +185,32 @@ export default function DayTimeline({
       today.getMonth() === dayStart.getMonth() &&
       today.getDate() === dayStart.getDate()
     );
-  }, [dayStart, now]);
+    // intentionally not depend on `now` — toto je per-render boolean
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayStart]);
 
-  // Filtruj jen časované eventy (allDay rendrujeme zvlášť nahoře)
-  const timedEvents = events.filter((e) => !e.allDay);
   const allDayEvents = events.filter((e) => e.allDay);
+  const timedEvents = events.filter((e) => !e.allDay);
 
-  // Pokud žádné časované eventy, fallback na "celý den 8-20"
-  const earliestStart = timedEvents.length > 0
+  // ----- Window timeline -----
+  // Petr: nezobrazovat ranní hodiny ve kterých se spí. Začni od first event - 1h.
+  const earliestStartMs = timedEvents.length > 0
     ? Math.min(...timedEvents.map((e) => new Date(e.startsAt).getTime()))
     : new Date(`${date}T08:00:00`).getTime();
-  const latestEnd = timedEvents.length > 0
+  const latestEndMs = timedEvents.length > 0
     ? Math.max(...timedEvents.map((e) => new Date(e.endsAt).getTime()))
     : new Date(`${date}T20:00:00`).getTime();
 
-  // Window timeline: 1h před nejdřívější a 1h po nejpozdější.
-  // Pokud je dnešek a aktuální čas spadá do okna, garantuj že now bude vidět.
-  let windowStart = new Date(earliestStart - 60 * 60 * 1000);
-  let windowEnd = new Date(latestEnd + 60 * 60 * 1000);
-  if (windowStart < dayStart) windowStart = dayStart;
+  let windowStart = new Date(earliestStartMs - 60 * 60 * 1000);
+  let windowEnd = new Date(latestEndMs + 60 * 60 * 1000);
   if (windowEnd > dayEnd) windowEnd = dayEnd;
+  // Pokud je dnešek a now mimo okno, posuň
   if (isToday) {
     if (now > windowEnd) windowEnd = new Date(now.getTime() + 60 * 60 * 1000);
     if (now < windowStart) windowStart = new Date(now.getTime() - 30 * 60 * 1000);
   }
 
-  // Zaokrouhli na celé hodiny pro hezkou mřížku
+  // Zaokrouhli grid na celé hodiny
   const gridStart = new Date(windowStart);
   gridStart.setMinutes(0, 0, 0);
   const gridEnd = new Date(windowEnd);
@@ -143,7 +221,7 @@ export default function DayTimeline({
   const totalMin = Math.max(60, (gridEnd.getTime() - gridStart.getTime()) / 60_000);
   const totalPx = totalMin * MIN_PX;
 
-  // Generuj hodinové popisky
+  // Hodinové popisky
   const hourLabels: Array<{ label: string; topPx: number }> = [];
   const cursor = new Date(gridStart);
   while (cursor <= gridEnd) {
@@ -155,81 +233,72 @@ export default function DayTimeline({
     cursor.setHours(cursor.getHours() + 1);
   }
 
-  // Pro každý event spočítej pozici v px + tint
-  type Layout = {
-    e: CalendarEvent;
-    topPx: number;
-    heightPx: number;
-    durationMin: number;
-    tint: string;
-    isLong: boolean; // > 4 hodin
-  };
-  const layouts: Layout[] = timedEvents.map((e) => {
-    const start = new Date(e.startsAt);
-    const end = new Date(e.endsAt);
-    const startMin = Math.max(0, (start.getTime() - gridStart.getTime()) / 60_000);
-    const endMin = Math.min(totalMin, (end.getTime() - gridStart.getTime()) / 60_000);
-    const durationMin = (end.getTime() - start.getTime()) / 60_000;
-    return {
-      e,
-      topPx: startMin * MIN_PX,
-      heightPx: Math.max(20, (endMin - startMin) * MIN_PX),
-      durationMin,
-      tint: eventTint(e.type),
-      isLong: durationMin > 240, // 4h
-    };
-  });
-
-  // Detekce overlap — long event je background, krátké přes něj
-  // Algoritmus: pro každý long zjisti jestli má překryv s kratším.
-  const longEventIds = new Set<string>();
-  for (const a of layouts) {
-    if (!a.isLong) continue;
-    const overlaps = layouts.some(
-      (b) =>
-        b.e.id !== a.e.id &&
-        !b.isLong &&
-        new Date(b.e.startsAt).getTime() < new Date(a.e.endsAt).getTime() &&
-        new Date(b.e.endsAt).getTime() > new Date(a.e.startsAt).getTime(),
+  // ----- Detekce background eventů (long >3h s overlap krátkého) -----
+  const longIds = new Set<string>(
+    timedEvents
+      .filter((e) => {
+        const dur = (new Date(e.endsAt).getTime() - new Date(e.startsAt).getTime()) / 60_000;
+        return dur > LONG_THRESHOLD_MIN;
+      })
+      .map((e) => e.id),
+  );
+  const backgroundIds = new Set<string>();
+  for (const longEv of timedEvents.filter((e) => longIds.has(e.id))) {
+    const ls = new Date(longEv.startsAt).getTime();
+    const le = new Date(longEv.endsAt).getTime();
+    const hasShortOverlap = timedEvents.some(
+      (other) =>
+        other.id !== longEv.id &&
+        !longIds.has(other.id) &&
+        new Date(other.startsAt).getTime() < le &&
+        new Date(other.endsAt).getTime() > ls,
     );
-    if (overlaps) longEventIds.add(a.e.id);
+    if (hasShortOverlap) backgroundIds.add(longEv.id);
   }
 
-  // "Now" pozice
+  // Foreground = events co půjdou do sloupců (vše kromě background)
+  const foregroundEvents = timedEvents.filter((e) => !backgroundIds.has(e.id));
+  const bgEvents = timedEvents.filter((e) => backgroundIds.has(e.id));
+
+  // Přiřaď sloupce jen FG eventům
+  const colMap = useMemo(() => assignColumns(foregroundEvents), [foregroundEvents]);
+
+  // Now pozice
   const nowMin = (now.getTime() - gridStart.getTime()) / 60_000;
   const nowPx = nowMin * MIN_PX;
   const showNow = isToday && nowMin >= 0 && nowMin <= totalMin;
 
   return (
-    <section className="glass rounded-xl p-4" style={{ ["--c" as string]: "var(--tint-sky)" }}>
+    <section className="glass rounded-xl p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Clock className="size-4" style={{ color: "var(--c)" }} />
         <h2 className="font-serif text-lg">Plán</h2>
         <span className="ml-auto text-xs font-mono text-muted-foreground">
           {events.length} {events.length === 1 ? "událost" : "události"}
         </span>
       </div>
 
-      {/* All-day události — proužky nad osou */}
+      {/* All-day proužky nad osou */}
       {allDayEvents.length > 0 && (
         <div className="space-y-1 mb-3">
-          {allDayEvents.map((e) => (
-            <button
-              key={e.id}
-              type="button"
-              onClick={() => setOpenId(openId === e.id ? null : e.id)}
-              className="w-full text-left rounded-md px-2.5 py-1.5 text-xs flex items-center gap-2 transition-colors"
-              style={{
-                background: `color-mix(in oklch, var(--tint-${eventTint(e.type)}) 14%, transparent)`,
-                border: `1px solid color-mix(in oklch, var(--tint-${eventTint(e.type)}) 30%, transparent)`,
-                color: `color-mix(in oklch, var(--tint-${eventTint(e.type)}) 90%, white)`,
-              }}
-            >
-              <span className="text-[9px] font-mono uppercase tracking-wider opacity-70">celý den</span>
-              <span className="flex-1 truncate text-foreground">{e.title}</span>
-              <span className="text-[9px] font-mono opacity-60">{sourceLabel(e.source)}</span>
-            </button>
-          ))}
+          {allDayEvents.map((e) => {
+            const tint = sourceTint(e.source);
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => setOpenId(openId === e.id ? null : e.id)}
+                className="w-full text-left rounded-md px-2.5 py-1.5 text-xs flex items-center gap-2 transition-colors"
+                style={{
+                  background: `color-mix(in oklch, var(--tint-${tint}) 14%, transparent)`,
+                  border: `1px solid color-mix(in oklch, var(--tint-${tint}) 30%, transparent)`,
+                }}
+              >
+                <span className="text-[9px] font-mono uppercase tracking-wider opacity-60">celý den</span>
+                <span className="flex-1 truncate text-foreground">{e.title}</span>
+                <span className="text-[9px] font-mono opacity-60">{sourceLabel(e.source)}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -242,114 +311,174 @@ export default function DayTimeline({
       {/* Vertikální timeline */}
       {timedEvents.length > 0 && (
         <div className="relative" style={{ height: `${totalPx}px` }}>
-          {/* Hodinové čáry + popisky */}
+          {/* Hodinové čáry — TLUMENÉ (opacity ~17%, nezakrývají bloky) */}
           {hourLabels.map((h, i) => (
             <div
               key={i}
-              className="absolute left-0 right-0 flex items-start"
+              className="absolute left-0 right-0 flex items-start pointer-events-none"
               style={{ top: `${h.topPx}px` }}
             >
-              <span className="text-[10px] font-mono text-muted-foreground/70 w-12 -translate-y-1.5 tabular shrink-0">
+              <span
+                className="text-[10px] font-mono w-12 -translate-y-1.5 tabular shrink-0"
+                style={{ color: "color-mix(in oklch, var(--foreground) 50%, transparent)" }}
+              >
                 {h.label}
               </span>
-              <div className="flex-1 border-t border-white/[0.06]" />
+              <div
+                className="flex-1 border-t"
+                style={{ borderColor: "color-mix(in oklch, var(--foreground) 8%, transparent)" }}
+              />
             </div>
           ))}
 
-          {/* Long event jako background (pokud overlapuje s kratším) */}
-          {layouts
-            .filter((l) => longEventIds.has(l.e.id))
-            .map((l) => (
+          {/* BACKGROUND events (long > 3h, levá polovina, opacita 40%) */}
+          {bgEvents.map((e) => {
+            const tint = sourceTint(e.source);
+            const start = new Date(e.startsAt);
+            const end = new Date(e.endsAt);
+            const startMin = Math.max(0, (start.getTime() - gridStart.getTime()) / 60_000);
+            const endMin = Math.min(totalMin, (end.getTime() - gridStart.getTime()) / 60_000);
+            const durHours = (end.getTime() - start.getTime()) / 3_600_000;
+            const isOpen = openId === e.id;
+            return (
               <button
-                key={`bg-${l.e.id}`}
+                key={e.id}
                 type="button"
-                onClick={() => setOpenId(openId === l.e.id ? null : l.e.id)}
-                className="absolute left-12 right-0 rounded-lg overflow-hidden text-left transition-all"
+                onClick={() => setOpenId(isOpen ? null : e.id)}
+                className="absolute rounded-lg overflow-hidden text-left transition-all hover:brightness-110 active:scale-[0.99]"
                 style={{
-                  top: `${l.topPx}px`,
-                  height: `${l.heightPx}px`,
-                  background: `color-mix(in oklch, var(--tint-${l.tint}) 12%, transparent)`,
-                  border: `1px dashed color-mix(in oklch, var(--tint-${l.tint}) 35%, transparent)`,
+                  top: `${startMin * MIN_PX + BLOCK_GAP_PX / 2}px`,
+                  height: `${(endMin - startMin) * MIN_PX - BLOCK_GAP_PX}px`,
+                  // Levá polovina: od LEFT_GUTTER do středu
+                  left: `${LEFT_GUTTER_PX}px`,
+                  width: `calc(50% - ${LEFT_GUTTER_PX / 2}px)`,
+                  background: `color-mix(in oklch, var(--tint-${tint}) 18%, transparent)`,
+                  border: `1px dashed color-mix(in oklch, var(--tint-${tint}) 35%, transparent)`,
+                  opacity: 0.55,
+                  boxShadow: isOpen
+                    ? `0 0 0 2px color-mix(in oklch, var(--tint-${tint}) 50%, transparent)`
+                    : undefined,
                 }}
               >
-                <div className="px-3 py-1.5 flex items-start gap-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-50 mt-0.5">
-                    {Math.round(l.durationMin / 60)} h
-                  </span>
-                  <span
-                    className="text-sm flex-1 truncate"
-                    style={{ color: `color-mix(in oklch, var(--tint-${l.tint}) 95%, white)` }}
+                <div className="px-2.5 py-1.5 flex flex-col gap-0.5">
+                  <div className="text-[10px] font-mono tabular font-semibold opacity-90">
+                    {fmtTime(start)}–{fmtTime(end)}
+                  </div>
+                  <div
+                    className="text-xs font-medium leading-tight line-clamp-3"
+                    style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
                   >
-                    {l.e.title}
-                  </span>
+                    {e.title}
+                  </div>
+                  <div className="text-[9px] font-mono uppercase opacity-50 mt-0.5">
+                    {Math.round(durHours)} h · {sourceLabel(e.source)}
+                  </div>
                 </div>
               </button>
-            ))}
+            );
+          })}
 
-          {/* Krátké eventy + non-overlapping long eventy v plné barvě */}
-          {layouts
-            .filter((l) => !longEventIds.has(l.e.id))
-            .map((l) => {
-              const isOpen = openId === l.e.id;
-              const showFullLabel = l.heightPx >= 28;
-              const showLocation = l.heightPx >= 56 && l.e.locationText;
-              return (
-                <button
-                  key={l.e.id}
-                  type="button"
-                  onClick={() => setOpenId(isOpen ? null : l.e.id)}
-                  className="absolute left-12 right-0 rounded-lg overflow-hidden text-left transition-all hover:brightness-110 active:scale-[0.99]"
-                  style={{
-                    top: `${l.topPx}px`,
-                    height: `${l.heightPx}px`,
-                    background: `color-mix(in oklch, var(--tint-${l.tint}) 22%, transparent)`,
-                    border: `1px solid color-mix(in oklch, var(--tint-${l.tint}) 45%, transparent)`,
-                    boxShadow: isOpen
-                      ? `0 0 0 2px color-mix(in oklch, var(--tint-${l.tint}) 60%, transparent)`
-                      : undefined,
-                  }}
-                >
-                  <div className="px-2.5 py-1 h-full flex flex-col justify-start gap-0.5">
-                    <div className="flex items-start gap-1.5">
-                      <span
-                        className="text-sm font-medium leading-tight flex-1 truncate"
-                        style={{ color: `color-mix(in oklch, var(--tint-${l.tint}) 96%, white)` }}
-                      >
-                        {l.e.title}
-                      </span>
-                      <span className="text-[9px] font-mono opacity-50 shrink-0 mt-0.5">
-                        {sourceLabel(l.e.source)}
-                      </span>
-                    </div>
-                    {showFullLabel && (
-                      <div className="text-[10px] font-mono text-muted-foreground tabular leading-tight">
-                        {fmtTime(new Date(l.e.startsAt))}–{fmtTime(new Date(l.e.endsAt))}
-                      </div>
-                    )}
-                    {showLocation && (
-                      <div className="text-[10px] text-muted-foreground flex items-center gap-1 truncate leading-tight">
-                        <MapPin className="size-2.5 shrink-0" />
-                        <span className="truncate">{l.e.locationText}</span>
-                      </div>
-                    )}
+          {/* FOREGROUND events — sloupce */}
+          {foregroundEvents.map((e) => {
+            const tint = sourceTint(e.source);
+            const start = new Date(e.startsAt);
+            const end = new Date(e.endsAt);
+            const startMin = Math.max(0, (start.getTime() - gridStart.getTime()) / 60_000);
+            const endMin = Math.min(totalMin, (end.getTime() - gridStart.getTime()) / 60_000);
+            const heightPx = Math.max(20, (endMin - startMin) * MIN_PX - BLOCK_GAP_PX);
+            const isOpen = openId === e.id;
+            const assignment = colMap.get(e);
+            const totalColumns = assignment?.totalColumns ?? 1;
+            const column = assignment?.column ?? 0;
+
+            // Jsou-li v této chvíli také background events, FG začíná v PRAVÉ
+            // polovině (50 % šířky pro long bg). Jinak FG zabírá plnou šířku
+            // od LEFT_GUTTER až k pravému okraji, dělenou počtem sloupců.
+            const overlapsBg = bgEvents.some(
+              (bg) =>
+                new Date(bg.startsAt).getTime() < end.getTime() &&
+                new Date(bg.endsAt).getTime() > start.getTime(),
+            );
+            const fgLeftPercent = overlapsBg ? 50 : 0;
+            const fgRightPercent = 100;
+            const fgWidth = (fgRightPercent - fgLeftPercent) / totalColumns;
+            const blockLeftPercent = fgLeftPercent + column * fgWidth;
+
+            const showLocation = heightPx >= 56 && e.locationText;
+
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => setOpenId(isOpen ? null : e.id)}
+                className="absolute rounded-lg overflow-hidden text-left transition-all hover:brightness-110 active:scale-[0.99]"
+                style={{
+                  top: `${startMin * MIN_PX + BLOCK_GAP_PX / 2}px`,
+                  height: `${heightPx}px`,
+                  left:
+                    overlapsBg
+                      ? `calc(${blockLeftPercent}% + 1px)`
+                      : `calc(${LEFT_GUTTER_PX}px + ${(blockLeftPercent / 100) * (100 - LEFT_GUTTER_PX / 4)}%)`,
+                  width: overlapsBg
+                    ? `calc(${fgWidth}% - 2px)`
+                    : `calc(${fgWidth}% - ${LEFT_GUTTER_PX / totalColumns}px - 1px)`,
+                  background: `color-mix(in oklch, var(--tint-${tint}) 28%, transparent)`,
+                  border: `1px solid color-mix(in oklch, var(--tint-${tint}) 50%, transparent)`,
+                  boxShadow: isOpen
+                    ? `0 0 0 2px color-mix(in oklch, var(--tint-${tint}) 65%, transparent)`
+                    : undefined,
+                }}
+              >
+                <div className="px-2 py-1 h-full flex flex-col gap-0.5 overflow-hidden">
+                  {/* ČAS NAHOŘE — Petr explicitně chtěl: kdy → co */}
+                  <div className="text-[10px] font-mono tabular font-semibold leading-tight opacity-90">
+                    {fmtTime(start)}–{fmtTime(end)}
                   </div>
-                </button>
-              );
-            })}
+                  <div
+                    className="text-xs font-medium leading-tight line-clamp-2"
+                    style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
+                  >
+                    {e.title}
+                  </div>
+                  {showLocation && (
+                    <div className="text-[10px] text-muted-foreground flex items-center gap-1 truncate leading-tight mt-auto">
+                      <MapPin className="size-2.5 shrink-0" />
+                      <span className="truncate">{e.locationText}</span>
+                    </div>
+                  )}
+                </div>
+                {/* Source badge v rohu */}
+                <span className="absolute top-1 right-1.5 text-[9px] font-mono opacity-50">
+                  {sourceLabel(e.source)}
+                </span>
+              </button>
+            );
+          })}
 
-          {/* Čára aktuálního času */}
+          {/* Now čára — terakota, přes všechno (z-50) */}
           {showNow && (
             <div
-              className="absolute left-0 right-0 pointer-events-none z-10"
-              style={{ top: `${nowPx}px` }}
+              className="absolute left-0 right-0 pointer-events-none"
+              style={{ top: `${nowPx}px`, zIndex: 50 }}
             >
               <div className="flex items-center">
-                <span className="text-[10px] font-mono font-bold text-[var(--tint-rose)] w-12 -translate-y-2 tabular shrink-0">
+                <span
+                  className="text-[10px] font-mono font-bold w-12 -translate-y-2 tabular shrink-0"
+                  style={{ color: "oklch(72% 0.14 35)" }}
+                >
                   {fmtTime(now)}
                 </span>
                 <div className="flex-1 flex items-center">
-                  <div className="size-2 rounded-full bg-[var(--tint-rose)] -translate-y-[3px]" />
-                  <div className="flex-1 border-t-2 border-[var(--tint-rose)]" />
+                  <div
+                    className="size-2 rounded-full -translate-y-[3px]"
+                    style={{ background: "oklch(72% 0.14 35)" }}
+                  />
+                  <div
+                    className="flex-1"
+                    style={{
+                      borderTop: "2px solid oklch(72% 0.14 35)",
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -357,11 +486,11 @@ export default function DayTimeline({
         </div>
       )}
 
-      {/* Detail vybrané události — bottom sheet style, mobilní friendly */}
+      {/* Detail */}
       {openId && (() => {
         const ev = events.find((e) => e.id === openId);
         if (!ev) return null;
-        const tint = eventTint(ev.type);
+        const tint = sourceTint(ev.source);
         const start = new Date(ev.startsAt);
         const end = new Date(ev.endsAt);
         return (
@@ -373,12 +502,17 @@ export default function DayTimeline({
             }}
           >
             <div className="flex items-start justify-between gap-3">
-              <h3
-                className="font-serif text-lg leading-tight"
-                style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
-              >
-                {ev.title}
-              </h3>
+              <div>
+                <div className="text-xs font-mono tabular font-semibold mb-0.5" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 90%, white)` }}>
+                  {ev.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
+                </div>
+                <h3
+                  className="font-serif text-lg leading-tight"
+                  style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
+                >
+                  {ev.title}
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setOpenId(null)}
@@ -389,10 +523,6 @@ export default function DayTimeline({
               </button>
             </div>
             <div className="text-xs font-mono text-muted-foreground tabular flex flex-wrap gap-x-3 gap-y-1">
-              <span>
-                {ev.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
-              </span>
-              <span>·</span>
               <span>{sourceLabel(ev.source)}</span>
               <span>·</span>
               <span>{ev.type.toLowerCase().replace(/_/g, " ")}</span>
@@ -415,6 +545,28 @@ export default function DayTimeline({
           </div>
         );
       })()}
+
+      {/* Legenda zdrojů — pomáhá si rychle namapovat barvy */}
+      {events.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-white/[0.06] flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-muted-foreground">
+          <LegendDot tint="sky" label="Petr" />
+          <LegendDot tint="rose" label="partnerka" />
+          <LegendDot tint="mint" label="syn" />
+          <LegendDot tint="butter" label="ostatní" />
+        </div>
+      )}
     </section>
+  );
+}
+
+function LegendDot({ tint, label }: { tint: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span
+        className="inline-block size-2 rounded-sm"
+        style={{ background: `color-mix(in oklch, var(--tint-${tint}) 50%, transparent)` }}
+      />
+      {label}
+    </span>
   );
 }
