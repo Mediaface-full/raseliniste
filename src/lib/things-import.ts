@@ -28,6 +28,11 @@ const baseItem = z.object({
   notes: z.string().max(20000).nullable().optional(),
 });
 
+const subtaskItem = z.object({
+  title: z.string().min(1).max(500),
+  notes: z.string().max(20000).nullable().optional(),
+});
+
 const migrateItem = baseItem.extend({
   decision: z.literal("migrate"),
   targetProject: z.string().min(1),
@@ -35,6 +40,12 @@ const migrateItem = baseItem.extend({
   targetLabels: z.array(z.string()).default([]),
   targetDue: z.string().nullable().optional(),
   targetPriority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  // Volitelné subtasks. V Todoistu se vytvoří jako podúkoly s parent_id =
+  // Todoist ID právě vytvořeného parent tasku. Dědí projekt, priority,
+  // labels od parenta. Vlastní due/priority subtasků zatím nepodporujeme —
+  // pokud potřeba, dá se rozšířit. Idempotence: stejně jako u parent (status
+  // guard na endpointu — re-run importu není možný).
+  subtasks: z.array(subtaskItem).optional().default([]),
 });
 
 const wishlistItem = baseItem.extend({
@@ -328,10 +339,58 @@ export async function executeImport(importId: string): Promise<void> {
             data: { todoistTaskId: todoistTask.id, pushedAt: new Date() },
           });
 
+          // Subtasks — vytvoř každý jako podúkol s parent_id = todoistTask.id.
+          // Dědí projekt + priority + labels od parenta. Selhání jednoho
+          // subtasku nezhodí parent flow — zalogujeme do errors a jedeme dál.
+          const subtaskErrors: string[] = [];
+          let subtasksPushed = 0;
+          for (const sub of item.subtasks ?? []) {
+            try {
+              const subTask = await prisma.task.create({
+                data: {
+                  userId,
+                  title: sub.title,
+                  notes: sub.notes?.trim() || null,
+                  tags: item.targetLabels ?? [],
+                  priority: curatedPriorityToTaskLevel(item.targetPriority),
+                  status: "open",
+                  source: "things_import",
+                  todoistProjectId: projectId,
+                  parentId: task.id,
+                },
+              });
+              const subTodoist = await createTask(todoistToken, {
+                content: sub.title.slice(0, 500),
+                description: sub.notes?.trim() || undefined,
+                parent_id: todoistTask.id,
+                priority: curatedPriorityToTodoistApi(item.targetPriority),
+                labels: item.targetLabels ?? [],
+              });
+              await prisma.task.update({
+                where: { id: subTask.id },
+                data: { todoistTaskId: subTodoist.id, pushedAt: new Date() },
+              });
+              subtasksPushed++;
+            } catch (subErr) {
+              const sm = subErr instanceof Error ? subErr.message : String(subErr);
+              subtaskErrors.push(`subtask "${sub.title.slice(0, 60)}": ${sm.slice(0, 150)}`);
+              errors.push({
+                thingsUuid: `${item.thingsUuid}#sub`,
+                title: `[subtask] ${sub.title}`,
+                error: sm,
+              });
+            }
+          }
+
+          const totalSubs = item.subtasks?.length ?? 0;
+          const pushResult = subtaskErrors.length === 0
+            ? (totalSubs > 0 ? `ok (+${subtasksPushed} subtasks)` : "ok")
+            : `partial: parent ok, ${subtasksPushed}/${totalSubs} subtasks; ${subtaskErrors.join("; ").slice(0, 400)}`;
+
           await prisma.thingsImportItem.update({
             where: { id: dbItem.id },
             data: {
-              pushResult: "ok",
+              pushResult,
               pushedTaskId: todoistTask.id,
               pushedAt: new Date(),
             },
