@@ -148,7 +148,8 @@ async function upsertEvent(
   });
 
   if (!existing) {
-    await prisma.calendarEvent.create({ data });
+    const created = await prisma.calendarEvent.create({ data });
+    void extractPrepInBackground(created.id, title, description);
     return "inserted";
   }
   // Pokud etag se nezměnil, jen touch lastSyncedAt
@@ -160,7 +161,36 @@ async function upsertEvent(
     return "skipped";
   }
   await prisma.calendarEvent.update({ where: { id: existing.id }, data });
+  // Etag se změnil = description možná také → re-extract prep
+  void extractPrepInBackground(existing.id, title, description);
   return "updated";
+}
+
+/**
+ * Fire-and-forget extrakce prep z popisu události. Nevolá se synchronně,
+ * aby sync cyklus nestrávil 0.5s na každé události. Při chybě jen loguje.
+ */
+async function extractPrepInBackground(eventId: string, title: string, description: string | null): Promise<void> {
+  if (!description || !description.trim()) {
+    // Description prázdný — vyčisti případné staré prep (Petr smazal popis)
+    try {
+      await prisma.calendarEvent.update({
+        where: { id: eventId },
+        data: { prepNote: null, itemsToBring: [] },
+      });
+    } catch { /* ignore */ }
+    return;
+  }
+  try {
+    const { extractCalendarPrep } = await import("./calendar-prep-ai");
+    const prep = await extractCalendarPrep({ title, description });
+    await prisma.calendarEvent.update({
+      where: { id: eventId },
+      data: { prepNote: prep.prepNote, itemsToBring: prep.itemsToBring },
+    });
+  } catch (e) {
+    console.warn(`[google-calendar prep ${eventId}]`, e instanceof Error ? e.message : String(e));
+  }
 }
 
 function parseEventDate(d: calendar_v3.Schema$EventDateTime | undefined): Date | null {

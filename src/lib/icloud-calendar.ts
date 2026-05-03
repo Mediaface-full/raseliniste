@@ -445,11 +445,35 @@ async function upsertOne(
   });
 
   if (!existing) {
-    await prisma.calendarEvent.create({ data });
+    const created = await prisma.calendarEvent.create({ data });
+    void extractPrepInBackground(created.id, title, description);
     return "inserted";
   }
   await prisma.calendarEvent.update({ where: { id: existing.id }, data });
+  void extractPrepInBackground(existing.id, title, description);
   return "updated";
+}
+
+async function extractPrepInBackground(eventId: string, title: string, description: string | null): Promise<void> {
+  if (!description || !description.trim()) {
+    try {
+      await prisma.calendarEvent.update({
+        where: { id: eventId },
+        data: { prepNote: null, itemsToBring: [] },
+      });
+    } catch { /* ignore */ }
+    return;
+  }
+  try {
+    const { extractCalendarPrep } = await import("./calendar-prep-ai");
+    const prep = await extractCalendarPrep({ title, description });
+    await prisma.calendarEvent.update({
+      where: { id: eventId },
+      data: { prepNote: prep.prepNote, itemsToBring: prep.itemsToBring },
+    });
+  } catch (e) {
+    console.warn(`[icloud-calendar prep ${eventId}]`, e instanceof Error ? e.message : String(e));
+  }
 }
 
 function isAllDayEvent(event: ICAL.Event): boolean {
