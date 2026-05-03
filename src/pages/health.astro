@@ -13,11 +13,48 @@ const user = await prisma.user.findUnique({
 });
 if (!user) return Astro.redirect("/login");
 
-// Rychlý metadata pro hlavičku — kolik je v DB celkem záznamů
-const [totalMetrics, totalEcgs] = await Promise.all([
+// Rychlý metadata pro hlavičku — kolik je v DB celkem záznamů + last import
+const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+const [totalMetrics, totalEcgs, lastRecorded, lastImport, last24h] = await Promise.all([
   prisma.healthMetric.count({ where: { userId: session.uid } }),
   prisma.healthEcg.count({ where: { userId: session.uid } }),
+  prisma.healthMetric.findFirst({
+    where: { userId: session.uid },
+    orderBy: { recordedAt: "desc" },
+    select: { recordedAt: true },
+  }),
+  prisma.healthMetric.findFirst({
+    where: { userId: session.uid },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  }),
+  prisma.healthMetric.count({
+    where: { userId: session.uid, createdAt: { gte: since24h } },
+  }),
 ]);
+
+const fmtRel = (d: Date | null | undefined): string => {
+  if (!d) return "—";
+  const min = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (min < 1) return "právě teď";
+  if (min < 60) return `před ${min} min`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `před ${hr} h`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `před ${day} dny`;
+  return d.toLocaleDateString("cs-CZ");
+};
+
+const fmtFull = (d: Date | null | undefined): string =>
+  d ? d.toLocaleString("cs-CZ") : "—";
+
+// Tint: zelená pokud import proběhl <30h, žlutá <72h, červená déle
+const lastImportAt = lastImport?.createdAt ?? null;
+const importAgeHr = lastImportAt
+  ? (Date.now() - lastImportAt.getTime()) / 3_600_000
+  : Infinity;
+const importTint =
+  importAgeHr < 30 ? "sage" : importAgeHr < 72 ? "butter" : "rose";
 ---
 
 <Shell
@@ -33,11 +70,45 @@ const [totalMetrics, totalEcgs] = await Promise.all([
           Data z Apple Health přes Health Auto Export. Automaticky se doplňují z iPhonu.
         </p>
       </div>
-      <div class="text-xs font-mono text-muted-foreground tabular">
+      <div class="text-xs font-mono text-muted-foreground tabular text-right">
         <span class="text-foreground">{totalMetrics.toLocaleString("cs-CZ")}</span> metrik ·
         <span class="text-foreground">{totalEcgs}</span> EKG v DB
       </div>
     </div>
+
+    {/* Status posledního importu — Petr potřebuje vědět, jestli auto-export funguje */}
+    <section
+      class="glass rounded-xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-4"
+      style={`--c: var(--tint-${importTint});`}
+    >
+      <div>
+        <div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono mb-1">
+          Poslední import
+        </div>
+        <div class="text-lg font-serif" style="color: var(--c);">{fmtRel(lastImportAt)}</div>
+        <div class="text-[11px] font-mono text-muted-foreground mt-0.5 tabular">
+          {fmtFull(lastImportAt)}
+        </div>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono mb-1">
+          Nejnovější měření
+        </div>
+        <div class="text-lg font-serif">{fmtRel(lastRecorded?.recordedAt)}</div>
+        <div class="text-[11px] font-mono text-muted-foreground mt-0.5 tabular">
+          {fmtFull(lastRecorded?.recordedAt)}
+        </div>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono mb-1">
+          Nových za 24 h
+        </div>
+        <div class="text-lg font-serif tabular">{last24h.toLocaleString("cs-CZ")}</div>
+        <div class="text-[11px] font-mono text-muted-foreground mt-0.5">
+          <a href="/settings/ingest" class="hover:underline">napojení Health →</a>
+        </div>
+      </div>
+    </section>
 
     <HealthDashboard client:load />
   </div>
