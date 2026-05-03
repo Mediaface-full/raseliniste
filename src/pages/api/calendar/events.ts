@@ -25,7 +25,7 @@ export const GET: APIRoute = async ({ cookies, url }) => {
   const fromDate = new Date(from);
   const toDate = new Date(to);
 
-  const events = await prisma.calendarEvent.findMany({
+  const rawEvents = await prisma.calendarEvent.findMany({
     where: {
       deletedRemotely: false,
       AND: [{ endsAt: { gte: fromDate } }, { startsAt: { lte: toDate } }],
@@ -37,7 +37,22 @@ export const GET: APIRoute = async ({ cookies, url }) => {
     take: 500,
   });
 
-  return Response.json({ events });
+  // Dedup: stejný (source, title, startsAt, endsAt) = duplikát.
+  // Hack ve view, root cause (recurring expansion / duplicit sync) je
+  // vyřešitelný v sync logice — tohle drží UI čisté. Stejný pattern jako
+  // /day/[date].astro (commit 08ab4f9).
+  const seen = new Set<string>();
+  const events = rawEvents.filter((e) => {
+    const key = `${e.source}|${e.title}|${e.startsAt.getTime()}|${e.endsAt.getTime()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return Response.json({
+    events,
+    dedupedCount: rawEvents.length - events.length,
+  });
 };
 
 /**
