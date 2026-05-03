@@ -6,22 +6,24 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/HANDOFF-2026-05-02-vecer.md`** ← **PRIMÁRNÍ ZDROJ pro novou session** (stav, pending TODO, kritické incidenty z předchozí session, push instrukce)
+1. **`INSTRUKCE/HANDOFF-2026-05-03.md`** ← **PRIMÁRNÍ ZDROJ pro novou session**
+   - Stav 23+ commitů čekajících na push
+   - Šest mých chyb z 2026-05-02 (mé chybné předpoklady o Todoist API)
+   - Push + deploy instrukce krok-za-krokem
+   - Kompletní TODO seznam (16 položek, vysoká → nice-to-have)
+   - Klíčové komponenty (rychlá orientace)
+   - Princip „Petr používá Todoist jako primary tool"
+   - Pravidla komunikace s Petrem (CPTSD, ADHD)
 2. `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
-3. `INSTRUKCE/04-todo-list.md` — co se má dělat (kromě toho co je v HANDOFFu)
+3. `INSTRUKCE/05-styl-prace.md` — komunikace
+4. `INSTRUKCE/03-moduly.md` — moduly, URL, status (rozšířeno 2026-05-02)
+5. `INSTRUKCE/04-todo-list.md` — manuální DSM akce
 
-**Tento CLAUDE.md je z dubna 2026 a může být v některých detailech zastaralý** — `INSTRUKCE/` se aktualizuje průběžně, `HANDOFF-*.md` jsou freshest.
+**Tento CLAUDE.md je z dubna 2026 a v některých detailech zastaralý** — `HANDOFF-*.md` jsou freshest.
 
-Plný onboarding seznam:
-- `INSTRUKCE/HANDOFF-2026-05-02-vecer.md` — **kritické**, čti první
-- `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
-- `INSTRUKCE/01-aktualni-stav.md` — recent commits
-- `INSTRUKCE/02-architektura.md` — stack
-- `INSTRUKCE/03-moduly.md` — moduly, URL, status (rozšířeno 2026-05-02)
-- `INSTRUKCE/04-todo-list.md` — TODO seznam
-- `INSTRUKCE/05-styl-prace.md` — komunikace
-- `INSTRUKCE/06-troubleshooting.md` — známé pasti
-- `INSTRUKCE/07-resources.md` — kde co je
+Starší HANDOFFs (zaarchivovány, nečíst pro orientaci):
+- `INSTRUKCE/HANDOFF-2026-05-02-vecer.md` (předchůdce, plně nahrazeno aktuálním)
+- `INSTRUKCE/HANDOFF-bwmys-viz.md` (B&W myš vizualizace, dokončeno)
 
 ---
 
