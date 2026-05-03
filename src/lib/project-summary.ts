@@ -22,6 +22,10 @@ export async function summarizeProject(params: {
   projectName: string;
   projectDescription: string | null;
   recordings: SummaryRecording[];
+  // Per-projekt override system prompty. Pokud vyplněn, použije se místo
+  // defaultního "senior projektový analytik" promptu. Petr může psát volně —
+  // tady se nevrací JSON, jen markdown.
+  customPrompt?: string | null;
 }): Promise<{ text: string; model: string; recordingsIncluded: number; briefsIncluded: number }> {
   if (params.recordings.length === 0) {
     return { text: "Projekt zatím neobsahuje žádné záznamy.", model: ANALYSIS_MODEL, recordingsIncluded: 0, briefsIncluded: 0 };
@@ -71,7 +75,11 @@ export async function summarizeProject(params: {
 
   const recordingsBundle = sections.join("\n");
 
-  const prompt = `Jsi senior projektový analytik. Projdi všechny dostupné podklady projektu „${params.projectName}" a vytvoř pro Gideona strukturovaný **stav projektu** v markdownu.
+  // Pokud má projekt vlastní prompt, použije se on (Petr v UI). Default ↓ jinak.
+  const customTrimmed = params.customPrompt?.trim();
+  const useCustom = customTrimmed && customTrimmed.length > 20;
+
+  const defaultPrompt = `Jsi senior projektový analytik. Projdi všechny dostupné podklady projektu „${params.projectName}" a vytvoř pro Gideona strukturovaný **stav projektu** v markdownu.
 
 ${params.projectDescription ? `Kontext: ${params.projectDescription}\n\n` : ""}
 Tvoje úkoly:
@@ -116,6 +124,22 @@ Vrať POUZE markdown bez úvodního komentáře. Začni rovnou nadpisem \`# Stav
 PODKLADY:
 
 ${recordingsBundle}`;
+
+  // Custom prompt — Petr napsal vlastní zadání. Připojíme jen kontext + podklady.
+  const customPromptFull = useCustom
+    ? `${customTrimmed}
+
+KONTEXT:
+- Název projektu: „${params.projectName}"
+${params.projectDescription ? `- Popis: ${params.projectDescription}\n` : ""}
+PODKLADY (záznamy a jejich AI rozbory):
+
+${recordingsBundle}
+
+Vrať POUZE markdown bez úvodního komentáře. Použij češtinu.`
+    : null;
+
+  const prompt = customPromptFull ?? defaultPrompt;
 
   const genai = getGemini();
   const response = await callTracked({

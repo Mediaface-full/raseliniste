@@ -16,6 +16,7 @@ interface ProjectDetail {
   extractionPrompt: string | null;
   studnaStandardPrompt: string | null;
   studnaBriefPrompt: string | null;
+  projectSummaryPrompt: string | null;
   analysisModel: string | null;
   includeInDigest: boolean;
   archivedAt: string | null;
@@ -828,6 +829,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
   const [extractionPrompt, setExtractionPrompt] = useState(project.extractionPrompt ?? "");
   const [studnaStandardPrompt, setStudnaStandardPrompt] = useState(project.studnaStandardPrompt ?? "");
   const [studnaBriefPrompt, setStudnaBriefPrompt] = useState(project.studnaBriefPrompt ?? "");
+  const [projectSummaryPrompt, setProjectSummaryPrompt] = useState(project.projectSummaryPrompt ?? "");
   const [analysisModel, setAnalysisModel] = useState<string>(project.analysisModel ?? "");
   const [showCustomPrompts, setShowCustomPrompts] = useState(
     Boolean(project.studnaStandardPrompt || project.studnaBriefPrompt),
@@ -848,6 +850,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           description: description.trim() || null,
           extractionPrompt: extractionPrompt.trim() || null,
           analysisModel: analysisModel || null,
+          projectSummaryPrompt: projectSummaryPrompt.trim() || null,
           studnaStandardPrompt: studnaStandardPrompt.trim() || null,
           studnaBriefPrompt: studnaBriefPrompt.trim() || null,
           includeInDigest,
@@ -901,6 +904,38 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             rows={5}
             placeholder="Pro tento projekt zaměř pozornost zejména na…"
             className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
+          />
+        </div>
+
+        {/* Vlastní prompt pro Souhrn projektu (volá tlačítko "Souhrn projektu"
+            v detailu — agregát napříč všemi nahrávkami, vrací markdown).
+            Pozor: NENÍ to per-recording analýza, je to mapa CELÉHO projektu. */}
+        <div className="rounded-md border border-[var(--tint-rose)]/25 bg-[var(--tint-rose)]/[0.04] p-3">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] uppercase tracking-wider text-[var(--tint-rose)] font-mono">
+              ✨ Vlastní prompt pro Souhrn projektu
+            </label>
+            {projectSummaryPrompt && (
+              <button
+                type="button"
+                onClick={() => setProjectSummaryPrompt("")}
+                className="text-[10px] font-mono text-muted-foreground hover:text-destructive"
+              >
+                Resetovat na default
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground/80 leading-relaxed mb-2">
+            Sem patří „mapa projektu", „index osob", „bílá místa", „časová osa" atd. Spustí se kliknutím na
+            tlačítko <strong>Souhrn projektu</strong>. Pracuje s <strong>VŠEMI</strong> zpracovanými nahrávkami v projektu, ne s jednou.
+            Vrací markdown — <strong>nemusíš</strong> řešit JSON schéma. Petr pak může text stáhnout.
+          </p>
+          <textarea
+            value={projectSummaryPrompt}
+            onChange={(e) => setProjectSummaryPrompt(e.target.value)}
+            rows={10}
+            placeholder="Prázdné = použije se default „senior projektový analytik" prompt. Sem napiš co od souhrnu chceš (mapu kapitol, index osob s #, bílá místa, časovou osu, …)."
+            className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-xs font-mono resize-y"
           />
         </div>
 

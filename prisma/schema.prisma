@@ -573,6 +573,11 @@ model ProjectBox {
   // použije se na všechny analýzy v projektu. Stage 1 (přepis) je vždy Flash.
   analysisModel     String?
 
+  // Per-projekt vlastní prompt pro Souhrn projektu (tlačítko v detail UI volá
+  // summarizeProject — agregát napříč všemi nahrávkami). Null = default prompt
+  // v project-summary.ts. Vrací markdown, ne JSON — Petr může psát volně.
+  projectSummaryPrompt String? @db.Text
+
   // Notifikace v 18:00 cron — pokud false, projekt se v digestu vynechá
   includeInDigest   Boolean  @default(true)
 

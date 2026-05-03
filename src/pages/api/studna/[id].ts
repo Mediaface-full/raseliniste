@@ -13,6 +13,7 @@ const PatchBody = z.object({
   extractionPrompt: z.string().max(8000).nullable().optional(),
   studnaStandardPrompt: z.string().max(16000).nullable().optional(),
   studnaBriefPrompt: z.string().max(16000).nullable().optional(),
+  projectSummaryPrompt: z.string().max(16000).nullable().optional(),
   // Per-projekt Gemini model pro Stage 2 analýzu. Whitelist hodnot — null = default.
   analysisModel: z.enum(["gemini-2.5-flash", "gemini-2.5-pro"]).nullable().optional(),
   includeInDigest: z.boolean().optional(),
@@ -90,6 +91,9 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
   }
   if (body.studnaBriefPrompt !== undefined) {
     data.studnaBriefPrompt = body.studnaBriefPrompt?.trim() || null;
+  }
+  if (body.projectSummaryPrompt !== undefined) {
+    data.projectSummaryPrompt = body.projectSummaryPrompt?.trim() || null;
   }
   if (body.analysisModel !== undefined) data.analysisModel = body.analysisModel;
   if (body.includeInDigest !== undefined) data.includeInDigest = body.includeInDigest;

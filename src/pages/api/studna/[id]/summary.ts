@@ -44,6 +44,7 @@ export const POST: APIRoute = async ({ cookies, params }) => {
     const result = await summarizeProject({
       projectName: project.name,
       projectDescription: project.description,
+      customPrompt: project.projectSummaryPrompt,
       recordings: recordings.map((r) => ({
         authorName: r.authorName,
         type: r.type as "STANDARD" | "BRIEF",
