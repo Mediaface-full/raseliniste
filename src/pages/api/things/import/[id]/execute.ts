@@ -2,6 +2,8 @@ import type { APIRoute } from "astro";
 import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
 import { executeImport, preflightProjectCheck, type CuratedFileT } from "@/lib/things-import";
+import { createProject } from "@/lib/todoist";
+import { decryptSecret } from "@/lib/crypto";
 
 export const prerender = false;
 
@@ -14,6 +16,11 @@ export const prerender = false;
  *
  * Idempotentní: pokud status != "uploaded" (např. už proběhl),
  * vrátí 409.
+ *
+ * Auto-create chybějících projektů (NOVÉ 05-03):
+ * Pokud import chce posílat tasky do projektů co nejsou v TodoistProjectMirror,
+ * sami je v Todoistu vytvoříme + zapíšeme do mirroru. Petr to už nemusí dělat
+ * ručně. Pokud Todoist API selže, vrátíme 422 s detaily co se pokazilo.
  */
 export const POST: APIRoute = async ({ cookies, params }) => {
   const session = await readSession(cookies);
@@ -33,24 +40,75 @@ export const POST: APIRoute = async ({ cookies, params }) => {
     );
   }
 
-  // Pre-flight check projektů — pokud chybí, blokovat se srozumitelnou hláškou
+  // Pre-flight: zjistit chybějící projekty
   const raw = imp.rawJson as unknown as CuratedFileT;
   const missingProjects = await preflightProjectCheck(session.uid, raw.items);
+
+  const createdProjects: string[] = [];
+  const failedProjects: { name: string; error: string }[] = [];
+
   if (missingProjects.length > 0) {
-    return Response.json(
-      {
-        error: "PROJECTS_MISSING",
-        message:
-          `V Todoistu chybí ${missingProjects.length === 1 ? "projekt" : "projekty"}: ${missingProjects.map((p) => `"${p}"`).join(", ")}. ` +
-          `Založ ${missingProjects.length === 1 ? "ho" : "je"} v Todoistu (nebo přes /settings/integrations → Bulk import) a spusť scheduler/sync, ať se ${missingProjects.length === 1 ? "natáhne" : "natáhnou"} do Todoist project mirroru. Pak zkus migraci znovu.`,
-        missingProjects,
-      },
-      { status: 422 },
-    );
+    // Načti Todoist token
+    const integration = await prisma.userIntegration.findUnique({
+      where: { userId_provider: { userId: session.uid, provider: "todoist" } },
+    });
+    if (!integration) {
+      return Response.json(
+        { error: "TODOIST_NOT_CONFIGURED", message: "Todoist integrace není nakonfigurovaná. Připoj ji v /settings/integrations." },
+        { status: 400 },
+      );
+    }
+    const token = decryptSecret({
+      enc: integration.tokenEnc,
+      iv: integration.tokenIv,
+      tag: integration.tokenTag,
+    });
+
+    // Vytvoř každý chybějící projekt v Todoistu + v mirroru
+    for (const projectName of missingProjects) {
+      try {
+        const created = await createProject(token, { name: projectName });
+        await prisma.todoistProjectMirror.create({
+          data: {
+            userId: session.uid,
+            todoistId: created.id,
+            name: created.name,
+            color: created.color ?? null,
+            isInbox: created.is_inbox_project ?? false,
+            parentId: created.parent_id ?? null,
+          },
+        });
+        createdProjects.push(projectName);
+      } catch (e) {
+        failedProjects.push({
+          name: projectName,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    if (failedProjects.length > 0) {
+      return Response.json(
+        {
+          error: "PROJECTS_CREATE_FAILED",
+          message:
+            `Nepodařilo se vytvořit projekty v Todoistu: ${failedProjects.map((p) => `"${p.name}" (${p.error})`).join(", ")}. ` +
+            `Vytvořené: ${createdProjects.length}/${missingProjects.length}.`,
+          createdProjects,
+          failedProjects,
+        },
+        { status: 422 },
+      );
+    }
   }
 
   // Fire-and-forget — module-level pinning v lib/things-import drží referenci
   void executeImport(id);
 
-  return Response.json({ ok: true, importId: id, status: "executing" });
+  return Response.json({
+    ok: true,
+    importId: id,
+    status: "executing",
+    autoCreatedProjects: createdProjects,
+  });
 };
