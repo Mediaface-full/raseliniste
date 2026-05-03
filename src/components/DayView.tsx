@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
+import DayTimeline from "./DayTimeline";
 
 interface CalendarEvent {
   id: string;
@@ -258,23 +259,9 @@ export default function DayView({ initial }: { initial: Initial }) {
         </div>
       </section>
 
-      {/* Plán */}
-      <section className="glass rounded-xl p-5" style={{ ["--c" as string]: "var(--tint-sky)" }}>
-        <div className="flex items-center gap-2 mb-3">
-          <CalIcon className="size-4" style={{ color: "var(--c)" }} />
-          <h2 className="font-serif text-lg">Plán</h2>
-          <span className="ml-auto text-xs font-mono text-muted-foreground">
-            {events.length} {events.length === 1 ? "událost" : "události"}
-          </span>
-        </div>
-        {events.length === 0 ? (
-          <div className="text-sm text-muted-foreground italic">Žádné události.</div>
-        ) : (
-          <div className="space-y-2">
-            {events.map((e) => <EventRow key={e.id} event={e} />)}
-          </div>
-        )}
-      </section>
+      {/* Plán — vertikální timeline (DayTimeline). Důvod: Petr má time blindness,
+          textový seznam je pro něj horší než vizuální plocha s bloky. */}
+      <DayTimeline events={events} date={date} />
 
       {/* Pravidla */}
       {violations.length > 0 && (
