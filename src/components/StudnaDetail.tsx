@@ -197,6 +197,24 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
     }
   }
 
+  async function markError(recId: string) {
+    if (!confirm("Označit zpracování jako chybu? Pak budeš moct kliknout Regenerovat a zkusit to znovu.")) return;
+    setBusy(recId);
+    try {
+      const res = await fetch(`/api/studna/recordings/${recId}/mark-error`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        onRefresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Akce selhala.");
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Inline recorder — nahrávej rovnou bez odchodu na /studna/nahravka */}
@@ -221,6 +239,7 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
               onTogglePin={() => togglePin(r.id, r.isPinned)}
               onDelete={() => remove(r.id)}
               onRegenerate={() => regenerate(r.id)}
+              onMarkError={() => markError(r.id)}
             />
           ))}
         </div>
@@ -235,12 +254,14 @@ function RecordingCard({
   onTogglePin,
   onDelete,
   onRegenerate,
+  onMarkError,
 }: {
   recording: ProjectDetail["recordings"][number];
   busy: boolean;
   onTogglePin: () => void;
   onRegenerate: () => void;
   onDelete: () => void;
+  onMarkError: () => void;
 }) {
   const [showTranscript, setShowTranscript] = useState(false);
   const [showAudio, setShowAudio] = useState(false);
@@ -285,9 +306,20 @@ function RecordingCard({
               <span className="text-[10px] uppercase font-mono tracking-wider text-destructive">chyba zpracování</span>
             )}
             {recording.status === "processing" && (
-              <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground flex items-center gap-1">
-                <Loader2 className="size-3 animate-spin" /> zpracovávám
-              </span>
+              <>
+                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="size-3 animate-spin" /> zpracovávám
+                </span>
+                <button
+                  type="button"
+                  onClick={onMarkError}
+                  disabled={busy}
+                  className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground hover:text-destructive underline-offset-2 hover:underline disabled:opacity-50"
+                  title="Zrušit zpracování (pokud uvázlo) — pak můžeš Regenerovat"
+                >
+                  zrušit
+                </button>
+              </>
             )}
           </div>
           <div className="text-xs font-mono text-muted-foreground mt-0.5">
