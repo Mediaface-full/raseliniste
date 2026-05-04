@@ -82,7 +82,9 @@ export async function generateBriefing(
   const events = await prisma.calendarEvent.findMany({
     where: {
       deletedRemotely: false,
-      AND: [{ endsAt: { gte: dayStart } }, { startsAt: { lte: dayEnd } }],
+      // `gt` (NE `gte`) — Google all-day má endsAt exclusive, jinak by sobotní
+      // celodenka spadla i do nedělního briefingu
+      AND: [{ endsAt: { gt: dayStart } }, { startsAt: { lte: dayEnd } }],
     },
     orderBy: { startsAt: "asc" },
   });

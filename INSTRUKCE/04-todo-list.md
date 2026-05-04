@@ -1,4 +1,26 @@
-# 04 — TODO list (2026-04-30 večer)
+# 04 — TODO list (aktualizováno 2026-05-04 večer)
+
+## ✅ Hotovo v session 2026-05-04 (přesunuto sem z aktivních)
+
+- **Kalendářové pohledy Den/Týden/Měsíc** se sjednocenou estetikou (DayTimeline, WeekView, MonthView)
+- **Rituály**: 3 default + custom přes `/settings/ritualy`, editovatelné popisky, render v Day/Week peach + dashed
+- **Výročí** zobrazené v Day/Week/Month jako virtual events (pink + 🕯)
+- **Topbar quick-access** Den/Týden/Měsíc na všech Shell stránkách
+- **Fullscreen mód** `?naplno=1` — Base layout, šipky listování zachovávají query string
+- **Tisk** `window.print()` + print CSS v global.css (A4 landscape)
+- **Health analýza** na samostatné stránce `/health/analyza/<id>` (modal nahrazen)
+- **Health upload souboru** přes web (`/api/health/upload-file`)
+- **Status posledního importu** na `/health` (3 dlaždice)
+- **Studna per-projekt model + custom souhrn prompt** (full transcripts pro kreativní)
+- **Studna guest note** — textový vzkaz vedle nahrávky
+- **Studna mark-error** — záchrana stuck recordings
+- **Things import auto-create projektů** + subtasks
+- **Calendar duplicate cleanup** + **all-day timestamp normalize** (`/settings/calendar-cleanup`)
+- **Petr → Gideon** napříč user-facing texty
+- **Mise dlaždice** (raketka) + **Myši** (vlastní SVG) v `/start`
+- **/calendar** redirect na `/calendar/tyden`
+
+
 
 ## 🟧 Aktivní (čeká na zpracování)
 

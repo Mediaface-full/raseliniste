@@ -1,9 +1,16 @@
 # Handoff — pro další Claude session
 
-**Datum:** 2026-04-28
-**Stav:** Kalendář fáze 1a hotová, čeká na deploy + autorizaci. Rozjedeme fázi 1b.
+> **⚠ ZASTARALÉ.** Aktuální stav najdeš v **`INSTRUKCE/HANDOFF-2026-05-04.md`** (nejnovější — kalendářové pohledy, rituály, výročí).
+> Předchozí session: `INSTRUKCE/HANDOFF-2026-05-03.md` (Todoist sync, VIP firewall).
+>
+> Tento root soubor držíme z historických důvodů — původní fáze 1a kalendáře v 2026-04.
 
-> **Toto je první dokument, který si přečteš.** Pak `HANDBOOK.md` (technika) a `RUNBOOK.md` (provoz).
+---
+
+## Historický záznam — 2026-04-28
+
+**Datum:** 2026-04-28
+**Stav (tehdy):** Kalendář fáze 1a hotová, čeká na deploy + autorizaci. Rozjedeme fázi 1b.
 
 ---
 

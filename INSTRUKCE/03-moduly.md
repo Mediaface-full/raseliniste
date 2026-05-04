@@ -1,6 +1,6 @@
 # 03 — Moduly (přehled)
 
-Stav 2026-05-03. Detail jednotlivých modulů v `Návody/*.pdf`.
+Stav 2026-05-04 (po session — kalendářové pohledy + rituály + výročí). Detail jednotlivých modulů v `Návody/*.pdf`.
 
 ## 🌅 Vstupní stránka
 
@@ -24,6 +24,9 @@ Stav 2026-05-03. Detail jednotlivých modulů v `Návody/*.pdf`.
 | **Per-projekt Gemini model** | `/studna/<id>` záložka Nastavení | ✅ NOVÉ 05-03 | `ProjectBox.analysisModel` nullable. Select v UI: Auto (default — BRIEF=Pro, STANDARD=Flash) / Flash 2.5 / Pro 2.5. Override Stage 2 modelu pro VŠECHNY analýzy v projektu (Stage 1 přepis je vždy Flash, mechanická úloha). Pro kreativní projekty (knížka, podcast) → Pro 2.5. Migrace `add_projectbox_analysis_model`. |
 | **Vlastní prompt pro Souhrn projektu** | `/studna/<id>` záložka Nastavení | ✅ NOVÉ 05-03 | `ProjectBox.projectSummaryPrompt @db.Text` — přepíše hardcoded prompt v `summarizeProject` (lib `project-summary.ts`). Když vyplněn (>20 znaků), Gemini Pro dostane **PLNÉ transkripty** všech nahrávek (ne osekané `summary` + `key_themes`), temperature 0.6, maxOutputTokens 32k. Pro kreativní agregaci napříč nahrávkami (mapa kapitol, index osob s `#`, bílá místa, časová osa). Petrův pojmový mismatch z 05-03: omylem dal volnotextový „Mapa projektu" prompt do `studnaStandardPrompt` (Stage 2 per-recording, MUSÍ vrátit JSON) → recording uvázl. Růžová sekce v UI s explicitním varováním. Migrace `add_projectbox_summary_prompt`. |
 | **Záchrana stuck recordings** | tlačítko „zrušit" v UI + `POST /api/studna/recordings/:id/mark-error` | ✅ NOVÉ 05-03 | Když nahrávka uvázne ve `status="processing"` (Promise umřela při restartu, Gemini vrátil neplatný JSON kvůli custom promptu, …), Petr klikne malé tlačítko **zrušit** vedle loaderu. Status → `error`, Petr může Regenerovat. Odpadá čekání 10–25 min na cron `retry-stuck-recordings`. |
+| **Studna guest note** | textarea v `/me/<token>` | ✅ NOVÉ 05-04 | Volitelný textový vzkaz vedle nahrávky (URL, jména, čísla co se hlasem komolí). Není AI analyzováno. Schema: `ProjectRecording.guestNote String?`. Petr vidí v detailu recording cards (butter sekce). Default schované, "+ Přidat textový vzkaz" expanduje. |
+| **Vlastní rituály** | `/settings/ritualy` | ✅ NOVÉ 05-04 | Schema `CustomRitual` + UI manager. Form: název, popis (markdown), opakování (každý den / pracovní dny / víkend / vybrané dny — checkboxy), čas, délka. Plus default 3 rituály mají editovatelné popisky (`User.ritualTemplates JSONB`). Render v Day/Week peach + dashed + ✨. Lib `src/lib/week-rituals.ts` + `src/lib/prague-tz.ts` (deterministická TZ konverze pro Praha). |
+| **Výročí v kalendáři** | Day/Week/Month views | ✅ NOVÉ 05-04 | `Anniversary` tabulka jako virtuální allDay events (pink + 🕯). Lib `src/lib/anniversary-events.ts`. Vykreslení: pink allDay proužek nahoře v Day/Week, velký event v buňce v Month. Žádný propag do Google/iCloud — samostatná entita. |
 
 **Wake Lock + visibility ochrana** = ve VŠECH 4 recorderech (commit `c649dd6`). Banner před start, indikátor během, varování po stop pokud audio nesedí.
 
@@ -64,7 +67,11 @@ Stav 2026-05-03. Detail jednotlivých modulů v `Návody/*.pdf`.
 |---|---|---|
 | Hlavní pohled | `/calendar` | ✅ |
 | Quickadd (hlas/text) | `/quickadd` | ✅ |
-| Den (briefing + DayNote) | `/day/<YYYY-MM-DD>` | ✅ AKT 05-03 — listování přes `<a href>` (fungovalo jen s JS), `endsAt: gte`→`gt` (sobotní all-day už nepadá do neděle), dedup duplikátů `(source, title, startsAt, endsAt)`, hlavička má odkaz „↻ dnes". Při cestě (DayNote) **přesunuto NAD Plán**. |
+| Den (briefing + DayNote) | `/day/<YYYY-MM-DD>` | ✅ AKT 05-04 — vertikální timeline (DayTimeline) místo seznamu řádků: barvy podle source, sloupce při overlapu, long-event jako pozadí, mezera mezi bloky, čas nahoře/název pod, sliding window, now čára, scroll-to-now, length badge, source badge podmíněně, fullscreen support. Plus rituály i výročí jako virtual events. |
+| **Týden** | `/calendar/tyden` (redirect) / `/calendar/tyden/<datum>` | ✅ NOVÉ 05-04 | Desktop pohled. 7 sloupců Po-Ne, časová osa 6-23h, default+custom rituály, výročí, multi-day spans (max 2 řádky + expand), now čára vlevo v gutteru, interpretační lišta, fullscreen mód `?naplno=1`, tisk. Print CSS v `global.css`. |
+| **Měsíc** | `/calendar/mesic` / `/calendar/mesic/<YYYY-MM>` | ✅ NOVÉ 05-04 | Desktop. Heatmap hustoty 5 stupňů, velké eventy jako TEXT v buňce (max 2, source-color), rituály ✨ v rohu, hover tooltip (200ms fade) s plným seznamem, aktuální týden inset, fullscreen, tisk. „Květen 2026" v nominativu. |
+| **Naplno mód** | `?naplno=1` na week/month/day | ✅ NOVÉ 05-04 | Base layout místo Shell. Bez sidebaru, bez Při cestě. Šipky listování zachovávají query string. „Rituální prostor" pro nedělní pohled.|
+| **/calendar (sidebar záložka)** | redirect na `/calendar/tyden` | ✅ AKT 05-04 — defaultní desktop pohled je týden. Stará CalendarView se nepoužívá. |
 | Pozvánka | `/calendar/invite` | ✅ |
 | Klient pozvánka | `/i/<token>` | ✅ public |
 | Cold lead | `/schuzka` | ✅ public |

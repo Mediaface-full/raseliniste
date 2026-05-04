@@ -24,7 +24,9 @@ export const GET: APIRoute = async ({ params, cookies }) => {
     prisma.calendarEvent.findMany({
       where: {
         deletedRemotely: false,
-        AND: [{ endsAt: { gte: dayStart } }, { startsAt: { lte: dayEnd } }],
+        // `gt` (NE `gte`) — Google/iCal all-day má endsAt exclusive, takže
+        // sobotní celodenka má endsAt = neděle 00:00 → `gte` by ji ukázal i v neděli
+        AND: [{ endsAt: { gt: dayStart } }, { startsAt: { lte: dayEnd } }],
       },
       orderBy: { startsAt: "asc" },
     }),
