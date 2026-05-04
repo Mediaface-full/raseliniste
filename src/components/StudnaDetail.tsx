@@ -46,6 +46,7 @@ interface ProjectDetail {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     analysis: any;
     transcript: string;
+    guestNote: string | null;
     createdAt: string;
   }>;
   summaries: Array<{
@@ -476,6 +477,20 @@ function RecordingCard({
               )}
 
               {/* Plný transkript */}
+              {/* Textový vzkaz od hosta vedle nahrávky — odkazy, jména, čísla.
+                  Petr to potřebuje vidět, aby si nemusel domýšlet co host
+                  v hlasu zkomolil. */}
+              {recording.guestNote && (
+                <div className="pt-2 border-t border-white/5">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-[var(--tint-butter)] mb-1.5 flex items-center gap-1">
+                    📝 Textový vzkaz
+                  </div>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 bg-[var(--tint-butter)]/[0.06] border border-[var(--tint-butter)]/20 rounded p-3">
+                    {recording.guestNote}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-2 border-t border-white/5">
                 <button
                   onClick={() => setShowTranscript(!showTranscript)}

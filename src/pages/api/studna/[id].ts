@@ -51,6 +51,7 @@ export const GET: APIRoute = async ({ cookies, params }) => {
           isPinned: true,
           analysis: true,
           transcript: true,
+          guestNote: true,
           createdAt: true,
         },
       },

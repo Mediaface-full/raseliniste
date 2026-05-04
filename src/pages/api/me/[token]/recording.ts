@@ -62,6 +62,13 @@ export const POST: APIRoute = async ({ request, params, clientAddress }) => {
   const audioFile = form.get("audio");
   const durationRaw = form.get("durationSec");
   const durationSec = durationRaw ? Math.round(Number(durationRaw)) : null;
+  // Volitelný textový vzkaz vedle nahrávky — pro URL, jména, čísla co se hlasem komolí.
+  // Není AI analyzováno, jen archivováno k záznamu.
+  const guestNoteRaw = form.get("guestNote");
+  const guestNote =
+    typeof guestNoteRaw === "string" && guestNoteRaw.trim().length > 0
+      ? guestNoteRaw.trim().slice(0, 8000)
+      : null;
 
   if (typeStr !== "STANDARD" && typeStr !== "BRIEF") {
     return Response.json({ error: "INVALID_TYPE" }, { status: 400 });
@@ -125,6 +132,7 @@ export const POST: APIRoute = async ({ request, params, clientAddress }) => {
       audioBytes: saved.bytes,
       audioDurationSec: durationSec,
       transcript: "",
+      guestNote,
       status: "processing",
       ip,
       userAgent: ua,

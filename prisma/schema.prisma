@@ -665,6 +665,11 @@ model ProjectRecording {
   // Transkript se zachová vždy
   transcript      String
 
+  // Volný text který klient/host napsal vedle hlasové nahrávky (URL, jména,
+  // čísla — věci co se hlasem zkomolí). Není to AI analyzováno, jen uloženo.
+  // Nepovinné, max ~8000 znaků. Petr to vidí v detailu nahrávky.
+  guestNote       String?  @db.Text
+
   // Strukturovaný rozbor z Gemini (volné JSON pro flexibilitu)
   // {
   //   summary: string,

@@ -36,6 +36,11 @@ export default function GuestRecorder({
   const [briefMode, setBriefMode] = useState(false);
   const [briefFile, setBriefFile] = useState<File | null>(null);
   const [micPermission, setMicPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
+
+  // Volitelný textový vzkaz vedle nahrávky — pro URL, jména, čísla co se hlasem
+  // zkomolí. Pole je collapsible, default schované, primární je hlas.
+  const [guestNote, setGuestNote] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
   const protection = useRecordingProtection();
 
   // Detekce stavu mic permission — ukáže hint Blance/guestům, ať klikli "Při každé návštěvě"
@@ -179,6 +184,9 @@ export default function GuestRecorder({
     fd.append("durationSec", String(durationSec));
     const filename = type === "BRIEF" ? `brief.${getExtensionFromMime(audio.type)}` : `recording.${getExtensionFromMime(audio.type)}`;
     fd.append("audio", new File([audio], filename, { type: audio.type }));
+    if (guestNote.trim()) {
+      fd.append("guestNote", guestNote.trim());
+    }
 
     try {
       // Po upload bytí setPhase("processing")
@@ -199,6 +207,8 @@ export default function GuestRecorder({
         setBriefMode(false);
         setBriefFile(null);
         setElapsedMs(0);
+        setGuestNote("");
+        setNoteOpen(false);
       }, 4000);
     } catch (e) {
       setPhase("error");
@@ -289,6 +299,44 @@ export default function GuestRecorder({
                 Klíčový brief — nahrát soubor →
               </button>
             )}
+
+            {/* Volitelný textový vzkaz vedle nahrávky — pro odkazy, jména,
+                čísla co se hlasem komolí. Hlavní je ZÁZNAM, tohle je doplněk. */}
+            <div className="w-full max-w-md mt-4 pt-4 border-t border-white/10">
+              {!noteOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setNoteOpen(true)}
+                  className="w-full text-xs font-mono text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
+                >
+                  + Přidat textový vzkaz (volitelné)
+                </button>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground flex items-center justify-between">
+                    <span>Textový vzkaz</span>
+                    <button
+                      type="button"
+                      onClick={() => { setGuestNote(""); setNoteOpen(false); }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      zavřít
+                    </button>
+                  </div>
+                  <textarea
+                    value={guestNote}
+                    onChange={(e) => setGuestNote(e.target.value)}
+                    rows={4}
+                    maxLength={8000}
+                    placeholder="Sem napiš odkazy, jména, čísla nebo cokoliv, co by se v nahrávce zkomolilo. Pošle se k záznamu, AI to nezpracovává."
+                    className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm leading-relaxed resize-y focus:border-[var(--tint-peach)] focus:outline-none"
+                  />
+                  <div className="text-[10px] font-mono text-muted-foreground text-right">
+                    {guestNote.length}/8000
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
 
