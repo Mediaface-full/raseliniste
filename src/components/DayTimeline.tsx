@@ -30,7 +30,8 @@
  * 7. **Čas v bloku NAD názvem** (Petr: "klient potřebuje vědět kdy, pak co").
  */
 import { useEffect, useState, useMemo, useRef } from "react";
-import { MapPin, X, ArrowUp, ArrowDown } from "lucide-react";
+import { MapPin, X, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { marked } from "marked";
 
 interface CalendarEvent {
   id: string;
@@ -701,9 +702,27 @@ export default function DayTimeline({
               </div>
             )}
             {ev.description && (
-              <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
-                {ev.description}
-              </p>
+              ev.source === "RITUAL" ? (
+                <div
+                  className="prose-rasel mt-2 text-sm leading-relaxed border-t border-white/[0.08] pt-3"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(ev.description) as string }}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
+                  {ev.description}
+                </p>
+              )
+            )}
+            {isRitual(ev.source) && (
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-1 mt-2 border-t border-white/[0.05]">
+                <Sparkles className="size-3" /> rituál
+                <a
+                  href="/settings/ritualy"
+                  className="ml-auto hover:underline"
+                >
+                  upravit text →
+                </a>
+              </div>
             )}
           </div>
         );

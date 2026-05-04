@@ -26,16 +26,83 @@ export interface RitualEvent {
   source: "RITUAL"; // mimo CalendarSource enum — speciální marker
   type: "RITUAL";
   locationText: null;
-  description: null;
+  description: string; // markdown návod co v rituálu dělat
   prepNote: null;
   itemsToBring: null;
+}
+
+export type RitualTemplates = {
+  morning_day?: string;
+  friday_reflection?: string;
+  weekly_review?: string;
+};
+
+/**
+ * Default texty rituálů. Petr je může v /settings/ritualy přepsat.
+ */
+export const DEFAULT_RITUAL_TEMPLATES: Required<RitualTemplates> = {
+  morning_day: `## Ranní pohled na den (7:00–8:00)
+
+Hodina ke spuštění dne. Bez spěchu.
+
+**Tělo a hlava**
+- Voda, něco malého k jídlu
+- 2 minuty dechu, ne na telefonu
+
+**Přehled dne**
+- Otevři kalendář na dnešek
+- Co je největší věc dne? Co to vyžaduje?
+- Co můžu zrušit nebo přesunout, pokud potřebuju?
+
+**Příprava**
+- Co si mám vzít s sebou (auto, kufr, kamera)?
+- Komu mám psát/volat?
+
+**Záměr**
+- Jedna věta: čeho chci dnes dosáhnout?
+- Co mě může vyvést z míry, jak na to budu reagovat?`,
+
+  friday_reflection: `## Páteční reflexe (Pá 17:00–17:15)
+
+15 minut, klidně se zápisem v deníku.
+
+- Co se podařilo tento týden?
+- Co mě překvapilo (pozitivně i jinak)?
+- Co mě stálo nejvíc energie?
+- Co příští týden potřebuje pozornost?
+- 3 věci za které jsem vděčný (může být drobnost)`,
+
+  weekly_review: `## Nedělní pohled na týden (Ne 18:00–18:15)
+
+Otevři kalendář na příští týden a projdi si to.
+
+- Hlavní 3 věci, které musím v týdnu zvládnout
+- Kde mám volné okno pro hlubokou práci?
+- Co potřebuji připravit dopředu?
+- Kde se setkám s lidmi (rodina, klienti, přátelé)?
+- Energetická bilance: kde nabírám, kde dávám?
+- Jeden úkol na pondělí ráno (konkrétní krok)`,
+};
+
+/** Vrátí popisek pro daný rituál — nejdřív custom, pak default. */
+export function ritualDescription(
+  type: RitualType,
+  custom: RitualTemplates | null | undefined,
+): string {
+  const fromCustom = custom?.[type]?.trim();
+  if (fromCustom && fromCustom.length > 0) return fromCustom;
+  return DEFAULT_RITUAL_TEMPLATES[type];
 }
 
 /**
  * Vygeneruje rituály pro daný týden (Po-Ne).
  * `weekStartMonday` musí být půlnoc pondělí.
+ * `customTemplates` přepíše default popisky (z User.ritualTemplates).
  */
-export function generateWeekRituals(weekStartMonday: Date): RitualEvent[] {
+export function generateWeekRituals(
+  weekStartMonday: Date,
+  customTemplates?: RitualTemplates | null,
+): RitualEvent[] {
   const rituals: RitualEvent[] = [];
 
   for (let i = 0; i < 7; i++) {
@@ -62,7 +129,7 @@ export function generateWeekRituals(weekStartMonday: Date): RitualEvent[] {
         source: "RITUAL",
         type: "RITUAL",
         locationText: null,
-        description: null,
+        description: ritualDescription("morning_day", customTemplates),
         prepNote: null,
         itemsToBring: null,
       });
@@ -82,7 +149,7 @@ export function generateWeekRituals(weekStartMonday: Date): RitualEvent[] {
         source: "RITUAL",
         type: "RITUAL",
         locationText: null,
-        description: null,
+        description: ritualDescription("friday_reflection", customTemplates),
         prepNote: null,
         itemsToBring: null,
       });
@@ -102,7 +169,7 @@ export function generateWeekRituals(weekStartMonday: Date): RitualEvent[] {
         source: "RITUAL",
         type: "RITUAL",
         locationText: null,
-        description: null,
+        description: ritualDescription("weekly_review", customTemplates),
         prepNote: null,
         itemsToBring: null,
       });

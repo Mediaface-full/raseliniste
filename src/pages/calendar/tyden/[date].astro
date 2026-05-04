@@ -12,7 +12,7 @@ if (!session) return Astro.redirect("/login");
 
 const user = await prisma.user.findUnique({
   where: { id: session.uid },
-  select: { username: true },
+  select: { username: true, ritualTemplates: true },
 });
 if (!user) return Astro.redirect("/login");
 
@@ -48,8 +48,11 @@ const events = rawEvents.filter((e) => {
   return true;
 });
 
-// Generuj rituály
-const rituals = generateWeekRituals(monday);
+// Generuj rituály s vlastními popisy uživatele
+const rituals = generateWeekRituals(
+  monday,
+  user.ritualTemplates as Record<string, string> | null,
+);
 
 // Interpretace
 const interpretationInput = events.map((e) => ({

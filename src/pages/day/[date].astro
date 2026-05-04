@@ -11,7 +11,7 @@ if (!session) return Astro.redirect("/login");
 
 const user = await prisma.user.findUnique({
   where: { id: session.uid },
-  select: { username: true },
+  select: { username: true, ritualTemplates: true },
 });
 if (!user) return Astro.redirect("/login");
 
@@ -58,7 +58,10 @@ const dedupedEvents = events.filter((e) => {
 // Připoj rituály daného týdne, vyfiltruj jen ty co spadají do dnešního dne.
 // Petr potřebuje vidět rituály i na mobilu, ne jen v týdenním desktop pohledu.
 const weekMonday = getMondayOfWeek(dayStart);
-const allRituals = generateWeekRituals(weekMonday);
+const allRituals = generateWeekRituals(
+  weekMonday,
+  user.ritualTemplates as Record<string, string> | null,
+);
 const todaysRituals = allRituals.filter((r) => {
   const start = new Date(r.startsAt);
   return start >= dayStart && start <= dayEnd;

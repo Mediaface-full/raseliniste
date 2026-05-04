@@ -1,0 +1,45 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import RitualsEditor from "../../components/RitualsEditor";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+import { DEFAULT_RITUAL_TEMPLATES } from "../../lib/week-rituals";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true, ritualTemplates: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const custom = (user.ritualTemplates ?? {}) as Record<string, string>;
+---
+
+<Shell
+  title="Rituály · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Nastavení", href: "/settings" }, { label: "Rituály" }]}
+>
+  <div class="max-w-3xl space-y-5">
+    <div>
+      <h1 class="font-serif text-[2rem] leading-tight tracking-tight">Rituály</h1>
+      <p class="text-sm text-muted-foreground mt-1.5">
+        Co v každém rituálu dělat. Markdown podporován (nadpisy, odrážky, tučně).
+        Zobrazí se v detailu eventu po klepnutí na rituál v denním nebo týdenním
+        pohledu kalendáře. Prázdné pole = použije se default text.
+      </p>
+    </div>
+
+    <RitualsEditor
+      client:load
+      initialMorning={custom.morning_day ?? ""}
+      initialFriday={custom.friday_reflection ?? ""}
+      initialSunday={custom.weekly_review ?? ""}
+      defaultMorning={DEFAULT_RITUAL_TEMPLATES.morning_day}
+      defaultFriday={DEFAULT_RITUAL_TEMPLATES.friday_reflection}
+      defaultSunday={DEFAULT_RITUAL_TEMPLATES.weekly_review}
+    />
+  </div>
+</Shell>

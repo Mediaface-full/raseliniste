@@ -25,6 +25,11 @@ model User {
   // Twilio credentials jsou v UserIntegration(provider="twilio").
   whatsappNumber    String?
 
+  // Vlastní popisky rituálů — co Petr v daném rituálu dělá, krok po kroku.
+  // JSON ve tvaru { morning_day: "...", friday_reflection: "...", weekly_review: "..." }
+  // Null = použijí se default texty z lib/week-rituals.ts. Editovatelné v /settings/ritualy.
+  ritualTemplates   Json?
+
   sessions     Session[]
   passkeys     WebauthnCredential[]
   recordings   Recording[]
