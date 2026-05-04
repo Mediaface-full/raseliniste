@@ -173,9 +173,17 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
           <div class="flex items-center gap-2 mb-3">
             <Icon name="lucide:calendar-days" class="size-4" style="color: var(--c);" />
             <h2 class="font-serif text-lg">Plán (dnes + 2 dny)</h2>
-            <a href="/quickadd" class="ml-auto text-xs font-mono text-[var(--tint-sky)] hover:underline">
-              + Rychlé zadání
-            </a>
+            <div class="ml-auto flex items-center gap-3 flex-wrap">
+              <a href="/calendar/tyden" class="text-xs font-mono text-[var(--tint-sky)] hover:underline">
+                Týden →
+              </a>
+              <a href="/calendar/mesic" class="text-xs font-mono text-[var(--tint-sky)] hover:underline">
+                Měsíc →
+              </a>
+              <a href="/quickadd" class="text-xs font-mono text-[var(--tint-sky)] hover:underline">
+                + Rychlé zadání
+              </a>
+            </div>
           </div>
           {upcomingEvents.length === 0 ? (
             <div class="text-sm text-muted-foreground italic">Žádné události — užij si volno.</div>
