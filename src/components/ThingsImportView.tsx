@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Upload, Loader2, CheckCircle2, AlertTriangle, Trash2, ListOrdered, X } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, AlertTriangle, Trash2, ListOrdered, X, Download } from "lucide-react";
 import { Button } from "./ui/Button";
 
 /**
@@ -322,17 +322,29 @@ export default function ThingsImportView() {
                   </thead>
                   <tbody>
                     {active.import.items.map((it) => (
-                      <tr key={it.id} className="border-t border-white/5">
-                        <td className="px-3 py-1.5 max-w-md truncate">{it.title}</td>
+                      <tr key={it.id} className="border-t border-white/5 align-top">
+                        <td className="px-3 py-1.5 max-w-md">
+                          <div className="truncate">{it.title}</div>
+                          {it.pushResult?.startsWith("error:") && (
+                            <div className="text-[10px] text-destructive/80 mt-0.5 font-mono whitespace-pre-wrap break-words">
+                              {it.pushResult.replace(/^error: /, "")}
+                            </div>
+                          )}
+                          {it.pushResult?.startsWith("partial:") && (
+                            <div className="text-[10px] text-[var(--tint-butter)] mt-0.5 font-mono whitespace-pre-wrap break-words">
+                              {it.pushResult}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-3 py-1.5 font-mono text-[11px]">
                           {decisionBadge(it.decision)}
                         </td>
                         <td className="px-3 py-1.5 font-mono text-[11px]">
                           {it.pushResult === "ok" && <span className="text-[var(--tint-sage)]">✓ ok</span>}
+                          {it.pushResult?.startsWith("ok (") && <span className="text-[var(--tint-sage)]">✓ ok+sub</span>}
                           {it.pushResult === "skipped" && <span className="text-muted-foreground">— skipped</span>}
-                          {it.pushResult?.startsWith("error:") && (
-                            <span className="text-destructive" title={it.pushResult}>✗ error</span>
-                          )}
+                          {it.pushResult?.startsWith("error:") && <span className="text-destructive">✗ error</span>}
+                          {it.pushResult?.startsWith("partial:") && <span className="text-[var(--tint-butter)]">⚠ partial</span>}
                           {it.pushResult === null && <span className="text-muted-foreground">…</span>}
                         </td>
                       </tr>
@@ -341,6 +353,60 @@ export default function ThingsImportView() {
                 </table>
               </div>
             </details>
+          )}
+
+          {/* Plný errorLog — agregovaný seznam plných error messages
+              (pushResult je truncated 200 znaků, errorLog má full).
+              Plus tlačítko "Stáhnout" — pro AI co vyrobí opravený JSON. */}
+          {data.import.errorLog && Array.isArray(data.import.errorLog) && (data.import.errorLog as unknown[]).length > 0 && (
+            <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/[0.05]">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-destructive/20">
+                <span className="text-xs font-mono text-destructive font-semibold flex-1">
+                  ✗ ErrorLog — {(data.import.errorLog as unknown[]).length} chyb
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const log = {
+                      importId: data.import.id,
+                      filename: data.import.filename ?? "import",
+                      executedAt: data.import.completedAt,
+                      counts: data.counts,
+                      errors: data.import.errorLog,
+                      // Vč. pushResult pro VŠECHNY items — full audit pro AI co opraví JSON
+                      items: data.import.items?.map((it) => ({
+                        thingsUuid: it.thingsUuid,
+                        title: it.title,
+                        decision: it.decision,
+                        pushResult: it.pushResult,
+                      })),
+                    };
+                    const blob = new Blob([JSON.stringify(log, null, 2)], {
+                      type: "application/json;charset=utf-8",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `things-import-errors-${data.import.id.slice(0, 8)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-xs font-mono text-destructive hover:text-foreground flex items-center gap-1 px-2 py-1 rounded hover:bg-destructive/10"
+                  title="Stáhnout error log + per-item pushResult jako JSON (pro AI co vyrobí opravený import)"
+                >
+                  <Download className="size-3" /> Stáhnout JSON
+                </button>
+              </div>
+              <ul className="px-3 py-2 space-y-2 text-xs font-mono max-h-[480px] overflow-y-auto">
+                {(data.import.errorLog as Array<{ thingsUuid: string; title: string; error: string }>).map((e, i) => (
+                  <li key={i} className="border-l-2 border-destructive/40 pl-2">
+                    <div className="text-foreground font-semibold">{e.title}</div>
+                    <div className="text-[10px] text-muted-foreground">uuid: {e.thingsUuid}</div>
+                    <div className="text-destructive whitespace-pre-wrap break-words mt-0.5">{e.error}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}
