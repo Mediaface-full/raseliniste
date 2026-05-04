@@ -266,3 +266,52 @@ html.sidebar-open [data-sidebar-backdrop] {
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover { background: oklch(100% 0 0 / 0.15); }
+
+/* ---- Tisková verze pro Týden / Měsíc / Health analýzy ----
+   Cíl: čitelná A4 stránka, černý text na bílém, žádná aplikační navigace,
+   bloky událostí v plném ladění (bez glass efektů). */
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+
+  /* Schovat aplikační UI */
+  body { background: white !important; color: black !important; }
+  aside, header.glass, .glass:has(button[aria-label="Hledat"]) { display: none !important; }
+  /* Schovat všechny prvky s utility .print:hidden (Tailwind v4) */
+  .print\:hidden { display: none !important; }
+
+  /* Vypnout backdrop blur a glass — pro tisk je třeba kontrast */
+  .glass, .glass-strong, .glass-subtle {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    color: black !important;
+  }
+
+  /* Text čitelný */
+  h1, h2, h3, h4, p, span, div, li, a {
+    color: black !important;
+    text-shadow: none !important;
+  }
+  .text-muted-foreground, [class*="text-muted-foreground"] { color: #555 !important; }
+
+  /* Bloky událostí — zachovat barevnou indikaci tlumeně, černý text */
+  [style*="--tint-"], [style*="var(--tint-"] {
+    color: black !important;
+  }
+
+  /* Týdenní mřížka — zúžit padding, vejdeme se na A4 landscape */
+  .week-print-root, .month-print-root {
+    max-width: 100% !important;
+  }
+  .week-print-root .glass {
+    padding: 4px !important;
+  }
+
+  /* Avoid page break uvnitř bloků */
+  button, a, .glass { page-break-inside: avoid; break-inside: avoid; }
+
+  /* Schovat interaktivní prvky (tlačítka navigace) */
+  button[aria-label*="Předchozí"],
+  button[aria-label*="Následující"] { display: none !important; }
+}

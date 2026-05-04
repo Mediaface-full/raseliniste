@@ -11,7 +11,7 @@
  * - Žádný drag-and-drop, žádný editing
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, MapPin, X, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, MapPin, X, Sparkles, Printer } from "lucide-react";
 
 interface CalEvent {
   id: string;
@@ -208,25 +208,28 @@ export default function WeekView({
   const showNowLine = isThisWeek && nowMin >= 0 && nowMin <= HOURS_VISIBLE * 60;
 
   return (
-    <div className="space-y-3">
-      {/* Přepínač Den / Týden / Měsíc */}
-      {!isFullscreen && (
-        <div className="flex items-center justify-center gap-1">
-          <a
-            href={`/day/${weekStart}`}
-            className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
-          >
-            Den
-          </a>
-          <span className="px-3 py-1 rounded-md bg-white/10 text-xs font-mono">Týden</span>
-          <a
-            href={`/calendar/mesic/${weekStart.slice(0, 7)}`}
-            className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
-          >
-            Měsíc
-          </a>
-        </div>
-      )}
+    <div className="space-y-3 week-print-root">
+      {/* Přepínač Den / Týden / Měsíc — vždy viditelný, i ve fullscreen.
+          Ve fullscreen módu chce Petr přepínat mezi pohledy v rámci rituálu. */}
+      <div className="flex items-center justify-center gap-1 print:hidden">
+        <a
+          href={isFullscreen ? `/day/${weekStart}?naplno=1` : `/day/${weekStart}`}
+          className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          Den
+        </a>
+        <span className="px-3 py-1 rounded-md bg-white/10 text-xs font-mono">Týden</span>
+        <a
+          href={
+            isFullscreen
+              ? `/calendar/mesic/${weekStart.slice(0, 7)}?naplno=1`
+              : `/calendar/mesic/${weekStart.slice(0, 7)}`
+          }
+          className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          Měsíc
+        </a>
+      </div>
 
       {/* Hlavička */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -244,12 +247,20 @@ export default function WeekView({
         <a href={nextWeekHref} className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center" aria-label="Další týden">
           <ChevronRight className="size-4" />
         </a>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs print:hidden"
+          title="Vytisknout (nebo uložit jako PDF přes Cmd+P)"
+        >
+          <Printer className="size-3.5" /> Tisk
+        </button>
         {fullscreenHref && (
           <a
             href={fullscreenHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs print:hidden"
             title="Otevřít naplno v nové záložce"
           >
             <Maximize2 className="size-3.5" /> Naplno
@@ -258,7 +269,7 @@ export default function WeekView({
         {isFullscreen && exitFullscreenHref && (
           <a
             href={exitFullscreenHref}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs print:hidden"
           >
             <X className="size-3.5" /> Zavřít naplno
           </a>

@@ -9,7 +9,7 @@
  * - Aktuální týden: jemně podbarvený řádek
  * - Klik na buňku → /day/<datum>
  */
-import { Maximize2, X } from "lucide-react";
+import { Maximize2, X, Printer } from "lucide-react";
 
 interface BasicEvent {
   startsAt: string;
@@ -83,25 +83,23 @@ export default function MonthView({
   // ISO datum 1. dne aktuálního měsíce — pro link na týdenní/denní pohled
   const ymStart = monthStart;
   return (
-    <div className="space-y-3">
-      {/* Přepínač Den / Týden / Měsíc */}
-      {!isFullscreen && (
-        <div className="flex items-center justify-center gap-1">
-          <a
-            href={`/day/${ymStart}`}
-            className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
-          >
-            Den
-          </a>
-          <a
-            href={`/calendar/tyden/${ymStart}`}
-            className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
-          >
-            Týden
-          </a>
-          <span className="px-3 py-1 rounded-md bg-white/10 text-xs font-mono">Měsíc</span>
-        </div>
-      )}
+    <div className="space-y-3 month-print-root">
+      {/* Přepínač Den / Týden / Měsíc — vždy viditelný (i ve fullscreen) */}
+      <div className="flex items-center justify-center gap-1 print:hidden">
+        <a
+          href={isFullscreen ? `/day/${ymStart}?naplno=1` : `/day/${ymStart}`}
+          className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          Den
+        </a>
+        <a
+          href={isFullscreen ? `/calendar/tyden/${ymStart}?naplno=1` : `/calendar/tyden/${ymStart}`}
+          className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          Týden
+        </a>
+        <span className="px-3 py-1 rounded-md bg-white/10 text-xs font-mono">Měsíc</span>
+      </div>
 
       {/* Hlavička */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -119,12 +117,20 @@ export default function MonthView({
         <a href={nextMonthHref} className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center" aria-label="Další měsíc">
           →
         </a>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs print:hidden"
+          title="Vytisknout (nebo uložit jako PDF přes Cmd+P)"
+        >
+          <Printer className="size-3.5" /> Tisk
+        </button>
         {fullscreenHref && (
           <a
             href={fullscreenHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs print:hidden"
           >
             <Maximize2 className="size-3.5" /> Naplno
           </a>
@@ -132,7 +138,7 @@ export default function MonthView({
         {isFullscreen && exitFullscreenHref && (
           <a
             href={exitFullscreenHref}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-xs print:hidden"
           >
             <X className="size-3.5" /> Zavřít naplno
           </a>
