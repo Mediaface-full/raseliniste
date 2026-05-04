@@ -694,52 +694,54 @@ export default function DayTimeline({
                 <X className="size-4" />
               </button>
             </div>
-            <div className="text-xs font-mono text-muted-foreground tabular flex flex-wrap gap-x-3 gap-y-1">
-              <span>{sourceLabel(ev.source)}</span>
-              <span>·</span>
-              <span>{ev.type.toLowerCase().replace(/_/g, " ")}</span>
-            </div>
-            {ev.locationText && (
-              <div className="text-xs flex items-center gap-1.5 text-muted-foreground">
-                <MapPin className="size-3" /> {ev.locationText}
-              </div>
-            )}
-            {ev.prepNote && (
-              <div className="text-xs text-[var(--tint-butter)] mt-1.5 px-2 py-1.5 rounded bg-black/20">
-                📝 {ev.prepNote}
-              </div>
-            )}
-            {(() => {
-              if (ev.source !== "RITUAL") {
-                return ev.description ? (
+            {/* Pro RITUÁL: description je HLAVNÍ obsah — hned pod headerem,
+                bez type/source šumu. Vždy nějaký text (multi-fallback). */}
+            {isRitual(ev.source) ? (
+              <>
+                <div
+                  className="prose-rasel text-sm leading-relaxed mt-2"
+                  dangerouslySetInnerHTML={{
+                    __html: marked.parse(
+                      ev.description ||
+                        (ritualTypeFromId(ev.id)
+                          ? DEFAULT_RITUAL_TEMPLATES[ritualTypeFromId(ev.id)!]
+                          : `## ${ev.title}\n\n*Text rituálu zatím není vyplněný.*`),
+                    ) as string,
+                  }}
+                />
+                <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-2 mt-2 border-t border-white/[0.05]">
+                  <Sparkles className="size-3" /> rituál
+                  <a
+                    href="/settings/ritualy"
+                    className="ml-auto hover:underline"
+                  >
+                    upravit text →
+                  </a>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-xs font-mono text-muted-foreground tabular flex flex-wrap gap-x-3 gap-y-1">
+                  <span>{sourceLabel(ev.source)}</span>
+                  <span>·</span>
+                  <span>{ev.type.toLowerCase().replace(/_/g, " ")}</span>
+                </div>
+                {ev.locationText && (
+                  <div className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                    <MapPin className="size-3" /> {ev.locationText}
+                  </div>
+                )}
+                {ev.prepNote && (
+                  <div className="text-xs text-[var(--tint-butter)] mt-1.5 px-2 py-1.5 rounded bg-black/20">
+                    📝 {ev.prepNote}
+                  </div>
+                )}
+                {ev.description && (
                   <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
                     {ev.description}
                   </p>
-                ) : null;
-              }
-              // RITUÁL — vždy popisek (fallback na default pokud server-side
-              // nedoručil description, např. starý cache nebo migrace neproběhla)
-              const fallbackType = ritualTypeFromId(ev.id);
-              const text =
-                ev.description ||
-                (fallbackType ? DEFAULT_RITUAL_TEMPLATES[fallbackType] : "");
-              return (
-                <div
-                  className="prose-rasel mt-2 text-sm leading-relaxed border-t border-white/[0.08] pt-3"
-                  dangerouslySetInnerHTML={{ __html: marked.parse(text) as string }}
-                />
-              );
-            })()}
-            {isRitual(ev.source) && (
-              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-1 mt-2 border-t border-white/[0.05]">
-                <Sparkles className="size-3" /> rituál
-                <a
-                  href="/settings/ritualy"
-                  className="ml-auto hover:underline"
-                >
-                  upravit text →
-                </a>
-              </div>
+                )}
+              </>
             )}
           </div>
         );
