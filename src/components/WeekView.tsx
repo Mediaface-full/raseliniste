@@ -83,12 +83,35 @@ export default function WeekView({
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [openId, setOpenId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; align: "left" | "right" }>({
+    x: 0,
+    y: 0,
+    align: "right",
+  });
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const tick = () => setNow(new Date());
     const interval = setInterval(tick, 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  function handleHover(id: string, rect: DOMRect) {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    const middle = window.innerWidth / 2;
+    const align: "left" | "right" = rect.left + rect.width / 2 > middle ? "left" : "right";
+    setHoverPos({
+      x: align === "right" ? rect.right + 8 : rect.left - 8,
+      y: rect.top,
+      align,
+    });
+    hoverTimeoutRef.current = setTimeout(() => setHoveredId(id), 200);
+  }
+  function handleLeave() {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => setHoveredId(null), 100);
+  }
 
   const monday = useMemo(() => {
     const d = new Date(`${weekStart}T00:00:00`);
@@ -446,6 +469,8 @@ export default function WeekView({
                   hourPx={HOUR_PX}
                   openId={openId}
                   onSelect={(id) => setOpenId(openId === id ? null : id)}
+                  onHover={handleHover}
+                  onLeave={handleLeave}
                 />
               </div>
             );
@@ -560,6 +585,71 @@ export default function WeekView({
         );
       })()}
 
+      {/* Hover tooltip — fixed pozice, fade-in. Stejný pattern jako MonthView.
+          Petr to chce na desktopu pro rychlou orientaci bez kliknutí. */}
+      {hoveredId && (() => {
+        const ev = allEvents.find((e) => e.id === hoveredId);
+        if (!ev) return null;
+        const tint = sourceTint(ev.source);
+        const start = new Date(ev.startsAt);
+        const end = new Date(ev.endsAt);
+        const fallbackText =
+          ev.source === "RITUAL"
+            ? ritualTypeFromId(ev.id)
+              ? DEFAULT_RITUAL_TEMPLATES[ritualTypeFromId(ev.id)!]
+              : `## ${ev.title}\n\n*Text rituálu zatím není vyplněný.*`
+            : "";
+        const desc = ev.description || fallbackText;
+        return (
+          <div
+            onMouseEnter={() => {
+              if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+            }}
+            onMouseLeave={handleLeave}
+            className="fixed pointer-events-auto z-50 print:hidden"
+            style={{
+              left: hoverPos.align === "right" ? `${hoverPos.x}px` : undefined,
+              right: hoverPos.align === "left" ? `${window.innerWidth - hoverPos.x}px` : undefined,
+              top: `${hoverPos.y}px`,
+              maxWidth: "360px",
+              animation: "fadeIn 200ms ease-out",
+            }}
+          >
+            <div
+              className="rounded-lg p-3 shadow-2xl border"
+              style={{
+                background: "oklch(14% 0.025 260 / 0.96)",
+                borderColor: `color-mix(in oklch, var(--tint-${tint}) 35%, transparent)`,
+              }}
+            >
+              <div
+                className="text-[10px] uppercase tracking-wider font-mono mb-1 font-semibold"
+                style={{ color: `color-mix(in oklch, var(--tint-${tint}) 90%, white)` }}
+              >
+                {ev.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
+              </div>
+              <div
+                className="font-serif text-base leading-tight mb-2"
+                style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
+              >
+                {ev.title}
+              </div>
+              {ev.locationText && (
+                <div className="text-xs flex items-center gap-1.5 text-muted-foreground mb-1">
+                  <MapPin className="size-3" /> {ev.locationText}
+                </div>
+              )}
+              {desc && (
+                <div
+                  className="prose-rasel text-xs leading-relaxed mt-2 max-h-[280px] overflow-y-auto"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(desc) as string }}
+                />
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Interpretační lišta */}
       <div className="glass rounded-xl p-4">
         <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono mb-2">
@@ -588,6 +678,8 @@ function WeekDayColumn({
   hourPx,
   openId,
   onSelect,
+  onHover,
+  onLeave,
 }: {
   timed: CalEvent[];
   hourStart: number;
@@ -595,6 +687,8 @@ function WeekDayColumn({
   hourPx: number;
   openId: string | null;
   onSelect: (id: string) => void;
+  onHover: (id: string, rect: DOMRect) => void;
+  onLeave: () => void;
 }) {
   const minPx = hourPx / 60;
   const totalMin = (hourEnd - hourStart) * 60;
@@ -629,26 +723,53 @@ function WeekDayColumn({
   const fg = timed.filter((e) => !bgIds.has(e.id) && e.source !== "RITUAL");
   const bg = timed.filter((e) => bgIds.has(e.id));
 
-  // Greedy column assignment pro FG events (rituály vyřazené)
+  // Cluster-based column assignment — clusters jsou souvislé řetězce overlapů.
+  // Pro každý cluster spočítáme totalColumns = max paralelních eventů uvnitř.
+  // Solo eventy (1 event v clusteru) mají total=1 = plná šířka. Předchozí
+  // verze používala globální cols.length což bralo všem eventům dne stejnou
+  // úzkou šířku jakmile někde v dni byl cluster s 2+ paralelními.
   const sorted = [...fg].sort(
     (a, b) =>
       new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime() ||
       new Date(a.endsAt).getTime() - new Date(b.endsAt).getTime(),
   );
-  const cols: number[] = [];
   const colMap = new Map<string, { col: number; total: number }>();
+  let cluster: typeof sorted = [];
+  let clusterEnd = 0;
+
+  function assignCluster(events: typeof sorted) {
+    if (events.length === 0) return;
+    const colEnds: number[] = [];
+    const cols: number[] = [];
+    for (const ev of events) {
+      const s = new Date(ev.startsAt).getTime();
+      let col = colEnds.findIndex((end) => end <= s);
+      if (col === -1) {
+        col = colEnds.length;
+        colEnds.push(0);
+      }
+      colEnds[col] = new Date(ev.endsAt).getTime();
+      cols.push(col);
+    }
+    const total = colEnds.length;
+    events.forEach((ev, i) => {
+      colMap.set(ev.id, { col: cols[i], total });
+    });
+  }
+
   for (const ev of sorted) {
     const s = new Date(ev.startsAt).getTime();
-    let col = cols.findIndex((end) => end <= s);
-    if (col === -1) {
-      col = cols.length;
-      cols.push(0);
+    const e = new Date(ev.endsAt).getTime();
+    if (cluster.length === 0 || s < clusterEnd) {
+      cluster.push(ev);
+      if (e > clusterEnd) clusterEnd = e;
+    } else {
+      assignCluster(cluster);
+      cluster = [ev];
+      clusterEnd = e;
     }
-    cols[col] = new Date(ev.endsAt).getTime();
-    colMap.set(ev.id, { col, total: 0 });
   }
-  // Set total = max columns used
-  for (const v of colMap.values()) v.total = cols.length;
+  assignCluster(cluster);
 
   function blockTopHeight(e: CalEvent) {
     const s = new Date(e.startsAt);
@@ -678,8 +799,9 @@ function WeekDayColumn({
             key={e.id}
             type="button"
             onClick={() => onSelect(e.id)}
+            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect())}
+            onMouseLeave={onLeave}
             className="absolute rounded text-left transition-all hover:brightness-110"
-            title={`${fmtTime(new Date(e.startsAt))}–${fmtTime(new Date(e.endsAt))} · ${e.title}${e.description ? "\n\n" + (e.description.length > 240 ? e.description.slice(0, 240) + "…" : e.description) : ""}`}
             style={{
               top,
               height,
@@ -777,8 +899,9 @@ function WeekDayColumn({
             key={e.id}
             type="button"
             onClick={() => onSelect(e.id)}
+            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect())}
+            onMouseLeave={onLeave}
             className="absolute rounded text-left transition-all hover:brightness-110 active:scale-[0.99]"
-            title={`${fmtTime(new Date(e.startsAt))}–${fmtTime(new Date(e.endsAt))} · ${e.title}`}
             style={{
               top,
               height,

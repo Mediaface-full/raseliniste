@@ -40,7 +40,15 @@ export async function syncGoogleCalendar(userId: string): Promise<SyncResult> {
   let deleted = 0;
   let errors = 0;
 
+  // Sběrný Set IDs z aktuálního API response — pro sweep pass na konci.
+  // Předtím jsme se spoléhali jen na cancelled status z showDeleted=true,
+  // ale Google občas nevrátí cancelled instance recurring eventu, pokud
+  // byly smazány už dříve a paging window posunut. Sweep zaručí: co dnes
+  // v Google API není, není v Rašeliništi (s safety guards proti error).
+  const seenIds = new Set<string>();
+
   let pageToken: string | undefined = undefined;
+  let pagingComplete = false;
   try {
     do {
       const res = await calendar.events.list({
@@ -54,6 +62,7 @@ export async function syncGoogleCalendar(userId: string): Promise<SyncResult> {
       });
       const items: calendar_v3.Schema$Event[] = res.data.items ?? [];
       for (const ev of items) {
+        if (ev.id) seenIds.add(ev.id);
         try {
           const result = await upsertEvent(ev, pragueLoc?.id ?? null);
           if (result === "inserted") inserted++;
@@ -66,11 +75,30 @@ export async function syncGoogleCalendar(userId: string): Promise<SyncResult> {
       }
       pageToken = res.data.nextPageToken ?? undefined;
     } while (pageToken);
+    pagingComplete = true;
 
     await recordUsage(userId);
   } catch (e) {
     await recordError(userId, e);
     throw e;
+  }
+
+  // SWEEP: pokud Google posílal úspěšně všechny stránky a žádné errory
+  // při upsertu, označ rows v window které nejsou v seenIds jako deleted.
+  // Safety: pokud paging selhal NEBO byly errory, sweep neprovedeme
+  // (mohl bychom omylem smazat eventy které Google jen dočasně neposlal).
+  if (pagingComplete && errors === 0 && seenIds.size > 0) {
+    const sweepResult = await prisma.calendarEvent.updateMany({
+      where: {
+        source: "GOOGLE_PRIMARY",
+        deletedRemotely: false,
+        externalId: { notIn: Array.from(seenIds) },
+        // Jen v aktuálním sync window — historicky starší necháme být
+        startsAt: { gte: timeMin, lte: timeMax },
+      },
+      data: { deletedRemotely: true, lastSyncedAt: new Date() },
+    });
+    deleted += sweepResult.count;
   }
 
   return { inserted, updated, deleted, errors, durationMs: Date.now() - start };
