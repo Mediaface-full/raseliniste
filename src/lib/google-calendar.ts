@@ -260,12 +260,20 @@ export async function createGoogleEvent(
     attendees: input.attendeeEmails?.map((email) => ({ email })),
   };
 
-  if (input.allDay) {
+  // POZOR: Google Calendar API odmítá `eventType=outOfOffice` v kombinaci
+  // s all-day eventy ("An out of office event must not be an all-day event").
+  // Pokud volající chce OOO + all-day range, převedeme na full-day TIMED
+  // event v Praha TZ (00:00 → další den 00:00 exclusive).
+  const useAllDay = input.allDay && !input.outOfOffice;
+
+  if (useAllDay) {
     // Google all-day: date YYYY-MM-DD, end exclusive (= startDate + 1 den pro single-day)
     requestBody.start = { date: input.startsAt.toISOString().slice(0, 10) };
-    // endsAt by měl být DAY AFTER last day (Google konvence)
     requestBody.end = { date: input.endsAt.toISOString().slice(0, 10) };
   } else {
+    // Pro OOO + allDay vyrobíme timed event 00:00–24:00 Praha TZ podle range.
+    // Petr volá s startsAt = first day 00:00 UTC, endsAt = lastDay+1 00:00 UTC
+    // (exclusive). Pro OOO Google chce dateTime + timeZone.
     requestBody.start = { dateTime: input.startsAt.toISOString(), timeZone: "Europe/Prague" };
     requestBody.end = { dateTime: input.endsAt.toISOString(), timeZone: "Europe/Prague" };
   }
