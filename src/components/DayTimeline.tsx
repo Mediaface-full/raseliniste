@@ -32,6 +32,14 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { MapPin, X, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
 import { marked } from "marked";
+import { DEFAULT_RITUAL_TEMPLATES, type RitualType } from "@/lib/week-rituals";
+
+function ritualTypeFromId(id: string): RitualType | null {
+  if (id.startsWith("ritual-morning-")) return "morning_day";
+  if (id.startsWith("ritual-friday-")) return "friday_reflection";
+  if (id.startsWith("ritual-sunday-")) return "weekly_review";
+  return null;
+}
 
 interface CalendarEvent {
   id: string;
@@ -701,18 +709,27 @@ export default function DayTimeline({
                 📝 {ev.prepNote}
               </div>
             )}
-            {ev.description && (
-              ev.source === "RITUAL" ? (
+            {(() => {
+              if (ev.source !== "RITUAL") {
+                return ev.description ? (
+                  <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
+                    {ev.description}
+                  </p>
+                ) : null;
+              }
+              // RITUÁL — vždy popisek (fallback na default pokud server-side
+              // nedoručil description, např. starý cache nebo migrace neproběhla)
+              const fallbackType = ritualTypeFromId(ev.id);
+              const text =
+                ev.description ||
+                (fallbackType ? DEFAULT_RITUAL_TEMPLATES[fallbackType] : "");
+              return (
                 <div
                   className="prose-rasel mt-2 text-sm leading-relaxed border-t border-white/[0.08] pt-3"
-                  dangerouslySetInnerHTML={{ __html: marked.parse(ev.description) as string }}
+                  dangerouslySetInnerHTML={{ __html: marked.parse(text) as string }}
                 />
-              ) : (
-                <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
-                  {ev.description}
-                </p>
-              )
-            )}
+              );
+            })()}
             {isRitual(ev.source) && (
               <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-1 mt-2 border-t border-white/[0.05]">
                 <Sparkles className="size-3" /> rituál

@@ -13,6 +13,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, MapPin, X, Sparkles, Printer } from "lucide-react";
 import { marked } from "marked";
+import { DEFAULT_RITUAL_TEMPLATES, type RitualType } from "@/lib/week-rituals";
+
+function ritualTypeFromId(id: string): RitualType | null {
+  if (id.startsWith("ritual-morning-")) return "morning_day";
+  if (id.startsWith("ritual-friday-")) return "friday_reflection";
+  if (id.startsWith("ritual-sunday-")) return "weekly_review";
+  return null;
+}
 
 interface CalEvent {
   id: string;
@@ -426,30 +434,34 @@ export default function WeekView({
           })}
 
           {/* Now čára — NAPŘÍČ všemi sloupci. Aktuální čas je 7:21 v Po i Pá
-              stejně. Zvýraznění aktuálního DNE je separate (header pondělí). */}
+              stejně. Zvýraznění aktuálního DNE je separate (header pondělí).
+              Časový badge VLEVO (pod hodinovým popiskem v gutteru) — Petr
+              chce badge na začátku čáry, ne v pravém rohu. */}
           {showNowLine && (
             <div
               className="col-span-7 relative pointer-events-none"
               style={{
-                gridColumnStart: 2,
+                gridColumnStart: 1, // začni od gutteru aby badge byl vlevo
                 gridColumnEnd: 9,
-                marginTop: -totalPx, // překryj sloupce
+                marginTop: -totalPx,
                 height: 0,
                 zIndex: 50,
               }}
             >
               <div
-                className="absolute left-0 right-0"
+                className="absolute"
                 style={{
                   top: nowPx,
+                  left: TIME_GUTTER_PX,
+                  right: 0,
                   borderTop: "2px solid oklch(72% 0.14 35)",
                 }}
               />
               <span
-                className="absolute -top-0.5 px-1.5 py-0 rounded text-[9px] font-mono font-bold tabular"
+                className="absolute px-1.5 py-0 rounded text-[9px] font-mono font-bold tabular"
                 style={{
                   top: `${nowPx - 8}px`,
-                  right: 4,
+                  left: 0,
                   background: "oklch(72% 0.14 35)",
                   color: "oklch(15% 0.02 35)",
                 }}
@@ -499,18 +511,27 @@ export default function WeekView({
                 📝 {ev.prepNote}
               </div>
             )}
-            {ev.description && (
-              ev.source === "RITUAL" ? (
+            {(() => {
+              if (ev.source !== "RITUAL") {
+                return ev.description ? (
+                  <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
+                    {ev.description}
+                  </p>
+                ) : null;
+              }
+              // RITUÁL — vždy zobrazit popisek. Fallback na default pokud
+              // ev.description selhalo (např. starý cache, neodeslaný server-side).
+              const fallbackType = ritualTypeFromId(ev.id);
+              const text =
+                ev.description ||
+                (fallbackType ? DEFAULT_RITUAL_TEMPLATES[fallbackType] : "");
+              return (
                 <div
                   className="prose-rasel mt-2 text-sm leading-relaxed border-t border-white/[0.08] pt-3"
-                  dangerouslySetInnerHTML={{ __html: marked.parse(ev.description) as string }}
+                  dangerouslySetInnerHTML={{ __html: marked.parse(text) as string }}
                 />
-              ) : (
-                <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
-                  {ev.description}
-                </p>
-              )
-            )}
+              );
+            })()}
             {ev.source === "RITUAL" && (
               <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-1 mt-2 border-t border-white/[0.05]">
                 <Sparkles className="size-3" /> rituál

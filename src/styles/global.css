@@ -268,50 +268,80 @@ html.sidebar-open [data-sidebar-backdrop] {
 ::-webkit-scrollbar-thumb:hover { background: oklch(100% 0 0 / 0.15); }
 
 /* ---- Tisková verze pro Týden / Měsíc / Health analýzy ----
-   Cíl: čitelná A4 stránka, černý text na bílém, žádná aplikační navigace,
-   bloky událostí v plném ladění (bez glass efektů). */
+   Cíl: A4 landscape, jedna stránka pokud možno. Žádná aplikační navigace,
+   černý text na bílém, kompaktní mřížka. Předtím (commit e26893c) se obsah
+   nepředatelně lámal na další stránky kvůli min-width gridu a overflow-x. */
 @media print {
-  @page { size: A4 landscape; margin: 8mm; }
+  @page { size: A4 landscape; margin: 5mm; }
+
+  /* Tělo a viewport — vypnout pevný layout, ať tiskárna může proudit */
+  html, body {
+    background: white !important;
+    color: black !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
 
   /* Schovat aplikační UI */
-  body { background: white !important; color: black !important; }
   aside, header.glass, .glass:has(button[aria-label="Hledat"]) { display: none !important; }
-  /* Schovat všechny prvky s utility .print:hidden (Tailwind v4) */
   .print\:hidden { display: none !important; }
 
-  /* Vypnout backdrop blur a glass — pro tisk je třeba kontrast */
+  /* Vypnout backdrop blur, glass efekty */
   .glass, .glass-strong, .glass-subtle {
     background: white !important;
-    border: 1px solid #ccc !important;
+    border: 1px solid #ddd !important;
     backdrop-filter: none !important;
     box-shadow: none !important;
     color: black !important;
+    padding: 4px !important;
+    border-radius: 4px !important;
   }
 
-  /* Text čitelný */
-  h1, h2, h3, h4, p, span, div, li, a {
+  /* Text — kompaktní velikosti pro A4 */
+  h1 { font-size: 13pt !important; margin: 0 0 3pt !important; line-height: 1.2 !important; }
+  h2 { font-size: 10pt !important; margin: 3pt 0 2pt !important; }
+  h3 { font-size: 9pt !important; }
+  p, span, div, li, a {
     color: black !important;
     text-shadow: none !important;
   }
   .text-muted-foreground, [class*="text-muted-foreground"] { color: #555 !important; }
+  [style*="--tint-"], [style*="var(--tint-"] { color: black !important; }
 
-  /* Bloky událostí — zachovat barevnou indikaci tlumeně, černý text */
-  [style*="--tint-"], [style*="var(--tint-"] {
-    color: black !important;
+  /* KLÍČOVÉ: vypnout overflow + min-width na week mřížce. Předtím grid měl
+     min-width 700px + overflow-x-auto, což při tisku vytvořilo extrémně
+     široký kontejner co se nelámal. */
+  .week-print-root,
+  .week-print-root *,
+  .month-print-root,
+  .month-print-root * {
+    overflow: visible !important;
+    min-width: 0 !important;
   }
 
-  /* Týdenní mřížka — zúžit padding, vejdeme se na A4 landscape */
-  .week-print-root, .month-print-root {
-    max-width: 100% !important;
-  }
-  .week-print-root .glass {
-    padding: 4px !important;
+  /* Truncate / line-clamp v tisku zrušíme — text se má vejít kompletní */
+  .truncate, [class*="line-clamp-"] {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    -webkit-line-clamp: unset !important;
+    display: block !important;
+    white-space: normal !important;
   }
 
-  /* Avoid page break uvnitř bloků */
-  button, a, .glass { page-break-inside: avoid; break-inside: avoid; }
+  /* Page-break: glass kontejnery NESMÍ být atomic blocky — povolit lámání
+     uvnitř (předtím page-break-inside: avoid na .glass tlačil obsah na další
+     stránku). Avoid jen pro absolutně pozicované eventové bloky. */
+  .glass { page-break-inside: auto !important; break-inside: auto !important; }
+  button[class*="absolute"],
+  a[class*="absolute"] {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
 
-  /* Schovat interaktivní prvky (tlačítka navigace) */
+  /* Schovat navigation šipky (left/right chevron) a now badge — v tisku
+     nemají smysl, jen zabírají místo */
   button[aria-label*="Předchozí"],
-  button[aria-label*="Následující"] { display: none !important; }
+  button[aria-label*="Následující"],
+  a[aria-label*="Předchozí"],
+  a[aria-label*="Následující"] { display: none !important; }
 }
