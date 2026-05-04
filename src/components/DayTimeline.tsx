@@ -502,6 +502,10 @@ export default function DayTimeline({
             const showLengthBadge = isLong && heightPx >= 80;
             const showSource = showSourceBadge(e.source);
 
+            // Minulé eventy (skončily před teď) ztlumit aby Petr viděl
+            // co už proběhlo. Aktivní/budoucí v plné barvě. Jen pro dnes.
+            const isPast = isToday && end.getTime() < now.getTime();
+
             return (
               <button
                 key={e.id}
@@ -523,6 +527,9 @@ export default function DayTimeline({
                   border: isRitual(e.source)
                     ? `1px dashed color-mix(in oklch, var(--tint-${tint}) 60%, transparent)`
                     : `1px solid color-mix(in oklch, var(--tint-${tint}) 50%, transparent)`,
+                  opacity: isPast ? 0.45 : 1,
+                  touchAction: "manipulation",
+                  zIndex: isRitual(e.source) ? 2 : 3, // ujistit klikatelnost
                   boxShadow: isOpen
                     ? `0 0 0 2px color-mix(in oklch, var(--tint-${tint}) 65%, transparent)`
                     : undefined,

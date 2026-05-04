@@ -97,16 +97,19 @@ export default function WeekView({
     return () => clearInterval(interval);
   }, []);
 
-  function handleHover(id: string, rect: DOMRect) {
+  function handleHover(id: string, _rect: DOMRect, mouseX?: number, mouseY?: number) {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    const middle = window.innerWidth / 2;
-    const align: "left" | "right" = rect.left + rect.width / 2 > middle ? "left" : "right";
-    setHoverPos({
-      x: align === "right" ? rect.right + 8 : rect.left - 8,
-      y: rect.top,
-      align,
-    });
+    if (typeof mouseX === "number" && typeof mouseY === "number") {
+      setHoverPos({ x: mouseX + 14, y: mouseY + 18, align: "right" });
+    }
     hoverTimeoutRef.current = setTimeout(() => setHoveredId(id), 200);
+  }
+  function handleMove(mouseX: number, mouseY: number) {
+    setHoverPos((prev) =>
+      prev.x === mouseX + 14 && prev.y === mouseY + 18
+        ? prev
+        : { x: mouseX + 14, y: mouseY + 18, align: "right" },
+    );
   }
   function handleLeave() {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -467,9 +470,11 @@ export default function WeekView({
                   hourStart={HOUR_START}
                   hourEnd={HOUR_END}
                   hourPx={HOUR_PX}
+                  now={now}
                   openId={openId}
                   onSelect={(id) => setOpenId(openId === id ? null : id)}
                   onHover={handleHover}
+                  onMove={handleMove}
                   onLeave={handleLeave}
                 />
               </div>
@@ -606,11 +611,12 @@ export default function WeekView({
               if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
             }}
             onMouseLeave={handleLeave}
-            className="fixed pointer-events-auto z-50 print:hidden"
+            className="fixed pointer-events-none z-50 print:hidden"
             style={{
-              left: hoverPos.align === "right" ? `${hoverPos.x}px` : undefined,
-              right: hoverPos.align === "left" ? `${window.innerWidth - hoverPos.x}px` : undefined,
-              top: `${hoverPos.y}px`,
+              // Tooltip sleduje kurzor — fixed pozice viewport-relative.
+              // Clamp aby nepřetekl viewport.
+              left: `min(${hoverPos.x}px, calc(100vw - 380px))`,
+              top: `min(${hoverPos.y}px, calc(100vh - 240px))`,
               maxWidth: "360px",
               animation: "fadeIn 200ms ease-out",
             }}
@@ -676,18 +682,22 @@ function WeekDayColumn({
   hourStart,
   hourEnd,
   hourPx,
+  now,
   openId,
   onSelect,
   onHover,
+  onMove,
   onLeave,
 }: {
   timed: CalEvent[];
   hourStart: number;
   hourEnd: number;
   hourPx: number;
+  now: Date;
   openId: string | null;
   onSelect: (id: string) => void;
-  onHover: (id: string, rect: DOMRect) => void;
+  onHover: (id: string, rect: DOMRect, mouseX?: number, mouseY?: number) => void;
+  onMove: (mouseX: number, mouseY: number) => void;
   onLeave: () => void;
 }) {
   const minPx = hourPx / 60;
@@ -799,7 +809,8 @@ function WeekDayColumn({
             key={e.id}
             type="button"
             onClick={() => onSelect(e.id)}
-            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect())}
+            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect(), ev.clientX, ev.clientY)}
+            onMouseMove={(ev) => onMove(ev.clientX, ev.clientY)}
             onMouseLeave={onLeave}
             className="absolute rounded text-left transition-all hover:brightness-110"
             style={{
@@ -893,13 +904,16 @@ function WeekDayColumn({
         const left = `calc(${fgLeft + colInfo.col * fgWidth}% + 1px)`;
         const width = `calc(${fgWidth}% - 2px)`;
         const isShort = height < 30;
+        // Minulé eventy (skončily před teď) ztlumit
+        const isPast = new Date(e.endsAt).getTime() < now.getTime();
 
         return (
           <button
             key={e.id}
             type="button"
             onClick={() => onSelect(e.id)}
-            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect())}
+            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect(), ev.clientX, ev.clientY)}
+            onMouseMove={(ev) => onMove(ev.clientX, ev.clientY)}
             onMouseLeave={onLeave}
             className="absolute rounded text-left transition-all hover:brightness-110 active:scale-[0.99]"
             style={{
@@ -907,7 +921,8 @@ function WeekDayColumn({
               height,
               left,
               width,
-              zIndex: 1, // nad rituály (které jsou v zIndex 0)
+              zIndex: 1,
+              opacity: isPast ? 0.45 : 1,
               background: `color-mix(in oklch, var(--tint-${tint}) ${isRitual ? 18 : 28}%, transparent)`,
               border: isRitual
                 ? `1px dashed color-mix(in oklch, var(--tint-${tint}) 60%, transparent)`

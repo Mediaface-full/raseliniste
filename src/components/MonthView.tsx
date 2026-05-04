@@ -101,16 +101,19 @@ export default function MonthView({
 
   function handleMouseEnter(e: React.MouseEvent<HTMLAnchorElement>, date: string) {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const middle = window.innerWidth / 2;
-    const align: "left" | "right" = rect.left + rect.width / 2 > middle ? "left" : "right";
-    setHoverPos({
-      x: align === "right" ? rect.right + 8 : rect.left - 8,
-      y: rect.top,
-      align,
-    });
-    // Plynulý přechod 200ms — Petr explicit
+    // Pozice tooltipu = pod kurzorem mírně vpravo dolů. Sleduje pohyb myši
+    // (handleMouseMove). Tím se vyhneme bug s `getBoundingClientRect` pozicí
+    // co se rozjede při scrollu / zoomu / page transformech.
+    setHoverPos({ x: e.clientX + 14, y: e.clientY + 18, align: "right" });
     hoverTimeoutRef.current = setTimeout(() => setHoveredDate(date), 200);
+  }
+
+  function handleMouseMove(e: React.MouseEvent<HTMLAnchorElement>) {
+    setHoverPos((prev) =>
+      prev.x === e.clientX + 14 && prev.y === e.clientY + 18
+        ? prev
+        : { x: e.clientX + 14, y: e.clientY + 18, align: "right" },
+    );
   }
 
   function handleMouseLeave() {
@@ -227,6 +230,7 @@ export default function MonthView({
                 key={cell.date}
                 href={`/day/${cell.date}${isFullscreen ? "?naplno=1" : ""}`}
                 onMouseEnter={(e) => handleMouseEnter(e, cell.date)}
+                onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
                 className={`relative aspect-square min-h-[80px] rounded-md flex flex-col p-1.5 transition-all hover:brightness-125 hover:scale-[1.02] ${
                   cell.isCurrentMonth ? "" : "opacity-30"
@@ -344,14 +348,13 @@ export default function MonthView({
             if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
           }}
           onMouseLeave={handleMouseLeave}
-          className="fixed pointer-events-auto z-50 print:hidden"
+          className="fixed pointer-events-none z-50 print:hidden"
           style={{
-            left: hoverPos.align === "right" ? `${hoverPos.x}px` : undefined,
-            right:
-              hoverPos.align === "left"
-                ? `${window.innerWidth - hoverPos.x}px`
-                : undefined,
-            top: `${hoverPos.y}px`,
+            // Tooltip sleduje kurzor — fixed pozice viewport-relative,
+            // po pravé/dolní straně kurzoru. Pokud by přesahovala viewport,
+            // CSS clamp ji udrží uvnitř.
+            left: `min(${hoverPos.x}px, calc(100vw - 340px))`,
+            top: `min(${hoverPos.y}px, calc(100vh - 200px))`,
             maxWidth: "320px",
             animation: "fadeIn 200ms ease-out",
           }}
