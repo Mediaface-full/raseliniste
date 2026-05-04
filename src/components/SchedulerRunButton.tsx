@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Loader2, Play, RotateCw, RefreshCcw } from "lucide-react";
+import { Loader2, Play, RotateCw, RefreshCcw, Trash2 } from "lucide-react";
 
 /**
  * Tlačítko „Spustit teď" v /settings/crons — manuální dispatch scheduleru
  * bez nutnosti SSH curlu. Po doběhu přesměruje na refresh stránky.
  */
 export default function SchedulerRunButton() {
-  const [busy, setBusy] = useState<"run" | "dryrun" | "reset" | null>(null);
+  const [busy, setBusy] = useState<"run" | "dryrun" | "reset" | "hardreset" | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any | null>(null);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
@@ -29,6 +29,34 @@ export default function SchedulerRunButton() {
         return;
       }
       setResetMsg(data.note ?? "Token resetován. Klikni Spustit teď.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function hardResetTodoist() {
+    if (!confirm(
+      "HARD RESET Todoist mirroru?\n\n" +
+      "Vyprázdní TodoistProjectMirror + TodoistLabelMirror v naší DB a odpojí Task rows " +
+      "od todoistTaskId / todoistProjectId. Použít POUZE pokud jsi v Todoist UI smazal/archivoval " +
+      "projekty a chceš čistý stav v Rašeliništi.\n\n" +
+      "Existující Task rows v naší DB ZŮSTÁVAJÍ. Příští sync naimportuje aktuální stav z Todoistu.",
+    )) return;
+    if (!confirm("Opravdu? Tohle nejde vrátit zpět.")) return;
+    setBusy("hardreset");
+    setErr(null);
+    setResetMsg(null);
+    try {
+      const res = await fetch("/api/todoist/reset-sync?hard=1", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setErr(data.error ?? "Hard reset selhal.");
+        return;
+      }
+      setResetMsg(
+        `HARD RESET hotov: smazáno ${data.deletedProjects} projektů, ${data.deletedLabels} labelů, ` +
+        `odpojeno ${data.updatedTasks} Tasků. ${data.note}`,
+      );
     } finally {
       setBusy(null);
     }
@@ -86,6 +114,15 @@ export default function SchedulerRunButton() {
         >
           {busy === "reset" ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
           Reset Todoist sync
+        </button>
+        <button
+          onClick={hardResetTodoist}
+          disabled={busy !== null}
+          className="px-3 py-1.5 rounded-md bg-destructive/10 border border-destructive/40 hover:bg-destructive/20 text-destructive text-sm flex items-center gap-1.5 transition disabled:opacity-50"
+          title="HARD RESET — vyprázdní project + label mirror, odpojí Task rows od Todoist ID. Pro situaci 'smazal jsem projekty v Todoistu, chci čistý stav'"
+        >
+          {busy === "hardreset" ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+          Hard reset mirror
         </button>
       </div>
 
