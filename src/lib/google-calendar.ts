@@ -196,7 +196,15 @@ async function extractPrepInBackground(eventId: string, title: string, descripti
 function parseEventDate(d: calendar_v3.Schema$EventDateTime | undefined): Date | null {
   if (!d) return null;
   if (d.dateTime) return new Date(d.dateTime);
-  if (d.date) return new Date(d.date + "T00:00:00");
+  if (d.date) {
+    // d.date je YYYY-MM-DD (kalendářní datum bez TZ). Uložíme deterministicky
+    // jako UTC midnight, ať server TZ neovlivní konzistenci napříč deploys.
+    // Bez tohoto: `new Date("2026-05-09T00:00:00")` parsuje server-local TZ
+    // (UTC docker → 00:00 UTC, Praha → 22:00 UTC předchozí den) → bug s
+    // multi-day spans v týdenním pohledu.
+    const [y, m, day] = d.date.split("-").map((s) => parseInt(s, 10));
+    return new Date(Date.UTC(y, m - 1, day));
+  }
   return null;
 }
 

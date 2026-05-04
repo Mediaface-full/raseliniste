@@ -160,13 +160,13 @@ export default function WeekView({
     for (const e of allDayList) {
       const start = new Date(e.startsAt);
       const end = new Date(e.endsAt);
-      // V Google/iCal je `endsAt` exclusive pro all-day. Posun o 1 ms zpět
-      // je nedostatečný — Praha je UTC+2 (CEST), takže `2026-05-06 00:00 UTC
-      // − 1 ms = 2026-05-06 01:59 PRAGUE` → klíč pořád spadne na další den.
-      // Odečítáme 4 hodiny (pokrývá CET +1 i CEST +2 + bezpečnostní rezerva)
-      // — pro all-day event s endsAt = půlnoc UTC vede vždy do předchozího
-      // kalendářního dne v Praze.
-      const endAdjusted = new Date(end.getTime() - 4 * 60 * 60 * 1000);
+      // V Google/iCal je `endsAt` exclusive pro all-day. Posun zpět musí být
+      // dost velký, aby v každé TZ skončil v PŘEDCHOZÍM kalendářním dni.
+      // Worst case: server uložil endsAt s posunutím +offset (např. Praha
+      // = +2h CEST), klient v Praze je +2h. Použijeme -12h = polovinu dne.
+      // Tím vždy spadne do druhé poloviny předchozího dne v jakékoli TZ.
+      // Pro all-day eventy je to bezpečné (žádný legitimní 12h all-day end posun).
+      const endAdjusted = new Date(end.getTime() - 12 * 60 * 60 * 1000);
 
       const startKey = dayKey(start);
       const endKey = dayKey(endAdjusted);

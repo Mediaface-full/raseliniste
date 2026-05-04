@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Search, Trash2, Check, AlertTriangle } from "lucide-react";
+import { Loader2, Search, Trash2, Check, AlertTriangle, Calendar } from "lucide-react";
 import { Button } from "./ui/Button";
 
 type DryRunResult = {
@@ -17,9 +17,29 @@ type DryRunResult = {
   groups?: number;
 };
 
+type AllDayResult = {
+  ok: boolean;
+  dryRun?: boolean;
+  message?: string;
+  total?: number;
+  toFix?: number;
+  plan?: Array<{
+    id: string;
+    title: string;
+    source: string;
+    oldStart: string;
+    oldEnd: string;
+    newStart: string;
+    newEnd: string;
+  }>;
+  updated?: number;
+  truncated?: boolean;
+};
+
 export default function CalendarCleanupTool() {
-  const [busy, setBusy] = useState<"check" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"check" | "delete" | "allday-check" | "allday-fix" | null>(null);
   const [result, setResult] = useState<DryRunResult | null>(null);
+  const [allDayResult, setAllDayResult] = useState<AllDayResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function run(confirm: boolean) {
@@ -33,6 +53,24 @@ export default function CalendarCleanupTool() {
       const res = await fetch(url, { method: "POST" });
       const data: DryRunResult = await res.json();
       setResult(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runAllDay(confirm: boolean) {
+    setBusy(confirm ? "allday-fix" : "allday-check");
+    setError(null);
+    if (!confirm) setAllDayResult(null);
+    try {
+      const url = confirm
+        ? "/api/diagnose/calendar-allday-fix?confirm=1"
+        : "/api/diagnose/calendar-allday-fix";
+      const res = await fetch(url, { method: "POST" });
+      const data: AllDayResult = await res.json();
+      setAllDayResult(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -175,6 +213,86 @@ export default function CalendarCleanupTool() {
           )}
         </div>
       )}
+
+      {/* All-day timestamp normalize — opraví staré rows kde startsAt/endsAt
+          není přesně UTC midnight. Hlavní příčina toho že multi-day spans
+          v týdenním pohledu vypadají rozhozené (1-day narozeniny přes 2 dny). */}
+      <div className="pt-4 border-t border-white/10">
+        <div className="flex items-center gap-2 mb-2">
+          <Calendar className="size-4 text-[var(--tint-butter)]" />
+          <h3 className="text-sm font-semibold">All-day timestamp normalize</h3>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Najde all-day eventy, jejichž <code className="text-xs">startsAt</code>/<code className="text-xs">endsAt</code> není
+          přesně UTC midnight (artefakt staršího serveru v Praha TZ). Po fixu by
+          se 1-denní narozeniny už neměly zobrazovat přes 2 dny.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button onClick={() => runAllDay(false)} disabled={busy !== null} variant="outline" size="sm">
+            {busy === "allday-check" ? <Loader2 className="animate-spin" /> : <Search />}
+            Najít posunuté (DRY RUN)
+          </Button>
+          {allDayResult?.dryRun && (allDayResult.toFix ?? 0) > 0 && (
+            <Button
+              onClick={() => {
+                if (confirm(`Normalizovat ${allDayResult.toFix} all-day eventů? Zápisy zpět nepůjdou.`)) {
+                  runAllDay(true);
+                }
+              }}
+              disabled={busy !== null}
+              variant="destructive"
+              size="sm"
+            >
+              {busy === "allday-fix" ? <Loader2 className="animate-spin" /> : <Check />}
+              Normalizovat {allDayResult.toFix} eventů
+            </Button>
+          )}
+        </div>
+
+        {allDayResult && (
+          <div className="mt-3 space-y-2">
+            {allDayResult.updated !== undefined && (
+              <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 p-3 text-sm">
+                <Check className="size-4 text-[var(--tint-sage)] inline mr-1" />
+                Normalizováno {allDayResult.updated} všedenních eventů.
+              </div>
+            )}
+            {allDayResult.dryRun && (allDayResult.toFix ?? 0) === 0 && (
+              <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 p-3 text-sm">
+                <Check className="size-4 text-[var(--tint-sage)] inline mr-1" />
+                Vše čisté. {allDayResult.total} all-day eventů, žádný posun.
+              </div>
+            )}
+            {allDayResult.dryRun && (allDayResult.toFix ?? 0) > 0 && (
+              <>
+                <div className="rounded-md border border-[var(--tint-butter)]/30 bg-[var(--tint-butter)]/10 p-3 text-sm">
+                  Nalezeno <strong>{allDayResult.toFix}</strong> z {allDayResult.total} all-day eventů s posunutým timestampem.
+                </div>
+                {allDayResult.plan && allDayResult.plan.length > 0 && (
+                  <details className="rounded-md border border-white/10 bg-white/5 p-3 text-xs font-mono">
+                    <summary className="cursor-pointer text-muted-foreground">
+                      Detail {allDayResult.plan.length} eventů (max 50 zobrazeno)
+                    </summary>
+                    <ul className="mt-2 space-y-1.5">
+                      {allDayResult.plan.map((p) => (
+                        <li key={p.id} className="border-l-2 border-[var(--tint-butter)]/40 pl-2">
+                          <div className="text-foreground">{p.title}</div>
+                          <div className="text-muted-foreground">
+                            {p.oldStart.slice(0, 19)} → {p.newStart.slice(0, 19)}
+                          </div>
+                        </li>
+                      ))}
+                      {allDayResult.truncated && (
+                        <li className="text-muted-foreground italic">…a další</li>
+                      )}
+                    </ul>
+                  </details>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
