@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, X, Lock, EyeOff } from "lucide-react";
+import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, X, Lock, EyeOff, Send } from "lucide-react";
 import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 interface Project {
@@ -174,6 +174,34 @@ export default function GuestRecorder({
     await uploadAudio(blob, "STANDARD", Math.round(finalMs / 1000));
   }
 
+  async function sendTextOnly() {
+    if (!guestNote.trim() || !selectedProjectId) return;
+    setPhase("uploading");
+    setError(null);
+    try {
+      const res = await fetch(`/api/me/${token}/note`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ projectId: selectedProjectId, text: guestNote.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setPhase("error");
+        setError(data.error ?? `Server vrátil ${res.status}.`);
+        return;
+      }
+      setPhase("done");
+      setTimeout(() => {
+        setPhase("idle");
+        setGuestNote("");
+        setNoteOpen(false);
+      }, 3000);
+    } catch (e) {
+      setPhase("error");
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function uploadAudio(audio: Blob, type: "STANDARD" | "BRIEF", durationSec: number) {
     setPhase("uploading");
     setError(null);
@@ -300,25 +328,40 @@ export default function GuestRecorder({
               </button>
             )}
 
-            {/* Volitelný textový vzkaz vedle nahrávky — pro odkazy, jména,
-                čísla co se hlasem komolí. Hlavní je ZÁZNAM, tohle je doplněk. */}
+            {/* Textový vzkaz — buď doplněk k nahrávce, nebo SAMOSTATNĚ (host
+                může poslat jen text bez audio). Lavender highlight, výrazné. */}
             <div className="w-full max-w-md mt-4 pt-4 border-t border-white/10">
               {!noteOpen ? (
                 <button
                   type="button"
                   onClick={() => setNoteOpen(true)}
-                  className="w-full text-xs font-mono text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
+                  className="w-full px-3 py-2 rounded-md text-xs font-mono flex items-center justify-center gap-2 transition-colors"
+                  style={{
+                    background: "color-mix(in oklch, var(--tint-lavender) 12%, transparent)",
+                    border: "1px dashed color-mix(in oklch, var(--tint-lavender) 40%, transparent)",
+                    color: "color-mix(in oklch, var(--tint-lavender) 90%, white)",
+                  }}
                 >
-                  + Přidat textové info k projektu (volitelné)
+                  ✏️ Napsat text k projektu (i bez nahrávky)
                 </button>
               ) : (
-                <div className="space-y-1.5">
-                  <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground flex items-center justify-between">
-                    <span>Textové info k projektu</span>
+                <div
+                  className="rounded-lg p-3 space-y-2"
+                  style={{
+                    background: "color-mix(in oklch, var(--tint-lavender) 10%, transparent)",
+                    border: "1px solid color-mix(in oklch, var(--tint-lavender) 40%, transparent)",
+                    borderLeft: "3px solid var(--tint-lavender)",
+                  }}
+                >
+                  <div
+                    className="text-[10px] uppercase tracking-wider font-mono font-semibold flex items-center justify-between"
+                    style={{ color: "color-mix(in oklch, var(--tint-lavender) 92%, white)" }}
+                  >
+                    <span>✏️ Textové info k projektu</span>
                     <button
                       type="button"
                       onClick={() => { setGuestNote(""); setNoteOpen(false); }}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-muted-foreground hover:text-foreground normal-case font-normal"
                     >
                       zavřít
                     </button>
@@ -326,13 +369,33 @@ export default function GuestRecorder({
                   <textarea
                     value={guestNote}
                     onChange={(e) => setGuestNote(e.target.value)}
-                    rows={4}
+                    rows={5}
                     maxLength={8000}
-                    placeholder="Sem napiš odkazy, jména, čísla nebo cokoliv, co by se v nahrávce zkomolilo. Pošle se k záznamu, AI to nezpracovává."
-                    className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm leading-relaxed resize-y focus:border-[var(--tint-peach)] focus:outline-none"
+                    placeholder="Sem napiš co potřebuješ — odkaz, jméno, číslo, zprávu. Můžeš to poslat samostatně (bez nahrávky), nebo to půjde k nahrávce. AI text neanalyzuje."
+                    className="w-full px-3 py-2 rounded-md bg-background/40 text-sm leading-relaxed resize-y focus:outline-none"
+                    style={{
+                      border: "1px solid color-mix(in oklch, var(--tint-lavender) 30%, transparent)",
+                    }}
                   />
-                  <div className="text-[10px] font-mono text-muted-foreground text-right">
-                    {guestNote.length}/8000
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[10px] font-mono text-muted-foreground">
+                      {guestNote.length}/8000
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!guestNote.trim() || phase !== "idle"}
+                      onClick={sendTextOnly}
+                      className="px-4 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{
+                        background: "var(--tint-lavender)",
+                        color: "oklch(15% 0.02 280)",
+                      }}
+                    >
+                      <Send className="size-3" /> Odeslat jen text
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground italic">
+                    Pokud chceš poslat i nahrávku, klikni na velký mikrofon nahoře — text se přiloží automaticky.
                   </div>
                 </div>
               )}
