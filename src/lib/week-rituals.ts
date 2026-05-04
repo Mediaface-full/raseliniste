@@ -4,13 +4,15 @@
  * vizuální váhou jako schůzky — proto je vykreslujeme jako virtual events
  * (nezapisují se do CalendarEventu).
  *
- * - Ranní pohled na den — každý den 08:00, 5 min
+ * - Ranní pohled na den — pondělí až pátek 08:00, 5 min (5 ranních)
  * - Páteční reflexe — pátek 17:00, 15 min
  * - Nedělní pohled na týden — neděle 18:00, 15 min
+ * Celkem max 7 rituálních bloků v týdnu.
  *
- * Vykreslujeme s tečkovaným okrajem + tint-peach (oddělená barva mimo
- * kalendářové) — viz WeekView. Tady jen generujeme data.
+ * POZOR: časy jsou v PRAHA TZ. Server může běžet v UTC, takže používáme
+ * pragueDate helper. Bez něj se ranní 8:00 zobrazí v UI jako 10:00 (CEST).
  */
+import { pragueDate } from "./prague-tz";
 
 export type RitualType = "morning_day" | "friday_reflection" | "weekly_review";
 
@@ -37,37 +39,42 @@ export function generateWeekRituals(weekStartMonday: Date): RitualEvent[] {
   const rituals: RitualEvent[] = [];
 
   for (let i = 0; i < 7; i++) {
-    const day = new Date(weekStartMonday);
-    day.setDate(day.getDate() + i);
-    day.setHours(0, 0, 0, 0);
+    // Spočítej kalendářní rok/měsíc/den pro Po+i (v Praze)
+    const calDate = new Date(weekStartMonday);
+    calDate.setDate(calDate.getDate() + i);
+    const year = calDate.getFullYear();
+    const month = calDate.getMonth() + 1; // 1-based
+    const day = calDate.getDate();
     const dow = i; // 0 = Po, ..., 4 = Pá, 5 = So, 6 = Ne
+    const isoDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-    // Ranní pohled na den — každý den 08:00, 5 min
-    const morning = new Date(day);
-    morning.setHours(8, 0, 0, 0);
-    const morningEnd = new Date(morning.getTime() + 5 * 60_000);
-    rituals.push({
-      id: `ritual-morning-${day.toISOString().slice(0, 10)}`,
-      title: "Ranní pohled na den",
-      ritualType: "morning_day",
-      startsAt: morning.toISOString(),
-      endsAt: morningEnd.toISOString(),
-      allDay: false,
-      source: "RITUAL",
-      type: "RITUAL",
-      locationText: null,
-      description: null,
-      prepNote: null,
-      itemsToBring: null,
-    });
+    // Ranní pohled na den — pondělí až pátek 08:00, 5 min (Petr explicit:
+    // víkendy nepatří mezi pracovní rituály, ne každý den)
+    if (dow >= 0 && dow <= 4) {
+      const morning = pragueDate(year, month, day, 8, 0);
+      const morningEnd = new Date(morning.getTime() + 5 * 60_000);
+      rituals.push({
+        id: `ritual-morning-${isoDate}`,
+        title: "Ranní pohled na den",
+        ritualType: "morning_day",
+        startsAt: morning.toISOString(),
+        endsAt: morningEnd.toISOString(),
+        allDay: false,
+        source: "RITUAL",
+        type: "RITUAL",
+        locationText: null,
+        description: null,
+        prepNote: null,
+        itemsToBring: null,
+      });
+    }
 
     // Páteční reflexe — pátek 17:00, 15 min
     if (dow === 4) {
-      const reflection = new Date(day);
-      reflection.setHours(17, 0, 0, 0);
+      const reflection = pragueDate(year, month, day, 17, 0);
       const end = new Date(reflection.getTime() + 15 * 60_000);
       rituals.push({
-        id: `ritual-friday-${day.toISOString().slice(0, 10)}`,
+        id: `ritual-friday-${isoDate}`,
         title: "Páteční reflexe",
         ritualType: "friday_reflection",
         startsAt: reflection.toISOString(),
@@ -84,11 +91,10 @@ export function generateWeekRituals(weekStartMonday: Date): RitualEvent[] {
 
     // Nedělní pohled na týden — neděle 18:00, 15 min
     if (dow === 6) {
-      const review = new Date(day);
-      review.setHours(18, 0, 0, 0);
+      const review = pragueDate(year, month, day, 18, 0);
       const end = new Date(review.getTime() + 15 * 60_000);
       rituals.push({
-        id: `ritual-sunday-${day.toISOString().slice(0, 10)}`,
+        id: `ritual-sunday-${isoDate}`,
         title: "Nedělní pohled na týden",
         ritualType: "weekly_review",
         startsAt: review.toISOString(),

@@ -101,7 +101,7 @@ export default function WeekView({
   // Sloučí real eventy + rituály a rozdělí podle dne (0 = Po)
   const allEvents = useMemo(() => [...events, ...rituals], [events, rituals]);
 
-  type ByDay = { allDay: CalEvent[]; timed: CalEvent[] };
+  type ByDay = { timed: CalEvent[] };
   const byDay = useMemo<ByDay[]>(() => {
     const result: ByDay[] = [];
     for (let i = 0; i < 7; i++) {
@@ -110,18 +110,86 @@ export default function WeekView({
       const dayEnd = new Date(dayStart);
       dayEnd.setHours(23, 59, 59, 999);
       const dayEvents = allEvents.filter((e) => {
+        if (e.allDay) return false; // all-day jdou do separátní sekce
         const s = new Date(e.startsAt);
         const en = new Date(e.endsAt);
-        // Event protíná tento den
         return en > dayStart && s <= dayEnd;
       });
       result.push({
-        allDay: dayEvents.filter((e) => e.allDay),
-        timed: dayEvents.filter((e) => !e.allDay),
+        timed: dayEvents,
       });
     }
     return result;
   }, [allEvents, monday]);
+
+  // All-day eventy — spanning přes víc dní. Spočítáme startCol/endCol pro
+  // každý unikátní all-day event. Multi-day = jeden vizuální blok přes více
+  // sloupců, ne separátní badge per den.
+  type AllDaySpan = {
+    event: CalEvent;
+    startCol: number; // 0..6 (Po..Ne) inclusive
+    endCol: number;
+    row: number; // pro stacking
+  };
+  const allDaySpans = useMemo<AllDaySpan[]>(() => {
+    const sundayLocal = new Date(monday);
+    sundayLocal.setDate(sundayLocal.getDate() + 6);
+    sundayLocal.setHours(23, 59, 59, 999);
+
+    const allDayList = allEvents.filter((e) => e.allDay);
+    // Dedup podle id (event může být v originálu několikrát kvůli sync ale
+    // tady už je dedupnutý na úrovni serveru)
+    const spans: AllDaySpan[] = [];
+    for (const e of allDayList) {
+      const start = new Date(e.startsAt);
+      const end = new Date(e.endsAt);
+      // Ořež na rozsah týdne
+      const startInWeek = start < monday ? new Date(monday) : start;
+      const endInWeek = end > sundayLocal ? new Date(sundayLocal) : end;
+      // V Google/iCal je `endsAt` exclusive pro all-day → odečteme 1 ms aby
+      // byl ve správném dni
+      const endAdjusted = new Date(endInWeek.getTime() - 1);
+
+      const startCol = Math.max(
+        0,
+        Math.floor((startInWeek.getTime() - monday.getTime()) / 86_400_000),
+      );
+      const endCol = Math.min(
+        6,
+        Math.floor((endAdjusted.getTime() - monday.getTime()) / 86_400_000),
+      );
+      if (endCol < startCol || endCol < 0 || startCol > 6) continue;
+      spans.push({ event: e, startCol, endCol, row: 0 });
+    }
+    // Greedy assign rows — minimalizuje překryv
+    spans.sort((a, b) => a.startCol - b.startCol);
+    const rowEnds: number[] = []; // poslední endCol per row
+    for (const span of spans) {
+      let assigned = -1;
+      for (let r = 0; r < rowEnds.length; r++) {
+        if (rowEnds[r] < span.startCol) {
+          assigned = r;
+          break;
+        }
+      }
+      if (assigned === -1) {
+        assigned = rowEnds.length;
+        rowEnds.push(0);
+      }
+      span.row = assigned;
+      rowEnds[assigned] = span.endCol;
+    }
+    return spans;
+  }, [allEvents, monday]);
+
+  const allDayRows = useMemo(
+    () => Math.max(1, Math.max(...allDaySpans.map((s) => s.row + 1), 0)),
+    [allDaySpans],
+  );
+  const ALL_DAY_VISIBLE_ROWS = 2;
+  const [allDayExpanded, setAllDayExpanded] = useState(false);
+  const visibleAllDayRows = allDayExpanded ? allDayRows : Math.min(ALL_DAY_VISIBLE_ROWS, allDayRows);
+  const hiddenSpansCount = allDaySpans.filter((s) => s.row >= visibleAllDayRows).length;
 
   const todayDayIndex = useMemo(() => {
     const t = new Date();
@@ -232,27 +300,69 @@ export default function WeekView({
             );
           })}
 
-          {/* All-day proužek */}
+          {/* All-day spanning row — multi-day eventy jsou jeden vizuální blok
+              napříč sloupci, ne separátní per-day badge */}
           <div className="text-[9px] font-mono text-muted-foreground/70 px-1 py-0.5 border-r border-white/[0.06]">cel.den</div>
-          {byDay.map((d, i) => (
-            <div key={`ad-${i}`} className="border-r border-white/[0.06] py-0.5 px-0.5 space-y-0.5 min-h-[18px]">
-              {d.allDay.map((e) => (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => setOpenId(openId === e.id ? null : e.id)}
-                  className="w-full text-left rounded text-[10px] px-1 py-0.5 truncate"
-                  style={{
-                    background: `color-mix(in oklch, var(--tint-${sourceTint(e.source)}) 18%, transparent)`,
-                    color: `color-mix(in oklch, var(--tint-${sourceTint(e.source)}) 96%, white)`,
-                  }}
-                  title={e.title}
-                >
-                  {e.title}
-                </button>
+          <div
+            className="col-span-7 relative border-b border-white/[0.06]"
+            style={{ minHeight: `${visibleAllDayRows * 22 + 4}px` }}
+          >
+            {/* Pozadí 7 sloupců (jemný separátor) */}
+            <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="border-r border-white/[0.04]" />
               ))}
             </div>
-          ))}
+            {/* Spans */}
+            {allDaySpans
+              .filter((s) => s.row < visibleAllDayRows)
+              .map((s) => {
+                const tint = sourceTint(s.event.source);
+                const colSpan = s.endCol - s.startCol + 1;
+                return (
+                  <button
+                    key={s.event.id}
+                    type="button"
+                    onClick={() => setOpenId(openId === s.event.id ? null : s.event.id)}
+                    className="absolute text-left rounded text-[10px] px-1.5 py-0.5 truncate transition-all hover:brightness-110"
+                    style={{
+                      top: `${s.row * 22 + 2}px`,
+                      left: `calc(${(s.startCol / 7) * 100}% + 1px)`,
+                      width: `calc(${(colSpan / 7) * 100}% - 2px)`,
+                      height: "20px",
+                      background: `color-mix(in oklch, var(--tint-${tint}) 22%, transparent)`,
+                      border: `1px solid color-mix(in oklch, var(--tint-${tint}) 40%, transparent)`,
+                      color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)`,
+                    }}
+                    title={`${s.event.title} (${colSpan === 1 ? "1 den" : `${colSpan} dnů`})`}
+                  >
+                    {colSpan > 1 && <span className="opacity-50 mr-1">▸</span>}
+                    {s.event.title}
+                  </button>
+                );
+              })}
+            {/* "+ X dalších" tlačítko */}
+            {hiddenSpansCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setAllDayExpanded(true)}
+                className="absolute text-[9px] font-mono text-muted-foreground hover:text-foreground hover:underline px-1.5"
+                style={{ top: `${ALL_DAY_VISIBLE_ROWS * 22 + 2}px`, right: 4 }}
+              >
+                + {hiddenSpansCount} dalších
+              </button>
+            )}
+            {allDayExpanded && hiddenSpansCount === 0 && allDayRows > ALL_DAY_VISIBLE_ROWS && (
+              <button
+                type="button"
+                onClick={() => setAllDayExpanded(false)}
+                className="absolute text-[9px] font-mono text-muted-foreground hover:text-foreground hover:underline px-1.5"
+                style={{ bottom: 2, right: 4 }}
+              >
+                sbalit
+              </button>
+            )}
+          </div>
 
           {/* Časová osa (gutter) */}
           <div className="relative" style={{ height: totalPx }}>
@@ -267,7 +377,7 @@ export default function WeekView({
             ))}
           </div>
 
-          {/* 7 sloupců dní */}
+          {/* 7 sloupců dní (bez now čáry — ta jde napříč všemi níž) */}
           {byDay.map((d, dayIdx) => {
             const isToday = dayIdx === todayDayIndex;
             return (
@@ -290,7 +400,7 @@ export default function WeekView({
                   />
                 ))}
 
-                {/* Eventy — render přes WeekDayColumn (interní inline) */}
+                {/* Eventy */}
                 <WeekDayColumn
                   timed={d.timed}
                   hourStart={HOUR_START}
@@ -299,27 +409,43 @@ export default function WeekView({
                   openId={openId}
                   onSelect={(id) => setOpenId(openId === id ? null : id)}
                 />
-
-                {/* Now čára — terakota přes celý sloupec, jen pro dnešní */}
-                {showNowLine && isToday && (
-                  <div
-                    className="absolute left-0 right-0 pointer-events-none"
-                    style={{ top: nowPx, zIndex: 50 }}
-                  >
-                    <div
-                      style={{ borderTop: "2px solid oklch(72% 0.14 35)" }}
-                    />
-                    <span
-                      className="absolute right-1 -top-2.5 px-1 py-0 rounded text-[9px] font-mono font-bold tabular"
-                      style={{ background: "oklch(72% 0.14 35)", color: "oklch(15% 0.02 35)" }}
-                    >
-                      {fmtTime(now)}
-                    </span>
-                  </div>
-                )}
               </div>
             );
           })}
+
+          {/* Now čára — NAPŘÍČ všemi sloupci. Aktuální čas je 7:21 v Po i Pá
+              stejně. Zvýraznění aktuálního DNE je separate (header pondělí). */}
+          {showNowLine && (
+            <div
+              className="col-span-7 relative pointer-events-none"
+              style={{
+                gridColumnStart: 2,
+                gridColumnEnd: 9,
+                marginTop: -totalPx, // překryj sloupce
+                height: 0,
+                zIndex: 50,
+              }}
+            >
+              <div
+                className="absolute left-0 right-0"
+                style={{
+                  top: nowPx,
+                  borderTop: "2px solid oklch(72% 0.14 35)",
+                }}
+              />
+              <span
+                className="absolute -top-0.5 px-1.5 py-0 rounded text-[9px] font-mono font-bold tabular"
+                style={{
+                  top: `${nowPx - 8}px`,
+                  right: 4,
+                  background: "oklch(72% 0.14 35)",
+                  color: "oklch(15% 0.02 35)",
+                }}
+              >
+                {fmtTime(now)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
