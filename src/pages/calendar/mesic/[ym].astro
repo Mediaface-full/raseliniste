@@ -4,7 +4,8 @@ import Base from "../../../layouts/Base.astro";
 import MonthView from "../../../components/MonthView";
 import { prisma } from "../../../lib/db";
 import { readSession } from "../../../lib/session";
-import { interpretMonth, CZ_MONTH_NAMES } from "../../../lib/month-interpretation";
+import { interpretMonth, CZ_MONTH_NAMES_NOM } from "../../../lib/month-interpretation";
+import { generateWeekRituals, generateCustomRituals, getMondayOfWeek } from "../../../lib/week-rituals";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -75,32 +76,97 @@ for (const e of events) {
   eventsByDate.set(key, arr);
 }
 
+// Načti rituály pro každý týden v rozsahu mřížky (ovlivní hasRitual flag)
+const userForRituals = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { ritualTemplates: true },
+});
+const customRitualsRows = await prisma.customRitual.findMany({
+  where: { userId: session.uid, active: true },
+});
+const ritualsByDate = new Set<string>();
+{
+  // Mřížka pokrývá max 6 týdnů, projedeme každé pondělí
+  const weekCursor = new Date(gridStart);
+  while (weekCursor <= gridEnd) {
+    const monday = getMondayOfWeek(weekCursor);
+    const weekRituals = [
+      ...generateWeekRituals(
+        monday,
+        userForRituals?.ritualTemplates as Record<string, string> | null,
+      ),
+      ...generateCustomRituals(monday, customRitualsRows),
+    ];
+    for (const r of weekRituals) {
+      const d = new Date(r.startsAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      ritualsByDate.add(key);
+    }
+    weekCursor.setDate(weekCursor.getDate() + 7);
+  }
+}
+
 // Vygeneruj 6 řádků × 7 sloupců = 42 buněk
 const cells: Array<{
   date: string;
   dayOfMonth: number;
   isCurrentMonth: boolean;
   count: number;
-  bigEvents: { source: string; title: string }[];
+  bigEvents: { source: string; title: string; allDay: boolean }[];
+  // Všechny eventy daného dne pro hover tooltip
+  allEvents: Array<{
+    title: string;
+    source: string;
+    allDay: boolean;
+    startTime: string | null; // "HH:MM" nebo null pro all-day
+    endTime: string | null;
+  }>;
+  hasRitual: boolean;
 }> = [];
 const cursor = new Date(gridStart);
 while (cursor <= gridEnd) {
   const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
   const dayEvents = eventsByDate.get(key) ?? [];
-  const big = dayEvents.filter((e) => {
-    if (e.allDay) return true;
-    const dur = (e.endsAt.getTime() - e.startsAt.getTime()) / 3_600_000;
-    return dur >= 4;
-  }).map((e) => ({ source: e.source, title: e.title }));
+  const big = dayEvents
+    .filter((e) => {
+      if (e.allDay) return true;
+      const dur = (e.endsAt.getTime() - e.startsAt.getTime()) / 3_600_000;
+      return dur >= 3;
+    })
+    // allDay nejdřív, pak time-based podle délky descending
+    .sort((a, b) => {
+      if (a.allDay && !b.allDay) return -1;
+      if (!a.allDay && b.allDay) return 1;
+      const da = a.endsAt.getTime() - a.startsAt.getTime();
+      const db = b.endsAt.getTime() - b.startsAt.getTime();
+      return db - da;
+    })
+    .map((e) => ({ source: e.source, title: e.title, allDay: e.allDay }));
+
+  const fmt = (d: Date) =>
+    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+  const allList = dayEvents
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
+    .map((e) => ({
+      title: e.title,
+      source: e.source,
+      allDay: e.allDay,
+      startTime: e.allDay ? null : fmt(e.startsAt),
+      endTime: e.allDay ? null : fmt(e.endsAt),
+    }));
+
   cells.push({
     date: key,
     dayOfMonth: cursor.getDate(),
     isCurrentMonth: cursor.getMonth() === month,
     count: dayEvents.length,
     bigEvents: big,
+    allEvents: allList,
+    hasRitual: ritualsByDate.has(key),
   });
   cursor.setDate(cursor.getDate() + 1);
-  if (cells.length >= 42) break; // safety
+  if (cells.length >= 42) break;
 }
 
 // Interpretace měsíce — jen eventy v aktuálním měsíci
@@ -123,7 +189,8 @@ const fmtYm = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 const today = new Date();
 const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-const monthLabel = `${CZ_MONTH_NAMES[month].charAt(0).toUpperCase() + CZ_MONTH_NAMES[month].slice(1)} ${year}`;
+// Nominativ pro hlavičku ("Květen 2026", ne "Května")
+const monthLabel = `${CZ_MONTH_NAMES_NOM[month]} ${year}`;
 
 const isFullscreen = Astro.url.searchParams.get("naplno") === "1";
 // Šipky a "tento měsíc" zachovávají ?naplno=1 ať Petr nevypadne z rituálního

@@ -1,35 +1,37 @@
 /**
- * Měsíční pohled — orientační, nikoli plánovací.
+ * Měsíční pohled — orientační. Petr otevře, na první pohled vidí:
+ *  - Kde v měsíci je (zvýrazněný den + aktuální týden)
+ *  - Které dny jsou hektické a které volné (hustotní podbarvení)
+ *  - Které dny mají velké události (text v buňce, source-color)
+ *  - Co celý měsíc znamená (interpretační lišta)
  *
- * Pravidla:
- * - Žádné texty v denních buňkách
- * - Hustota podbarvení podle počtu eventů: 0/1-2/3-4/5+
- * - "Velké" eventy (allDay nebo >4h) = drobná tečka v rohu, barva = source
- * - Aktuální den: jasný terakotový rámeček
- * - Aktuální týden: jemně podbarvený řádek
- * - Klik na buňku → /day/<datum>
+ * Hover na buňku → tooltip se seznamem všech událostí daného dne.
+ * Klik na buňku → /day/<datum>.
  */
-import { Maximize2, X, Printer } from "lucide-react";
+import { useState, useRef } from "react";
+import { Maximize2, X, Printer, Sparkles } from "lucide-react";
 
-interface BasicEvent {
-  startsAt: string;
-  endsAt: string;
-  allDay: boolean;
+interface DayEvent {
   title: string;
   source: string;
+  allDay: boolean;
+  startTime: string | null;
+  endTime: string | null;
 }
 
 interface DayCell {
-  date: string; // YYYY-MM-DD
+  date: string;
   dayOfMonth: number;
   isCurrentMonth: boolean;
   count: number;
-  bigEvents: { source: string; title: string }[];
+  bigEvents: { source: string; title: string; allDay: boolean }[];
+  allEvents: DayEvent[];
+  hasRitual: boolean;
 }
 
 interface Props {
-  monthStart: string; // YYYY-MM-DD = 1. den měsíce
-  cells: DayCell[]; // 6 týdnů × 7 = 42 buněk
+  monthStart: string;
+  cells: DayCell[];
   prevMonthHref: string;
   nextMonthHref: string;
   thisMonthHref: string;
@@ -51,11 +53,16 @@ function sourceTint(src: string): string {
   return "butter";
 }
 
-function densityClass(count: number): { bg: string; opacity: number } {
+/**
+ * Hustotní podbarvení — 5 stupňů. Klient na první pohled vidí "tady budou
+ * hektické dny, tady volné". Nejtmavší = varovný signál.
+ */
+function densityStyle(count: number): { bg: string; opacity: number } {
   if (count === 0) return { bg: "transparent", opacity: 0 };
-  if (count <= 2) return { bg: "var(--foreground)", opacity: 0.05 };
-  if (count <= 4) return { bg: "var(--foreground)", opacity: 0.1 };
-  return { bg: "var(--foreground)", opacity: 0.18 };
+  if (count === 1) return { bg: "var(--foreground)", opacity: 0.04 };
+  if (count <= 3) return { bg: "var(--foreground)", opacity: 0.09 };
+  if (count <= 5) return { bg: "var(--foreground)", opacity: 0.16 };
+  return { bg: "var(--tint-rose)", opacity: 0.18 }; // 6+ = rose tint, varovný
 }
 
 export default function MonthView({
@@ -71,7 +78,9 @@ export default function MonthView({
   isFullscreen,
   exitFullscreenHref,
 }: Props) {
-  // Najdi index týdne, který obsahuje dnešek (pro subtle podbarvení řádku)
+  const ymStart = monthStart;
+
+  // Najdi index týdne s dneškem (pro subtle podbarvení řádku)
   let currentWeekIdx = -1;
   for (let i = 0; i < cells.length; i++) {
     if (cells[i].date === todayIso) {
@@ -80,11 +89,39 @@ export default function MonthView({
     }
   }
 
-  // ISO datum 1. dne aktuálního měsíce — pro link na týdenní/denní pohled
-  const ymStart = monthStart;
+  // Hover tooltip state
+  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; align: "left" | "right" }>({
+    x: 0,
+    y: 0,
+    align: "right",
+  });
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleMouseEnter(e: React.MouseEvent<HTMLAnchorElement>, date: string) {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const middle = window.innerWidth / 2;
+    const align: "left" | "right" = rect.left + rect.width / 2 > middle ? "left" : "right";
+    setHoverPos({
+      x: align === "right" ? rect.right + 8 : rect.left - 8,
+      y: rect.top,
+      align,
+    });
+    // Plynulý přechod 200ms — Petr explicit
+    hoverTimeoutRef.current = setTimeout(() => setHoveredDate(date), 200);
+  }
+
+  function handleMouseLeave() {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => setHoveredDate(null), 100);
+  }
+
+  const hoveredCell = hoveredDate ? cells.find((c) => c.date === hoveredDate) : null;
+
   return (
     <div className="space-y-3 month-print-root">
-      {/* Přepínač Den / Týden / Měsíc — vždy viditelný (i ve fullscreen) */}
+      {/* Přepínač Den/Týden/Měsíc */}
       <div className="flex items-center justify-center gap-1 print:hidden">
         <a
           href={isFullscreen ? `/day/${ymStart}?naplno=1` : `/day/${ymStart}`}
@@ -103,7 +140,11 @@ export default function MonthView({
 
       {/* Hlavička */}
       <div className="flex items-center gap-2 flex-wrap">
-        <a href={prevMonthHref} className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center" aria-label="Předchozí měsíc">
+        <a
+          href={prevMonthHref}
+          className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center"
+          aria-label="Předchozí měsíc"
+        >
           ←
         </a>
         <div className="flex-1">
@@ -114,7 +155,11 @@ export default function MonthView({
             </a>
           )}
         </div>
-        <a href={nextMonthHref} className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center" aria-label="Další měsíc">
+        <a
+          href={nextMonthHref}
+          className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center"
+          aria-label="Další měsíc"
+        >
           →
         </a>
         <button
@@ -145,11 +190,23 @@ export default function MonthView({
         )}
       </div>
 
+      {/* Legenda zdrojů */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-muted-foreground">
+        <Dot tint="sky" label="Petr" />
+        <Dot tint="rose" label="partnerka" />
+        <Dot tint="mint" label="syn" />
+        <Dot tint="butter" label="ostatní" />
+        <Dot tint="peach" label="rituál" />
+      </div>
+
       {/* Mřížka */}
       <div className="glass rounded-xl p-3">
         <div className="grid grid-cols-7 gap-1 mb-1">
           {DAY_NAMES.map((name) => (
-            <div key={name} className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground text-center py-1">
+            <div
+              key={name}
+              className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground text-center py-1"
+            >
               {name}
             </div>
           ))}
@@ -159,13 +216,17 @@ export default function MonthView({
             const weekIdx = Math.floor(i / 7);
             const inCurrentWeek = weekIdx === currentWeekIdx;
             const isToday = cell.date === todayIso;
-            const dens = densityClass(cell.count);
+            const dens = densityStyle(cell.count);
+            const visible = cell.bigEvents.slice(0, 2);
+            const remaining = cell.count - visible.length;
+
             return (
               <a
                 key={cell.date}
-                href={`/day/${cell.date}`}
-                title={`${cell.date} · ${cell.count} ${cell.count === 1 ? "událost" : cell.count >= 2 && cell.count <= 4 ? "události" : "událostí"}${cell.bigEvents.length > 0 ? "\n\nVelké: " + cell.bigEvents.map((b) => b.title).join(", ") : ""}`}
-                className={`relative aspect-square rounded-md flex items-start justify-end p-1.5 transition-all hover:brightness-125 ${
+                href={`/day/${cell.date}${isFullscreen ? "?naplno=1" : ""}`}
+                onMouseEnter={(e) => handleMouseEnter(e, cell.date)}
+                onMouseLeave={handleMouseLeave}
+                className={`relative aspect-square min-h-[80px] rounded-md flex flex-col p-1.5 transition-all hover:brightness-125 hover:scale-[1.02] ${
                   cell.isCurrentMonth ? "" : "opacity-30"
                 }`}
                 style={{
@@ -173,30 +234,57 @@ export default function MonthView({
                   border: isToday
                     ? "1.5px solid oklch(72% 0.14 35)"
                     : inCurrentWeek
-                      ? "1px solid color-mix(in oklch, var(--foreground) 6%, transparent)"
+                      ? "1px solid color-mix(in oklch, var(--foreground) 8%, transparent)"
                       : "1px solid transparent",
-                  boxShadow: inCurrentWeek && !isToday
-                    ? "inset 0 0 0 9999px color-mix(in oklch, var(--foreground) 2%, transparent)"
-                    : undefined,
+                  boxShadow:
+                    inCurrentWeek && !isToday
+                      ? "inset 0 0 0 9999px color-mix(in oklch, var(--foreground) 2%, transparent)"
+                      : undefined,
                 }}
               >
-                <span
-                  className={`text-xs font-mono tabular ${
-                    isToday ? "text-[oklch(72%_0.14_35)] font-bold" : "text-foreground/80"
-                  }`}
-                >
-                  {cell.dayOfMonth}
-                </span>
-                {/* Tečky pro velké eventy */}
-                {cell.bigEvents.length > 0 && (
-                  <div className="absolute bottom-1 left-1 flex gap-0.5">
-                    {cell.bigEvents.slice(0, 4).map((b, idx) => (
-                      <span
+                {/* Hlavička buňky — číslo dne + rituál tečka */}
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`text-xs font-mono tabular ${
+                      isToday
+                        ? "text-[oklch(72%_0.14_35)] font-bold"
+                        : "text-foreground/85"
+                    }`}
+                  >
+                    {cell.dayOfMonth}
+                  </span>
+                  {cell.hasRitual && (
+                    <Sparkles
+                      className="size-2.5"
+                      style={{ color: "var(--tint-peach)" }}
+                    />
+                  )}
+                </div>
+
+                {/* Velké události jako text v buňce */}
+                <div className="flex-1 mt-1 space-y-0.5 overflow-hidden">
+                  {visible.map((b, idx) => {
+                    const tint = sourceTint(b.source);
+                    return (
+                      <div
                         key={idx}
-                        className="size-1.5 rounded-full"
-                        style={{ background: `var(--tint-${sourceTint(b.source)})` }}
-                      />
-                    ))}
+                        className="text-[10px] leading-tight truncate font-medium"
+                        style={{
+                          color: `color-mix(in oklch, var(--tint-${tint}) 92%, white)`,
+                        }}
+                        title={b.title}
+                      >
+                        {b.allDay && <span className="opacity-50">▸ </span>}
+                        {b.title.length > 20 ? `${b.title.slice(0, 19)}…` : b.title}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* "+ X dalších" pokud je víc */}
+                {remaining > 0 && (
+                  <div className="text-[9px] font-mono text-muted-foreground mt-0.5">
+                    + {remaining} dalších
                   </div>
                 )}
               </a>
@@ -227,22 +315,117 @@ export default function MonthView({
         <span>hustota:</span>
         {[
           { c: 0, label: "0" },
-          { c: 1, label: "1-2" },
-          { c: 3, label: "3-4" },
-          { c: 5, label: "5+" },
+          { c: 1, label: "1" },
+          { c: 2, label: "2-3" },
+          { c: 4, label: "4-5" },
+          { c: 6, label: "6+" },
         ].map((s) => {
-          const d = densityClass(s.c);
+          const d = densityStyle(s.c);
           return (
             <span key={s.c} className="inline-flex items-center gap-1">
               <span
                 className="inline-block size-3 rounded-sm border border-white/10"
-                style={{ background: `color-mix(in oklch, ${d.bg} ${d.opacity * 100}%, transparent)` }}
+                style={{
+                  background: `color-mix(in oklch, ${d.bg} ${d.opacity * 100}%, transparent)`,
+                }}
               />
               {s.label}
             </span>
           );
         })}
       </div>
+
+      {/* Hover tooltip — fixed pozice, fade-in */}
+      {hoveredCell && (
+        <div
+          onMouseEnter={() => {
+            if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+          }}
+          onMouseLeave={handleMouseLeave}
+          className="fixed pointer-events-auto z-50 print:hidden"
+          style={{
+            left: hoverPos.align === "right" ? `${hoverPos.x}px` : undefined,
+            right:
+              hoverPos.align === "left"
+                ? `${window.innerWidth - hoverPos.x}px`
+                : undefined,
+            top: `${hoverPos.y}px`,
+            maxWidth: "320px",
+            animation: "fadeIn 200ms ease-out",
+          }}
+        >
+          <div className="glass-strong rounded-lg p-3 shadow-2xl border border-white/15">
+            <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
+              {formatLongDate(hoveredCell.date)}
+            </div>
+            {hoveredCell.hasRitual && (
+              <div className="text-[10px] font-mono text-[var(--tint-peach)] flex items-center gap-1 mt-1">
+                <Sparkles className="size-2.5" /> rituál
+              </div>
+            )}
+            {hoveredCell.allEvents.length === 0 ? (
+              <div className="text-xs italic text-muted-foreground mt-2">
+                Žádné události
+              </div>
+            ) : (
+              <ul className="mt-2 space-y-1 text-xs">
+                {hoveredCell.allEvents.slice(0, 8).map((ev, i) => {
+                  const tint = sourceTint(ev.source);
+                  return (
+                    <li key={i} className="flex items-start gap-2 leading-tight">
+                      <span
+                        className="font-mono tabular text-[10px] shrink-0 w-12 mt-px"
+                        style={{
+                          color: `color-mix(in oklch, var(--tint-${tint}) 80%, white)`,
+                        }}
+                      >
+                        {ev.allDay
+                          ? "celý den"
+                          : ev.startTime ?? "—"}
+                      </span>
+                      <span
+                        className="flex-1"
+                        style={{
+                          color: `color-mix(in oklch, var(--tint-${tint}) 95%, white)`,
+                        }}
+                      >
+                        {ev.title}
+                      </span>
+                    </li>
+                  );
+                })}
+                {hoveredCell.allEvents.length > 8 && (
+                  <li className="text-[10px] text-muted-foreground italic">
+                    + {hoveredCell.allEvents.length - 8} dalších
+                  </li>
+                )}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function formatLongDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString("cs-CZ", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function Dot({ tint, label }: { tint: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span
+        className="inline-block size-2 rounded-sm"
+        style={{ background: `color-mix(in oklch, var(--tint-${tint}) 50%, transparent)` }}
+      />
+      {label}
+    </span>
   );
 }
