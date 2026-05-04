@@ -29,8 +29,8 @@
  *
  * 7. **Čas v bloku NAD názvem** (Petr: "klient potřebuje vědět kdy, pak co").
  */
-import { useEffect, useState, useMemo } from "react";
-import { MapPin, X } from "lucide-react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { MapPin, X, ArrowUp, ArrowDown } from "lucide-react";
 
 interface CalendarEvent {
   id: string;
@@ -157,6 +157,9 @@ export default function DayTimeline({
 }) {
   const [now, setNow] = useState(() => new Date());
   const [openId, setOpenId] = useState<string | null>(null);
+  const [nowVisibility, setNowVisibility] = useState<"in" | "above" | "below">("in");
+  const nowMarkerRef = useRef<HTMLDivElement | null>(null);
+  const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
 
   // Update aktuálního času každou minutu
   useEffect(() => {
@@ -171,6 +174,35 @@ export default function DayTimeline({
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
+
+  // Sleduj jestli je "now" čára vidět ve viewportu (window scroll).
+  // Pokud ne, zobraz floating tlačítko "skok na teď" — Petr potřebuje vždy
+  // vědět kde v dni je.
+  useEffect(() => {
+    const el = nowMarkerRef.current;
+    if (!el) {
+      setNowVisibility("in");
+      return;
+    }
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      if (rect.bottom < 80) setNowVisibility("above");
+      else if (rect.top > vh - 80) setNowVisibility("below");
+      else setNowVisibility("in");
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [now]);
+
+  function scrollToNow() {
+    nowMarkerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   const dayStart = useMemo(() => new Date(`${date}T00:00:00`), [date]);
   const dayEnd = useMemo(() => {
@@ -191,6 +223,26 @@ export default function DayTimeline({
 
   const allDayEvents = events.filter((e) => e.allDay);
   const timedEvents = events.filter((e) => !e.allDay);
+
+  // Dominantní zdroj — pokud má jeden source ≥ 80 % eventů, je to "default"
+  // a ten badge nezobrazujeme (jen u "minoritních" zdrojů). Když je distribuce
+  // smíšená, ukážeme všechny — pro orientaci.
+  const sourceCounts = new Map<string, number>();
+  for (const e of events) {
+    sourceCounts.set(e.source, (sourceCounts.get(e.source) ?? 0) + 1);
+  }
+  const totalCount = events.length || 1;
+  const dominantSource = Array.from(sourceCounts.entries())
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+  const dominantShare = dominantSource
+    ? (sourceCounts.get(dominantSource) ?? 0) / totalCount
+    : 0;
+  // Zobrazit zdroj jen pokud je distribuce smíšená (dominant pod 80 %) NEBO
+  // event není z dominantního zdroje.
+  const showSourceBadge = (src: string): boolean => {
+    if (dominantShare >= 0.8) return src !== dominantSource;
+    return true;
+  };
 
   // ----- Window timeline -----
   // Petr: nezobrazovat ranní hodiny ve kterých se spí. Začni od first event - 1h.
@@ -360,7 +412,7 @@ export default function DayTimeline({
                     : undefined,
                 }}
               >
-                <div className="px-2.5 py-1.5 flex flex-col gap-0.5">
+                <div className="px-2.5 pt-1.5 pb-1 flex flex-col gap-0.5">
                   <div className="text-[10px] font-mono tabular font-semibold opacity-90">
                     {fmtTime(start)}–{fmtTime(end)}
                   </div>
@@ -371,7 +423,8 @@ export default function DayTimeline({
                     {e.title}
                   </div>
                   <div className="text-[9px] font-mono uppercase opacity-50 mt-0.5">
-                    {Math.round(durHours)} h · {sourceLabel(e.source)}
+                    {Math.round(durHours)} h
+                    {showSourceBadge(e.source) && ` · ${sourceLabel(e.source)}`}
                   </div>
                 </div>
               </button>
@@ -385,15 +438,13 @@ export default function DayTimeline({
             const end = new Date(e.endsAt);
             const startMin = Math.max(0, (start.getTime() - gridStart.getTime()) / 60_000);
             const endMin = Math.min(totalMin, (end.getTime() - gridStart.getTime()) / 60_000);
+            const durationMin = (end.getTime() - start.getTime()) / 60_000;
             const heightPx = Math.max(20, (endMin - startMin) * MIN_PX - BLOCK_GAP_PX);
             const isOpen = openId === e.id;
             const assignment = colMap.get(e);
             const totalColumns = assignment?.totalColumns ?? 1;
             const column = assignment?.column ?? 0;
 
-            // Jsou-li v této chvíli také background events, FG začíná v PRAVÉ
-            // polovině (50 % šířky pro long bg). Jinak FG zabírá plnou šířku
-            // od LEFT_GUTTER až k pravému okraji, dělenou počtem sloupců.
             const overlapsBg = bgEvents.some(
               (bg) =>
                 new Date(bg.startsAt).getTime() < end.getTime() &&
@@ -404,7 +455,13 @@ export default function DayTimeline({
             const fgWidth = (fgRightPercent - fgLeftPercent) / totalColumns;
             const blockLeftPercent = fgLeftPercent + column * fgWidth;
 
-            const showLocation = heightPx >= 56 && e.locationText;
+            // Adaptivní velikost obsahu podle výšky bloku
+            const isShort = heightPx < 36; // < ~30 min
+            const isMedium = heightPx >= 36 && heightPx < 60;
+            const showLocation = heightPx >= 60 && e.locationText;
+            const isLong = durationMin > LONG_THRESHOLD_MIN;
+            const showLengthBadge = isLong && heightPx >= 80;
+            const showSource = showSourceBadge(e.source);
 
             return (
               <button
@@ -429,13 +486,30 @@ export default function DayTimeline({
                     : undefined,
                 }}
               >
-                <div className="px-2 py-1 h-full flex flex-col gap-0.5 overflow-hidden">
-                  {/* ČAS NAHOŘE — Petr explicitně chtěl: kdy → co */}
-                  <div className="text-[10px] font-mono tabular font-semibold leading-tight opacity-90">
+                {/* Vždy top-aligned, padding nahoru jemný. Text vlevo + source vpravo. */}
+                <div
+                  className={`h-full flex flex-col items-stretch overflow-hidden ${
+                    isShort ? "px-1.5 pt-0.5 pb-0 gap-0" : "px-2 pt-1 pb-1 gap-0.5"
+                  }`}
+                >
+                  {/* ČAS — vždy nahoře */}
+                  <div
+                    className={`font-mono tabular font-semibold leading-none opacity-90 ${
+                      isShort ? "text-[9px]" : "text-[10px]"
+                    }`}
+                  >
                     {fmtTime(start)}–{fmtTime(end)}
                   </div>
+                  {/* NÁZEV — vždy hned pod, top-aligned. Truncate v krátkých,
+                      line-clamp-2 ve středních+. */}
                   <div
-                    className="text-xs font-medium leading-tight line-clamp-2"
+                    className={`font-medium leading-tight ${
+                      isShort
+                        ? "text-[10.5px] truncate"
+                        : isMedium
+                          ? "text-xs line-clamp-1"
+                          : "text-xs line-clamp-2"
+                    }`}
                     style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
                   >
                     {e.title}
@@ -447,10 +521,23 @@ export default function DayTimeline({
                     </div>
                   )}
                 </div>
-                {/* Source badge v rohu */}
-                <span className="absolute top-1 right-1.5 text-[9px] font-mono opacity-50">
-                  {sourceLabel(e.source)}
-                </span>
+
+                {/* Source badge — jen pokud je smíšená distribuce nebo
+                    minoritní zdroj. Navíc skryto v krátkých blocích, kam by
+                    nešel, ať nezakrývá text. */}
+                {showSource && !isShort && (
+                  <span className="absolute top-1 right-1.5 text-[9px] font-mono opacity-50">
+                    {sourceLabel(e.source)}
+                  </span>
+                )}
+
+                {/* Length badge — u všech long event (>3h) v levém dolním rohu */}
+                {showLengthBadge && (
+                  <span className="absolute bottom-1 left-2 text-[9px] font-mono uppercase opacity-50">
+                    {Math.round(durationMin / 60)} h
+                    {showSource && ` · ${sourceLabel(e.source)}`}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -458,6 +545,7 @@ export default function DayTimeline({
           {/* Now čára — terakota, přes všechno (z-50) */}
           {showNow && (
             <div
+              ref={nowMarkerRef}
               className="absolute left-0 right-0 pointer-events-none"
               style={{ top: `${nowPx}px`, zIndex: 50 }}
             >
@@ -485,6 +573,36 @@ export default function DayTimeline({
           )}
         </div>
       )}
+
+      {/* Floating tlačítko "skok na teď" — viditelné jen když je now mimo
+          viewport. Pozice: fixed na okraji obrazovky, šipka nahoru/dolů
+          podle směru. */}
+      {showNow && nowVisibility !== "in" && (
+        <button
+          type="button"
+          onClick={scrollToNow}
+          className="fixed right-3 z-40 inline-flex items-center gap-1.5 px-3 py-2 rounded-full shadow-lg text-xs font-mono font-semibold transition-all active:scale-95"
+          style={{
+            top: nowVisibility === "above" ? "5rem" : undefined,
+            bottom: nowVisibility === "below" ? "5rem" : undefined,
+            background: "oklch(72% 0.14 35 / 0.95)",
+            color: "oklch(15% 0.02 35)",
+            border: "1px solid oklch(72% 0.14 35)",
+          }}
+          aria-label="Skok na aktuální čas"
+        >
+          {nowVisibility === "above" ? (
+            <ArrowUp className="size-3.5" />
+          ) : (
+            <ArrowDown className="size-3.5" />
+          )}
+          teď · {fmtTime(now)}
+        </button>
+      )}
+
+      {/* Anchor pro scroll-into-view fallback (pokud nowMarker chybí mimo today) */}
+      <div ref={scrollAnchorRef} />
+      {/* (scrollAnchorRef je rezerva — pokud bys chtěl scrollnout někam jinam) */}
 
       {/* Detail */}
       {openId && (() => {
