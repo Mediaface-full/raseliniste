@@ -5,6 +5,7 @@ import WeekView from "../../../components/WeekView";
 import { prisma } from "../../../lib/db";
 import { readSession } from "../../../lib/session";
 import { generateWeekRituals, generateCustomRituals, getMondayOfWeek, getSundayOfWeek } from "../../../lib/week-rituals";
+import { generateAnniversaryEvents } from "../../../lib/anniversary-events";
 import { interpretWeek } from "../../../lib/week-interpretation";
 
 const session = await readSession(Astro.cookies);
@@ -60,6 +61,16 @@ const rituals = [
   ...generateCustomRituals(monday, customRitualsRows),
 ];
 
+// Výročí — samostatná entita mimo Google/iCloud, virtual events do týdne
+const anniversariesRows = await prisma.anniversary.findMany({
+  where: { userId: session.uid },
+});
+const anniversaryEvents = generateAnniversaryEvents(
+  anniversariesRows,
+  monday,
+  sunday,
+);
+
 // Interpretace
 const interpretationInput = events.map((e) => ({
   source: e.source,
@@ -88,19 +99,36 @@ const thisWeekHref = `/calendar/tyden${qs}`;
 const fullscreenHref = isFullscreen ? undefined : `${Astro.url.pathname}?naplno=1`;
 const exitFullscreenHref = isFullscreen ? Astro.url.pathname : undefined;
 
-const eventsForView = events.map((e) => ({
-  id: e.id,
-  title: e.title,
-  type: e.type,
-  source: e.source,
-  startsAt: e.startsAt.toISOString(),
-  endsAt: e.endsAt.toISOString(),
-  locationText: e.locationText,
-  description: e.description,
-  prepNote: e.prepNote,
-  itemsToBring: e.itemsToBring,
-  allDay: e.allDay,
-}));
+const eventsForView = [
+  ...events.map((e) => ({
+    id: e.id,
+    title: e.title,
+    type: e.type as string,
+    source: e.source as string,
+    startsAt: e.startsAt.toISOString(),
+    endsAt: e.endsAt.toISOString(),
+    locationText: e.locationText,
+    description: e.description,
+    prepNote: e.prepNote,
+    itemsToBring: e.itemsToBring,
+    allDay: e.allDay,
+  })),
+  // Výročí jako virtual events s ANNIVERSARY source — WeekView je vykreslí
+  // pink tintem jako allDay proužek nad osou
+  ...anniversaryEvents.map((a) => ({
+    id: a.id,
+    title: a.title,
+    type: a.type as string,
+    source: a.source as string,
+    startsAt: a.startsAt,
+    endsAt: a.endsAt,
+    locationText: a.locationText,
+    description: a.description,
+    prepNote: a.prepNote,
+    itemsToBring: a.itemsToBring,
+    allDay: a.allDay,
+  })),
+];
 
 const Layout = isFullscreen ? Base : Shell;
 const layoutProps = isFullscreen

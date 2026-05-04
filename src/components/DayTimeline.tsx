@@ -59,7 +59,8 @@ interface CalendarEvent {
 // Petr potřebuje rychle vidět čí život se v dni odehrává.
 // V rámci rodiny lze rozlišit typ skrze sytost — zatím jednotně.
 function sourceTint(src: string): string {
-  if (src === "RITUAL") return "peach"; // rituály — peach + dashed border
+  if (src === "RITUAL") return "peach";
+  if (src === "ANNIVERSARY") return "pink";
   if (src === "ICLOUD_PARTNER") return "rose";
   if (src === "ICLOUD_SON") return "mint";
   if (src === "GOOGLE_PRIMARY") return "sky";
@@ -69,6 +70,7 @@ function sourceTint(src: string): string {
 
 function sourceLabel(src: string): string {
   if (src === "RITUAL") return "✨";
+  if (src === "ANNIVERSARY") return "🕯";
   if (src === "ICLOUD_SON") return "syn";
   if (src === "ICLOUD_PARTNER") return "partner";
   if (src === "RASELINISTE") return "R";

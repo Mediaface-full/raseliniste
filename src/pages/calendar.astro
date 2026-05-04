@@ -1,27 +1,9 @@
 ---
-import Shell from "../layouts/Shell.astro";
-import CalendarView from "../components/CalendarView";
-import { prisma } from "../lib/db";
-import { readSession } from "../lib/session";
-import { isConnected } from "../lib/google-oauth";
-
-const session = await readSession(Astro.cookies);
-if (!session) return Astro.redirect("/login");
-
-const user = await prisma.user.findUnique({
-  where: { id: session.uid },
-  select: { username: true },
-});
-if (!user) return Astro.redirect("/login");
-
-const status = await isConnected(session.uid);
+// /calendar (záložka Kalendář v sidebaru) přesměrovává na týdenní pohled.
+// Defaultní pohled na desktopu = TÝDEN (Petr explicit). Petr může přepnout
+// na Den/Měsíc přes tabs v hlavičce nebo topbar buttons.
+//
+// Stará CalendarView komponenta (DayView klon ve formě tabs) byla nahrazena
+// novým systémem WeekView/MonthView/DayView se sjednocenou estetikou.
+return Astro.redirect("/calendar/tyden", 302);
 ---
-
-<Shell
-  title="Kalendář · Rašeliniště"
-  username={user.username}
-  heading="Kalendář"
-  breadcrumb={[{ label: "Organizace" }, { label: "Kalendář" }]}
->
-  <CalendarView client:load googleConnected={status.connected} />
-</Shell>

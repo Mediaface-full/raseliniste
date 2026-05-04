@@ -58,6 +58,7 @@ const DAY_NAMES_SHORT = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
 
 function sourceTint(src: string): string {
   if (src === "RITUAL") return "peach";
+  if (src === "ANNIVERSARY") return "pink";
   if (src === "ICLOUD_PARTNER") return "rose";
   if (src === "ICLOUD_SON") return "mint";
   if (src === "GOOGLE_PRIMARY") return "sky";
@@ -308,6 +309,7 @@ export default function WeekView({
         <Dot tint="mint" label="syn" />
         <Dot tint="butter" label="ostatní" />
         <Dot tint="peach" label="rituál" dashed />
+        <Dot tint="pink" label="výročí" />
       </div>
 
       {/* Týdenní mřížka */}

@@ -6,6 +6,7 @@ import { prisma } from "../../../lib/db";
 import { readSession } from "../../../lib/session";
 import { interpretMonth, CZ_MONTH_NAMES_NOM } from "../../../lib/month-interpretation";
 import { generateWeekRituals, generateCustomRituals, getMondayOfWeek } from "../../../lib/week-rituals";
+import { generateAnniversaryEvents } from "../../../lib/anniversary-events";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -66,9 +67,30 @@ const events = rawEvents.filter((e) => {
   return true;
 });
 
+// Načti výročí (samostatná entita) a vyrobí virtuální allDay events
+const anniversariesRows = await prisma.anniversary.findMany({
+  where: { userId: session.uid },
+});
+const anniversaryEvents = generateAnniversaryEvents(
+  anniversariesRows,
+  gridStart,
+  gridEnd,
+);
+type DayEv = (typeof events)[number] & { source: string };
+const allEventsForGrid: DayEv[] = [
+  ...events,
+  ...anniversaryEvents.map((a) => ({
+    title: a.title,
+    source: a.source as string,
+    startsAt: new Date(a.startsAt),
+    endsAt: new Date(a.endsAt),
+    allDay: a.allDay,
+  })),
+] as DayEv[];
+
 // Group events by start date YYYY-MM-DD (lokální datum)
-const eventsByDate = new Map<string, typeof events>();
-for (const e of events) {
+const eventsByDate = new Map<string, DayEv[]>();
+for (const e of allEventsForGrid) {
   const localDate = e.startsAt;
   const key = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, "0")}-${String(localDate.getDate()).padStart(2, "0")}`;
   const arr = eventsByDate.get(key) ?? [];

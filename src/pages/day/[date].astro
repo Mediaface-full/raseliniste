@@ -5,6 +5,7 @@ import DayView from "../../components/DayView";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 import { generateWeekRituals, generateCustomRituals, getMondayOfWeek } from "../../lib/week-rituals";
+import { generateAnniversaryEvents } from "../../lib/anniversary-events";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -73,6 +74,17 @@ const todaysRituals = allRituals.filter((r) => {
   return start >= dayStart && start <= dayEnd;
 });
 
+// Výročí — samostatná entita, nepropsaná do Google/iCloud kalendářů.
+// Načteme všechna a filtrujeme na dnešní datum.
+const anniversaries = await prisma.anniversary.findMany({
+  where: { userId: session.uid },
+});
+const todaysAnniversaries = generateAnniversaryEvents(
+  anniversaries,
+  dayStart,
+  dayEnd,
+);
+
 const initial = {
   date: dateStr,
   events: [
@@ -96,6 +108,19 @@ const initial = {
       prepNote: r.prepNote,
       itemsToBring: r.itemsToBring,
       allDay: r.allDay,
+    })),
+    ...todaysAnniversaries.map((a) => ({
+      id: a.id,
+      title: a.title,
+      type: a.type,
+      source: a.source,
+      startsAt: a.startsAt,
+      endsAt: a.endsAt,
+      locationText: a.locationText,
+      description: a.description,
+      prepNote: a.prepNote,
+      itemsToBring: a.itemsToBring,
+      allDay: a.allDay,
     })),
   ],
   dayNotes: dayNotes.map((n) => ({
