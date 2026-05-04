@@ -68,10 +68,10 @@ function fmtTime(d: Date): string {
   return d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-const HOUR_PX = 64; // px per hour
+const HOUR_PX = 76; // px per hour — vyšší rozlišení, přesnější umístění minut
 const MIN_PX = HOUR_PX / 60;
 const LEFT_GUTTER_PX = 48; // šířka pro hodinové popisky vlevo
-const BLOCK_GAP_PX = 2; // mezera mezi navazujícími bloky
+const BLOCK_GAP_PX = 2; // mezera mezi navazujícími bloky (jen ze SPODKU bloku)
 const LONG_THRESHOLD_MIN = 180; // 3h — nad tím je event "long"
 
 // ----- Sweep algoritmus pro přiřazení sloupců (interval scheduling) -----
@@ -322,12 +322,22 @@ export default function DayTimeline({
 
   return (
     <section className="glass rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-2">
         <h2 className="font-serif text-lg">Plán</h2>
         <span className="ml-auto text-xs font-mono text-muted-foreground">
           {events.length} {events.length === 1 ? "událost" : "události"}
         </span>
       </div>
+      {/* Legenda zdrojů — kompaktní pruh nad osou. Petr potřebuje rychle
+          mapovat barvu na zdroj. */}
+      {events.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-muted-foreground mb-3 pb-2 border-b border-white/[0.05]">
+          <LegendDot tint="sky" label="Petr" />
+          <LegendDot tint="rose" label="partnerka" />
+          <LegendDot tint="mint" label="syn" />
+          <LegendDot tint="butter" label="ostatní" />
+        </div>
+      )}
 
       {/* All-day proužky nad osou */}
       {allDayEvents.length > 0 && (
@@ -399,9 +409,11 @@ export default function DayTimeline({
                 onClick={() => setOpenId(isOpen ? null : e.id)}
                 className="absolute rounded-lg overflow-hidden text-left transition-all hover:brightness-110 active:scale-[0.99]"
                 style={{
-                  top: `${startMin * MIN_PX + BLOCK_GAP_PX / 2}px`,
-                  height: `${(endMin - startMin) * MIN_PX - BLOCK_GAP_PX}px`,
-                  // Levá polovina: od LEFT_GUTTER do středu
+                  // Přesný top podle startMin — žádný offset, pixel-perfect
+                  top: `${startMin * MIN_PX}px`,
+                  // Gap se odečítá jen z DNA bloku, ne z TOPu — top musí
+                  // přesně sedět s časem začátku
+                  height: `${Math.max(20, (endMin - startMin) * MIN_PX - BLOCK_GAP_PX)}px`,
                   left: `${LEFT_GUTTER_PX}px`,
                   width: `calc(50% - ${LEFT_GUTTER_PX / 2}px)`,
                   background: `color-mix(in oklch, var(--tint-${tint}) 18%, transparent)`,
@@ -439,7 +451,8 @@ export default function DayTimeline({
             const startMin = Math.max(0, (start.getTime() - gridStart.getTime()) / 60_000);
             const endMin = Math.min(totalMin, (end.getTime() - gridStart.getTime()) / 60_000);
             const durationMin = (end.getTime() - start.getTime()) / 60_000;
-            const heightPx = Math.max(20, (endMin - startMin) * MIN_PX - BLOCK_GAP_PX);
+            // Přesná výška: gap odečteme jen ze spodku bloku, top sedí pixel-perfect
+            const heightPx = Math.max(18, (endMin - startMin) * MIN_PX - BLOCK_GAP_PX);
             const isOpen = openId === e.id;
             const assignment = colMap.get(e);
             const totalColumns = assignment?.totalColumns ?? 1;
@@ -470,7 +483,8 @@ export default function DayTimeline({
                 onClick={() => setOpenId(isOpen ? null : e.id)}
                 className="absolute rounded-lg overflow-hidden text-left transition-all hover:brightness-110 active:scale-[0.99]"
                 style={{
-                  top: `${startMin * MIN_PX + BLOCK_GAP_PX / 2}px`,
+                  // Přesný top podle startMin — pixel-perfect
+                  top: `${startMin * MIN_PX}px`,
                   height: `${heightPx}px`,
                   left:
                     overlapsBg
@@ -542,33 +556,47 @@ export default function DayTimeline({
             );
           })}
 
-          {/* Now čára — terakota, přes všechno (z-50) */}
+          {/* Now čára — terakota, přes všechno (z-50). Čára jde přes celou
+              šířku osy (od LEFT_GUTTER doprava). Časový badge se vznáší NA
+              čáře v pravé části (mimo gutter, aby nepřekrýval popisek hodiny). */}
           {showNow && (
             <div
               ref={nowMarkerRef}
               className="absolute left-0 right-0 pointer-events-none"
               style={{ top: `${nowPx}px`, zIndex: 50 }}
             >
-              <div className="flex items-center">
-                <span
-                  className="text-[10px] font-mono font-bold w-12 -translate-y-2 tabular shrink-0"
-                  style={{ color: "oklch(72% 0.14 35)" }}
-                >
-                  {fmtTime(now)}
-                </span>
-                <div className="flex-1 flex items-center">
-                  <div
-                    className="size-2 rounded-full -translate-y-[3px]"
-                    style={{ background: "oklch(72% 0.14 35)" }}
-                  />
-                  <div
-                    className="flex-1"
-                    style={{
-                      borderTop: "2px solid oklch(72% 0.14 35)",
-                    }}
-                  />
-                </div>
-              </div>
+              {/* Čára přes celou šířku osy — přesně na nowPx */}
+              <div
+                className="absolute"
+                style={{
+                  left: `${LEFT_GUTTER_PX}px`,
+                  right: 0,
+                  top: 0,
+                  borderTop: "2px solid oklch(72% 0.14 35)",
+                }}
+              />
+              {/* Levý bod na začátku čáry */}
+              <div
+                className="absolute size-2 rounded-full"
+                style={{
+                  left: `${LEFT_GUTTER_PX - 4}px`,
+                  top: "-3px",
+                  background: "oklch(72% 0.14 35)",
+                }}
+              />
+              {/* Časový badge — pill nad čárou na pravé straně, mimo gutter
+                  i nad bloky (ne uprostřed kde by maskoval text) */}
+              <span
+                className="absolute text-[10px] font-mono font-bold tabular px-1.5 py-0.5 rounded"
+                style={{
+                  right: "0.25rem",
+                  top: "-9px",
+                  background: "oklch(72% 0.14 35)",
+                  color: "oklch(15% 0.02 35)",
+                }}
+              >
+                {fmtTime(now)}
+              </span>
             </div>
           )}
         </div>
@@ -664,15 +692,6 @@ export default function DayTimeline({
         );
       })()}
 
-      {/* Legenda zdrojů — pomáhá si rychle namapovat barvy */}
-      {events.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-white/[0.06] flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-muted-foreground">
-          <LegendDot tint="sky" label="Petr" />
-          <LegendDot tint="rose" label="partnerka" />
-          <LegendDot tint="mint" label="syn" />
-          <LegendDot tint="butter" label="ostatní" />
-        </div>
-      )}
     </section>
   );
 }
