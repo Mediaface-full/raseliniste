@@ -354,7 +354,10 @@ export default function MonthView({
             animation: "fadeIn 200ms ease-out",
           }}
         >
-          <div className="glass-strong rounded-lg p-3 shadow-2xl border border-white/15">
+          <div
+            className="glass-strong rounded-lg p-3 shadow-2xl border border-white/15"
+            style={{ background: "oklch(14% 0.025 260 / 0.92)" }}
+          >
             <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
               {formatLongDate(hoveredCell.date)}
             </div>
