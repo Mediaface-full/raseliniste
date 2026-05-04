@@ -424,20 +424,29 @@ export default function DayTimeline({
                     : undefined,
                 }}
               >
-                <div className="px-2.5 pt-1.5 pb-1 flex flex-col gap-0.5">
-                  <div className="text-[10px] font-mono tabular font-semibold opacity-90">
-                    {fmtTime(start)}–{fmtTime(end)}
+                {/* Top group (čas + název) v levém horním rohu, length+source
+                    v levém dolním rohu. flex justify-between roztáhne mezery —
+                    název zůstává čitelný i když přes střed jde fg blok.
+                    Pokud je BG event krátký (≤2h výšky bloku), length se
+                    vynechá aby nezahltil malý prostor. */}
+                <div className="h-full flex flex-col justify-between px-2.5 py-1.5">
+                  <div className="space-y-0.5">
+                    <div className="text-[10px] font-mono tabular font-semibold opacity-90">
+                      {fmtTime(start)}–{fmtTime(end)}
+                    </div>
+                    <div
+                      className="text-xs font-medium leading-tight line-clamp-2"
+                      style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
+                    >
+                      {e.title}
+                    </div>
                   </div>
-                  <div
-                    className="text-xs font-medium leading-tight line-clamp-3"
-                    style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
-                  >
-                    {e.title}
-                  </div>
-                  <div className="text-[9px] font-mono uppercase opacity-50 mt-0.5">
-                    {Math.round(durHours)} h
-                    {showSourceBadge(e.source) && ` · ${sourceLabel(e.source)}`}
-                  </div>
+                  {durHours > 2 && (
+                    <div className="text-[9px] font-mono uppercase opacity-60 leading-none">
+                      {Math.round(durHours)} h
+                      {showSourceBadge(e.source) && ` · ${sourceLabel(e.source)}`}
+                    </div>
+                  )}
                 </div>
               </button>
             );
