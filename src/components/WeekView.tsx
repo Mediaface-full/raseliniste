@@ -141,33 +141,45 @@ export default function WeekView({
     row: number; // pro stacking
   };
   const allDaySpans = useMemo<AllDaySpan[]>(() => {
-    const sundayLocal = new Date(monday);
-    sundayLocal.setDate(sundayLocal.getDate() + 6);
-    sundayLocal.setHours(23, 59, 59, 999);
+    // KLÍČOVÉ: porovnáváme kalendářní dny v PRAHA TZ, ne UTC ms.
+    // UTC posun (CEST = +2) způsoboval že 1-den allDay event uložený jako
+    // 2026-05-09T00:00:00Z se zobrazil přes 2 dny — endAdjusted se v UTC
+    // počítání "překlopilo" do následujícího dne.
+    const dayKey = (d: Date): string =>
+      d.toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" });
+
+    const weekDayKeys: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + i);
+      weekDayKeys.push(dayKey(d));
+    }
 
     const allDayList = allEvents.filter((e) => e.allDay);
-    // Dedup podle id (event může být v originálu několikrát kvůli sync ale
-    // tady už je dedupnutý na úrovni serveru)
     const spans: AllDaySpan[] = [];
     for (const e of allDayList) {
       const start = new Date(e.startsAt);
       const end = new Date(e.endsAt);
-      // Ořež na rozsah týdne
-      const startInWeek = start < monday ? new Date(monday) : start;
-      const endInWeek = end > sundayLocal ? new Date(sundayLocal) : end;
       // V Google/iCal je `endsAt` exclusive pro all-day → odečteme 1 ms aby
-      // byl ve správném dni
-      const endAdjusted = new Date(endInWeek.getTime() - 1);
+      // byl ve správném kalendářním dni
+      const endAdjusted = new Date(end.getTime() - 1);
 
-      const startCol = Math.max(
-        0,
-        Math.floor((startInWeek.getTime() - monday.getTime()) / 86_400_000),
-      );
-      const endCol = Math.min(
-        6,
-        Math.floor((endAdjusted.getTime() - monday.getTime()) / 86_400_000),
-      );
-      if (endCol < startCol || endCol < 0 || startCol > 6) continue;
+      const startKey = dayKey(start);
+      const endKey = dayKey(endAdjusted);
+
+      let startCol = weekDayKeys.indexOf(startKey);
+      let endCol = weekDayKeys.indexOf(endKey);
+
+      // Pokud event přesahuje týden zleva/zprava, ořež na rozsah
+      if (startCol === -1 && endCol === -1) {
+        // Možná oba před týdnem nebo za týdnem? Zkontroluj jestli event
+        // protíná týden vůbec — porovnání day keys
+        if (startKey > weekDayKeys[6] || endKey < weekDayKeys[0]) continue;
+      }
+      if (startCol === -1) startCol = 0;
+      if (endCol === -1) endCol = 6;
+      if (endCol < startCol) continue;
+
       spans.push({ event: e, startCol, endCol, row: 0 });
     }
     // Greedy assign rows — minimalizuje překryv
