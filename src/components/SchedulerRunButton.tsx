@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Loader2, Play, RotateCw, RefreshCcw, Trash2 } from "lucide-react";
+import { Loader2, Play, RotateCw, RefreshCcw, Trash2, Eraser } from "lucide-react";
 
 /**
  * Tlačítko „Spustit teď" v /settings/crons — manuální dispatch scheduleru
  * bez nutnosti SSH curlu. Po doběhu přesměruje na refresh stránky.
  */
 export default function SchedulerRunButton() {
-  const [busy, setBusy] = useState<"run" | "dryrun" | "reset" | "hardreset" | null>(null);
+  const [busy, setBusy] = useState<"run" | "dryrun" | "reset" | "hardreset" | "wipe" | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any | null>(null);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
@@ -29,6 +29,29 @@ export default function SchedulerRunButton() {
         return;
       }
       setResetMsg(data.note ?? "Token resetován. Klikni Spustit teď.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function wipeOrphanTasks() {
+    if (!confirm(
+      "Smaže lokální Task rows, které nemají vazbu na Todoist (todoistTaskId IS NULL) " +
+      "a jsou ve stavu open. Tasky napojené na VIP/VYRUŠENÍ a uzavřené tasky zůstanou. " +
+      "Tohle je čistící krok před importem z Things. POKRAČOVAT?",
+    )) return;
+    if (!confirm("Opravdu? Smazané Task rows nelze vrátit zpět.")) return;
+    setBusy("wipe");
+    setErr(null);
+    setResetMsg(null);
+    try {
+      const res = await fetch("/api/todoist/reset-sync?wipeTasks=1", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setErr(data.error ?? "Wipe selhal.");
+        return;
+      }
+      setResetMsg(`WIPE hotov: smazáno ${data.deletedTasks} orphan open Tasků. ${data.note ?? ""}`);
     } finally {
       setBusy(null);
     }
@@ -123,6 +146,15 @@ export default function SchedulerRunButton() {
         >
           {busy === "hardreset" ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
           Hard reset mirror
+        </button>
+        <button
+          onClick={wipeOrphanTasks}
+          disabled={busy !== null}
+          className="px-3 py-1.5 rounded-md bg-destructive/10 border border-destructive/40 hover:bg-destructive/20 text-destructive text-sm flex items-center gap-1.5 transition disabled:opacity-50"
+          title="Smaže Task rows kde todoistTaskId IS NULL a status='open'. Pro čištění před /things-import migrací. Done a Todoist-napojené tasky zůstanou."
+        >
+          {busy === "wipe" ? <Loader2 className="size-4 animate-spin" /> : <Eraser className="size-4" />}
+          Wipe orphan Tasks
         </button>
       </div>
 
