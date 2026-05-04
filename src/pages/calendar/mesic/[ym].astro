@@ -1,0 +1,159 @@
+---
+import Shell from "../../../layouts/Shell.astro";
+import Base from "../../../layouts/Base.astro";
+import MonthView from "../../../components/MonthView";
+import { prisma } from "../../../lib/db";
+import { readSession } from "../../../lib/session";
+import { interpretMonth, CZ_MONTH_NAMES } from "../../../lib/month-interpretation";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const ymParam = Astro.params.ym;
+if (!ymParam || !/^\d{4}-\d{2}$/.test(ymParam)) {
+  return Astro.redirect("/calendar/mesic");
+}
+const [yearStr, monthStr] = ymParam.split("-");
+const year = parseInt(yearStr, 10);
+const month = parseInt(monthStr, 10) - 1; // JS month index
+
+const monthStart = new Date(year, month, 1, 0, 0, 0, 0);
+const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+// Mřížka začíná pondělím týdne, ve kterém je 1. den měsíce, končí nedělí týdne posledního dne
+const gridStart = new Date(monthStart);
+const startDow = gridStart.getDay();
+const offsetStart = startDow === 0 ? -6 : 1 - startDow;
+gridStart.setDate(gridStart.getDate() + offsetStart);
+gridStart.setHours(0, 0, 0, 0);
+
+const gridEnd = new Date(monthEnd);
+const endDow = gridEnd.getDay();
+const offsetEnd = endDow === 0 ? 0 : 7 - endDow;
+gridEnd.setDate(gridEnd.getDate() + offsetEnd);
+gridEnd.setHours(23, 59, 59, 999);
+
+// Načti eventy v rozsahu mřížky (ne jen měsíce — buňky před/za měsícem mohou
+// patřit do předchozího/dalšího měsíce a chceme jejich hustotu).
+const rawEvents = await prisma.calendarEvent.findMany({
+  where: {
+    deletedRemotely: false,
+    AND: [{ endsAt: { gt: gridStart } }, { startsAt: { lte: gridEnd } }],
+  },
+  select: {
+    title: true,
+    source: true,
+    startsAt: true,
+    endsAt: true,
+    allDay: true,
+  },
+  orderBy: { startsAt: "asc" },
+});
+
+// Dedup
+const seen = new Set<string>();
+const events = rawEvents.filter((e) => {
+  const key = `${e.source}|${e.title}|${e.startsAt.getTime()}|${e.endsAt.getTime()}`;
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+});
+
+// Group events by start date YYYY-MM-DD (lokální datum)
+const eventsByDate = new Map<string, typeof events>();
+for (const e of events) {
+  const localDate = e.startsAt;
+  const key = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, "0")}-${String(localDate.getDate()).padStart(2, "0")}`;
+  const arr = eventsByDate.get(key) ?? [];
+  arr.push(e);
+  eventsByDate.set(key, arr);
+}
+
+// Vygeneruj 6 řádků × 7 sloupců = 42 buněk
+const cells: Array<{
+  date: string;
+  dayOfMonth: number;
+  isCurrentMonth: boolean;
+  count: number;
+  bigEvents: { source: string; title: string }[];
+}> = [];
+const cursor = new Date(gridStart);
+while (cursor <= gridEnd) {
+  const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+  const dayEvents = eventsByDate.get(key) ?? [];
+  const big = dayEvents.filter((e) => {
+    if (e.allDay) return true;
+    const dur = (e.endsAt.getTime() - e.startsAt.getTime()) / 3_600_000;
+    return dur >= 4;
+  }).map((e) => ({ source: e.source, title: e.title }));
+  cells.push({
+    date: key,
+    dayOfMonth: cursor.getDate(),
+    isCurrentMonth: cursor.getMonth() === month,
+    count: dayEvents.length,
+    bigEvents: big,
+  });
+  cursor.setDate(cursor.getDate() + 1);
+  if (cells.length >= 42) break; // safety
+}
+
+// Interpretace měsíce — jen eventy v aktuálním měsíci
+const inMonthEvents = events.filter(
+  (e) => e.startsAt.getMonth() === month && e.startsAt.getFullYear() === year,
+).map((e) => ({
+  startsAt: e.startsAt.toISOString(),
+  endsAt: e.endsAt.toISOString(),
+  allDay: e.allDay,
+  title: e.title,
+  source: e.source,
+}));
+const { lines: interpretation } = interpretMonth(monthStart, inMonthEvents);
+
+// Navigation
+const prevMonth = new Date(year, month - 1, 1);
+const nextMonth = new Date(year, month + 1, 1);
+const fmtYm = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+const today = new Date();
+const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+const monthLabel = `${CZ_MONTH_NAMES[month].charAt(0).toUpperCase() + CZ_MONTH_NAMES[month].slice(1)} ${year}`;
+
+const isFullscreen = Astro.url.searchParams.get("naplno") === "1";
+const fullscreenHref = isFullscreen ? undefined : `${Astro.url.pathname}?naplno=1`;
+const exitFullscreenHref = isFullscreen ? Astro.url.pathname : undefined;
+
+const Layout = isFullscreen ? Base : Shell;
+const layoutProps = isFullscreen
+  ? { title: `${monthLabel} · Rašeliniště` }
+  : {
+      title: `${monthLabel} · Rašeliniště`,
+      username: user.username,
+      breadcrumb: [{ label: "Kalendář" }, { label: "Měsíc" }],
+    };
+---
+
+<Layout {...layoutProps}>
+  <div class={isFullscreen ? "max-w-[1200px] mx-auto p-4" : ""}>
+    <MonthView
+      client:load
+      monthStart={`${year}-${String(month + 1).padStart(2, "0")}-01`}
+      cells={cells}
+      prevMonthHref={`/calendar/mesic/${fmtYm(prevMonth)}`}
+      nextMonthHref={`/calendar/mesic/${fmtYm(nextMonth)}`}
+      thisMonthHref="/calendar/mesic"
+      monthLabel={monthLabel}
+      todayIso={todayIso}
+      interpretation={interpretation}
+      fullscreenHref={fullscreenHref}
+      isFullscreen={isFullscreen}
+      exitFullscreenHref={exitFullscreenHref}
+    />
+  </div>
+</Layout>

@@ -1,0 +1,12 @@
+---
+// Redirect na aktuální týden — Po-Ne, Petrova lokální TZ.
+// Cílová URL používá ISO datum pondělí toho týdne.
+const today = new Date();
+const dow = today.getDay(); // 0 = Ne
+const offsetToMonday = dow === 0 ? -6 : 1 - dow;
+const monday = new Date(today);
+monday.setHours(0, 0, 0, 0);
+monday.setDate(monday.getDate() + offsetToMonday);
+const iso = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+return Astro.redirect(`/calendar/tyden/${iso}`, 302);
+---

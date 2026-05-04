@@ -156,6 +156,23 @@ export default function DayView({ initial }: { initial: Initial }) {
 
   return (
     <div className="space-y-4">
+      {/* Přepínač Den / Týden / Měsíc */}
+      <div className="flex items-center justify-center gap-1">
+        <span className="px-3 py-1 rounded-md bg-white/10 text-xs font-mono">Den</span>
+        <a
+          href={`/calendar/tyden/${date}`}
+          className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          Týden
+        </a>
+        <a
+          href={`/calendar/mesic/${date.slice(0, 7)}`}
+          className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          Měsíc
+        </a>
+      </div>
+
       {/* Hlavička s navigací */}
       <div className="flex items-center justify-between gap-3">
         <a

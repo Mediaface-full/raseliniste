@@ -1,0 +1,5 @@
+---
+const today = new Date();
+const ym = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+return Astro.redirect(`/calendar/mesic/${ym}`, 302);
+---

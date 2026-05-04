@@ -1,0 +1,119 @@
+---
+import Shell from "../../../layouts/Shell.astro";
+import Base from "../../../layouts/Base.astro";
+import WeekView from "../../../components/WeekView";
+import { prisma } from "../../../lib/db";
+import { readSession } from "../../../lib/session";
+import { generateWeekRituals, getMondayOfWeek, getSundayOfWeek } from "../../../lib/week-rituals";
+import { interpretWeek } from "../../../lib/week-interpretation";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// param může být kterékoli ISO datum v týdnu — najdeme pondělí
+const dateParam = Astro.params.date;
+if (!dateParam || !/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+  return Astro.redirect("/calendar/tyden");
+}
+const anchor = new Date(`${dateParam}T00:00:00`);
+const monday = getMondayOfWeek(anchor);
+const sunday = getSundayOfWeek(monday);
+const mondayIso = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+
+// Pokud URL neodpovídá pondělí, redirect na canonical
+if (mondayIso !== dateParam) {
+  return Astro.redirect(`/calendar/tyden/${mondayIso}`);
+}
+
+// Načti eventy pro tento týden (s dedupem podle source/title/start/end ve view)
+const rawEvents = await prisma.calendarEvent.findMany({
+  where: {
+    deletedRemotely: false,
+    AND: [{ endsAt: { gt: monday } }, { startsAt: { lte: sunday } }],
+  },
+  orderBy: { startsAt: "asc" },
+});
+
+const seen = new Set<string>();
+const events = rawEvents.filter((e) => {
+  const key = `${e.source}|${e.title}|${e.startsAt.getTime()}|${e.endsAt.getTime()}`;
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+});
+
+// Generuj rituály
+const rituals = generateWeekRituals(monday);
+
+// Interpretace
+const interpretationInput = events.map((e) => ({
+  source: e.source,
+  startsAt: e.startsAt.toISOString(),
+  endsAt: e.endsAt.toISOString(),
+  allDay: e.allDay,
+}));
+const interpretation = interpretWeek(monday, interpretationInput, rituals.length);
+
+// Navigation hrefs
+const prev = new Date(monday);
+prev.setDate(prev.getDate() - 7);
+const next = new Date(monday);
+next.setDate(next.getDate() + 7);
+const fmtIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const prevHref = `/calendar/tyden/${fmtIso(prev)}`;
+const nextHref = `/calendar/tyden/${fmtIso(next)}`;
+
+// Fullscreen mode přes query string ?naplno=1
+const isFullscreen = Astro.url.searchParams.get("naplno") === "1";
+const fullscreenHref = isFullscreen ? undefined : `${Astro.url.pathname}?naplno=1`;
+const exitFullscreenHref = isFullscreen ? Astro.url.pathname : undefined;
+
+const eventsForView = events.map((e) => ({
+  id: e.id,
+  title: e.title,
+  type: e.type,
+  source: e.source,
+  startsAt: e.startsAt.toISOString(),
+  endsAt: e.endsAt.toISOString(),
+  locationText: e.locationText,
+  description: e.description,
+  prepNote: e.prepNote,
+  itemsToBring: e.itemsToBring,
+  allDay: e.allDay,
+}));
+
+const Layout = isFullscreen ? Base : Shell;
+const layoutProps = isFullscreen
+  ? { title: `Týden ${mondayIso} · Rašeliniště` }
+  : {
+      title: `Týden ${mondayIso} · Rašeliniště`,
+      username: user.username,
+      breadcrumb: [{ label: "Kalendář" }, { label: "Týden" }],
+    };
+---
+
+<Layout {...layoutProps}>
+  <div class={isFullscreen ? "max-w-[1400px] mx-auto p-4" : ""}>
+    <WeekView
+      client:load
+      events={eventsForView}
+      rituals={rituals}
+      weekStart={mondayIso}
+      interpretation={interpretation}
+      prevWeekHref={prevHref}
+      nextWeekHref={nextHref}
+      thisWeekHref="/calendar/tyden"
+      fullscreenHref={fullscreenHref}
+      isFullscreen={isFullscreen}
+      exitFullscreenHref={exitFullscreenHref}
+    />
+  </div>
+</Layout>
