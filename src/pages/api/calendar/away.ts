@@ -45,12 +45,18 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       : `💻 NOMÁD: ${title ?? "Pracuji odjinud"}`;
 
   try {
+    // POZNÁMKA: outOfOffice flag NEpoužíváme — Google API totiž odmítá
+    // kombinaci eventType=outOfOffice + all-day. Workaround na timed event
+    // 00:00-24:00 v Praha TZ vedl k vizuálně rozbitému zobrazení v
+    // Fantasticalu (gigantický modrý blok přes 24 hodin místo all-day badge).
+    // Petr má v Rašeliništi vlastní rules engine pro auto-decline pozvánek
+    // přes verdict GREEN/YELLOW/RED — Google native OOO nepotřebuje.
+    // Klasifikátor v Rašeliništi rozezná OOO podle prefixu 🌴 / 💻 NOMÁD.
     const result = await createGoogleEvent(session.uid, {
       summary,
       startsAt,
       endsAt: endsAtExclusive,
       allDay: true,
-      outOfOffice: mode === "FULL",
     });
     return Response.json({ ok: true, eventId: result.eventId, htmlLink: result.htmlLink });
   } catch (e) {
