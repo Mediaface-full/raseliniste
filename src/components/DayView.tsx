@@ -71,14 +71,19 @@ export default function DayView({ initial }: { initial: Initial }) {
     year: "numeric",
   });
 
+  // Detekce fullscreen módu z URL — šipky a switch tabů musí query string
+  // zachovat, jinak Petr vypadne z rituálního prostoru
+  const isFullscreen = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("naplno") === "1";
+  const qs = isFullscreen ? "?naplno=1" : "";
+
   function dayHref(delta: number): string {
     const d = new Date(dateObj);
     d.setDate(d.getDate() + delta);
-    // Lokální datum (ne toISOString — ten dělá UTC posun)
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
-    return `/day/${y}-${m}-${day}`;
+    return `/day/${y}-${m}-${day}${qs}`;
   }
 
   async function addNote() {
@@ -160,13 +165,13 @@ export default function DayView({ initial }: { initial: Initial }) {
       <div className="flex items-center justify-center gap-1">
         <span className="px-3 py-1 rounded-md bg-white/10 text-xs font-mono">Den</span>
         <a
-          href={`/calendar/tyden/${date}`}
+          href={`/calendar/tyden/${date}${qs}`}
           className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
         >
           Týden
         </a>
         <a
-          href={`/calendar/mesic/${date.slice(0, 7)}`}
+          href={`/calendar/mesic/${date.slice(0, 7)}${qs}`}
           className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
         >
           Měsíc
@@ -188,7 +193,7 @@ export default function DayView({ initial }: { initial: Initial }) {
           </div>
           <h1 className="font-serif text-2xl">{dateLabel}</h1>
           <a
-            href="/dnes"
+            href={`/dnes${qs}`}
             className="text-[10px] uppercase tracking-widest font-mono text-[var(--tint-sky)] hover:underline"
           >
             ↻ dnes

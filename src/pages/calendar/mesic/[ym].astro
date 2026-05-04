@@ -126,6 +126,9 @@ const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart
 const monthLabel = `${CZ_MONTH_NAMES[month].charAt(0).toUpperCase() + CZ_MONTH_NAMES[month].slice(1)} ${year}`;
 
 const isFullscreen = Astro.url.searchParams.get("naplno") === "1";
+// Šipky a "tento měsíc" zachovávají ?naplno=1 ať Petr nevypadne z rituálního
+// prostoru když přelistuje na sousední měsíc.
+const qs = isFullscreen ? "?naplno=1" : "";
 const fullscreenHref = isFullscreen ? undefined : `${Astro.url.pathname}?naplno=1`;
 const exitFullscreenHref = isFullscreen ? Astro.url.pathname : undefined;
 
@@ -145,9 +148,9 @@ const layoutProps = isFullscreen
       client:load
       monthStart={`${year}-${String(month + 1).padStart(2, "0")}-01`}
       cells={cells}
-      prevMonthHref={`/calendar/mesic/${fmtYm(prevMonth)}`}
-      nextMonthHref={`/calendar/mesic/${fmtYm(nextMonth)}`}
-      thisMonthHref="/calendar/mesic"
+      prevMonthHref={`/calendar/mesic/${fmtYm(prevMonth)}${qs}`}
+      nextMonthHref={`/calendar/mesic/${fmtYm(nextMonth)}${qs}`}
+      thisMonthHref={`/calendar/mesic${qs}`}
       monthLabel={monthLabel}
       todayIso={todayIso}
       interpretation={interpretation}

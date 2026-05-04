@@ -1,5 +1,6 @@
 ---
 import Shell from "../../layouts/Shell.astro";
+import Base from "../../layouts/Base.astro";
 import DayView from "../../components/DayView";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
@@ -76,12 +77,20 @@ const initial = {
 };
 ---
 
-<Shell
-  title={`Den ${dateStr} · Rašeliniště`}
-  username={user.username}
-  breadcrumb={[{ label: "Kalendář" }, { label: "Den" }]}
->
-  <div class="max-w-3xl mx-auto">
-    <DayView client:load initial={initial} />
-  </div>
-</Shell>
+{Astro.url.searchParams.get("naplno") === "1" ? (
+  <Base title={`Den ${dateStr} · Rašeliniště`}>
+    <div class="max-w-3xl mx-auto p-4">
+      <DayView client:load initial={initial} />
+    </div>
+  </Base>
+) : (
+  <Shell
+    title={`Den ${dateStr} · Rašeliniště`}
+    username={user.username}
+    breadcrumb={[{ label: "Kalendář" }, { label: "Den" }]}
+  >
+    <div class="max-w-3xl mx-auto">
+      <DayView client:load initial={initial} />
+    </div>
+  </Shell>
+)}

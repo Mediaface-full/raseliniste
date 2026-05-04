@@ -4,5 +4,7 @@
 // chceme aby se po otevření vždy zobrazil aktuální den, ne datum,
 // kdy se ikona vytvořila.
 const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" });
-return Astro.redirect(`/day/${today}`, 302);
+// Zachovej ?naplno=1 (pokud je v URL) — fullscreen ritual mode
+const qs = Astro.url.searchParams.get("naplno") === "1" ? "?naplno=1" : "";
+return Astro.redirect(`/day/${today}${qs}`, 302);
 ---

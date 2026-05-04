@@ -68,11 +68,14 @@ next.setDate(next.getDate() + 7);
 const fmtIso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-const prevHref = `/calendar/tyden/${fmtIso(prev)}`;
-const nextHref = `/calendar/tyden/${fmtIso(next)}`;
-
 // Fullscreen mode přes query string ?naplno=1
 const isFullscreen = Astro.url.searchParams.get("naplno") === "1";
+// Šipky a "tento týden" zachovávají ?naplno=1 ať Petr nevypadne z rituálního
+// prostoru když přelistuje na sousední týden.
+const qs = isFullscreen ? "?naplno=1" : "";
+const prevHref = `/calendar/tyden/${fmtIso(prev)}${qs}`;
+const nextHref = `/calendar/tyden/${fmtIso(next)}${qs}`;
+const thisWeekHref = `/calendar/tyden${qs}`;
 const fullscreenHref = isFullscreen ? undefined : `${Astro.url.pathname}?naplno=1`;
 const exitFullscreenHref = isFullscreen ? Astro.url.pathname : undefined;
 
@@ -110,7 +113,7 @@ const layoutProps = isFullscreen
       interpretation={interpretation}
       prevWeekHref={prevHref}
       nextWeekHref={nextHref}
-      thisWeekHref="/calendar/tyden"
+      thisWeekHref={thisWeekHref}
       fullscreenHref={fullscreenHref}
       isFullscreen={isFullscreen}
       exitFullscreenHref={exitFullscreenHref}

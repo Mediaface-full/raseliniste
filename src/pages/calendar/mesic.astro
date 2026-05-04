@@ -1,5 +1,6 @@
 ---
 const today = new Date();
 const ym = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-return Astro.redirect(`/calendar/mesic/${ym}`, 302);
+const qs = Astro.url.searchParams.get("naplno") === "1" ? "?naplno=1" : "";
+return Astro.redirect(`/calendar/mesic/${ym}${qs}`, 302);
 ---
