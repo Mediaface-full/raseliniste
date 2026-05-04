@@ -325,6 +325,22 @@ html.sidebar-open [data-sidebar-backdrop] {
     min-width: 0 !important;
   }
 
+  /* Zmenšit celý týdenní grid přes transform aby se vešel na 1 A4 landscape.
+     56 px/h × 17 h = 952 px pro samotnou osu. Po scale 0.62 to je ~590 px.
+     A4 landscape na 8mm margins má ~191mm = ~720 px (300 dpi varianta).
+     Zmenšení 0.62 vejde i s hlavičkou, all-day proužkem a interpretací. */
+  .week-print-root {
+    transform: scale(0.62);
+    transform-origin: top left;
+    width: 161%;
+  }
+  /* Měsíční pohled ne tak agresivní — 7×6 mřížka už je kompaktnější */
+  .month-print-root {
+    transform: scale(0.85);
+    transform-origin: top left;
+    width: 117%;
+  }
+
   /* Truncate / line-clamp v tisku zrušíme — text se má vejít kompletní */
   .truncate, [class*="line-clamp-"] {
     overflow: visible !important;
