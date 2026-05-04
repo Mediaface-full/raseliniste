@@ -4,7 +4,7 @@ import Base from "../../../layouts/Base.astro";
 import WeekView from "../../../components/WeekView";
 import { prisma } from "../../../lib/db";
 import { readSession } from "../../../lib/session";
-import { generateWeekRituals, getMondayOfWeek, getSundayOfWeek } from "../../../lib/week-rituals";
+import { generateWeekRituals, generateCustomRituals, getMondayOfWeek, getSundayOfWeek } from "../../../lib/week-rituals";
 import { interpretWeek } from "../../../lib/week-interpretation";
 
 const session = await readSession(Astro.cookies);
@@ -48,11 +48,17 @@ const events = rawEvents.filter((e) => {
   return true;
 });
 
-// Generuj rituály s vlastními popisy uživatele
-const rituals = generateWeekRituals(
-  monday,
-  user.ritualTemplates as Record<string, string> | null,
-);
+// Generuj rituály — defaultní 3 + custom z DB
+const customRitualsRows = await prisma.customRitual.findMany({
+  where: { userId: session.uid, active: true },
+});
+const rituals = [
+  ...generateWeekRituals(
+    monday,
+    user.ritualTemplates as Record<string, string> | null,
+  ),
+  ...generateCustomRituals(monday, customRitualsRows),
+];
 
 // Interpretace
 const interpretationInput = events.map((e) => ({

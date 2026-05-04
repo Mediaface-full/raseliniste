@@ -1,6 +1,7 @@
 ---
 import Shell from "../../layouts/Shell.astro";
 import RitualsEditor from "../../components/RitualsEditor";
+import CustomRitualsManager from "../../components/CustomRitualsManager";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 import { DEFAULT_RITUAL_TEMPLATES } from "../../lib/week-rituals";
@@ -32,14 +33,22 @@ const custom = (user.ritualTemplates ?? {}) as Record<string, string>;
       </p>
     </div>
 
-    <RitualsEditor
-      client:load
-      initialMorning={custom.morning_day ?? ""}
-      initialFriday={custom.friday_reflection ?? ""}
-      initialSunday={custom.weekly_review ?? ""}
-      defaultMorning={DEFAULT_RITUAL_TEMPLATES.morning_day}
-      defaultFriday={DEFAULT_RITUAL_TEMPLATES.friday_reflection}
-      defaultSunday={DEFAULT_RITUAL_TEMPLATES.weekly_review}
-    />
+    <div>
+      <h2 class="font-serif text-xl mb-2">Defaultní rituály</h2>
+      <p class="text-xs text-muted-foreground mb-3">
+        Tři pravidelné rituály které máš vždy. Můžeš upravit jen text co v nich děláš.
+      </p>
+      <RitualsEditor
+        client:load
+        initialMorning={custom.morning_day ?? ""}
+        initialFriday={custom.friday_reflection ?? ""}
+        initialSunday={custom.weekly_review ?? ""}
+        defaultMorning={DEFAULT_RITUAL_TEMPLATES.morning_day}
+        defaultFriday={DEFAULT_RITUAL_TEMPLATES.friday_reflection}
+        defaultSunday={DEFAULT_RITUAL_TEMPLATES.weekly_review}
+      />
+    </div>
+
+    <CustomRitualsManager client:load />
   </div>
 </Shell>

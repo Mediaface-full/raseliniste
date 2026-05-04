@@ -56,6 +56,7 @@ model User {
   todoistProjects  TodoistProjectMirror[]
   todoistLabels    TodoistLabelMirror[]
   thingsImports    ThingsImport[]
+  customRituals    CustomRitual[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -853,6 +854,38 @@ model DayNote {
   createdAt   DateTime  @default(now())
 
   @@index([forDate, done])
+}
+
+/**
+ * Vlastní rituály které si Petr vytvoří. Nad rámec hardcoded 3 default
+ * rituálů (ranní pohled na den / páteční reflexe / nedělní pohled týden).
+ *
+ * Opakování: pole `daysOfWeek` obsahuje čísla 0-6 kde 0=Po, 6=Ne.
+ *   [0,1,2,3,4]       = pracovní dny
+ *   [5,6]             = víkend
+ *   [0,1,2,3,4,5,6]   = každý den
+ *   [3]               = každý čtvrtek
+ * Empty array = neaktivní (žádný den).
+ *
+ * Čas v Praha TZ. Při generování virtual events je převeden přes pragueDate().
+ */
+model CustomRitual {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?  @db.Text  // markdown návod
+  daysOfWeek  Int[]    @default([])   // 0=Po, 6=Ne
+  startHour   Int                     // 0-23, Praha TZ
+  startMinute Int      @default(0)
+  durationMin Int                     // 5..480
+
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, active])
 }
 
 enum RuleViolationSeverity {

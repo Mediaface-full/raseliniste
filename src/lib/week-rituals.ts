@@ -197,3 +197,79 @@ export function getSundayOfWeek(monday: Date): Date {
   result.setHours(23, 59, 59, 999);
   return result;
 }
+
+// ===========================================================================
+// Vlastní rituály (CustomRitual) — nad rámec 3 default
+// ===========================================================================
+
+export interface CustomRitualInput {
+  id: string;
+  title: string;
+  description: string | null;
+  daysOfWeek: number[]; // 0=Po, 6=Ne
+  startHour: number;
+  startMinute: number;
+  durationMin: number;
+}
+
+/**
+ * Vygeneruje virtual events pro custom rituály v daném týdnu.
+ * Pro každý rituál a každý den v `daysOfWeek` vyrobí jeden RitualEvent.
+ */
+export function generateCustomRituals(
+  weekStartMonday: Date,
+  customRituals: CustomRitualInput[],
+): RitualEvent[] {
+  const out: RitualEvent[] = [];
+  for (let i = 0; i < 7; i++) {
+    const calDate = new Date(weekStartMonday);
+    calDate.setDate(calDate.getDate() + i);
+    const year = calDate.getFullYear();
+    const month = calDate.getMonth() + 1;
+    const day = calDate.getDate();
+    const isoDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+    for (const r of customRituals) {
+      if (!r.daysOfWeek.includes(i)) continue;
+      const start = pragueDate(year, month, day, r.startHour, r.startMinute);
+      const end = new Date(start.getTime() + r.durationMin * 60_000);
+      out.push({
+        id: `ritual-custom-${r.id}-${isoDate}`,
+        title: r.title,
+        // Custom rituály nemají pevný RitualType — používáme generic "morning_day"
+        // jako placeholder (pro routing fallback v ritualDescription nepoužíváme,
+        // description posíláme přímo z DB níže).
+        ritualType: "morning_day",
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+        allDay: false,
+        source: "RITUAL",
+        type: "RITUAL",
+        locationText: null,
+        description: r.description?.trim() || `## ${r.title}\n\n*(Bez popisku — uprav v /settings/ritualy)*`,
+        prepNote: null,
+        itemsToBring: null,
+      });
+    }
+  }
+  return out;
+}
+
+export const DAY_NAMES_CZ: ReadonlyArray<string> = [
+  "Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek", "Sobota", "Neděle",
+];
+export const DAY_NAMES_SHORT_CZ: ReadonlyArray<string> = [
+  "Po", "Út", "St", "Čt", "Pá", "So", "Ne",
+];
+
+/** Lidsky čitelný popis opakování. */
+export function formatRecurrence(daysOfWeek: number[]): string {
+  if (daysOfWeek.length === 0) return "(neaktivní)";
+  if (daysOfWeek.length === 7) return "Každý den";
+  const sorted = [...daysOfWeek].sort();
+  const isWeekdays = sorted.length === 5 && sorted.every((d, i) => d === i);
+  if (isWeekdays) return "Pracovní dny (Po–Pá)";
+  const isWeekend = sorted.length === 2 && sorted[0] === 5 && sorted[1] === 6;
+  if (isWeekend) return "Víkend (So–Ne)";
+  return sorted.map((d) => DAY_NAMES_SHORT_CZ[d]).join(", ");
+}
