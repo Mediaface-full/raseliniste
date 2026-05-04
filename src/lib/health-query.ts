@@ -160,22 +160,50 @@ export async function querySleep(
     select: { recordedAt: true, sleepData: true },
   });
 
-  const points: SleepDayPoint[] = [];
+  // HAE může poslat víc sleep rows per den (např. nap + noční spánek = 2
+  // záznamy se totalSleep 0.5 a 7). Předtím jsme každý row brali jako
+  // samostatný point a počítali průměr přes všechny → naps zatáhly průměr
+  // dolů (Petrův "0.5 h" bug). Teď agregujeme per kalendářní den.
+  const asNum = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
+  const asStr = (x: unknown) => (typeof x === "string" ? x : null);
+
+  const byDay = new Map<string, SleepDayPoint>();
   for (const r of rows) {
     const d = (r.sleepData ?? {}) as Record<string, unknown>;
-    const asNum = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
-    const asStr = (x: unknown) => (typeof x === "string" ? x : null);
-    points.push({
-      date: toDayKey(r.recordedAt),
-      total: asNum(d.totalSleep),
-      deep: asNum(d.deep),
-      rem: asNum(d.rem),
-      core: asNum(d.core),
-      awake: asNum(d.awake),
-      inBedStart: asStr(d.inBedStart),
-      inBedEnd: asStr(d.inBedEnd),
-    });
+    const dayKey = toDayKey(r.recordedAt);
+    const existing = byDay.get(dayKey);
+    if (existing) {
+      // Sečti všechny sleep rows daného dne (nap + noční)
+      existing.total += asNum(d.totalSleep);
+      existing.deep += asNum(d.deep);
+      existing.rem += asNum(d.rem);
+      existing.core += asNum(d.core);
+      existing.awake += asNum(d.awake);
+      // Pro inBed časy: prefer ten s vyšším totalSleep (= delší = nejspíš noční)
+      const incoming = asNum(d.totalSleep);
+      const incomingStart = asStr(d.inBedStart);
+      const incomingEnd = asStr(d.inBedEnd);
+      if (incoming > 4 && incomingStart && incomingEnd) {
+        existing.inBedStart = incomingStart;
+        existing.inBedEnd = incomingEnd;
+      }
+    } else {
+      byDay.set(dayKey, {
+        date: dayKey,
+        total: asNum(d.totalSleep),
+        deep: asNum(d.deep),
+        rem: asNum(d.rem),
+        core: asNum(d.core),
+        awake: asNum(d.awake),
+        inBedStart: asStr(d.inBedStart),
+        inBedEnd: asStr(d.inBedEnd),
+      });
+    }
   }
+
+  const points: SleepDayPoint[] = Array.from(byDay.values()).sort((a, b) =>
+    a.date.localeCompare(b.date),
+  );
 
   const totalStats = computeStats(points.map((p) => p.total), points.map((p) => p.date));
   const deepStats = computeStats(points.map((p) => p.deep), points.map((p) => p.date));
