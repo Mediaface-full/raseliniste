@@ -621,10 +621,15 @@ function WeekDayColumn({
       bgIds.add(long.id);
     }
   }
-  const fg = timed.filter((e) => !bgIds.has(e.id));
+  // RITUÁLY mají vždy plnou šířku sloupce — vyloučit z column scheduleru.
+  // Renderují se jako pozadí (z-index 0), klasické eventy se vykreslí přes
+  // ně (z-index 1+). Tím se Petrův Ranní pohled na den zobrazí na plnou
+  // šířku ve VŠECH dnech, ne jen v některých kde scheduler dal sloupec.
+  const ritualEvents = timed.filter((e) => e.source === "RITUAL" && !bgIds.has(e.id));
+  const fg = timed.filter((e) => !bgIds.has(e.id) && e.source !== "RITUAL");
   const bg = timed.filter((e) => bgIds.has(e.id));
 
-  // Greedy column assignment pro FG events
+  // Greedy column assignment pro FG events (rituály vyřazené)
   const sorted = [...fg].sort(
     (a, b) =>
       new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime() ||
@@ -662,6 +667,50 @@ function WeekDayColumn({
 
   return (
     <>
+      {/* RITUÁLY — full width, peach + dashed, ve spodní vrstvě (z-index 0).
+          Klasické eventy se vykreslí přes ně, pokud overlapují. */}
+      {ritualEvents.map((e) => {
+        const tint = sourceTint(e.source);
+        const { top, height } = blockTopHeight(e);
+        const isOpen = openId === e.id;
+        return (
+          <button
+            key={e.id}
+            type="button"
+            onClick={() => onSelect(e.id)}
+            className="absolute rounded text-left transition-all hover:brightness-110"
+            title={`${fmtTime(new Date(e.startsAt))}–${fmtTime(new Date(e.endsAt))} · ${e.title}${e.description ? "\n\n" + (e.description.length > 240 ? e.description.slice(0, 240) + "…" : e.description) : ""}`}
+            style={{
+              top,
+              height,
+              left: 1,
+              right: 1,
+              zIndex: 0,
+              background: `color-mix(in oklch, var(--tint-${tint}) 18%, transparent)`,
+              border: `1px dashed color-mix(in oklch, var(--tint-${tint}) 60%, transparent)`,
+              boxShadow: isOpen
+                ? `0 0 0 2px color-mix(in oklch, var(--tint-${tint}) 65%, transparent)`
+                : undefined,
+            }}
+          >
+            <div className="h-full overflow-hidden flex flex-col items-stretch px-1.5 pt-1">
+              <div className="font-mono tabular font-semibold leading-none opacity-90 text-[9px]">
+                {fmtTime(new Date(e.startsAt))}–{fmtTime(new Date(e.endsAt))}
+              </div>
+              <div
+                className="font-medium leading-tight text-[10px] line-clamp-2"
+                style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
+              >
+                {e.title}
+              </div>
+            </div>
+            <span className="absolute top-0.5 right-0.5 text-[var(--tint-peach)]">
+              <Sparkles className="size-2.5" />
+            </span>
+          </button>
+        );
+      })}
+
       {/* BG eventy (long) v levé polovině */}
       {bg.map((e) => {
         const tint = sourceTint(e.source);
@@ -735,6 +784,7 @@ function WeekDayColumn({
               height,
               left,
               width,
+              zIndex: 1, // nad rituály (které jsou v zIndex 0)
               background: `color-mix(in oklch, var(--tint-${tint}) ${isRitual ? 18 : 28}%, transparent)`,
               border: isRitual
                 ? `1px dashed color-mix(in oklch, var(--tint-${tint}) 60%, transparent)`
