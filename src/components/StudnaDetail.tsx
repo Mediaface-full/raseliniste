@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Loader2, Plus, Pin, Trash2, Sparkles, FileText, Settings, Users, AudioLines,
   ChevronDown, ChevronRight, Copy, Check, FileAudio2, Mic, Send, FileDown,
-  Star, RotateCw,
+  Star, RotateCw, Pencil,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -477,16 +477,30 @@ function RecordingCard({
               )}
 
               {/* Plný transkript */}
-              {/* Textový vzkaz od hosta vedle nahrávky — odkazy, jména, čísla.
-                  Petr to potřebuje vidět, aby si nemusel domýšlet co host
-                  v hlasu zkomolil. */}
+              {/* Textové info k projektu od hosta vedle nahrávky — odkazy,
+                  jména, čísla. Petr to potřebuje VIDĚT (lavender + ikona
+                  tužky), aby si nemusel domýšlet co host v hlasu zkomolil. */}
               {recording.guestNote && (
-                <div className="pt-2 border-t border-white/5">
-                  <div className="text-[11px] font-mono uppercase tracking-wider text-[var(--tint-butter)] mb-1.5 flex items-center gap-1">
-                    📝 Textový vzkaz
-                  </div>
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 bg-[var(--tint-butter)]/[0.06] border border-[var(--tint-butter)]/20 rounded p-3">
-                    {recording.guestNote}
+                <div className="pt-3 mt-1">
+                  <div
+                    className="rounded-lg p-3 border-l-4"
+                    style={{
+                      background: "color-mix(in oklch, var(--tint-lavender) 14%, transparent)",
+                      borderLeftColor: "var(--tint-lavender)",
+                      borderTop: "1px solid color-mix(in oklch, var(--tint-lavender) 30%, transparent)",
+                      borderRight: "1px solid color-mix(in oklch, var(--tint-lavender) 30%, transparent)",
+                      borderBottom: "1px solid color-mix(in oklch, var(--tint-lavender) 30%, transparent)",
+                    }}
+                  >
+                    <div
+                      className="text-[11px] font-mono uppercase tracking-wider mb-1.5 flex items-center gap-1.5 font-semibold"
+                      style={{ color: "color-mix(in oklch, var(--tint-lavender) 90%, white)" }}
+                    >
+                      <Pencil className="size-3" /> Textové info k projektu
+                    </div>
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/95">
+                      {recording.guestNote}
+                    </div>
                   </div>
                 </div>
               )}

@@ -309,12 +309,12 @@ export default function GuestRecorder({
                   onClick={() => setNoteOpen(true)}
                   className="w-full text-xs font-mono text-muted-foreground hover:text-foreground flex items-center justify-center gap-2"
                 >
-                  + Přidat textový vzkaz (volitelné)
+                  + Přidat textové info k projektu (volitelné)
                 </button>
               ) : (
                 <div className="space-y-1.5">
                   <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground flex items-center justify-between">
-                    <span>Textový vzkaz</span>
+                    <span>Textové info k projektu</span>
                     <button
                       type="button"
                       onClick={() => { setGuestNote(""); setNoteOpen(false); }}
