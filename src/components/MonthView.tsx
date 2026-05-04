@@ -8,7 +8,8 @@
  * Hover na buňku → tooltip se seznamem všech událostí daného dne.
  * Klik na buňku → /day/<datum>.
  */
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Maximize2, X, Printer, Sparkles } from "lucide-react";
 
 interface DayEvent {
@@ -90,33 +91,29 @@ export default function MonthView({
     }
   }
 
-  // Hover tooltip state — ukotvený k buňce dne (rect-based, ne mouse-tracking).
-  // Mouse tracking utíkal daleko od buňky když Petr přesunul kurzor.
+  // Hover tooltip — sleduje kurzor (clientX/Y), portal-rendered do <body>.
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; placeLeft: boolean }>({
-    x: 0,
-    y: 0,
-    placeLeft: false,
-  });
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [mounted, setMounted] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function handleMouseEnter(e: React.MouseEvent<HTMLAnchorElement>, date: string) {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const TOOLTIP_W = 320;
-    const GAP = 8;
-    const placeLeft = rect.right + GAP + TOOLTIP_W > window.innerWidth - 12;
-    setHoverPos({
-      x: placeLeft ? rect.left - GAP : rect.right + GAP,
-      y: rect.top,
-      placeLeft,
-    });
-    hoverTimeoutRef.current = setTimeout(() => setHoveredDate(date), 200);
+    setHoverPos({ x: e.clientX, y: e.clientY });
+    hoverTimeoutRef.current = setTimeout(() => setHoveredDate(date), 80);
+  }
+
+  function handleMouseMove(e: React.MouseEvent<HTMLAnchorElement>) {
+    setHoverPos({ x: e.clientX, y: e.clientY });
   }
 
   function handleMouseLeave() {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => setHoveredDate(null), 100);
+    hoverTimeoutRef.current = setTimeout(() => setHoveredDate(null), 80);
   }
 
   const hoveredCell = hoveredDate ? cells.find((c) => c.date === hoveredDate) : null;
@@ -228,6 +225,7 @@ export default function MonthView({
                 key={cell.date}
                 href={`/day/${cell.date}${isFullscreen ? "?naplno=1" : ""}`}
                 onMouseEnter={(e) => handleMouseEnter(e, cell.date)}
+                onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
                 className={`relative aspect-square min-h-[80px] rounded-md flex flex-col p-1.5 transition-all hover:brightness-125 hover:scale-[1.02] ${
                   cell.isCurrentMonth ? "" : "opacity-30"
@@ -338,21 +336,27 @@ export default function MonthView({
         })}
       </div>
 
-      {/* Hover tooltip — fixed pozice, fade-in */}
-      {hoveredCell && (
+      {/* Hover tooltip — portal-rendered, sleduje kurzor */}
+      {hoveredCell && mounted && (() => {
+        const TOOLTIP_W = 320;
+        const TOOLTIP_MAX_H = 360;
+        const wouldOverflowRight = hoverPos.x + 14 + TOOLTIP_W > window.innerWidth - 8;
+        const left = wouldOverflowRight
+          ? Math.max(8, hoverPos.x - 14 - TOOLTIP_W)
+          : hoverPos.x + 14;
+        const top = Math.max(8, Math.min(hoverPos.y + 14, window.innerHeight - TOOLTIP_MAX_H - 8));
+        return createPortal((
         <div
           onMouseEnter={() => {
             if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
           }}
           onMouseLeave={handleMouseLeave}
-          className="fixed pointer-events-none z-50 print:hidden"
+          className="fixed pointer-events-none z-[100] print:hidden"
           style={{
-            // Tooltip ukotvený k buňce dne — viewport-relative.
-            left: hoverPos.placeLeft ? undefined : `${hoverPos.x}px`,
-            right: hoverPos.placeLeft ? `${window.innerWidth - hoverPos.x}px` : undefined,
-            top: `min(${hoverPos.y}px, calc(100vh - 220px))`,
-            width: "320px",
-            animation: "fadeIn 200ms ease-out",
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${TOOLTIP_W}px`,
+            animation: "fadeIn 120ms ease-out",
           }}
         >
           <div
@@ -407,7 +411,8 @@ export default function MonthView({
             )}
           </div>
         </div>
-      )}
+        ), document.body);
+      })()}
     </div>
   );
 }

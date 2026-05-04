@@ -30,6 +30,7 @@
  * 7. **Čas v bloku NAD názvem** (Petr: "klient potřebuje vědět kdy, pak co").
  */
 import { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { MapPin, X, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
 import { marked } from "marked";
 import { DEFAULT_RITUAL_TEMPLATES, type RitualType } from "@/lib/week-rituals";
@@ -175,8 +176,13 @@ export default function DayTimeline({
   const [now, setNow] = useState(() => new Date());
   const [openId, setOpenId] = useState<string | null>(null);
   const [nowVisibility, setNowVisibility] = useState<"in" | "above" | "below">("in");
+  const [mounted, setMounted] = useState(false);
   const nowMarkerRef = useRef<HTMLDivElement | null>(null);
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Update aktuálního času každou minutu
   useEffect(() => {
@@ -667,18 +673,17 @@ export default function DayTimeline({
       <div ref={scrollAnchorRef} />
       {/* (scrollAnchorRef je rezerva — pokud bys chtěl scrollnout někam jinam) */}
 
-      {/* Detail — fixed modal s backdrop. Předtím byl panel inline na konci
-          timeline, takže Petr musel scrollovat 1000+ px aby viděl popis
-          rituálu. Teď klik = okamžitě viditelný popover přes obrazovku. */}
-      {openId && (() => {
+      {/* Detail — portal-rendered fixed modal. Portal do <body> zaručuje že
+          ho neovlivní žádný ancestor s transformem/filtrem (CSS containing block). */}
+      {openId && mounted && (() => {
         const ev = events.find((e) => e.id === openId);
         if (!ev) return null;
         const tint = sourceTint(ev.source);
         const start = new Date(ev.startsAt);
         const end = new Date(ev.endsAt);
-        return (
+        return createPortal((
           <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6"
+            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-3 sm:p-6"
             onClick={() => setOpenId(null)}
             style={{ background: "oklch(8% 0.02 260 / 0.55)", backdropFilter: "blur(8px)" }}
           >
@@ -760,7 +765,7 @@ export default function DayTimeline({
               )}
             </div>
           </div>
-        );
+        ), document.body);
       })()}
 
     </section>

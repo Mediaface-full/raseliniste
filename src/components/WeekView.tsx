@@ -11,6 +11,7 @@
  * - Žádný drag-and-drop, žádný editing
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Maximize2, MapPin, X, Sparkles, Printer } from "lucide-react";
 import { marked } from "marked";
 import { DEFAULT_RITUAL_TEMPLATES, type RitualType } from "@/lib/week-rituals";
@@ -84,38 +85,30 @@ export default function WeekView({
   const [now, setNow] = useState(() => new Date());
   const [openId, setOpenId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  // Tooltip ukotvený k pravému okraji bloku eventu (rect-based, ne mouse-tracking).
-  // Důvod: mouse-tracking odlétal daleko od bloku, když Petr přesunul kurzor po
-  // kliknutí. Rect-based pozice je stabilní a vždy u eventu.
-  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; placeLeft: boolean }>({
-    x: 0,
-    y: 0,
-    placeLeft: false,
-  });
+  // Tooltip sleduje kurzor (clientX/Y). Portal-rendered do <body> aby unikl
+  // jakýmkoliv ancestor transforms/filters co by zlomily fixed positioning.
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [mounted, setMounted] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    setMounted(true);
     const tick = () => setNow(new Date());
     const interval = setInterval(tick, 60_000);
     return () => clearInterval(interval);
   }, []);
 
-  function handleHover(id: string, rect: DOMRect) {
+  function handleHover(id: string, mouseX: number, mouseY: number) {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    // Default vpravo od bloku, fallback nalevo pokud by přetekl viewport.
-    const TOOLTIP_W = 360;
-    const GAP = 8;
-    const placeLeft = rect.right + GAP + TOOLTIP_W > window.innerWidth - 12;
-    setHoverPos({
-      x: placeLeft ? rect.left - GAP : rect.right + GAP,
-      y: rect.top,
-      placeLeft,
-    });
-    hoverTimeoutRef.current = setTimeout(() => setHoveredId(id), 200);
+    setHoverPos({ x: mouseX, y: mouseY });
+    hoverTimeoutRef.current = setTimeout(() => setHoveredId(id), 80);
+  }
+  function handleMove(mouseX: number, mouseY: number) {
+    setHoverPos({ x: mouseX, y: mouseY });
   }
   function handleLeave() {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => setHoveredId(null), 100);
+    hoverTimeoutRef.current = setTimeout(() => setHoveredId(null), 80);
   }
 
   const monday = useMemo(() => {
@@ -476,6 +469,7 @@ export default function WeekView({
                   openId={openId}
                   onSelect={(id) => setOpenId(openId === id ? null : id)}
                   onHover={handleHover}
+                  onMove={handleMove}
                   onLeave={handleLeave}
                 />
               </div>
@@ -522,17 +516,17 @@ export default function WeekView({
         </div>
       </div>
 
-      {/* Detail panel — fixed modal s backdrop. Předtím byl panel pod gridem,
-          což na desktopu znamenalo scroll dolů. Modal je vidět hned. */}
-      {openId && (() => {
+      {/* Detail panel — portal-rendered fixed modal s backdrop. Portal do <body>
+          aby unikl ancestor transforms/filters co by zlomily fixed positioning. */}
+      {openId && mounted && (() => {
         const ev = allEvents.find((e) => e.id === openId);
         if (!ev) return null;
         const tint = sourceTint(ev.source);
         const start = new Date(ev.startsAt);
         const end = new Date(ev.endsAt);
-        return (
+        return createPortal((
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 print:hidden"
             onClick={() => setOpenId(null)}
             style={{ background: "oklch(8% 0.02 260 / 0.55)", backdropFilter: "blur(8px)" }}
           >
@@ -596,12 +590,11 @@ export default function WeekView({
               )}
             </div>
           </div>
-        );
+        ), document.body);
       })()}
 
-      {/* Hover tooltip — fixed pozice, fade-in. Stejný pattern jako MonthView.
-          Petr to chce na desktopu pro rychlou orientaci bez kliknutí. */}
-      {hoveredId && (() => {
+      {/* Hover tooltip — portal-rendered fixed, sleduje kurzor. */}
+      {hoveredId && mounted && (() => {
         const ev = allEvents.find((e) => e.id === hoveredId);
         if (!ev) return null;
         const tint = sourceTint(ev.source);
@@ -614,21 +607,23 @@ export default function WeekView({
               : `## ${ev.title}\n\n*Text rituálu zatím není vyplněný.*`
             : "";
         const desc = ev.description || fallbackText;
-        return (
+        // Tooltip se umístí 14px vpravo dolů od kurzoru. Pokud by přesahoval
+        // viewport, clamp na opačné straně.
+        const TOOLTIP_W = 360;
+        const TOOLTIP_MAX_H = 320;
+        const wouldOverflowRight = hoverPos.x + 14 + TOOLTIP_W > window.innerWidth - 8;
+        const left = wouldOverflowRight
+          ? Math.max(8, hoverPos.x - 14 - TOOLTIP_W)
+          : hoverPos.x + 14;
+        const top = Math.min(hoverPos.y + 14, window.innerHeight - TOOLTIP_MAX_H - 8);
+        return createPortal((
           <div
-            onMouseEnter={() => {
-              if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-            }}
-            onMouseLeave={handleLeave}
-            className="fixed pointer-events-none z-50 print:hidden"
+            className="fixed pointer-events-none z-[100] print:hidden"
             style={{
-              // Tooltip ukotvený k bloku eventu — viewport-relative.
-              // placeLeft=true znamená že x je pravý okraj tooltipu (alignovat right edge).
-              left: hoverPos.placeLeft ? undefined : `${hoverPos.x}px`,
-              right: hoverPos.placeLeft ? `${window.innerWidth - hoverPos.x}px` : undefined,
-              top: `min(${hoverPos.y}px, calc(100vh - 260px))`,
-              width: "360px",
-              animation: "fadeIn 200ms ease-out",
+              left: `${left}px`,
+              top: `${Math.max(8, top)}px`,
+              width: `${TOOLTIP_W}px`,
+              animation: "fadeIn 120ms ease-out",
             }}
           >
             <div
@@ -663,7 +658,7 @@ export default function WeekView({
               )}
             </div>
           </div>
-        );
+        ), document.body);
       })()}
 
       {/* Interpretační lišta */}
@@ -696,6 +691,7 @@ function WeekDayColumn({
   openId,
   onSelect,
   onHover,
+  onMove,
   onLeave,
 }: {
   timed: CalEvent[];
@@ -705,7 +701,8 @@ function WeekDayColumn({
   now: Date;
   openId: string | null;
   onSelect: (id: string) => void;
-  onHover: (id: string, rect: DOMRect) => void;
+  onHover: (id: string, mouseX: number, mouseY: number) => void;
+  onMove: (mouseX: number, mouseY: number) => void;
   onLeave: () => void;
 }) {
   const minPx = hourPx / 60;
@@ -817,7 +814,8 @@ function WeekDayColumn({
             key={e.id}
             type="button"
             onClick={() => onSelect(e.id)}
-            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect())}
+            onMouseEnter={(ev) => onHover(e.id, ev.clientX, ev.clientY)}
+            onMouseMove={(ev) => onMove(ev.clientX, ev.clientY)}
             onMouseLeave={onLeave}
             className="absolute rounded text-left transition-all hover:brightness-110"
             style={{
@@ -919,7 +917,8 @@ function WeekDayColumn({
             key={e.id}
             type="button"
             onClick={() => onSelect(e.id)}
-            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect())}
+            onMouseEnter={(ev) => onHover(e.id, ev.clientX, ev.clientY)}
+            onMouseMove={(ev) => onMove(ev.clientX, ev.clientY)}
             onMouseLeave={onLeave}
             className="absolute rounded text-left transition-all hover:brightness-110 active:scale-[0.99]"
             style={{
