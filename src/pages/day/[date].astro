@@ -4,6 +4,7 @@ import Base from "../../layouts/Base.astro";
 import DayView from "../../components/DayView";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
+import { generateWeekRituals, getMondayOfWeek } from "../../lib/week-rituals";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -54,13 +55,40 @@ const dedupedEvents = events.filter((e) => {
   return true;
 });
 
+// Připoj rituály daného týdne, vyfiltruj jen ty co spadají do dnešního dne.
+// Petr potřebuje vidět rituály i na mobilu, ne jen v týdenním desktop pohledu.
+const weekMonday = getMondayOfWeek(dayStart);
+const allRituals = generateWeekRituals(weekMonday);
+const todaysRituals = allRituals.filter((r) => {
+  const start = new Date(r.startsAt);
+  return start >= dayStart && start <= dayEnd;
+});
+
 const initial = {
   date: dateStr,
-  events: dedupedEvents.map((e) => ({
-    ...e,
-    startsAt: e.startsAt.toISOString(),
-    endsAt: e.endsAt.toISOString(),
-  })),
+  events: [
+    ...dedupedEvents.map((e) => ({
+      ...e,
+      startsAt: e.startsAt.toISOString(),
+      endsAt: e.endsAt.toISOString(),
+    })),
+    // Rituály — virtuální eventy s source="RITUAL", DayTimeline je kreslí
+    // v peach tintu (sourceTint funkce). Drží se nad reálným syncem,
+    // takže každý den 7-8 ráno se vyrenderuje.
+    ...todaysRituals.map((r) => ({
+      id: r.id,
+      title: r.title,
+      type: r.type,
+      source: r.source,
+      startsAt: r.startsAt,
+      endsAt: r.endsAt,
+      locationText: r.locationText,
+      description: r.description,
+      prepNote: r.prepNote,
+      itemsToBring: r.itemsToBring,
+      allDay: r.allDay,
+    })),
+  ],
   dayNotes: dayNotes.map((n) => ({
     ...n,
     doneAt: n.doneAt?.toISOString() ?? null,

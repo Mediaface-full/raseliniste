@@ -4,7 +4,7 @@
  * vizuální váhou jako schůzky — proto je vykreslujeme jako virtual events
  * (nezapisují se do CalendarEventu).
  *
- * - Ranní pohled na den — pondělí až pátek 08:00, 5 min (5 ranních)
+ * - Ranní pohled na den — pondělí až pátek 07:00–08:00 (1h)
  * - Páteční reflexe — pátek 17:00, 15 min
  * - Nedělní pohled na týden — neděle 18:00, 15 min
  * Celkem max 7 rituálních bloků v týdnu.
@@ -48,11 +48,10 @@ export function generateWeekRituals(weekStartMonday: Date): RitualEvent[] {
     const dow = i; // 0 = Po, ..., 4 = Pá, 5 = So, 6 = Ne
     const isoDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-    // Ranní pohled na den — pondělí až pátek 08:00, 5 min (Petr explicit:
-    // víkendy nepatří mezi pracovní rituály, ne každý den)
+    // Ranní pohled na den — pondělí až pátek 07:00–08:00 (1h)
     if (dow >= 0 && dow <= 4) {
-      const morning = pragueDate(year, month, day, 8, 0);
-      const morningEnd = new Date(morning.getTime() + 5 * 60_000);
+      const morning = pragueDate(year, month, day, 7, 0);
+      const morningEnd = pragueDate(year, month, day, 8, 0);
       rituals.push({
         id: `ritual-morning-${isoDate}`,
         title: "Ranní pohled na den",

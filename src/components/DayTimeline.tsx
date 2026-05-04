@@ -50,6 +50,7 @@ interface CalendarEvent {
 // Petr potřebuje rychle vidět čí život se v dni odehrává.
 // V rámci rodiny lze rozlišit typ skrze sytost — zatím jednotně.
 function sourceTint(src: string): string {
+  if (src === "RITUAL") return "peach"; // rituály — peach + dashed border
   if (src === "ICLOUD_PARTNER") return "rose";
   if (src === "ICLOUD_SON") return "mint";
   if (src === "GOOGLE_PRIMARY") return "sky";
@@ -58,10 +59,15 @@ function sourceTint(src: string): string {
 }
 
 function sourceLabel(src: string): string {
+  if (src === "RITUAL") return "✨";
   if (src === "ICLOUD_SON") return "syn";
   if (src === "ICLOUD_PARTNER") return "partner";
   if (src === "RASELINISTE") return "R";
   return "G";
+}
+
+function isRitual(src: string): boolean {
+  return src === "RITUAL";
 }
 
 function fmtTime(d: Date): string {
@@ -502,8 +508,10 @@ export default function DayTimeline({
                   width: overlapsBg
                     ? `calc(${fgWidth}% - 2px)`
                     : `calc(${fgWidth}% - ${LEFT_GUTTER_PX / totalColumns}px - 1px)`,
-                  background: `color-mix(in oklch, var(--tint-${tint}) 28%, transparent)`,
-                  border: `1px solid color-mix(in oklch, var(--tint-${tint}) 50%, transparent)`,
+                  background: `color-mix(in oklch, var(--tint-${tint}) ${isRitual(e.source) ? 18 : 28}%, transparent)`,
+                  border: isRitual(e.source)
+                    ? `1px dashed color-mix(in oklch, var(--tint-${tint}) 60%, transparent)`
+                    : `1px solid color-mix(in oklch, var(--tint-${tint}) 50%, transparent)`,
                   boxShadow: isOpen
                     ? `0 0 0 2px color-mix(in oklch, var(--tint-${tint}) 65%, transparent)`
                     : undefined,
