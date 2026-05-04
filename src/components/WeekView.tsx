@@ -84,10 +84,13 @@ export default function WeekView({
   const [now, setNow] = useState(() => new Date());
   const [openId, setOpenId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; align: "left" | "right" }>({
+  // Tooltip ukotvený k pravému okraji bloku eventu (rect-based, ne mouse-tracking).
+  // Důvod: mouse-tracking odlétal daleko od bloku, když Petr přesunul kurzor po
+  // kliknutí. Rect-based pozice je stabilní a vždy u eventu.
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; placeLeft: boolean }>({
     x: 0,
     y: 0,
-    align: "right",
+    placeLeft: false,
   });
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -97,19 +100,18 @@ export default function WeekView({
     return () => clearInterval(interval);
   }, []);
 
-  function handleHover(id: string, _rect: DOMRect, mouseX?: number, mouseY?: number) {
+  function handleHover(id: string, rect: DOMRect) {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    if (typeof mouseX === "number" && typeof mouseY === "number") {
-      setHoverPos({ x: mouseX + 14, y: mouseY + 18, align: "right" });
-    }
+    // Default vpravo od bloku, fallback nalevo pokud by přetekl viewport.
+    const TOOLTIP_W = 360;
+    const GAP = 8;
+    const placeLeft = rect.right + GAP + TOOLTIP_W > window.innerWidth - 12;
+    setHoverPos({
+      x: placeLeft ? rect.left - GAP : rect.right + GAP,
+      y: rect.top,
+      placeLeft,
+    });
     hoverTimeoutRef.current = setTimeout(() => setHoveredId(id), 200);
-  }
-  function handleMove(mouseX: number, mouseY: number) {
-    setHoverPos((prev) =>
-      prev.x === mouseX + 14 && prev.y === mouseY + 18
-        ? prev
-        : { x: mouseX + 14, y: mouseY + 18, align: "right" },
-    );
   }
   function handleLeave() {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -474,7 +476,6 @@ export default function WeekView({
                   openId={openId}
                   onSelect={(id) => setOpenId(openId === id ? null : id)}
                   onHover={handleHover}
-                  onMove={handleMove}
                   onLeave={handleLeave}
                 />
               </div>
@@ -521,7 +522,8 @@ export default function WeekView({
         </div>
       </div>
 
-      {/* Detail panel pod mřížkou */}
+      {/* Detail panel — fixed modal s backdrop. Předtím byl panel pod gridem,
+          což na desktopu znamenalo scroll dolů. Modal je vidět hned. */}
       {openId && (() => {
         const ev = allEvents.find((e) => e.id === openId);
         if (!ev) return null;
@@ -530,62 +532,69 @@ export default function WeekView({
         const end = new Date(ev.endsAt);
         return (
           <div
-            className="rounded-lg p-4 space-y-2 text-sm"
-            style={{
-              background: `color-mix(in oklch, var(--tint-${tint}) 10%, transparent)`,
-              border: `1px solid color-mix(in oklch, var(--tint-${tint}) 30%, transparent)`,
-            }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden"
+            onClick={() => setOpenId(null)}
+            style={{ background: "oklch(8% 0.02 260 / 0.55)", backdropFilter: "blur(8px)" }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-mono tabular font-semibold mb-0.5" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 90%, white)` }}>
-                  {ev.allDay ? "celý den" : `${start.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "numeric" })} · ${fmtTime(start)}–${fmtTime(end)}`}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl p-5 space-y-2 text-sm shadow-2xl"
+              style={{
+                background: "oklch(14% 0.025 260 / 0.98)",
+                border: `1px solid color-mix(in oklch, var(--tint-${tint}) 35%, transparent)`,
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-mono tabular font-semibold mb-0.5" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 90%, white)` }}>
+                    {ev.allDay ? "celý den" : `${start.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "numeric" })} · ${fmtTime(start)}–${fmtTime(end)}`}
+                  </div>
+                  <h3 className="font-serif text-lg leading-tight" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}>
+                    {ev.title}
+                  </h3>
                 </div>
-                <h3 className="font-serif text-lg leading-tight" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}>
-                  {ev.title}
-                </h3>
+                <button type="button" onClick={() => setOpenId(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="size-4" />
+                </button>
               </div>
-              <button type="button" onClick={() => setOpenId(null)} className="text-muted-foreground hover:text-foreground">
-                <X className="size-4" />
-              </button>
+              {ev.locationText && (
+                <div className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                  <MapPin className="size-3" /> {ev.locationText}
+                </div>
+              )}
+              {ev.prepNote && (
+                <div className="text-xs text-[var(--tint-butter)] mt-1.5 px-2 py-1.5 rounded bg-black/20">
+                  📝 {ev.prepNote}
+                </div>
+              )}
+              {ev.source === "RITUAL" ? (
+                <>
+                  <div
+                    className="prose-rasel text-sm leading-relaxed mt-2"
+                    dangerouslySetInnerHTML={{
+                      __html: marked.parse(
+                        ev.description ||
+                          (ritualTypeFromId(ev.id)
+                            ? DEFAULT_RITUAL_TEMPLATES[ritualTypeFromId(ev.id)!]
+                            : `## ${ev.title}\n\n*Text rituálu zatím není vyplněný.*`),
+                      ) as string,
+                    }}
+                  />
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-2 mt-2 border-t border-white/[0.05]">
+                    <Sparkles className="size-3" /> rituál
+                    <a href="/settings/ritualy" className="ml-auto hover:underline">
+                      upravit text →
+                    </a>
+                  </div>
+                </>
+              ) : (
+                ev.description && (
+                  <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
+                    {ev.description}
+                  </p>
+                )
+              )}
             </div>
-            {ev.locationText && (
-              <div className="text-xs flex items-center gap-1.5 text-muted-foreground">
-                <MapPin className="size-3" /> {ev.locationText}
-              </div>
-            )}
-            {ev.prepNote && (
-              <div className="text-xs text-[var(--tint-butter)] mt-1.5 px-2 py-1.5 rounded bg-black/20">
-                📝 {ev.prepNote}
-              </div>
-            )}
-            {ev.source === "RITUAL" ? (
-              <>
-                <div
-                  className="prose-rasel text-sm leading-relaxed mt-2"
-                  dangerouslySetInnerHTML={{
-                    __html: marked.parse(
-                      ev.description ||
-                        (ritualTypeFromId(ev.id)
-                          ? DEFAULT_RITUAL_TEMPLATES[ritualTypeFromId(ev.id)!]
-                          : `## ${ev.title}\n\n*Text rituálu zatím není vyplněný.*`),
-                    ) as string,
-                  }}
-                />
-                <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-2 mt-2 border-t border-white/[0.05]">
-                  <Sparkles className="size-3" /> rituál
-                  <a href="/settings/ritualy" className="ml-auto hover:underline">
-                    upravit text →
-                  </a>
-                </div>
-              </>
-            ) : (
-              ev.description && (
-                <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
-                  {ev.description}
-                </p>
-              )
-            )}
           </div>
         );
       })()}
@@ -613,11 +622,12 @@ export default function WeekView({
             onMouseLeave={handleLeave}
             className="fixed pointer-events-none z-50 print:hidden"
             style={{
-              // Tooltip sleduje kurzor — fixed pozice viewport-relative.
-              // Clamp aby nepřetekl viewport.
-              left: `min(${hoverPos.x}px, calc(100vw - 380px))`,
-              top: `min(${hoverPos.y}px, calc(100vh - 240px))`,
-              maxWidth: "360px",
+              // Tooltip ukotvený k bloku eventu — viewport-relative.
+              // placeLeft=true znamená že x je pravý okraj tooltipu (alignovat right edge).
+              left: hoverPos.placeLeft ? undefined : `${hoverPos.x}px`,
+              right: hoverPos.placeLeft ? `${window.innerWidth - hoverPos.x}px` : undefined,
+              top: `min(${hoverPos.y}px, calc(100vh - 260px))`,
+              width: "360px",
               animation: "fadeIn 200ms ease-out",
             }}
           >
@@ -686,7 +696,6 @@ function WeekDayColumn({
   openId,
   onSelect,
   onHover,
-  onMove,
   onLeave,
 }: {
   timed: CalEvent[];
@@ -696,8 +705,7 @@ function WeekDayColumn({
   now: Date;
   openId: string | null;
   onSelect: (id: string) => void;
-  onHover: (id: string, rect: DOMRect, mouseX?: number, mouseY?: number) => void;
-  onMove: (mouseX: number, mouseY: number) => void;
+  onHover: (id: string, rect: DOMRect) => void;
   onLeave: () => void;
 }) {
   const minPx = hourPx / 60;
@@ -809,8 +817,7 @@ function WeekDayColumn({
             key={e.id}
             type="button"
             onClick={() => onSelect(e.id)}
-            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect(), ev.clientX, ev.clientY)}
-            onMouseMove={(ev) => onMove(ev.clientX, ev.clientY)}
+            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect())}
             onMouseLeave={onLeave}
             className="absolute rounded text-left transition-all hover:brightness-110"
             style={{
@@ -912,8 +919,7 @@ function WeekDayColumn({
             key={e.id}
             type="button"
             onClick={() => onSelect(e.id)}
-            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect(), ev.clientX, ev.clientY)}
-            onMouseMove={(ev) => onMove(ev.clientX, ev.clientY)}
+            onMouseEnter={(ev) => onHover(e.id, ev.currentTarget.getBoundingClientRect())}
             onMouseLeave={onLeave}
             className="absolute rounded text-left transition-all hover:brightness-110 active:scale-[0.99]"
             style={{

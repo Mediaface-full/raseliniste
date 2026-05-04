@@ -667,7 +667,9 @@ export default function DayTimeline({
       <div ref={scrollAnchorRef} />
       {/* (scrollAnchorRef je rezerva — pokud bys chtěl scrollnout někam jinam) */}
 
-      {/* Detail */}
+      {/* Detail — fixed modal s backdrop. Předtím byl panel inline na konci
+          timeline, takže Petr musel scrollovat 1000+ px aby viděl popis
+          rituálu. Teď klik = okamžitě viditelný popover přes obrazovku. */}
       {openId && (() => {
         const ev = events.find((e) => e.id === openId);
         if (!ev) return null;
@@ -676,82 +678,87 @@ export default function DayTimeline({
         const end = new Date(ev.endsAt);
         return (
           <div
-            className="mt-4 rounded-lg p-4 space-y-2 text-sm"
-            style={{
-              background: `color-mix(in oklch, var(--tint-${tint}) 10%, transparent)`,
-              border: `1px solid color-mix(in oklch, var(--tint-${tint}) 30%, transparent)`,
-            }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-6"
+            onClick={() => setOpenId(null)}
+            style={{ background: "oklch(8% 0.02 260 / 0.55)", backdropFilter: "blur(8px)" }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-mono tabular font-semibold mb-0.5" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 90%, white)` }}>
-                  {ev.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
-                </div>
-                <h3
-                  className="font-serif text-lg leading-tight"
-                  style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
-                >
-                  {ev.title}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpenId(null)}
-                className="text-muted-foreground hover:text-foreground"
-                aria-label="Zavřít detail"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            {/* Pro RITUÁL: description je HLAVNÍ obsah — hned pod headerem,
-                bez type/source šumu. Vždy nějaký text (multi-fallback). */}
-            {isRitual(ev.source) ? (
-              <>
-                <div
-                  className="prose-rasel text-sm leading-relaxed mt-2"
-                  dangerouslySetInnerHTML={{
-                    __html: marked.parse(
-                      ev.description ||
-                        (ritualTypeFromId(ev.id)
-                          ? DEFAULT_RITUAL_TEMPLATES[ritualTypeFromId(ev.id)!]
-                          : `## ${ev.title}\n\n*Text rituálu zatím není vyplněný.*`),
-                    ) as string,
-                  }}
-                />
-                <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-2 mt-2 border-t border-white/[0.05]">
-                  <Sparkles className="size-3" /> rituál
-                  <a
-                    href="/settings/ritualy"
-                    className="ml-auto hover:underline"
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto rounded-2xl p-5 space-y-2 text-sm shadow-2xl"
+              style={{
+                background: "oklch(14% 0.025 260 / 0.98)",
+                border: `1px solid color-mix(in oklch, var(--tint-${tint}) 35%, transparent)`,
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-mono tabular font-semibold mb-0.5" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 90%, white)` }}>
+                    {ev.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
+                  </div>
+                  <h3
+                    className="font-serif text-lg leading-tight"
+                    style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
                   >
-                    upravit text →
-                  </a>
+                    {ev.title}
+                  </h3>
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="text-xs font-mono text-muted-foreground tabular flex flex-wrap gap-x-3 gap-y-1">
-                  <span>{sourceLabel(ev.source)}</span>
-                  <span>·</span>
-                  <span>{ev.type.toLowerCase().replace(/_/g, " ")}</span>
-                </div>
-                {ev.locationText && (
-                  <div className="text-xs flex items-center gap-1.5 text-muted-foreground">
-                    <MapPin className="size-3" /> {ev.locationText}
+                <button
+                  type="button"
+                  onClick={() => setOpenId(null)}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Zavřít detail"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              {isRitual(ev.source) ? (
+                <>
+                  <div
+                    className="prose-rasel text-sm leading-relaxed mt-2"
+                    dangerouslySetInnerHTML={{
+                      __html: marked.parse(
+                        ev.description ||
+                          (ritualTypeFromId(ev.id)
+                            ? DEFAULT_RITUAL_TEMPLATES[ritualTypeFromId(ev.id)!]
+                            : `## ${ev.title}\n\n*Text rituálu zatím není vyplněný.*`),
+                      ) as string,
+                    }}
+                  />
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-2 mt-2 border-t border-white/[0.05]">
+                    <Sparkles className="size-3" /> rituál
+                    <a
+                      href="/settings/ritualy"
+                      className="ml-auto hover:underline"
+                    >
+                      upravit text →
+                    </a>
                   </div>
-                )}
-                {ev.prepNote && (
-                  <div className="text-xs text-[var(--tint-butter)] mt-1.5 px-2 py-1.5 rounded bg-black/20">
-                    📝 {ev.prepNote}
+                </>
+              ) : (
+                <>
+                  <div className="text-xs font-mono text-muted-foreground tabular flex flex-wrap gap-x-3 gap-y-1">
+                    <span>{sourceLabel(ev.source)}</span>
+                    <span>·</span>
+                    <span>{ev.type.toLowerCase().replace(/_/g, " ")}</span>
                   </div>
-                )}
-                {ev.description && (
-                  <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
-                    {ev.description}
-                  </p>
-                )}
-              </>
-            )}
+                  {ev.locationText && (
+                    <div className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                      <MapPin className="size-3" /> {ev.locationText}
+                    </div>
+                  )}
+                  {ev.prepNote && (
+                    <div className="text-xs text-[var(--tint-butter)] mt-1.5 px-2 py-1.5 rounded bg-black/20">
+                      📝 {ev.prepNote}
+                    </div>
+                  )}
+                  {ev.description && (
+                    <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
+                      {ev.description}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         );
       })()}

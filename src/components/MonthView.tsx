@@ -90,30 +90,28 @@ export default function MonthView({
     }
   }
 
-  // Hover tooltip state
+  // Hover tooltip state — ukotvený k buňce dne (rect-based, ne mouse-tracking).
+  // Mouse tracking utíkal daleko od buňky když Petr přesunul kurzor.
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
-  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; align: "left" | "right" }>({
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; placeLeft: boolean }>({
     x: 0,
     y: 0,
-    align: "right",
+    placeLeft: false,
   });
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleMouseEnter(e: React.MouseEvent<HTMLAnchorElement>, date: string) {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    // Pozice tooltipu = pod kurzorem mírně vpravo dolů. Sleduje pohyb myši
-    // (handleMouseMove). Tím se vyhneme bug s `getBoundingClientRect` pozicí
-    // co se rozjede při scrollu / zoomu / page transformech.
-    setHoverPos({ x: e.clientX + 14, y: e.clientY + 18, align: "right" });
+    const rect = e.currentTarget.getBoundingClientRect();
+    const TOOLTIP_W = 320;
+    const GAP = 8;
+    const placeLeft = rect.right + GAP + TOOLTIP_W > window.innerWidth - 12;
+    setHoverPos({
+      x: placeLeft ? rect.left - GAP : rect.right + GAP,
+      y: rect.top,
+      placeLeft,
+    });
     hoverTimeoutRef.current = setTimeout(() => setHoveredDate(date), 200);
-  }
-
-  function handleMouseMove(e: React.MouseEvent<HTMLAnchorElement>) {
-    setHoverPos((prev) =>
-      prev.x === e.clientX + 14 && prev.y === e.clientY + 18
-        ? prev
-        : { x: e.clientX + 14, y: e.clientY + 18, align: "right" },
-    );
   }
 
   function handleMouseLeave() {
@@ -230,7 +228,6 @@ export default function MonthView({
                 key={cell.date}
                 href={`/day/${cell.date}${isFullscreen ? "?naplno=1" : ""}`}
                 onMouseEnter={(e) => handleMouseEnter(e, cell.date)}
-                onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
                 className={`relative aspect-square min-h-[80px] rounded-md flex flex-col p-1.5 transition-all hover:brightness-125 hover:scale-[1.02] ${
                   cell.isCurrentMonth ? "" : "opacity-30"
@@ -350,12 +347,11 @@ export default function MonthView({
           onMouseLeave={handleMouseLeave}
           className="fixed pointer-events-none z-50 print:hidden"
           style={{
-            // Tooltip sleduje kurzor — fixed pozice viewport-relative,
-            // po pravé/dolní straně kurzoru. Pokud by přesahovala viewport,
-            // CSS clamp ji udrží uvnitř.
-            left: `min(${hoverPos.x}px, calc(100vw - 340px))`,
-            top: `min(${hoverPos.y}px, calc(100vh - 200px))`,
-            maxWidth: "320px",
+            // Tooltip ukotvený k buňce dne — viewport-relative.
+            left: hoverPos.placeLeft ? undefined : `${hoverPos.x}px`,
+            right: hoverPos.placeLeft ? `${window.innerWidth - hoverPos.x}px` : undefined,
+            top: `min(${hoverPos.y}px, calc(100vh - 220px))`,
+            width: "320px",
             animation: "fadeIn 200ms ease-out",
           }}
         >
