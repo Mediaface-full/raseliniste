@@ -370,13 +370,34 @@ async function upsertFromIcs(
     if (!startsAtRaw || !endsAtRaw) continue;
 
     // Recurring: pokud nemá explicitní expansion (expand=true neudělalo svoji práci),
-    // expanduj ručně iterátorem v rozsahu okna
+    // expanduj ručně iterátorem v rozsahu okna.
+    //
+    // BUG FIX 2026-05-05: iterator startuje od DTSTART (kdy event vznikl). Pro
+    // daily/weekly event existující od 2020 původní safety<366 vyčerpal limit
+    // dávno před dnešním sync oknem — recurring eventy mizely. Fix:
+    //  1) jump-forward iterator na začátek okna (event.iterator(startTime))
+    //     — pokud DTSTART je před oknem
+    //  2) zvýšit safety limit na 2000 (pokrývá daily přes 5+ let pokud by
+    //     jump-forward selhal a iterator by musel projít vše)
     const isRecurring = event.isRecurring();
     if (isRecurring) {
-      const iter = event.iterator();
+      // Jump-forward na windowStart pokud DTSTART je dávno před oknem.
+      // Některé RRULE konfigurace jump-forward neřeknou (ICAL.js fallback) —
+      // pak vyšší safety limit dotáhne zbytek.
+      let iter: any;
+      try {
+        if (startsAtRaw < windowStart) {
+          const fromIcal = ICAL.Time.fromJSDate(windowStart, false);
+          iter = event.iterator(fromIcal);
+        } else {
+          iter = event.iterator();
+        }
+      } catch {
+        iter = event.iterator();
+      }
       let next: any;
       let safety = 0;
-      while ((next = iter.next()) && safety < 366) {
+      while ((next = iter.next()) && safety < 2000) {
         safety++;
         const occStart = next.toJSDate();
         if (occStart > windowEnd) break;
