@@ -637,6 +637,11 @@ model ProjectInvitation {
   // Per-projekt permission — některý host má brief permission jinde, jinde ne.
   canRecordBrief  Boolean  @default(false)
 
+  // Per-projekt × per-host: zachovat audio nahrávky tohoto hosta natrvalo.
+  // Default false → STANDARD audio se po 14 dnech maže (transkript zůstává).
+  // Při true → cleanup-audio cron tento konkrétní pár (projekt × host) přeskočí.
+  keepAudio       Boolean  @default(false)
+
   invitedAt       DateTime @default(now())
 
   @@unique([projectId, guestUserId])

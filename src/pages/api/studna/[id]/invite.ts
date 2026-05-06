@@ -12,6 +12,7 @@ const Body = z.object({
   email: z.string().email().max(200),
   phone: z.string().max(40).nullable().optional(),
   canRecordBrief: z.boolean().optional(),
+  keepAudio: z.boolean().optional(),
 });
 
 function makeGuestToken(): string {
@@ -81,9 +82,11 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
       projectId,
       guestUserId: guest.id,
       canRecordBrief: body.canRecordBrief ?? false,
+      keepAudio: body.keepAudio ?? false,
     },
     update: {
       canRecordBrief: body.canRecordBrief ?? false,
+      ...(body.keepAudio !== undefined ? { keepAudio: body.keepAudio } : {}),
     },
   });
 

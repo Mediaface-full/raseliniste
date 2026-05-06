@@ -19,8 +19,10 @@ export const prerender = false;
  *     * isPinned = false
  *     * createdAt < now - 14 dní
  *     * audioPath != null (ještě tam je)
+ *     * pozvánka (projekt × host) NEMÁ keepAudio=true
  *   - Transkripty + analýza zůstávají v DB navždy
  *   - Briefy se nemažou nikdy
+ *   - Hosti s keepAudio=true: audio zůstává natrvalo (per-projekt nastavení)
  */
 
 const RETENTION_DAYS = 14;
@@ -41,11 +43,32 @@ export const POST: APIRoute = async ({ request }) => {
       createdAt: { lt: cutoff },
       audioPath: { not: null },
     },
-    select: { id: true, audioPath: true },
+    select: { id: true, audioPath: true, projectId: true, guestUserId: true },
   });
 
+  // Vyfiltruj nahrávky kde pozvánka (projekt × host) má keepAudio=true.
+  // Owner-recordings (guestUserId=null) cleanup zachytí normálně — keepAudio
+  // je per-host nastavení, owner si pinuje přes isPinned.
+  const protectedKeys = new Set<string>();
+  const guestPairs = candidates
+    .filter((r) => r.guestUserId)
+    .map((r) => ({ projectId: r.projectId, guestUserId: r.guestUserId! }));
+  if (guestPairs.length > 0) {
+    const keepInvites = await prisma.projectInvitation.findMany({
+      where: {
+        keepAudio: true,
+        OR: guestPairs.map((p) => ({ projectId: p.projectId, guestUserId: p.guestUserId })),
+      },
+      select: { projectId: true, guestUserId: true },
+    });
+    for (const inv of keepInvites) protectedKeys.add(`${inv.projectId}|${inv.guestUserId}`);
+  }
+  const toDelete = candidates.filter(
+    (r) => !(r.guestUserId && protectedKeys.has(`${r.projectId}|${r.guestUserId}`)),
+  );
+
   let deleted = 0;
-  for (const r of candidates) {
+  for (const r of toDelete) {
     await deleteUpload(r.audioPath);
     await prisma.projectRecording.update({
       where: { id: r.id },
@@ -54,5 +77,11 @@ export const POST: APIRoute = async ({ request }) => {
     deleted++;
   }
 
-  return Response.json({ ok: true, retentionDays: RETENTION_DAYS, deleted, scanned: candidates.length });
+  return Response.json({
+    ok: true,
+    retentionDays: RETENTION_DAYS,
+    deleted,
+    scanned: candidates.length,
+    protectedByKeepAudio: candidates.length - toDelete.length,
+  });
 };

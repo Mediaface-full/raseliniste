@@ -23,6 +23,7 @@ interface ProjectDetail {
   createdAt: string;
   invitations: Array<{
     canRecordBrief: boolean;
+    keepAudio: boolean;
     invitedAt: string;
     guestUser: {
       id: string;
@@ -624,6 +625,20 @@ function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: 
     }
   }
 
+  async function toggleKeepAudio(guestId: string, current: boolean) {
+    setBusy(guestId);
+    try {
+      await fetch(`/api/studna/${project.id}/invitations/${guestId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ keepAudio: !current }),
+      });
+      onRefresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function removeInvite(guestId: string) {
     if (!confirm("Odebrat hosta z projektu? Jeho předchozí záznamy zůstanou.")) return;
     setBusy(guestId);
@@ -693,6 +708,19 @@ function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: 
                   />
                   <Star className="size-3" /> Klíčový brief
                 </label>
+                <label
+                  className="flex items-center gap-2 text-xs cursor-pointer select-none"
+                  title="Audio nahrávky tohoto hosta se nemažou po 14 dnech, zůstávají natrvalo."
+                >
+                  <input
+                    type="checkbox"
+                    checked={inv.keepAudio}
+                    onChange={() => toggleKeepAudio(inv.guestUser.id, inv.keepAudio)}
+                    disabled={busy === inv.guestUser.id}
+                    className="size-3.5"
+                  />
+                  💾 Zachovávat audio
+                </label>
                 <div className="flex gap-1">
                   <Button size="sm" variant="outline" onClick={() => copyLink(inv.guestUser.guestToken)}>
                     {copied === inv.guestUser.guestToken ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -738,6 +766,7 @@ function InviteForm({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [canBrief, setCanBrief] = useState(false);
+  const [keepAudio, setKeepAudio] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -753,6 +782,7 @@ function InviteForm({
           email: email.trim(),
           phone: phone.trim() || null,
           canRecordBrief: canBrief,
+          keepAudio,
         }),
       });
       const data = await res.json();
@@ -775,6 +805,10 @@ function InviteForm({
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" checked={canBrief} onChange={(e) => setCanBrief(e.target.checked)} className="size-4" />
         Smí nahrávat <strong>Klíčový brief</strong> (dlouhé audio přes upload, hloubková AI analýza)
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" checked={keepAudio} onChange={(e) => setKeepAudio(e.target.checked)} className="size-4" />
+        💾 <strong>Zachovávat audio</strong> (audio nahrávky tohoto hosta se nemažou po 14 dnech)
       </label>
       {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">{error}</div>}
       <div className="flex gap-2">
