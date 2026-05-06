@@ -26,6 +26,34 @@ export const GET: APIRoute = async ({ cookies, params }) => {
   const id = params.id;
   if (!id) return Response.json({ error: "INVALID_ID" }, { status: 400 });
 
+  // Defenzivní cleanup stuck processing — pokud AI pipeline crashla nebo
+  // kontejner se restartoval během běhu, processing rows by zůstaly
+  // navždy s loaderem v UI. Po 5 minutách je automaticky překlopíme na error.
+  const STALE_AFTER_MS = 5 * 60 * 1000;
+  const staleCutoff = new Date(Date.now() - STALE_AFTER_MS);
+  await prisma.decisionEvaluation.updateMany({
+    where: {
+      decision: { id, userId: session.uid },
+      status: "processing",
+      datum: { lt: staleCutoff },
+    },
+    data: {
+      status: "error",
+      processingError: "AI pipeline nestihla doběhnout do 5 minut. Smaž tuto evaluaci a zkus znovu.",
+    },
+  });
+  await prisma.decisionEntry.updateMany({
+    where: {
+      decision: { id, userId: session.uid },
+      status: "processing",
+      datum: { lt: staleCutoff },
+    },
+    data: {
+      status: "error",
+      processingError: "Audio AI pipeline nestihla doběhnout do 5 minut.",
+    },
+  });
+
   const item = await prisma.decision.findFirst({
     where: { id, userId: session.uid },
     include: {

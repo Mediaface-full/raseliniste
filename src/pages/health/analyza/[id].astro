@@ -15,9 +15,21 @@ const user = await prisma.user.findUnique({
 if (!user) return Astro.redirect("/login");
 
 const id = Astro.params.id as string;
-const analysis = await prisma.healthAnalysis.findUnique({ where: { id } });
+let analysis = await prisma.healthAnalysis.findUnique({ where: { id } });
 if (!analysis || analysis.userId !== session.uid) {
   return Astro.redirect("/health");
+}
+
+// Defenzivní cleanup: pokud AI pipeline padla / kontejner se restartoval,
+// processing rows by zůstaly navždy. Po 5 min překlopíme na error.
+if (analysis.status === "processing") {
+  const ageMs = Date.now() - analysis.createdAt.getTime();
+  if (ageMs > 5 * 60 * 1000) {
+    analysis = await prisma.healthAnalysis.update({
+      where: { id },
+      data: { status: "error", processingError: "AI analýza nestihla doběhnout do 5 minut. Zkus znovu." },
+    });
+  }
 }
 
 const html = marked.parse(analysis.text) as string;

@@ -58,16 +58,35 @@ export const POST: APIRoute = async ({ request, cookies, params, url }) => {
     obsah: e.obsah,
   }));
 
-  try {
-    const args = await extractArguments(dForAi, entriesForAi);
-    await prisma.decisionEvaluation.update({
-      where: { id: lastFinal.id },
-      data: { argumentsJson: args as unknown as object },
-    });
-    return Response.json({ arguments: args });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[bwmys arguments]", msg);
-    return Response.json({ error: msg }, { status: 500 });
-  }
+  // Fire-and-forget — extractArguments může trvat 10-30 s. Pokud Petr přijde
+  // poprvé, dostane processing:true a UI poll-ne za pár sekund (ArgumentsBanner
+  // má auto-fetch retry).
+  void runExtractArgs(lastFinal.id, dForAi, entriesForAi);
+  return Response.json({ processing: true });
 };
+
+const inFlight = new Set<Promise<void>>();
+
+async function runExtractArgs(
+  evaluationId: string,
+  dForAi: DecisionForAi,
+  entriesForAi: EntryForAi[],
+): Promise<void> {
+  const p = (async () => {
+    try {
+      const args = await extractArguments(dForAi, entriesForAi);
+      await prisma.decisionEvaluation.update({
+        where: { id: evaluationId },
+        data: { argumentsJson: args as unknown as object },
+      });
+      console.log(`[bwmys arguments bg] ${evaluationId} processed OK`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bwmys arguments bg] ${evaluationId} failed:`, msg);
+    } finally {
+      inFlight.delete(p);
+    }
+  })();
+  inFlight.add(p);
+  return p;
+}

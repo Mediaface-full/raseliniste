@@ -30,6 +30,13 @@ export const GET: APIRoute = async ({ cookies, params }) => {
   const id = params.id;
   if (!id) return Response.json({ error: "INVALID_ID" }, { status: 400 });
 
+  // Defenzivní cleanup: ProjectSummary processing déle než 5 min → error
+  const staleCutoff = new Date(Date.now() - 5 * 60 * 1000);
+  await prisma.projectSummary.updateMany({
+    where: { project: { id, userId: session.uid }, status: "processing", createdAt: { lt: staleCutoff } },
+    data: { status: "error", processingError: "Souhrn nestihl doběhnout do 5 minut. Smaž a zkus znovu." },
+  });
+
   const project = await prisma.projectBox.findFirst({
     where: { id, userId: session.uid },
     include: {
