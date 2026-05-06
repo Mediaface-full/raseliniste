@@ -347,14 +347,15 @@ export default function BwMysDetail({ id }: { id: string }) {
             >
               <FileDown className="size-3" /> .md
             </a>
-            <button
-              type="button"
-              onClick={() => window.print()}
+            <a
+              href={`/bwmys/${d.id}/tisk?print=1`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-foreground/80 hover:text-foreground"
-              title="Vytisknout / uložit jako PDF (Cmd+P)"
+              title="Otevře tisknutelnou verzi v novém tabu (auto Cmd+P)"
             >
               <Printer className="size-3" /> PDF
-            </button>
+            </a>
           </div>
           {d.evaluations.map((ev) => {
             const isProcessing = ev.status === "processing";

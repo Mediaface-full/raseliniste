@@ -1,0 +1,729 @@
+---
+import Base from "../../../layouts/Base.astro";
+import { prisma } from "../../../lib/db";
+import { readSession } from "../../../lib/session";
+import { COMPASS_HAT_COLORS, HAT_COLORS, MOOD_COLORS, TYPE_LABEL, ARGUMENT_COLORS } from "../../../lib/bwmys-colors";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const id = Astro.params.id as string;
+const decision = await prisma.decision.findFirst({
+  where: { id, userId: session.uid },
+  include: {
+    entries: { orderBy: { datum: "asc" } },
+    evaluations: { orderBy: { datum: "desc" } },
+  },
+});
+if (!decision) return Astro.redirect("/bwmys");
+
+const lastFinal = decision.evaluations.find((e) => e.typ === "finalni" && e.status === "ready");
+const A = (lastFinal?.obsahStrukturovany as any)?.A_statistika;
+const B = (lastFinal?.obsahStrukturovany as any)?.B_sixHats;
+const C = (lastFinal?.obsahStrukturovany as any)?.C_signalSum;
+const D = (lastFinal?.obsahStrukturovany as any)?.D_preMortem;
+const E = (lastFinal?.obsahStrukturovany as any)?.E_horizon10;
+const F = (lastFinal?.obsahStrukturovany as any)?.F_wrapCheck;
+const G = (lastFinal?.obsahStrukturovany as any)?.G_kriteria;
+const H = (lastFinal?.obsahStrukturovany as any)?.H_verdikt;
+
+const args = (lastFinal?.argumentsJson as Array<{
+  argument: string;
+  smer: number;
+  konzistence: number;
+  cetnost: number;
+  klobouk?: string;
+}>) ?? [];
+
+const fmtDate = (d: Date) => d.toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric" });
+const fmtDateShort = (d: Date) => d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" });
+
+const STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  aktivni: { label: "Aktivní (sběr probíhá)", color: "#A0522D" },
+  uzavrene_jdu: { label: "Verdikt: jdu do toho", color: "#0F6E56" },
+  uzavrene_nejdu: { label: "Verdikt: nejdu", color: "#993556" },
+  odlozene: { label: "Odloženo", color: "#854F0B" },
+  archivovane: { label: "Archivováno", color: "#5C5650" },
+};
+const statusInfo = STATUS_LABEL[decision.status] ?? { label: decision.status, color: "#444441" };
+
+const HAT_BG_FOR_KEY: Record<string, { bg: string; text: string; label: string }> = {
+  bily_fakta: { bg: "#F5F5F5", text: "#222", label: "🤍 Fakta (bílý)" },
+  cerveny_emoce: { bg: "#FBEAE8", text: "#7B2032", label: "❤️ Emoce (červený)" },
+  cerny_rizika: { bg: "#E8E8E8", text: "#222", label: "🖤 Kritika / rizika (černý)" },
+  zluty_prinosy: { bg: "#FBF4DB", text: "#6B5210", label: "💛 Přínosy (žlutý)" },
+  zeleny_alternativy: { bg: "#E6F5EE", text: "#0F6E56", label: "💚 Alternativy (zelený)" },
+  modry_meta: { bg: "#E8F1FB", text: "#185FA5", label: "💙 Meta (modrý)" },
+};
+
+const printAuto = Astro.url.searchParams.get("print") === "1";
+---
+
+<Base title={`${decision.nazev} · Tisk · Myši`}>
+  <main class="print-root">
+    {/* Toolbar — schovaný v tisku */}
+    <div class="toolbar print:hidden">
+      <a href={`/bwmys/${decision.id}`} class="btn-link">← Zpět na rozhodnutí</a>
+      <button type="button" onclick="window.print()" class="btn-primary">🖨 Vytisknout / Uložit PDF</button>
+    </div>
+
+    {/* HEADER */}
+    <header class="page-header">
+      <div class="meta-strip">
+        <span class="kontext-pill" style={`background: ${decision.kontext === "pracovni" ? "#E8F1FB" : decision.kontext === "osobni" ? "#FBEAE8" : "#FBF4DB"};`}>
+          {decision.kontext === "pracovni" ? "Pracovní" : decision.kontext === "osobni" ? "Osobní" : "Smíšený"} kontext
+        </span>
+        <span class="date-stamp">Vygenerováno {new Date().toLocaleString("cs-CZ")}</span>
+      </div>
+      <h1 class="title">{decision.nazev}</h1>
+      <p class="question">„{decision.otazka}"</p>
+      <div class="status-badge" style={`background: ${statusInfo.color}; color: white;`}>
+        {statusInfo.label}
+      </div>
+    </header>
+
+    {/* ZARÁMOVÁNÍ */}
+    <section class="section break-inside-avoid">
+      <h2 class="section-title">Zarámování</h2>
+      <div class="frame-grid">
+        <div>
+          <div class="kicker">Varianty</div>
+          <ol class="varianty-list">
+            {(decision.varianty as string[]).map((v) => <li>{v}</li>)}
+          </ol>
+        </div>
+        <div>
+          <div class="kicker">Předpoklady</div>
+          <ul class="bullets">
+            {(decision.predpoklady as string[]).map((p) => <li>{p}</li>)}
+          </ul>
+        </div>
+        <div class="meta-cell">
+          <div><strong>Deadline:</strong> {fmtDate(decision.deadlineRozhodnuti)}</div>
+          <div><strong>Délka sběru:</strong> {decision.delkaSberuDny} dní</div>
+          <div><strong>Vytvořeno:</strong> {fmtDate(decision.datumVytvoreni)}</div>
+          <div><strong>Autorství:</strong> {decision.autorstvi.replace(/_/g, " ")}{decision.autorstviKdo ? ` · ${decision.autorstviKdo}` : ""}</div>
+        </div>
+      </div>
+    </section>
+
+    {lastFinal ? (
+      <>
+        {/* H — VERDIKT (nejdřív, nejdůležitější) */}
+        {H && (
+          <section class="section break-inside-avoid verdict-section" style={`border-left: 4px solid ${statusInfo.color};`}>
+            <h2 class="section-title">H · Verdikt</h2>
+            <p class="verdict-text">{H.doporuceni}</p>
+            <div class="pro-proti-grid">
+              <div class="pro-box">
+                <div class="kicker green">Hlavní argument PRO</div>
+                <p>{H.hlavniArgumentPro}</p>
+              </div>
+              <div class="proti-box">
+                <div class="kicker red">Hlavní argument PROTI</div>
+                <p>{H.hlavniArgumentProti}</p>
+              </div>
+            </div>
+            <div class="preklopit-box">
+              <div class="kicker">Co by ho překlopilo</div>
+              <p>{H.coByPreklopilo}</p>
+            </div>
+            {H.doporuceneDatumRevize && (
+              <div class="revize">
+                Doporučená revize: <strong>{H.doporuceneDatumRevize}</strong>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* A — STATISTIKA */}
+        {A && (
+          <section class="section break-inside-avoid">
+            <h2 class="section-title">A · Statistika sběru</h2>
+            <div class="stats-grid">
+              <div class="stat-cell"><div class="stat-num">{A.pocetZapisu}</div><div class="stat-label">zápisů</div></div>
+              <div class="stat-cell"><div class="stat-num">{A.rozsahDni}</div><div class="stat-label">dní</div></div>
+              <div class="stat-cell wide"><div class="stat-label">Nálady</div><div class="stat-distrib">{A.distribuceNalad}</div></div>
+              <div class="stat-cell wide"><div class="stat-label">Typy vstupů</div><div class="stat-distrib">{A.distribuceTypu}</div></div>
+            </div>
+            {A.upozorneni && <p class="warning">⚠ {A.upozorneni}</p>}
+          </section>
+        )}
+
+        {/* B — SIX HATS */}
+        {B && (
+          <section class="section break-inside-avoid">
+            <h2 class="section-title">B · Six Hats analýza</h2>
+            <div class="hats-grid">
+              {Object.entries(HAT_BG_FOR_KEY).map(([k, info]) => {
+                const arr = (B[k] as string[]) ?? [];
+                if (arr.length === 0) return null;
+                return (
+                  <div class="hat-card" style={`background: ${info.bg}; color: ${info.text};`}>
+                    <div class="hat-title">{info.label}</div>
+                    <ul>{arr.map((x) => <li>{x}</li>)}</ul>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* C — SIGNAL/ŠUM */}
+        {C && (
+          <section class="section break-inside-avoid">
+            <h2 class="section-title">C · Signál a šum</h2>
+            <div class="three-col">
+              <div class="signal-box ok">
+                <div class="kicker">Konzistentní napříč náladami</div>
+                <ul>{(C.konzistentniSignaly as string[] ?? []).map((x) => <li>{x}</li>)}</ul>
+              </div>
+              <div class="signal-box warn">
+                <div class="kicker">Náladově zkreslené</div>
+                <ul>{(C.naladoveSkrelene as string[] ?? []).map((x) => <li>{x}</li>)}</ul>
+              </div>
+              <div class="signal-box noise">
+                <div class="kicker">Recyklované úvahy</div>
+                <ul>{(C.recyklovaneUvahy as string[] ?? []).map((x) => <li>{x}</li>)}</ul>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* D — PRE-MORTEM */}
+        {D && (
+          <section class="section break-inside-avoid">
+            <h2 class="section-title">D · Pre-Mortem</h2>
+            <p class="premortem-horizon"><em>{D.horizont}</em></p>
+            <ol class="premortem-list">
+              {((D.duvody as string[]) ?? []).map((x) => <li>{x}</li>)}
+            </ol>
+          </section>
+        )}
+
+        {/* E — 10/10/10 */}
+        {E && (
+          <section class="section break-inside-avoid">
+            <h2 class="section-title">E · Horizont 10/10/10</h2>
+            <div class="three-col">
+              <div class="horizon-box"><div class="kicker">Za 10 minut</div><p>{E.za10Minut}</p></div>
+              <div class="horizon-box"><div class="kicker">Za 10 měsíců</div><p>{E.za10Mesicu}</p></div>
+              <div class="horizon-box"><div class="kicker">Za 10 let</div><p>{E.za10Let}</p></div>
+            </div>
+          </section>
+        )}
+
+        {/* F — WRAP CHECK */}
+        {F && (
+          <section class="section break-inside-avoid">
+            <h2 class="section-title">F · Wrap Check (Heath bros)</h2>
+            <dl class="wrap-list">
+              <dt>Reálně víc variant?</dt><dd>{F.realneViceVariant}</dd>
+              <dt>Otestované předpoklady?</dt><dd>{F.otestovanePredpoklady}</dd>
+              <dt>Dostatečný odstup?</dt><dd>{F.dostatecnyOdstup}</dd>
+              <dt>Plán B?</dt><dd>{F.planB}</dd>
+            </dl>
+          </section>
+        )}
+
+        {/* G — DOMÉNOVÁ KRITÉRIA */}
+        {G && (
+          <section class="section break-inside-avoid">
+            <h2 class="section-title">G · Doménová kritéria</h2>
+            {G.pracovni && (
+              <div class="kriteria-block">
+                <div class="kicker blue">Pracovní</div>
+                <dl class="wrap-list">
+                  <dt>Obchodní</dt><dd>{G.pracovni.obchodni}</dd>
+                  <dt>Finanční</dt><dd>{G.pracovni.financni}</dd>
+                  <dt>Marketingový</dt><dd>{G.pracovni.marketingovy}</dd>
+                  <dt>Náročnost realizace</dt><dd>{G.pracovni.narocnostRealizace}</dd>
+                  <dt>Strategický fit</dt><dd>{G.pracovni.strategickyFit}</dd>
+                </dl>
+              </div>
+            )}
+            {G.osobni && (
+              <div class="kriteria-block">
+                <div class="kicker pink">Osobní</div>
+                <dl class="wrap-list">
+                  <dt>Soulad s hodnotami</dt><dd>{G.osobni.souladSHodnotami}</dd>
+                  <dt>Vliv na vztahy</dt><dd>{G.osobni.vlivNaVztahy}</dd>
+                  <dt>Vliv na čas a energii</dt><dd>{G.osobni.vlivNaCasAEnergii}</dd>
+                  <dt>Reverzibilita</dt><dd>{G.osobni.reverzibilita}</dd>
+                  <dt>Soulad s životní fází</dt><dd>{G.osobni.souladSeZivotniFazi}</dd>
+                </dl>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* MŘÍŽKA ARGUMENTŮ */}
+        {args.length > 0 && (
+          <section class="section">
+            <h2 class="section-title">Mřížka argumentů ({args.length})</h2>
+            <table class="args-table">
+              <thead>
+                <tr>
+                  <th>Argument</th>
+                  <th class="num">Směr</th>
+                  <th class="num">Konzistence</th>
+                  <th class="num">Četnost</th>
+                  <th>Klobouk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {args.map((a) => {
+                  const proti = a.smer < -0.3;
+                  const pro = a.smer > 0.3;
+                  const klobouk = a.klobouk ?? "meta";
+                  return (
+                    <tr>
+                      <td class="arg-text">{a.argument}</td>
+                      <td class="num">
+                        <span class="bar-cell">
+                          <span
+                            class="bar"
+                            style={`background: ${pro ? ARGUMENT_COLORS.pro : proti ? ARGUMENT_COLORS.proti : "#CCC"}; width: ${Math.abs(a.smer) * 100}%;`}
+                          />
+                          <span class="num-label">{a.smer >= 0 ? "+" : ""}{a.smer.toFixed(2)}</span>
+                        </span>
+                      </td>
+                      <td class="num">{(a.konzistence * 100).toFixed(0)}%</td>
+                      <td class="num">{a.cetnost}×</td>
+                      <td>
+                        <span class="klobouk-pill" style={`background: ${COMPASS_HAT_COLORS[klobouk] ?? "#888"}; color: white;`}>
+                          {klobouk}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
+        )}
+      </>
+    ) : (
+      <section class="section">
+        <p class="no-eval">Rozhodnutí zatím nemá hotové finální vyhodnocení.</p>
+      </section>
+    )}
+
+    {/* TIMELINE — kompaktní souhrn všech zápisů */}
+    {decision.entries.length > 0 && (
+      <section class="section">
+        <h2 class="section-title">Časová osa zápisů ({decision.entries.length})</h2>
+        <div class="entries-list">
+          {decision.entries.map((e) => (
+            <div class="entry-row">
+              <span
+                class="mood-dot"
+                style={`background: ${MOOD_COLORS[e.nalada] ?? "#888"};`}
+                title={`Nálada ${e.nalada}/5`}
+              />
+              <span class="entry-date">{fmtDateShort(e.datum)}</span>
+              <span class="entry-type">{TYPE_LABEL[e.typVstupu] ?? e.typVstupu}</span>
+              <span class="entry-text">{e.obsah}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <footer class="page-footer">
+      Rašeliniště · Myši · {decision.id}
+    </footer>
+  </main>
+
+  <style>
+    /* === Print-first design — žádný Liquid Glass, čistý černobílý+akcenty layout === */
+
+    :global(body) {
+      background: white !important;
+      color: #1a1a1a !important;
+    }
+
+    .print-root {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 16mm 14mm;
+      font-family: "Geist Variable", system-ui, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      color: #1a1a1a;
+      background: white;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    .btn-link {
+      color: #555;
+      text-decoration: none;
+      font-size: 13px;
+      padding: 6px 10px;
+    }
+    .btn-link:hover { background: #f3f3f3; border-radius: 4px; }
+    .btn-primary {
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      margin-left: auto;
+    }
+
+    /* Header */
+    .page-header { margin-bottom: 22pt; }
+    .meta-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 8.5pt;
+      color: #666;
+      margin-bottom: 8pt;
+    }
+    .kontext-pill {
+      padding: 2pt 8pt;
+      border-radius: 100px;
+      font-weight: 500;
+      color: #333;
+    }
+    .date-stamp { margin-left: auto; font-family: ui-monospace, monospace; }
+
+    .title {
+      font-family: "Fraunces Variable", Georgia, serif;
+      font-size: 22pt;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0 0 4pt 0;
+      color: #1a1a1a;
+    }
+    .question {
+      font-size: 12pt;
+      font-style: italic;
+      color: #444;
+      margin: 0 0 10pt 0;
+      line-height: 1.4;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4pt 12pt;
+      border-radius: 4pt;
+      font-size: 10pt;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 20pt;
+      padding: 12pt 14pt;
+      border: 1px solid #e0e0e0;
+      border-radius: 6pt;
+      background: #fafafa;
+    }
+    .section-title {
+      font-family: "Fraunces Variable", Georgia, serif;
+      font-size: 13pt;
+      font-weight: 600;
+      margin: 0 0 10pt 0;
+      padding-bottom: 6pt;
+      border-bottom: 2px solid #1a1a1a;
+      color: #1a1a1a;
+    }
+
+    .kicker {
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #777;
+      font-weight: 600;
+      margin-bottom: 4pt;
+      font-family: ui-monospace, monospace;
+    }
+    .kicker.green { color: #0F6E56; }
+    .kicker.red { color: #993556; }
+    .kicker.blue { color: #185FA5; }
+    .kicker.pink { color: #993556; }
+
+    /* Zarámování */
+    .frame-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1.5fr 1fr;
+      gap: 14pt;
+    }
+    .varianty-list, .bullets { margin: 0; padding-left: 18pt; }
+    .varianty-list li, .bullets li { margin-bottom: 3pt; }
+    .meta-cell { font-size: 9.5pt; line-height: 1.65; }
+    .meta-cell strong { color: #444; }
+
+    /* Verdict */
+    .verdict-section {
+      background: #FBFAF7;
+      border: 1px solid #d8d4cc;
+    }
+    .verdict-text {
+      font-size: 12pt;
+      line-height: 1.5;
+      margin: 0 0 10pt 0;
+      color: #1a1a1a;
+    }
+    .pro-proti-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10pt;
+      margin: 8pt 0;
+    }
+    .pro-box {
+      padding: 8pt 10pt;
+      background: #E6F5EE;
+      border-radius: 4pt;
+      border-left: 3px solid #0F6E56;
+    }
+    .proti-box {
+      padding: 8pt 10pt;
+      background: #FBEAE8;
+      border-radius: 4pt;
+      border-left: 3px solid #993556;
+    }
+    .pro-box p, .proti-box p { margin: 0; font-size: 10pt; }
+    .preklopit-box {
+      padding: 8pt 10pt;
+      background: #F5F0FA;
+      border-radius: 4pt;
+      border-left: 3px solid #534AB7;
+      margin: 8pt 0;
+    }
+    .preklopit-box p { margin: 0; font-size: 10pt; }
+    .revize {
+      margin-top: 8pt;
+      padding-top: 6pt;
+      border-top: 1px solid #d8d4cc;
+      font-size: 9.5pt;
+      color: #666;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 2fr 2fr;
+      gap: 10pt;
+    }
+    .stat-cell {
+      padding: 8pt;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 4pt;
+      text-align: center;
+    }
+    .stat-cell.wide { text-align: left; }
+    .stat-num { font-size: 22pt; font-weight: 700; color: #1a1a1a; line-height: 1; }
+    .stat-label { font-size: 8pt; color: #777; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2pt; }
+    .stat-distrib { font-family: ui-monospace, monospace; font-size: 9pt; margin-top: 4pt; color: #333; }
+    .warning { color: #854F0B; background: #FBF4DB; padding: 6pt 10pt; border-radius: 4pt; margin: 8pt 0 0 0; font-size: 9.5pt; }
+
+    /* Hats grid */
+    .hats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8pt;
+    }
+    .hat-card {
+      padding: 8pt 10pt;
+      border-radius: 4pt;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+    .hat-title {
+      font-weight: 600;
+      font-size: 10pt;
+      margin-bottom: 4pt;
+    }
+    .hat-card ul { margin: 0; padding-left: 16pt; }
+    .hat-card li { font-size: 9.5pt; line-height: 1.4; margin-bottom: 2pt; }
+
+    /* 3 columns */
+    .three-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10pt;
+    }
+    .signal-box, .horizon-box {
+      padding: 8pt 10pt;
+      border-radius: 4pt;
+      border: 1px solid #e0e0e0;
+      background: white;
+      font-size: 9.5pt;
+    }
+    .signal-box.ok { border-left: 3px solid #0F6E56; }
+    .signal-box.warn { border-left: 3px solid #854F0B; }
+    .signal-box.noise { border-left: 3px solid #888; }
+    .signal-box ul { margin: 0; padding-left: 14pt; }
+    .signal-box li { margin-bottom: 2pt; }
+    .horizon-box p { margin: 0; }
+
+    /* Pre-mortem */
+    .premortem-horizon { font-size: 11pt; color: #444; margin: 0 0 8pt 0; }
+    .premortem-list { margin: 0; padding-left: 18pt; counter-reset: pm; list-style: none; }
+    .premortem-list li {
+      counter-increment: pm;
+      margin-bottom: 5pt;
+      padding-left: 24pt;
+      position: relative;
+    }
+    .premortem-list li::before {
+      content: counter(pm);
+      position: absolute;
+      left: 0;
+      top: 0;
+      background: #993556;
+      color: white;
+      width: 18pt;
+      height: 18pt;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9pt;
+      font-weight: 600;
+    }
+
+    /* Wrap list (G/F) */
+    .wrap-list {
+      display: grid;
+      grid-template-columns: 140pt 1fr;
+      gap: 4pt 12pt;
+      margin: 0;
+      font-size: 10pt;
+    }
+    .wrap-list dt { font-weight: 600; color: #444; }
+    .wrap-list dd { margin: 0; }
+    .kriteria-block { margin-bottom: 12pt; }
+    .kriteria-block:last-child { margin-bottom: 0; }
+
+    /* Args table */
+    .args-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5pt;
+    }
+    .args-table th, .args-table td {
+      padding: 5pt 6pt;
+      border-bottom: 1px solid #e8e8e8;
+      text-align: left;
+      vertical-align: middle;
+    }
+    .args-table th {
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #777;
+      border-bottom: 2px solid #1a1a1a;
+    }
+    .args-table th.num, .args-table td.num { text-align: right; font-family: ui-monospace, monospace; white-space: nowrap; }
+    .arg-text { max-width: 280pt; }
+    .bar-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 6pt;
+      width: 100%;
+      justify-content: flex-end;
+    }
+    .bar {
+      display: inline-block;
+      height: 8pt;
+      max-width: 60pt;
+      border-radius: 2pt;
+    }
+    .num-label { font-size: 8.5pt; color: #444; min-width: 32pt; text-align: right; }
+    .klobouk-pill {
+      display: inline-block;
+      padding: 1pt 7pt;
+      border-radius: 100px;
+      font-size: 8.5pt;
+      letter-spacing: 0.04em;
+    }
+
+    /* Entries */
+    .entries-list { display: flex; flex-direction: column; gap: 3pt; }
+    .entry-row {
+      display: grid;
+      grid-template-columns: 12pt 36pt 90pt 1fr;
+      gap: 6pt;
+      align-items: baseline;
+      font-size: 9.5pt;
+      padding: 3pt 0;
+      border-bottom: 1px dotted #ececec;
+    }
+    .mood-dot {
+      width: 8pt;
+      height: 8pt;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .entry-date { font-family: ui-monospace, monospace; font-size: 8.5pt; color: #777; }
+    .entry-type { font-size: 8.5pt; color: #555; text-transform: lowercase; }
+    .entry-text { color: #1a1a1a; }
+
+    .no-eval { color: #777; font-style: italic; text-align: center; padding: 20pt; }
+
+    /* Footer */
+    .page-footer {
+      margin-top: 30pt;
+      padding-top: 10pt;
+      border-top: 1px solid #e5e5e5;
+      font-size: 8pt;
+      color: #aaa;
+      font-family: ui-monospace, monospace;
+      text-align: center;
+    }
+
+    /* PRINT */
+    @page {
+      size: A4;
+      margin: 12mm 10mm;
+    }
+
+    @media print {
+      :global(html), :global(body) {
+        background: white !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .print-root {
+        padding: 0;
+        max-width: none;
+        font-size: 9.5pt;
+      }
+      .toolbar { display: none !important; }
+      .section, .verdict-section, .pro-box, .proti-box, .preklopit-box,
+      .stat-cell, .hat-card, .signal-box, .horizon-box, .kontext-pill,
+      .status-badge, .klobouk-pill, .bar, .warning, .premortem-list li::before {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .break-inside-avoid {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .section { box-shadow: none; }
+    }
+
+    .print\:hidden {}
+    @media print { .print\:hidden { display: none !important; } }
+  </style>
+</Base>
+
+{printAuto && (
+  <script is:inline>
+    window.addEventListener("load", () => {
+      setTimeout(() => window.print(), 350);
+    });
+  </script>
+)}
