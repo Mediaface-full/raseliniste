@@ -51,6 +51,7 @@ model User {
   ragChunks        RagChunk[]
   anniversaries    Anniversary[]
   checkIns         CheckIn[]
+  sharedFiles      SharedFile[]
   pushSubscriptions WebPushSubscription[]
   decisions        Decision[]
   todoistProjects  TodoistProjectMirror[]
@@ -611,6 +612,29 @@ model ProjectBox {
 // Admin (owner) přílohy ke projektu — PDF, XLS, DOC, obrázky atd.
 // Žádná AI analýza, jen storage a download. Petr je u Studánky/Prskavky
 // jediný uploader — hosté soubory nepřidávají.
+// Sdílené soubory — Gideon nahraje, dostane share link, klient stáhne, po
+// 14 dnech se soubor automaticky smaže. Veřejný download přes /g/<token>.
+model SharedFile {
+  id           String   @id @default(cuid())
+  userId       String   // owner (Petr)
+  user         User     @relation(fields: [userId], references: [id])
+
+  token        String   @unique // 24 znaků base64url, public URL
+  filename     String   // bezpečné jméno na disku
+  originalName String
+  mime         String
+  bytes        Int
+  storagePath  String
+
+  uploadedAt   DateTime @default(now())
+  expiresAt    DateTime // typicky uploadedAt + 14 dní; cron maže po expiraci
+  downloadCount Int     @default(0)
+  lastDownloadAt DateTime?
+
+  @@index([userId, uploadedAt])
+  @@index([expiresAt])
+}
+
 model ProjectFile {
   id           String   @id @default(cuid())
   projectId    String

@@ -1,0 +1,92 @@
+---
+import Base from "../../layouts/Base.astro";
+import { prisma } from "../../lib/db";
+
+const token = Astro.params.token;
+const f = token
+  ? await prisma.sharedFile.findUnique({
+      where: { token },
+      select: { originalName: true, mime: true, bytes: true, expiresAt: true, uploadedAt: true },
+    })
+  : null;
+
+const expired = f ? f.expiresAt.getTime() < Date.now() : false;
+
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+const daysLeft = f && !expired
+  ? Math.ceil((f.expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+  : 0;
+---
+
+<Base title={f ? `Spíž · ${f.originalName}` : "Spíž · Gideon"}>
+  <div class="min-h-screen px-4 pt-10 sm:pt-20 pb-10 relative z-10">
+    <div class="w-full max-w-md mx-auto">
+      {!f || expired ? (
+        <div class="glass-strong rounded-xl p-8 text-center">
+          <img
+            src="/apple-touch-icon.png"
+            alt="Gideon"
+            width="64"
+            height="64"
+            class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
+          />
+          <h1 class="font-serif text-2xl tracking-tight mb-3">Spíž je prázdná</h1>
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            {expired
+              ? "Tenhle odkaz vypršel — po 14 dnech se sdílené soubory automaticky mažou."
+              : "Tenhle odkaz neexistuje nebo už byl smazán."}
+          </p>
+          <p class="text-xs text-muted-foreground/70 mt-4">
+            Napiš Gideonovi, ať ti soubor sdílí znovu.
+          </p>
+        </div>
+      ) : (
+        <div class="glass-strong rounded-xl p-8 text-center">
+          <img
+            src="/apple-touch-icon.png"
+            alt="Gideon"
+            width="72"
+            height="72"
+            class="mx-auto mb-5 rounded-[16px] shadow-lg shadow-black/40"
+          />
+          <h1 class="font-serif text-3xl tracking-tight mb-2">
+            Vítejte ve spíži Gideona.
+          </h1>
+          <p class="text-sm text-muted-foreground/90 leading-relaxed mb-6">
+            Stáhněte si nasdílený soubor.
+          </p>
+
+          <div
+            class="rounded-xl p-4 mb-5 text-left"
+            style="background: color-mix(in oklch, var(--tint-mint) 10%, transparent); border: 1px solid color-mix(in oklch, var(--tint-mint) 25%, transparent);"
+          >
+            <div class="flex items-baseline gap-2 flex-wrap mb-1">
+              <span class="font-medium break-all">{f.originalName}</span>
+            </div>
+            <div class="text-xs font-mono text-muted-foreground">
+              {fmtBytes(f.bytes)} · k dispozici ještě {daysLeft} {daysLeft === 1 ? "den" : daysLeft < 5 ? "dny" : "dní"}
+            </div>
+          </div>
+
+          <a
+            href={`/api/spiz/d/${token}`}
+            class="inline-flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl text-base font-medium transition-colors"
+            style="background: color-mix(in oklch, var(--tint-mint) 22%, transparent); color: color-mix(in oklch, var(--tint-mint) 96%, white); border: 1px solid color-mix(in oklch, var(--tint-mint) 40%, transparent);"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Stáhnout soubor
+          </a>
+
+          <p class="mt-5 text-[11px] font-mono text-muted-foreground/70 tracking-wider">
+            Soubor zmizí {f.expiresAt.toLocaleDateString("cs-CZ")} (14 dní od nahrání).
+          </p>
+        </div>
+      )}
+    </div>
+  </div>
+</Base>

@@ -74,6 +74,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Studna — mazání starých audio souborů",
   },
   {
+    name: "cleanup-spiz",
+    endpoint: "/api/cron/cleanup-spiz",
+    schedule: { type: "daily", hour: 3, minute: 10 },
+    description: "Spíž — mazání expirovaných sdílených souborů (>14 dní)",
+  },
+  {
     name: "daily-projects-digest",
     endpoint: "/api/cron/daily-projects-digest",
     schedule: { type: "daily", hour: 7, minute: 0 },

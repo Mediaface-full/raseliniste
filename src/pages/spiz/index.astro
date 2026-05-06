@@ -1,0 +1,23 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+import SpizApp from "../../components/SpizApp";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Spíž · Rašeliniště"
+  username={user.username}
+  heading="Spíž"
+  breadcrumb={[{ label: "Spíž" }]}
+>
+  <SpizApp client:load />
+</Shell>
