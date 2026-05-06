@@ -3,6 +3,7 @@ import Base from "../../../layouts/Base.astro";
 import { prisma } from "../../../lib/db";
 import { readSession } from "../../../lib/session";
 import { COMPASS_HAT_COLORS, HAT_COLORS, MOOD_COLORS, TYPE_LABEL, ARGUMENT_COLORS } from "../../../lib/bwmys-colors";
+import BwMysPrintViz from "../../../components/BwMysViz/PrintViz";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -109,6 +110,24 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
 
     {lastFinal ? (
       <>
+        {/* GRAFY — primární vizuální shrnutí */}
+        <section class="section break-after-section">
+          <h2 class="section-title">Vizuální přehled</h2>
+          <BwMysPrintViz
+            client:load
+            entries={decision.entries.map((e) => ({
+              datum: e.datum.toISOString(),
+              nalada: e.nalada,
+              typVstupu: e.typVstupu,
+              uhelPohledu: e.uhelPohledu,
+              uhelPohleduAi: e.uhelPohleduAi ?? null,
+              obsah: e.obsah,
+            }))}
+            args={(args as any) ?? []}
+            decisionStatus={decision.status}
+          />
+        </section>
+
         {/* H — VERDIKT (nejdřív, nejdůležitější) */}
         {H && (
           <section class="section break-inside-avoid verdict-section" style={`border-left: 4px solid ${statusInfo.color};`}>
@@ -722,8 +741,10 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
 
 {printAuto && (
   <script is:inline>
+    // Delay 1.8 s — Recharts grafy potřebují čas na hydration + render do
+    // ResponsiveContainer. Jinak by tiskárna chytila prázdná SVG.
     window.addEventListener("load", () => {
-      setTimeout(() => window.print(), 350);
+      setTimeout(() => window.print(), 1800);
     });
   </script>
 )}
