@@ -27,6 +27,17 @@ export const HAT_COLORS: Record<string, string> = {
   modry: "#9CCAE8",    // meta
 };
 
+// Six Hats per úhel — pro Decision Compass (sytější varianty pro fill bodu na světlém SVG).
+// Hex z Decision Compass spec (zadani-decision-compass.pdf, sekce 3).
+export const COMPASS_HAT_COLORS: Record<string, string> = {
+  fakta: "#444441",       // šedá (neutrální)
+  emoce: "#993556",       // růžová
+  kritika: "#0F6E56",     // zelená/teal
+  prinosy: "#854F0B",     // hnědá/amber
+  alternativy: "#185FA5", // modrá
+  meta: "#534AB7",        // fialová
+};
+
 // Mapování úhlu pohledu (DB hodnota) na hat-barvu.
 export const UHEL_TO_HAT: Record<string, keyof typeof HAT_COLORS> = {
   fakta: "bily",

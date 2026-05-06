@@ -10,6 +10,9 @@ export interface DecisionArgument {
   konzistence: number;     // 0..1
   cetnost: number;
   nalady_vyskytu: number[];
+  // Six Hats kategorie — přidáno pro Decision Compass (zadani-decision-compass.pdf, květen 2026).
+  // Optional kvůli backwards compatibility se starými argumentsJson v DB.
+  klobouk?: "fakta" | "emoce" | "kritika" | "prinosy" | "alternativy" | "meta";
 }
 
 interface Point extends DecisionArgument {

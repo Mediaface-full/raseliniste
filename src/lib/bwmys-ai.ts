@@ -296,6 +296,7 @@ export interface DecisionArgument {
   konzistence: number;       // 0.0 až 1.0 — napříč náladami
   cetnost: number;           // kolikrát se objevil v zápisech
   nalady_vyskytu: number[];  // 1-5
+  klobouk: "fakta" | "emoce" | "kritika" | "prinosy" | "alternativy" | "meta";
 }
 
 export async function extractArguments(d: DecisionForAi, entries: EntryForAi[]): Promise<DecisionArgument[]> {
@@ -318,7 +319,8 @@ ${entries.map((e, i) => `[${i + 1}] ${e.datum.toLocaleDateString("cs-CZ")} | ná
       "smer": -1.0 až +1.0,
       "konzistence": 0.0 až 1.0,
       "cetnost": int,
-      "nalady_vyskytu": [1-5]
+      "nalady_vyskytu": [1-5],
+      "klobouk": "fakta" | "emoce" | "kritika" | "prinosy" | "alternativy" | "meta"
     }
   ]
 }
@@ -327,6 +329,13 @@ PRAVIDLA:
 - Argument = TÉMA, ne citace. 3× stejné téma = 1 argument cetnost=3.
 - Konzistence: napříč náladami 1 i 5 → vysoká (1.0). Jen v náladě 1 → 0.2.
 - Smer: AI rozhodne. „Obavy z financí" = -0.7. „Baví mě to" = +0.6.
+- Klobouk: Six Hats kategorie podle převažujícího charakteru obsahu:
+  * "vysoké náklady" → kritika
+  * "cítil bych se dobře" → emoce
+  * "data ukazují růst trhu" → fakta
+  * "nový kanál distribuce" → prinosy
+  * "mohli bychom udělat menší verzi" → alternativy
+  * "uvědomuji si že rozhoduji unaveně" → meta
 - Max 12 argumentů, vyber nejvýraznější.
 - Žádný terapeutický tón.`;
 
@@ -345,17 +354,26 @@ PRAVIDLA:
   try {
     const parsed = JSON.parse(raw) as { arguments?: DecisionArgument[] };
     const arr = parsed.arguments ?? [];
+    const allowedHats = ["fakta", "emoce", "kritika", "prinosy", "alternativy", "meta"] as const;
     return arr
       .filter((a) => typeof a?.argument === "string" && a.argument.length > 0)
-      .map((a) => ({
-        argument: String(a.argument).slice(0, 120),
-        smer: Math.max(-1, Math.min(1, Number(a.smer) || 0)),
-        konzistence: Math.max(0, Math.min(1, Number(a.konzistence) || 0)),
-        cetnost: Math.max(1, Math.floor(Number(a.cetnost) || 1)),
-        nalady_vyskytu: Array.isArray(a.nalady_vyskytu)
-          ? a.nalady_vyskytu.map((n) => Number(n)).filter((n) => n >= 1 && n <= 5)
-          : [],
-      }))
+      .map((a) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawHat = String((a as any).klobouk ?? "").toLowerCase();
+        const klobouk = (allowedHats as readonly string[]).includes(rawHat)
+          ? (rawHat as DecisionArgument["klobouk"])
+          : "meta"; // fallback pokud AI nevrátila klobouk (legacy / parse fail)
+        return {
+          argument: String(a.argument).slice(0, 120),
+          smer: Math.max(-1, Math.min(1, Number(a.smer) || 0)),
+          konzistence: Math.max(0, Math.min(1, Number(a.konzistence) || 0)),
+          cetnost: Math.max(1, Math.floor(Number(a.cetnost) || 1)),
+          nalady_vyskytu: Array.isArray(a.nalady_vyskytu)
+            ? a.nalady_vyskytu.map((n) => Number(n)).filter((n) => n >= 1 && n <= 5)
+            : [],
+          klobouk,
+        };
+      })
       .slice(0, 12);
   } catch (e) {
     void e;

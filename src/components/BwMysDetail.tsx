@@ -5,6 +5,7 @@ import { Input } from "./ui/Input";
 import BwMysAudioRecorder from "./BwMysAudioRecorder";
 import BwMysViz from "./BwMysViz";
 import ArgumentsGrid, { type DecisionArgument } from "./BwMysViz/ArgumentsGrid";
+import DecisionCompass from "./BwMysViz/DecisionCompass";
 import SixHatsRadar from "./BwMysViz/SixHatsRadar";
 import MoodCurve from "./BwMysViz/MoodCurve";
 import EntryTypesDonut from "./BwMysViz/EntryTypesDonut";
@@ -282,7 +283,7 @@ export default function BwMysDetail({ id }: { id: string }) {
               </summary>
               <div className="mt-3">
                 {ev.typ === "finalni"
-                  ? <FinalEvalRender data={ev.obsahStrukturovany as Record<string, unknown>} evaluation={ev} entries={d.entries} decisionId={d.id} />
+                  ? <FinalEvalRender data={ev.obsahStrukturovany as Record<string, unknown>} evaluation={ev} entries={d.entries} decisionId={d.id} decisionStatus={d.status} />
                   : <MiniEvalRender data={ev.obsahStrukturovany as Record<string, unknown>} />}
               </div>
               {ev.typ === "finalni" && d.status === "aktivni" && (
@@ -499,11 +500,12 @@ function NewEntryModal({ decisionId, onClose }: { decisionId: string; onClose: (
 // ============================================================================
 
 function ArgumentsBanner({
-  decisionId, evaluation, entries,
+  decisionId, evaluation, entries, decisionStatus,
 }: {
   decisionId: string;
   evaluation: DecisionEvaluation;
   entries: DecisionEntry[];
+  decisionStatus: string;
 }) {
   const [args, setArgs] = useState<DecisionArgument[] | null>(evaluation.argumentsJson ?? null);
   const [loading, setLoading] = useState(false);
@@ -553,6 +555,17 @@ function ArgumentsBanner({
           <Sparkles className="size-3" /> {loading ? "generuji…" : "regenerovat"}
         </button>
       </div>
+
+      {/* Decision Compass — primární shrnutí "kde rozhodnutí stojí".
+          Spec: zadani-decision-compass.pdf (květen 2026). */}
+      {args && args.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground mb-1">
+            Decision Compass
+          </div>
+          <DecisionCompass args={args} decisionStatus={decisionStatus} />
+        </div>
+      )}
 
       <div>
         <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground mb-1">
@@ -604,12 +617,13 @@ function MiniTile({ title, children }: { title: string; children: React.ReactNod
 // ============================================================================
 
 function FinalEvalRender({
-  data, evaluation, entries, decisionId,
+  data, evaluation, entries, decisionId, decisionStatus,
 }: {
   data: Record<string, unknown>;
   evaluation: DecisionEvaluation;
   entries: DecisionEntry[];
   decisionId: string;
+  decisionStatus: string;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const d = data as any;
@@ -619,6 +633,7 @@ function FinalEvalRender({
         decisionId={decisionId}
         evaluation={evaluation}
         entries={entries}
+        decisionStatus={decisionStatus}
       />
 
       <Section letter="A" title="Statistika sběru">
