@@ -595,12 +595,35 @@ model ProjectBox {
   invitations       ProjectInvitation[]
   recordings        ProjectRecording[]
   summaries         ProjectSummary[]
+  files             ProjectFile[]
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   archivedAt        DateTime?
 
   @@index([userId])
+}
+
+// Admin (owner) přílohy ke projektu — PDF, XLS, DOC, obrázky atd.
+// Žádná AI analýza, jen storage a download. Petr je u Studánky/Prskavky
+// jediný uploader — hosté soubory nepřidávají.
+model ProjectFile {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      ProjectBox @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  filename     String   // bezpečné jméno na disku (uuid + ext)
+  originalName String   // původní jméno z uploadu (pro download "save as")
+  mime         String
+  bytes        Int
+  storagePath  String   // relativní k UPLOADS_PATH
+
+  // Volitelný popis — Petr si může napsat „faktura listopad 2026" apod.
+  note         String?  @db.Text
+
+  uploadedAt   DateTime @default(now())
+
+  @@index([projectId, uploadedAt])
 }
 
 model GuestUser {

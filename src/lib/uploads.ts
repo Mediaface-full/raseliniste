@@ -38,6 +38,8 @@ function extFromMime(mime: string): string | null {
     "image/jpeg": "jpg",
     "image/jpg": "jpg",
     "image/webp": "webp",
+    "image/gif": "gif",
+    "image/heic": "heic",
     "application/pdf": "pdf",
     // Audio (Studna)
     "audio/webm": "webm",
@@ -52,6 +54,25 @@ function extFromMime(mime: string): string | null {
     "audio/wave": "wav",
     "audio/aac": "aac",
     "audio/flac": "flac",
+    // Office dokumenty + texty (project files)
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.ms-powerpoint": "ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "text/plain": "txt",
+    "text/csv": "csv",
+    "text/markdown": "md",
+    "application/json": "json",
+    "application/rtf": "rtf",
+    // Archivy
+    "application/zip": "zip",
+    "application/x-zip-compressed": "zip",
+    "application/x-7z-compressed": "7z",
+    "application/x-rar-compressed": "rar",
+    "application/x-tar": "tar",
+    "application/gzip": "gz",
   };
   return map[base] ?? null;
 }
@@ -77,6 +98,43 @@ export async function saveUpload(
   await fs.writeFile(absolutePath, data, { mode: 0o600 });
 
   return { relativePath, absolutePath, bytes: data.byteLength };
+}
+
+/**
+ * Specializovaný uploader pro project files (Studánka/Prskavka přílohy).
+ * Tolerantnější než saveUpload — pokud mime není v whitelistu nebo je generic,
+ * fallback na příponu z originálního filename. Drobnější bezpečnostní kontrola
+ * na blacklist nebezpečných extenzí.
+ */
+const DANGEROUS_EXTENSIONS = new Set([
+  "exe", "bat", "cmd", "com", "pif", "scr", "vbs", "js", "ws", "wsf",
+  "msi", "msp", "hta", "cpl", "jar", "dll", "sys", "drv", "ps1", "psm1",
+  "sh", "bash", "command", "app",
+]);
+
+export async function saveProjectFile(
+  subdir: string,
+  data: Buffer,
+  mime: string,
+  originalName: string,
+): Promise<{ relativePath: string; absolutePath: string; bytes: number; safeExt: string }> {
+  // Zkus získat ext z mime, fallback na originální filename
+  let ext = extFromMime(mime);
+  if (!ext) {
+    const m = originalName.toLowerCase().match(/\.([a-z0-9]{1,8})$/);
+    ext = m ? m[1] : "bin";
+  }
+  if (DANGEROUS_EXTENSIONS.has(ext)) {
+    throw new Error(`Tento typ souboru není povolený (${ext}).`);
+  }
+
+  await ensureUploadDir(subdir);
+  const filename = `${randomBytes(12).toString("hex")}.${ext}`;
+  const relativePath = path.posix.join(subdir, filename);
+  const absolutePath = path.join(UPLOADS_DIR, subdir, filename);
+  await fs.writeFile(absolutePath, data, { mode: 0o600 });
+
+  return { relativePath, absolutePath, bytes: data.byteLength, safeExt: ext };
 }
 
 /**

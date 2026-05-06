@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Loader2, Plus, Pin, Trash2, Sparkles, FileText, Settings, Users, AudioLines,
   ChevronDown, ChevronRight, Copy, Check, FileAudio2, Mic, Send, FileDown,
-  Star, RotateCw, Pencil,
+  Star, RotateCw, Pencil, Paperclip, Upload, X as XIcon, Download,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -58,9 +58,17 @@ interface ProjectDetail {
     briefsIncluded: number;
     createdAt: string;
   }>;
+  files: Array<{
+    id: string;
+    originalName: string;
+    mime: string;
+    bytes: number;
+    note: string | null;
+    uploadedAt: string;
+  }>;
 }
 
-type Tab = "feed" | "guests" | "summaries" | "settings";
+type Tab = "feed" | "guests" | "summaries" | "files" | "settings";
 
 export default function StudnaDetail({ projectId, ownerName }: { projectId: string; ownerName: string }) {
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -126,6 +134,9 @@ export default function StudnaDetail({ projectId, ownerName }: { projectId: stri
         <TabButton active={tab === "summaries"} onClick={() => setTab("summaries")}>
           <Sparkles className="size-4" /> Souhrny ({project.summaries.length})
         </TabButton>
+        <TabButton active={tab === "files"} onClick={() => setTab("files")}>
+          <Paperclip className="size-4" /> Soubory ({project.files.length})
+        </TabButton>
         <TabButton active={tab === "settings"} onClick={() => setTab("settings")}>
           <Settings className="size-4" /> Nastavení
         </TabButton>
@@ -134,6 +145,7 @@ export default function StudnaDetail({ projectId, ownerName }: { projectId: stri
       {tab === "feed" && <FeedTab project={project} ownerName={ownerName} onRefresh={load} />}
       {tab === "guests" && <GuestsTab project={project} onRefresh={load} />}
       {tab === "summaries" && <SummariesTab project={project} onRefresh={load} />}
+      {tab === "files" && <FilesTab project={project} onRefresh={load} />}
       {tab === "settings" && <SettingsTab project={project} onRefresh={load} />}
     </div>
   );
@@ -1247,6 +1259,225 @@ function TextInputCard({ projectId, onSuccess }: { projectId: string; onSuccess:
           Vyčistit
         </Button>
       </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// FILES tab — admin přílohy (PDF, XLS, DOC...) bez AI analýzy
+// =============================================================================
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function iconForMime(mime: string, name: string): React.ComponentType<{ className?: string }> {
+  const m = mime.toLowerCase();
+  if (m.includes("pdf")) return FileText;
+  if (m.includes("audio")) return FileAudio2;
+  if (m.includes("image")) return FileText; // fallback ikona
+  if (m.includes("zip") || m.includes("rar") || m.includes("7z") || m.includes("tar")) return FileDown;
+  if (name.match(/\.(xlsx?|csv)$/i)) return FileText;
+  return FileText;
+}
+
+function FilesTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const fileInputRef = useState<HTMLInputElement | null>(null);
+
+  async function uploadFile(file: File) {
+    setError(null);
+    setUploading(true);
+    setProgress(0);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      if (note.trim()) fd.append("note", note.trim());
+
+      const xhr = new XMLHttpRequest();
+      const done = new Promise<void>((resolve, reject) => {
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+        });
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              reject(new Error(data.error ?? `HTTP ${xhr.status}`));
+            } catch {
+              reject(new Error(`HTTP ${xhr.status}`));
+            }
+          }
+        });
+        xhr.addEventListener("error", () => reject(new Error("Síťová chyba")));
+        xhr.open("POST", `/api/studna/${project.id}/files`);
+        xhr.send(fd);
+      });
+      await done;
+      setNote("");
+      onRefresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
+  }
+
+  async function deleteFile(fileId: string, name: string) {
+    if (!confirm(`Smazat soubor „${name}"?`)) return;
+    setBusy(fileId);
+    try {
+      const res = await fetch(`/api/studna/files/${fileId}`, { method: "DELETE" });
+      if (res.ok) onRefresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Upload zone */}
+      <div
+        className="glass rounded-xl p-4 space-y-3"
+        style={{ ["--c" as string]: "var(--tint-mint)" }}
+      >
+        <div className="flex items-center gap-2">
+          <Paperclip className="size-4 text-[var(--tint-mint)]" />
+          <span className="font-serif text-base">Přidat soubor</span>
+          <span className="ml-auto text-[11px] font-mono text-muted-foreground">
+            PDF, XLS, DOC, obrázky, ZIP — max 200 MB
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Soubory se neanalyzují AI. Slouží jako přílohy projektu — fakturace, tabulky, scany,
+          podklady. Hosté je nevidí.
+        </p>
+
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder='Volitelný popis (např. "faktura listopad 2026")'
+          className="w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:border-[var(--tint-mint)]/40"
+          disabled={uploading}
+        />
+
+        <div className="flex items-center gap-3">
+          <label
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-md cursor-pointer text-sm transition-colors ${
+              uploading
+                ? "bg-white/5 text-muted-foreground cursor-not-allowed"
+                : "bg-[var(--tint-mint)]/15 text-foreground hover:bg-[var(--tint-mint)]/25"
+            }`}
+            style={{ border: "1px solid color-mix(in oklch, var(--tint-mint) 30%, transparent)" }}
+          >
+            <Upload className="size-4" />
+            {uploading ? "Nahrávám…" : "Vybrat soubor"}
+            <input
+              type="file"
+              ref={(el) => { fileInputRef[1](el); }}
+              className="hidden"
+              disabled={uploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadFile(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          {uploading && (
+            <div className="flex-1 max-w-xs">
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[var(--tint-mint)] transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                {progress}%
+              </div>
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* List */}
+      {project.files.length === 0 ? (
+        <div className="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
+          Zatím žádný soubor.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {project.files.map((f) => {
+            const Icon = iconForMime(f.mime, f.originalName);
+            return (
+              <div
+                key={f.id}
+                className="glass rounded-xl p-3 flex items-center gap-3"
+              >
+                <div
+                  className="size-10 rounded-md grid place-items-center shrink-0"
+                  style={{
+                    background: "color-mix(in oklch, var(--tint-mint) 12%, transparent)",
+                    border: "1px solid color-mix(in oklch, var(--tint-mint) 25%, transparent)",
+                  }}
+                >
+                  <Icon className="size-5 text-[var(--tint-mint)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <a
+                      href={`/api/studna/files/${f.id}`}
+                      className="text-sm font-medium hover:underline truncate"
+                    >
+                      {f.originalName}
+                    </a>
+                    <span className="text-[11px] font-mono text-muted-foreground">
+                      {fmtBytes(f.bytes)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {f.note ? `${f.note} · ` : ""}
+                    {new Date(f.uploadedAt).toLocaleString("cs-CZ", {
+                      day: "numeric", month: "numeric", year: "numeric",
+                      hour: "2-digit", minute: "2-digit",
+                    })}
+                  </div>
+                </div>
+                <a
+                  href={`/api/studna/files/${f.id}`}
+                  className="p-2 rounded-md hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                  title="Stáhnout"
+                >
+                  <Download className="size-4" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => deleteFile(f.id, f.originalName)}
+                  disabled={busy === f.id}
+                  className="p-2 rounded-md hover:bg-destructive/15 text-muted-foreground hover:text-destructive"
+                  title="Smazat"
+                >
+                  {busy === f.id ? <Loader2 className="size-4 animate-spin" /> : <XIcon className="size-4" />}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

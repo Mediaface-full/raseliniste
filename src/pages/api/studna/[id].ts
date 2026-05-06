@@ -59,6 +59,13 @@ export const GET: APIRoute = async ({ cookies, params }) => {
         orderBy: { createdAt: "desc" },
         take: 5,
       },
+      files: {
+        orderBy: { uploadedAt: "desc" },
+        select: {
+          id: true, originalName: true, mime: true, bytes: true,
+          note: true, uploadedAt: true,
+        },
+      },
     },
   });
   if (!project) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
@@ -121,6 +128,13 @@ export const DELETE: APIRoute = async ({ cookies, params }) => {
     select: { audioPath: true },
   });
   for (const r of recs) await deleteUpload(r.audioPath);
+
+  // Smaž admin přílohy (PDF/XLS/...) z disku
+  const files = await prisma.projectFile.findMany({
+    where: { projectId: id },
+    select: { storagePath: true },
+  });
+  for (const f of files) await deleteUpload(f.storagePath);
 
   await prisma.projectBox.delete({ where: { id } });
   return Response.json({ ok: true });
