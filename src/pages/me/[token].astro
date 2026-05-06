@@ -2,6 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import GuestRecorder from "../../components/GuestRecorder";
 import GuestGuide from "../../components/GuestGuide";
+import GuestRecordings from "../../components/GuestRecordings";
 import { prisma } from "../../lib/db";
 
 const token = Astro.params.token;
@@ -12,6 +13,15 @@ let projects: Array<{
   homeTitle: string | null;
   description: string | null;
   canRecordBrief: boolean;
+}> = [];
+let recentRecordings: Array<{
+  id: string;
+  projectName: string;
+  type: "STANDARD" | "BRIEF";
+  status: string;
+  durationSec: number | null;
+  transcript: string;
+  createdAt: string;
 }> = [];
 
 if (token) {
@@ -35,6 +45,33 @@ if (token) {
       description: inv.project.description,
       canRecordBrief: inv.canRecordBrief,
     }));
+
+    // Posledních 5 vlastních nahrávek hosta napříč všemi jeho projekty.
+    // Petr chce ať host vidí kde skončil — tedy plný transkript, ne AI analýzu.
+    const recs = await prisma.projectRecording.findMany({
+      where: { guestUserId: g.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        audioDurationSec: true,
+        transcript: true,
+        createdAt: true,
+        project: { select: { name: true } },
+      },
+    });
+    recentRecordings = recs.map((r) => ({
+      id: r.id,
+      projectName: r.project.name,
+      type: r.type,
+      status: r.status,
+      durationSec: r.audioDurationSec,
+      transcript: r.transcript,
+      createdAt: r.createdAt.toISOString(),
+    }));
+
     // Touch lastSeenAt asynchronně (fire-and-forget)
     prisma.guestUser.update({
       where: { id: g.id },
@@ -107,6 +144,10 @@ const guideVariant: "standard" | "brief" =
             initialProjects={projects}
             guestName={guest.name}
           />
+
+          {recentRecordings.length > 0 && (
+            <GuestRecordings client:load recordings={recentRecordings} />
+          )}
 
           <p class="mt-6 text-center text-[11px] text-muted-foreground font-mono tracking-wider">
             Tip: přidej tuhle stránku na plochu (Sdílet → Přidat na plochu).
