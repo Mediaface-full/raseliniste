@@ -145,29 +145,30 @@ export default function BwMysDetail({ id }: { id: string }) {
     }
   }
 
-  async function load() {
-    setLoading(true);
+  async function load(showSpinner = true) {
+    if (showSpinner) setLoading(true);
     try {
       const res = await fetch(`/api/bwmys/${id}`);
       const data = await res.json();
       if (res.ok) setD(data.item);
       else setErr(data.error ?? "Nelze načíst");
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
   // Polling pro audio entries + evaluace co se zpracovávají na pozadí.
-  // Petr nemusí ručně refreshovat — jakmile AI pipeline doběhne, UI se updatuje.
+  // KRITICKÉ: load(false) — bez fullscreen spinneru, jinak by UI blikalo
+  // každých 4 s (Petr nahlásil blikání 2026-05-06).
   useEffect(() => {
     if (!d) return;
     const hasProcessing =
       d.entries.some((e) => e.status === "processing") ||
       d.evaluations.some((ev) => ev.status === "processing");
     if (!hasProcessing) return;
-    const interval = setInterval(() => load(), 4000);
+    const interval = setInterval(() => load(false), 4000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d]);
