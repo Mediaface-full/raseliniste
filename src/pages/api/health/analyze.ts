@@ -56,33 +56,71 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return Response.json({ error: "RATE_LIMITED", limit: DAILY_LIMIT, window: "24h" }, { status: 429 });
   }
 
-  try {
-    const result = await analyzeHealth(session.uid, from, to, body.focus ?? null);
+  // Fire-and-forget — Gemini Pro analýza zdraví trvá 30-90 s, browser by timeoval.
+  // Hned vytvoříme placeholder s status=processing a vrátíme ID; UI polluje.
+  const placeholder = await prisma.healthAnalysis.create({
+    data: {
+      userId: session.uid,
+      periodFrom: from,
+      periodTo: to,
+      focus: body.focus ?? null,
+      trigger: "MANUAL",
+      text: "",
+      model: "gemini-2.5-pro",
+      status: "processing",
+    },
+    select: { id: true, createdAt: true },
+  });
 
-    // Persist — i manuální analýzy si ukládáme, uživatel se k nim může vracet.
-    const saved = await prisma.healthAnalysis.create({
-      data: {
-        userId: session.uid,
-        periodFrom: from,
-        periodTo: to,
-        focus: body.focus ?? null,
-        trigger: "MANUAL",
-        text: result.text,
-        model: result.meta.model,
-        promptChars: result.meta.promptChars,
-        totalSamples: result.meta.totalSamples,
-        metricsWithData: result.meta.metricsWithData,
-      },
-      select: { id: true, createdAt: true },
-    });
+  void runHealthAnalysis(placeholder.id, session.uid, from, to, body.focus ?? null);
 
-    return Response.json({
-      id: saved.id,
-      createdAt: saved.createdAt,
-      ...result,
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Analýza selhala";
-    return Response.json({ error: "ANALYZE_FAILED", message: msg }, { status: 500 });
-  }
+  return Response.json({
+    id: placeholder.id,
+    createdAt: placeholder.createdAt,
+    status: "processing",
+    processing: true,
+  });
 };
+
+// Module-level Set anti-GC pinning pro fire-and-forget pipeline
+const inFlight = new Set<Promise<void>>();
+
+async function runHealthAnalysis(
+  analysisId: string,
+  userId: string,
+  from: Date,
+  to: Date,
+  focus: string | null,
+): Promise<void> {
+  const p = (async () => {
+    try {
+      const result = await analyzeHealth(userId, from, to, focus);
+      await prisma.healthAnalysis.update({
+        where: { id: analysisId },
+        data: {
+          text: result.text,
+          model: result.meta.model,
+          promptChars: result.meta.promptChars,
+          totalSamples: result.meta.totalSamples,
+          metricsWithData: result.meta.metricsWithData,
+          status: "ready",
+          processingError: null,
+        },
+      });
+      console.log(`[health analyze bg] ${analysisId} processed OK`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[health analyze bg] ${analysisId} failed:`, msg);
+      try {
+        await prisma.healthAnalysis.update({
+          where: { id: analysisId },
+          data: { status: "error", processingError: msg.slice(0, 1000) },
+        });
+      } catch {}
+    } finally {
+      inFlight.delete(p);
+    }
+  })();
+  inFlight.add(p);
+  return p;
+}

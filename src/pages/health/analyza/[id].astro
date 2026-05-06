@@ -65,27 +65,58 @@ const days = Math.round(
       )}
     </div>
 
-    {/* Actions */}
-    <HealthAnalysisActions
-      client:load
-      id={analysis.id}
-      text={analysis.text}
-      fromIso={fromIso}
-      toIso={toIso}
-      meta={{
-        days,
-        totalSamples: analysis.totalSamples ?? 0,
-        metricsWithData: analysis.metricsWithData ?? 0,
-        model: analysis.model,
-        focus: analysis.focus,
-        createdAt: analysis.createdAt.toISOString(),
-      }}
-    />
+    {analysis.status === "processing" ? (
+      <div
+        class="rounded-lg border border-[var(--tint-butter)]/40 bg-[var(--tint-butter)]/[0.08] p-8 text-center"
+        data-poll-status="processing"
+        data-id={analysis.id}
+      >
+        <div class="inline-flex items-center gap-2 text-[var(--tint-butter)]">
+          <svg class="size-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.25" /><path d="M4 12a8 8 0 0 1 8-8" stroke="currentColor" stroke-width="3" /></svg>
+          <span class="font-mono text-sm">AI analyzuje zdravotní data…</span>
+        </div>
+        <p class="mt-3 text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
+          Gemini Pro prochází {(analysis.totalSamples ?? 0).toLocaleString("cs-CZ")} záznamů.
+          Typicky 30–90 sekund. Stránka se sama obnoví, jakmile bude analýza hotová —
+          můžeš ji zavřít a vrátit se kdykoli.
+        </p>
+      </div>
+    ) : analysis.status === "error" ? (
+      <div class="rounded-lg border border-destructive/40 bg-destructive/[0.08] p-6 space-y-2">
+        <div class="font-mono text-xs uppercase text-destructive">Analýza selhala</div>
+        <pre class="text-xs whitespace-pre-wrap text-destructive/90">{analysis.processingError ?? "neznámá chyba"}</pre>
+        <p class="text-xs text-muted-foreground">Zkus to znovu z hlavní stránky Zdraví — někdy pomůže menší rozsah dat.</p>
+      </div>
+    ) : (
+      <>
+        <HealthAnalysisActions
+          client:load
+          id={analysis.id}
+          text={analysis.text}
+          fromIso={fromIso}
+          toIso={toIso}
+          meta={{
+            days,
+            totalSamples: analysis.totalSamples ?? 0,
+            metricsWithData: analysis.metricsWithData ?? 0,
+            model: analysis.model,
+            focus: analysis.focus,
+            createdAt: analysis.createdAt.toISOString(),
+          }}
+        />
 
-    {/* Body */}
-    <article
-      class="prose-rasel rounded-lg border border-white/10 bg-black/20 p-6 text-[15px] leading-relaxed"
-      set:html={html}
-    />
+        <article
+          class="prose-rasel rounded-lg border border-white/10 bg-black/20 p-6 text-[15px] leading-relaxed"
+          set:html={html}
+        />
+      </>
+    )}
   </div>
 </Shell>
+
+{analysis.status === "processing" && (
+  <script is:inline>
+    // Polling — server-side rendered guard přepíše po dokončení
+    setTimeout(() => location.reload(), 5000);
+  </script>
+)}

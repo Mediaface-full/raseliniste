@@ -57,6 +57,8 @@ interface ProjectDetail {
     recordingsIncluded: number;
     briefsIncluded: number;
     createdAt: string;
+    status?: string;             // "ready" | "processing" | "error"
+    processingError?: string | null;
   }>;
   files: Array<{
     id: string;
@@ -88,10 +90,12 @@ export default function StudnaDetail({ projectId, ownerName }: { projectId: stri
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [projectId]);
 
-  // Polling: pokud existuje processing recording, refresh každých 5 s (bez loading flash).
+  // Polling: pokud existuje processing recording NEBO summary, refresh à 5 s (bez loading flash).
   useEffect(() => {
     if (!project) return;
-    const hasProcessing = project.recordings.some((r) => r.status === "processing");
+    const hasProcessing =
+      project.recordings.some((r) => r.status === "processing") ||
+      project.summaries.some((s) => s.status === "processing");
     if (!hasProcessing) return;
     const interval = setInterval(() => load(false), 5000);
     return () => clearInterval(interval);
@@ -876,9 +880,17 @@ function SummariesTab({ project, onRefresh }: { project: ProjectDetail; onRefres
           nad všemi záznamy.
         </div>
       ) : (
-        project.summaries.map((s) => (
-          <details key={s.id} className="glass rounded-xl p-4" open>
-            <summary className="cursor-pointer flex items-center gap-2 mb-2">
+        project.summaries.map((s) => {
+          const isProcessing = s.status === "processing";
+          const isError = s.status === "error";
+          return (
+          <details
+            key={s.id}
+            className="glass rounded-xl p-4"
+            open
+            style={isProcessing ? { borderColor: "color-mix(in oklch, var(--tint-butter) 35%, transparent)" } : undefined}
+          >
+            <summary className="cursor-pointer flex items-center flex-wrap gap-2 mb-2">
               <Sparkles className="size-4 text-[var(--tint-rose)]" />
               <span className="font-medium">
                 {new Date(s.createdAt).toLocaleString("cs-CZ", { timeZone: "Europe/Prague" })}
@@ -886,12 +898,34 @@ function SummariesTab({ project, onRefresh }: { project: ProjectDetail; onRefres
               <span className="text-[11px] font-mono text-muted-foreground ml-2">
                 {s.model} · {s.recordingsIncluded} záznamů ({s.briefsIncluded} briefů)
               </span>
+              {isProcessing && (
+                <span className="ml-auto inline-flex items-center gap-1 text-[var(--tint-butter)] text-xs">
+                  <Loader2 className="size-3 animate-spin" /> AI píše souhrn…
+                </span>
+              )}
+              {isError && (
+                <span className="ml-auto text-[var(--tint-rose)] text-xs">⚠ chyba</span>
+              )}
             </summary>
-            <div className="mt-2 text-sm leading-relaxed whitespace-pre-wrap prose prose-invert max-w-none">
-              {s.text}
-            </div>
+            {isProcessing ? (
+              <div className="mt-2 text-sm text-muted-foreground italic py-4 text-center flex items-center justify-center gap-2">
+                <Loader2 className="size-4 animate-spin" />
+                Generuji souhrn projektu — Gemini Pro nad plnými transkripty,
+                typicky 30–120 s. Můžeš zavřít stránku a vrátit se.
+              </div>
+            ) : isError ? (
+              <div className="mt-2 text-sm text-[var(--tint-rose)] bg-[var(--tint-rose)]/10 rounded-md px-3 py-2">
+                <div className="font-mono text-xs mb-1">Souhrn selhal:</div>
+                <div className="text-xs whitespace-pre-wrap">{s.processingError || "neznámá chyba"}</div>
+              </div>
+            ) : (
+              <div className="mt-2 text-sm leading-relaxed whitespace-pre-wrap prose prose-invert max-w-none">
+                {s.text}
+              </div>
+            )}
           </details>
-        ))
+          );
+        })
       )}
     </div>
   );

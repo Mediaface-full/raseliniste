@@ -213,6 +213,10 @@ model HealthAnalysis {
   emailSentAt     DateTime?
   emailError      String?
 
+  // AI processing status pro fire-and-forget (NOVÉ 2026-05-06)
+  status          String   @default("ready")
+  processingError String?  @db.Text
+
   createdAt       DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -743,6 +747,10 @@ model ProjectSummary {
   model       String   // "gemini-2.5-pro"
   recordingsIncluded Int
   briefsIncluded     Int
+
+  // AI processing status pro fire-and-forget (NOVÉ 2026-05-06)
+  status      String   @default("ready")
+  processingError String?  @db.Text
 
   createdAt   DateTime @default(now())
 
