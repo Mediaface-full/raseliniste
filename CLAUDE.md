@@ -6,23 +6,25 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/HANDOFF-2026-05-03.md`** ← **PRIMÁRNÍ ZDROJ pro novou session**
-   - Stav 23+ commitů čekajících na push
-   - Šest mých chyb z 2026-05-02 (mé chybné předpoklady o Todoist API)
-   - Push + deploy instrukce krok-za-krokem
-   - Kompletní TODO seznam (16 položek, vysoká → nice-to-have)
-   - Klíčové komponenty (rychlá orientace)
-   - Princip „Petr používá Todoist jako primary tool"
-   - Pravidla komunikace s Petrem (CPTSD, ADHD)
-2. `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
-3. `INSTRUKCE/05-styl-prace.md` — komunikace
-4. `INSTRUKCE/03-moduly.md` — moduly, URL, status (rozšířeno 2026-05-02)
-5. `INSTRUKCE/04-todo-list.md` — manuální DSM akce
+1. **`INSTRUKCE/HANDOFF-2026-05-06.md`** ← **PRIMÁRNÍ ZDROJ pro novou session**
+   - Calendar tooltip + Portal fix (containing block bug)
+   - iCloud RODINA recurring events fix (jump-forward iterator)
+   - Studánka per-host „Zachovávat audio" + výpis 5 záznamů pro hosta
+   - Prskavka audio retention + výpis 5 záznamů pro Petra
+   - Push + deploy instrukce
+   - Kompletní matice audio retence (Studánka × Prskavka × keepAudio × isPinned)
+2. `INSTRUKCE/PRO-CLAUDINE-COACHE.md` — kontext o Petrovi, filozofie systému
+3. `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
+4. `INSTRUKCE/05-styl-prace.md` — komunikace
+5. `INSTRUKCE/03-moduly.md` — moduly, URL, status (aktualizováno 2026-05-06)
+6. `INSTRUKCE/04-todo-list.md` — manuální DSM akce
 
 **Tento CLAUDE.md je z dubna 2026 a v některých detailech zastaralý** — `HANDOFF-*.md` jsou freshest.
 
 Starší HANDOFFs (zaarchivovány, nečíst pro orientaci):
-- `INSTRUKCE/HANDOFF-2026-05-02-vecer.md` (předchůdce, plně nahrazeno aktuálním)
+- `INSTRUKCE/HANDOFF-2026-05-02-vecer.md`
+- `INSTRUKCE/HANDOFF-2026-05-03.md`
+- `INSTRUKCE/HANDOFF-2026-05-04.md`
 - `INSTRUKCE/HANDOFF-bwmys-viz.md` (B&W myš vizualizace, dokončeno)
 
 ---
