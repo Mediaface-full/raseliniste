@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, Mic, Trash2, Pencil, X, Save, Sparkles } from "lucide-react";
+import { Loader2, Plus, Clock, MessageSquare, AlertTriangle, Send, ChevronDown, ChevronUp, Mic, Trash2, Pencil, X, Save, Sparkles, FileDown, Printer } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import BwMysAudioRecorder from "./BwMysAudioRecorder";
@@ -41,6 +41,8 @@ interface DecisionEntry {
   uhelPohleduAi?: string | null;
   stavSystemu: string;
   obsah: string;
+  status?: string;            // "ready" | "processing" | "error"
+  processingError?: string | null;
 }
 
 const STAV_OPTIONS: { value: string; label: string; popisek: string; color: string }[] = [
@@ -155,6 +157,17 @@ export default function BwMysDetail({ id }: { id: string }) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
+  // Polling pro audio entries co se zpracovávají na pozadí.
+  // Petr nemusí ručně refreshovat — jakmile AI pipeline doběhne, UI se updatuje.
+  useEffect(() => {
+    if (!d) return;
+    const hasProcessing = d.entries.some((e) => e.status === "processing");
+    if (!hasProcessing) return;
+    const interval = setInterval(() => load(), 4000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d]);
+
   if (loading) return <div className="glass rounded-xl p-6 flex items-center gap-2 text-sm text-muted-foreground">
     <Loader2 className="size-4 animate-spin" /> Načítám…
   </div>;
@@ -203,6 +216,34 @@ export default function BwMysDetail({ id }: { id: string }) {
         </div>
       </div>
 
+      {/* Akční toolbar — nahoře, pod hlavičkou. Petr nemusí scrollovat dolů.
+          Zobrazený jen u aktivních rozhodnutí. */}
+      {d.status === "aktivni" && (
+        <div className="glass-strong rounded-xl p-3 flex flex-wrap gap-2">
+          <Button onClick={() => setAdding(true)}>
+            <Plus /> Zápis textem
+          </Button>
+          <Button variant="outline" onClick={() => setAudioRecording(true)}>
+            <Mic /> Nadiktovat
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!canMini || evaluating !== null}
+            onClick={() => runEvaluation("prubezne")}
+            title={!canMini ? "Potřeba alespoň 3 zápisy" : ""}
+          >
+            {evaluating === "prubezne" ? <Loader2 className="animate-spin" /> : <Send />} Mini-vyhodnocení
+          </Button>
+          <Button
+            variant="outline"
+            disabled={evaluating !== null}
+            onClick={() => runEvaluation("finalni")}
+          >
+            {evaluating === "finalni" ? <Loader2 className="animate-spin" /> : <Send />} Finální vyhodnocení
+          </Button>
+        </div>
+      )}
+
       {/* Zarámování (sbalené) */}
       <div className="glass rounded-xl p-3">
         <button
@@ -243,34 +284,72 @@ export default function BwMysDetail({ id }: { id: string }) {
             Zatím žádný zápis. Přidej první klikem dole.
           </div>
         ) : (
-          d.entries.slice().reverse().map((e) => (
-            <div key={e.id} className="glass rounded-xl p-4 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2 text-xs font-mono">
-                <span
-                  className="size-3 rounded-full"
-                  style={{ background: NALADA_BARVA[e.nalada] ?? "var(--muted-foreground)" }}
-                  title={`Nálada ${e.nalada}/5`}
-                />
-                <span className="text-muted-foreground">{new Date(e.datum).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground/90">{TYP_LABEL[e.typVstupu] ?? e.typVstupu}</span>
-                {e.uhelPohledu !== "nevybrano" && (
-                  <span style={{ color: UHEL_LABEL[e.uhelPohledu]?.color }}>
-                    · {UHEL_LABEL[e.uhelPohledu]?.label}
-                  </span>
+          d.entries.slice().reverse().map((e) => {
+            const isProcessing = e.status === "processing";
+            const isError = e.status === "error";
+            return (
+              <div
+                key={e.id}
+                className="glass rounded-xl p-4 flex flex-col gap-1.5"
+                style={isProcessing ? { borderColor: "color-mix(in oklch, var(--tint-butter) 35%, transparent)" } : undefined}
+              >
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <span
+                    className="size-3 rounded-full"
+                    style={{ background: NALADA_BARVA[e.nalada] ?? "var(--muted-foreground)" }}
+                    title={`Nálada ${e.nalada}/5`}
+                  />
+                  <span className="text-muted-foreground">{new Date(e.datum).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground/90">{TYP_LABEL[e.typVstupu] ?? e.typVstupu}</span>
+                  {e.uhelPohledu !== "nevybrano" && (
+                    <span style={{ color: UHEL_LABEL[e.uhelPohledu]?.color }}>
+                      · {UHEL_LABEL[e.uhelPohledu]?.label}
+                    </span>
+                  )}
+                  {isProcessing && (
+                    <span className="ml-auto inline-flex items-center gap-1 text-[var(--tint-butter)]">
+                      <Loader2 className="size-3 animate-spin" /> AI zpracovává…
+                    </span>
+                  )}
+                  {isError && (
+                    <span className="ml-auto text-[var(--tint-rose)]">
+                      ⚠ chyba zpracování
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm leading-relaxed whitespace-pre-wrap">{e.obsah}</div>
+                {isError && e.processingError && (
+                  <div className="text-[11px] font-mono text-[var(--tint-rose)]/80 bg-[var(--tint-rose)]/10 px-2 py-1 rounded">
+                    {e.processingError}
+                  </div>
                 )}
               </div>
-              <div className="text-sm leading-relaxed whitespace-pre-wrap">{e.obsah}</div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
       {/* Vyhodnocení */}
       {d.evaluations.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground px-1">
-            Vyhodnocení ({d.evaluations.length})
+        <div className="space-y-2 bwmys-print-root">
+          <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground px-1 flex items-center gap-3 print:hidden">
+            <span>Vyhodnocení ({d.evaluations.length})</span>
+            <a
+              href={`/api/bwmys/${d.id}/export`}
+              className="ml-auto inline-flex items-center gap-1 text-foreground/80 hover:text-foreground"
+              title="Stáhnout celé rozhodnutí jako Markdown"
+            >
+              <FileDown className="size-3" /> .md
+            </a>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1 text-foreground/80 hover:text-foreground"
+              title="Vytisknout / uložit jako PDF (Cmd+P)"
+            >
+              <Printer className="size-3" /> PDF
+            </button>
           </div>
           {d.evaluations.map((ev) => (
             <details key={ev.id} className="glass rounded-xl p-3" open={ev === d.evaluations[0]}>
@@ -307,32 +386,6 @@ export default function BwMysDetail({ id }: { id: string }) {
         </div>
       )}
 
-      {/* Akční zóna */}
-      {d.status === "aktivni" && (
-        <div className="glass-strong rounded-xl p-3 sticky bottom-4 flex flex-wrap gap-2">
-          <Button onClick={() => setAdding(true)}>
-            <Plus /> Zápis textem
-          </Button>
-          <Button variant="outline" onClick={() => setAudioRecording(true)}>
-            <Mic /> Nadiktovat
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!canMini || evaluating !== null}
-            onClick={() => runEvaluation("prubezne")}
-            title={!canMini ? "Potřeba alespoň 3 zápisy" : ""}
-          >
-            {evaluating === "prubezne" ? <Loader2 className="animate-spin" /> : <Send />} Mini-vyhodnocení
-          </Button>
-          <Button
-            variant="outline"
-            disabled={evaluating !== null}
-            onClick={() => runEvaluation("finalni")}
-          >
-            {evaluating === "finalni" ? <Loader2 className="animate-spin" /> : <Send />} Finální vyhodnocení
-          </Button>
-        </div>
-      )}
 
       {closeDialog && d && (
         <CloseDecisionDialog

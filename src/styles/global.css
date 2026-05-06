@@ -350,6 +350,22 @@ html.sidebar-open [data-sidebar-backdrop] {
     white-space: normal !important;
   }
 
+  /* Myši — vyhodnocení v PDF (window.print). Cíl: čistý report bez UI hluku.
+     Schováme všechno KROMĚ .bwmys-print-root a jeho rodičů. */
+  body:has(.bwmys-print-root) > *:not(:has(.bwmys-print-root)) {
+    display: none !important;
+  }
+  .bwmys-print-root details {
+    /* Otevřít všechna details v PDF — jinak by se kolapsovaná nepřevedla */
+  }
+  .bwmys-print-root details > summary {
+    list-style: none;
+    font-weight: bold;
+    margin-bottom: 6pt;
+  }
+  .bwmys-print-root details > summary::-webkit-details-marker { display: none; }
+  .bwmys-print-root details:not([open]) > *:not(summary) { display: revert !important; }
+
   /* Page-break: glass kontejnery NESMÍ být atomic blocky — povolit lámání
      uvnitř (předtím page-break-inside: avoid na .glass tlačil obsah na další
      stránku). Avoid jen pro absolutně pozicované eventové bloky. */

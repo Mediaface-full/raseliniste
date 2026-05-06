@@ -15,6 +15,50 @@
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
 import { callTracked } from "./gemini-usage";
 
+/**
+ * Robustní parse — nejprve normální, pak fallback s opravou
+ * truncated/unterminated stringů (Gemini občas vyčerpá maxOutputTokens
+ * uprostřed věty). Místo throw vrátí null.
+ */
+function safeParseJson<T>(raw: string): T | null {
+  let s = raw.trim();
+  if (s.startsWith("```")) {
+    const m = s.match(/```(?:json)?\s*([\s\S]+?)```/);
+    if (m) s = m[1].trim();
+  }
+  const fb = s.indexOf("{"), lb = s.lastIndexOf("}");
+  if (fb > 0 && lb > fb) s = s.slice(fb, lb + 1);
+
+  try { return JSON.parse(s) as T; } catch {}
+
+  for (let i = 0; i < 3; i++) {
+    try { return JSON.parse(s) as T; } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      const m = msg.match(/position (\d+)/);
+      if (!m) break;
+      const pos = parseInt(m[1], 10);
+      let cut = s.slice(0, pos);
+      const breakAt = Math.max(cut.lastIndexOf(","), cut.lastIndexOf("}"), cut.lastIndexOf("]"));
+      if (breakAt < 0) break;
+      cut = cut.slice(0, breakAt);
+      let cur = 0, sq = 0, inStr = false, esc = false;
+      for (let j = 0; j < cut.length; j++) {
+        const c = cut[j];
+        if (esc) { esc = false; continue; }
+        if (c === "\\") { esc = true; continue; }
+        if (c === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (c === "{") cur++;
+        else if (c === "}") cur--;
+        else if (c === "[") sq++;
+        else if (c === "]") sq--;
+      }
+      s = cut + "]".repeat(Math.max(0, sq)) + "}".repeat(Math.max(0, cur));
+    }
+  }
+  try { return JSON.parse(s) as T; } catch { return null; }
+}
+
 // ---------------------------------------------------------------------------
 // Typy
 // ---------------------------------------------------------------------------
@@ -119,11 +163,9 @@ Vrať POUZE JSON tohoto tvaru:
   });
 
   const raw = (response.text ?? "").trim();
-  try {
-    return JSON.parse(raw) as MiniEvaluation;
-  } catch (e) {
-    throw new Error(`Mini-vyhodnocení: nelze parse JSON. Prvních 200 znaků: ${raw.slice(0, 200)}`);
-  }
+  const parsed = safeParseJson<MiniEvaluation>(raw);
+  if (!parsed) throw new Error(`Mini-vyhodnocení: nelze parse JSON ani po opravě. Prvních 200 znaků: ${raw.slice(0, 200)}`);
+  return parsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -279,11 +321,9 @@ Vrať POUZE JSON tohoto tvaru (žádný markdown wrapper, žádný komentář):
   });
 
   const raw = (response.text ?? "").trim();
-  try {
-    return JSON.parse(raw) as FinalniEvaluation;
-  } catch (e) {
-    throw new Error(`Finální vyhodnocení: nelze parse JSON. Prvních 200 znaků: ${raw.slice(0, 200)}`);
-  }
+  const parsed = safeParseJson<FinalniEvaluation>(raw);
+  if (!parsed) throw new Error(`Finální vyhodnocení: nelze parse JSON ani po opravě. Prvních 200 znaků: ${raw.slice(0, 200)}`);
+  return parsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -351,8 +391,12 @@ PRAVIDLA:
   });
 
   const raw = (response.text ?? "").trim();
+  const parsedRaw = safeParseJson<{ arguments?: DecisionArgument[] }>(raw);
+  if (!parsedRaw) {
+    throw new Error(`Extrakce argumentů: nelze parse JSON ani po opravě. Prvních 200 znaků: ${raw.slice(0, 200)}`);
+  }
   try {
-    const parsed = JSON.parse(raw) as { arguments?: DecisionArgument[] };
+    const parsed = parsedRaw;
     const arr = parsed.arguments ?? [];
     const allowedHats = ["fakta", "emoce", "kritika", "prinosy", "alternativy", "meta"] as const;
     return arr

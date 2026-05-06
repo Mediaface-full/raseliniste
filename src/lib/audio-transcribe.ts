@@ -154,12 +154,70 @@ async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
 
 function extractJson(text: string): string {
   // Gemini občas vrací JSON v markdown code-fence, i když říkáme „bez markdown".
-  const trimmed = text.trim();
+  let trimmed = text.trim();
   if (trimmed.startsWith("```")) {
     const m = trimmed.match(/```(?:json)?\s*([\s\S]+?)```/);
-    if (m) return m[1].trim();
+    if (m) trimmed = m[1].trim();
+  }
+  // Někdy je před/za JSON volný text — vyříznout od první { po poslední }.
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace > 0 && lastBrace > firstBrace) {
+    trimmed = trimmed.slice(firstBrace, lastBrace + 1);
   }
   return trimmed;
+}
+
+/**
+ * Pokus opravit truncated/malformed JSON od Gemini.
+ * Časté chyby:
+ *  - "Unterminated string in JSON" — výstup oříznutý uprostřed stringu (maxOutputTokens)
+ *  - chybějící závěrečná závorka
+ *
+ * Strategie: postupně uzavírat unterminated stringy, zavírat otevřené [ { závorky.
+ * Když parse stále selže, vrátí null.
+ */
+function tryRepairJson(raw: string): string | null {
+  let s = raw;
+  try { JSON.parse(s); return s; } catch {}
+
+  // Najdi pozici syntaktické chyby a uřízni text před ní + uzavři otevřené struktury.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      JSON.parse(s);
+      return s;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // "Unterminated string in JSON at position N"
+      const posMatch = msg.match(/position (\d+)/);
+      if (!posMatch) break;
+      const pos = parseInt(posMatch[1], 10);
+      // Uřízni před chybnou pozicí, najdi poslední validní bod (čárku, } nebo ]).
+      let cut = s.slice(0, pos);
+      // Vrať se k poslední validní čárce nebo závorce
+      const lastComma = cut.lastIndexOf(",");
+      const lastClose = Math.max(cut.lastIndexOf("}"), cut.lastIndexOf("]"));
+      const breakAt = Math.max(lastComma, lastClose);
+      if (breakAt < 0) break;
+      cut = cut.slice(0, breakAt);
+      // Spočítej kolik je otevřených { a [
+      let openCurly = 0, openSquare = 0, inString = false, escape = false;
+      for (let i = 0; i < cut.length; i++) {
+        const c = cut[i];
+        if (escape) { escape = false; continue; }
+        if (c === "\\") { escape = true; continue; }
+        if (c === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (c === "{") openCurly++;
+        else if (c === "}") openCurly--;
+        else if (c === "[") openSquare++;
+        else if (c === "]") openSquare--;
+      }
+      // Doplň závěrečné závorky
+      s = cut + "]".repeat(Math.max(0, openSquare)) + "}".repeat(Math.max(0, openCurly));
+    }
+  }
+  try { JSON.parse(s); return s; } catch { return null; }
 }
 
 // Inline audio limit. Vertex i AI Studio mají ~20 MB request size limit.
@@ -269,6 +327,23 @@ export async function transcribeAudio(params: {
   // Načti Stage 1 prompt z DB override (fallback na default v ai-prompts.ts).
   // Pokud cleanupFillers=true (Studna), připoj instrukci o čištění výplňových slov.
   const baseTranscribePrompt = await getPrompt("ozvena-stage1-transcribe");
+  // KRITICKÉ pravidlo přesnosti — Petr nahlásil že AI několikrát zaměnila
+  // směr akce (kdo komu platil, kdo komu dal, kdo o koho pečuje). To je
+  // diametrální chyba s reálnými následky. Prompt explicitně varuje a vyžaduje
+  // doslovnost u subjekt/objekt.
+  const accuracyRules = `
+
+KRITICKÁ PRAVIDLA PŘESNOSTI (nesmíš porušit):
+- Subjekt/objekt v každé větě dej **přesně tak, jak to mluvčí řekl**.
+  Pokud řekne "platil jsem za něj" → napiš "platil jsem za něj", NIKDY
+  "platil za mě". Stejně u "zavolal jsem mu" / "zavolal mi", "dal jsem ti" /
+  "dal jsi mi", "pečuju o něj" / "pečuje o mě". Když si nejsi jistý kdo
+  komu, napiš to **doslova jak slyšíš**, neopravuj domnělou logiku.
+- Čísla, částky, data a jména osob přepiš **doslova**. Pokud jméno neslyšíš
+  jasně, dej ho v hranatých závorkách s otazníkem např. [Mortyk?].
+- "Pro" vs "od" / "za" vs "místo" — tyto předložky **NIKDY neměň**, mění smysl.
+- Když je věta nejednoznačná, raději ji nech v původní (nejednoznačné) podobě
+  než ji "opravit" do něčeho co měnitelně mění význam.`;
   const transcribePrompt = params.cleanupFillers
     ? `${baseTranscribePrompt}
 
@@ -279,8 +354,8 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
   "no no no" → vypustit).
 - Vynech nedokončené začátky vět které mluvčí přerušil a začal znovu.
 - ZACHOVEJ obsah, tón a všechny věcné informace. Cílem je čitelný text,
-  ne shrnutí.`
-    : baseTranscribePrompt;
+  ne shrnutí.${accuracyRules}`
+    : `${baseTranscribePrompt}${accuracyRules}`;
 
   const stage1Start = Date.now();
   const transcribeResp = await withRetry("Stage 1 (transcribe)", () =>
@@ -358,18 +433,27 @@ Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň v�
   }
 
   let parsed: any;
+  const cleaned = extractJson(rawAnalysis);
   try {
-    parsed = JSON.parse(extractJson(rawAnalysis));
+    parsed = JSON.parse(cleaned);
   } catch (e) {
-    return {
-      transcript,
-      analysis: minimalAnalysis(
-        isBrief,
-        `Stage 2 výstup není validní JSON: ${e instanceof Error ? e.message : String(e)}. Přepis je k dispozici. Surový output (200 znaků): ${rawAnalysis.slice(0, 200)}`,
-      ),
-      model,
-      promptChars: prompt.length,
-    };
+    // Gemini občas vrátí truncated/unterminated JSON (typicky narazil na maxOutputTokens).
+    // Pokus opravit — odřízneme po poslední validní pozici a uzavřeme závorky.
+    const repaired = tryRepairJson(cleaned);
+    if (repaired) {
+      try { parsed = JSON.parse(repaired); } catch {}
+    }
+    if (!parsed) {
+      return {
+        transcript,
+        analysis: minimalAnalysis(
+          isBrief,
+          `Stage 2 výstup není validní JSON: ${e instanceof Error ? e.message : String(e)}. Přepis je k dispozici. Surový output (200 znaků): ${rawAnalysis.slice(0, 200)}`,
+        ),
+        model,
+        promptChars: prompt.length,
+      };
+    }
   }
 
   const analysis: AudioAnalysis = {
@@ -471,18 +555,25 @@ Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň v�
   }
 
   let parsed: any;
+  const cleaned2 = extractJson(rawAnalysis);
   try {
-    parsed = JSON.parse(extractJson(rawAnalysis));
+    parsed = JSON.parse(cleaned2);
   } catch (e) {
-    return {
-      transcript,
-      analysis: minimalAnalysis(
-        isBrief,
-        `Stage 2 výstup není validní JSON: ${e instanceof Error ? e.message : String(e)}. Přepis je k dispozici.`,
-      ),
-      model,
-      promptChars: prompt.length,
-    };
+    const repaired = tryRepairJson(cleaned2);
+    if (repaired) {
+      try { parsed = JSON.parse(repaired); } catch {}
+    }
+    if (!parsed) {
+      return {
+        transcript,
+        analysis: minimalAnalysis(
+          isBrief,
+          `Stage 2 výstup není validní JSON: ${e instanceof Error ? e.message : String(e)}. Přepis je k dispozici.`,
+        ),
+        model,
+        promptChars: prompt.length,
+      };
+    }
   }
 
   const analysis: AudioAnalysis = {

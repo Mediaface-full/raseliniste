@@ -79,7 +79,30 @@ Vrať POUZE JSON tohoto tvaru:
   });
 
   const raw = (response.text ?? "").trim();
-  const parsed = JSON.parse(raw) as ExtractedEntry;
+  let parsed: ExtractedEntry;
+  try {
+    parsed = JSON.parse(raw) as ExtractedEntry;
+  } catch {
+    // Repair pass — Gemini občas vyčerpá maxOutputTokens uprostřed stringu.
+    let s = raw.trim();
+    if (s.startsWith("```")) {
+      const m = s.match(/```(?:json)?\s*([\s\S]+?)```/);
+      if (m) s = m[1].trim();
+    }
+    const fb = s.indexOf("{"), lb = s.lastIndexOf("}");
+    if (fb >= 0 && lb > fb) s = s.slice(fb, lb + 1);
+    try {
+      parsed = JSON.parse(s) as ExtractedEntry;
+    } catch {
+      // Fallback — vrať defaults s celým transkriptem v obsahu
+      parsed = {
+        nalada: 3,
+        typVstupu: "nova_uvaha",
+        uhelPohledu: "nevybrano",
+        obsah: transcript.slice(0, 5000),
+      };
+    }
+  }
 
   // Sanitizace + defaults
   const allowedTyp = ["novy_fakt_zvenci", "nova_uvaha", "napadlo_me", "reakce_na_udalost"];
@@ -114,50 +137,101 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
     return Response.json({ error: "MISSING_AUDIO" }, { status: 400 });
   }
 
+  const audioBuf = Buffer.from(await audioFile.arrayBuffer());
+  const mime = audioFile.type || "audio/webm";
+
+  // Hned ulož audio + vytvoř entry s status="processing".
+  // Petr dostane odpověď okamžitě — AI Stage 1+2 běží na pozadí.
+  let saved;
   try {
-    const audioBuf = Buffer.from(await audioFile.arrayBuffer());
-    const mime = audioFile.type || "audio/webm";
-
-    // Stage 1: přepis
-    const transcribeResult = await transcribeAudio({
-      audio: audioBuf,
-      mimeType: mime,
-      recordingType: "STANDARD",
-      projectContext: `Rozhodnutí "${decision.nazev}": ${decision.otazka}`,
-      cleanupFillers: true,
-    });
-
-    const transcript = transcribeResult.transcript.trim();
-    if (!transcript) {
-      return Response.json({ error: "Přepis je prázdný — nahrávka byla zřejmě tichá." }, { status: 400 });
-    }
-
-    // Stage 2: extrakce metadat
-    const extracted = await extractEntryFromTranscript(transcript, {
-      otazka: decision.otazka,
-      varianty: decision.varianty as string[],
-    });
-
-    // Uložit audio (pro audit) + entry
-    const saved = await saveUpload(`bwmys/${decisionId}`, audioBuf, mime);
-
-    const entry = await prisma.decisionEntry.create({
-      data: {
-        decisionId,
-        nalada: extracted.nalada,
-        typVstupu: extracted.typVstupu,
-        uhelPohledu: extracted.uhelPohledu,
-        obsah: extracted.obsah,
-        audioPath: saved.relativePath,
-        audioMime: mime,
-        audioBytes: audioBuf.byteLength,
-      },
-    });
-
-    return Response.json({ entry, transcript });
+    saved = await saveUpload(`bwmys/${decisionId}`, audioBuf, mime);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[bwmys entry-audio]", msg);
-    return Response.json({ error: msg }, { status: 500 });
+    return Response.json({ error: e instanceof Error ? e.message : "Ukládání selhalo." }, { status: 500 });
   }
+
+  const entry = await prisma.decisionEntry.create({
+    data: {
+      decisionId,
+      nalada: 3,                  // placeholder, AI updatuje
+      typVstupu: "nova_uvaha",   // placeholder
+      uhelPohledu: "nevybrano",  // placeholder
+      obsah: "[Audio se zpracovává…]",
+      audioPath: saved.relativePath,
+      audioMime: mime,
+      audioBytes: audioBuf.byteLength,
+      status: "processing",
+    },
+  });
+
+  // Fire-and-forget — drž referenci přes module-level Set ať Promise neumře GC.
+  void runAiPipeline(entry.id, audioBuf, mime, {
+    nazev: decision.nazev,
+    otazka: decision.otazka,
+    varianty: decision.varianty as string[],
+  });
+
+  return Response.json({ entry, processing: true });
 };
+
+// Module-level Set drží reference na probíhající Promise (Astro/Node fire-and-forget
+// jinak nespolehlivé — GC může Promise sebrat).
+const inFlight = new Set<Promise<void>>();
+
+async function runAiPipeline(
+  entryId: string,
+  audio: Buffer,
+  mime: string,
+  ctx: { nazev: string; otazka: string; varianty: string[] },
+): Promise<void> {
+  const p = (async () => {
+    try {
+      const transcribeResult = await transcribeAudio({
+        audio,
+        mimeType: mime,
+        recordingType: "STANDARD",
+        projectContext: `Rozhodnutí "${ctx.nazev}": ${ctx.otazka}`,
+        cleanupFillers: true,
+      });
+
+      const transcript = transcribeResult.transcript.trim();
+      if (!transcript) {
+        await prisma.decisionEntry.update({
+          where: { id: entryId },
+          data: { status: "error", processingError: "Přepis je prázdný — nahrávka byla zřejmě tichá." },
+        });
+        return;
+      }
+
+      const extracted = await extractEntryFromTranscript(transcript, {
+        otazka: ctx.otazka,
+        varianty: ctx.varianty,
+      });
+
+      await prisma.decisionEntry.update({
+        where: { id: entryId },
+        data: {
+          nalada: extracted.nalada,
+          typVstupu: extracted.typVstupu,
+          uhelPohledu: extracted.uhelPohledu,
+          obsah: extracted.obsah,
+          status: "ready",
+          processingError: null,
+        },
+      });
+      console.log(`[bwmys entry-audio] ${entryId} processed in background`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bwmys entry-audio] ${entryId} background failed:`, msg);
+      try {
+        await prisma.decisionEntry.update({
+          where: { id: entryId },
+          data: { status: "error", processingError: msg.slice(0, 1000) },
+        });
+      } catch {}
+    } finally {
+      inFlight.delete(p);
+    }
+  })();
+  inFlight.add(p);
+  return p;
+}

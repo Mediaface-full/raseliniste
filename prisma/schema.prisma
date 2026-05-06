@@ -1321,6 +1321,11 @@ model DecisionEntry {
   audioMime   String?
   audioBytes  Int?
 
+  // AI processing status — pro fire-and-forget audio entries (NOVÉ 2026-05-06)
+  // "ready" = hotovo, "processing" = AI Stage 1+2 běží na pozadí, "error" = AI selhala
+  status          String   @default("ready")
+  processingError String?  @db.Text
+
   @@index([decisionId, datum])
 }
 

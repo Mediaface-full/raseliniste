@@ -361,7 +361,7 @@ Sémantické vyhledávání s citací = mohu se zeptat „co jsem říkal o X v 
 
   {
     slug: "bwmys",
-    title: "B&W Myš",
+    title: "Myši",
     icon: "lucide:arrow-left-right",
     tint: "lavender",
     oneLiner: "Rozhodovací linka pro emocionální rozhodovací styl. 14denní sběr → AI verdikt.",

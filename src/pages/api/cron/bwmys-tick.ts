@@ -7,7 +7,7 @@ import { sendPushToUser } from "@/lib/webpush";
 export const prerender = false;
 
 /**
- * B&W Myš denní tick (cron 7:10 ráno).
+ * Myši denní tick (cron 7:10 ráno).
  *
  * Co dělá:
  *   1. Odložená rozhodnutí kde odlozenoDo <= dnes → vrátí na status=aktivni
@@ -93,7 +93,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     // Pošli (email + push)
-    const subject = `B&W Myš — ${notifs.length} ${notifs.length === 1 ? "připomínka" : "připomínek"}`;
+    const subject = `Myši — ${notifs.length} ${notifs.length === 1 ? "připomínka" : "připomínek"}`;
     const html = renderHtml(notifs);
     const text = notifs.map((n) => `${kindLabel(n)}: ${n.nazev}`).join("\n");
 

@@ -15,10 +15,10 @@ if (!user) return Astro.redirect("/login");
 ---
 
 <Shell
-  title="Nové rozhodnutí · B&W Myš"
+  title="Nové rozhodnutí · Myši"
   username={user.username}
   heading="Nové rozhodnutí"
-  breadcrumb={[{ label: "B&W Myš", href: "/bwmys" }, { label: "Nové" }]}
+  breadcrumb={[{ label: "Myši", href: "/bwmys" }, { label: "Nové" }]}
 >
   <BwMysNew client:load />
 </Shell>

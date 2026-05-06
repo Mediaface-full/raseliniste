@@ -1,5 +1,5 @@
 /**
- * Decision Compass — 5. vizualizační komponenta v B&W Myš.
+ * Decision Compass — 5. vizualizační komponenta v Myši.
  *
  * SVG kompas se 4 kvadranty zobrazující kde se rozhodnutí opírá:
  *   - SZ (smer<0, konz>0.5) — silný signál PROTI

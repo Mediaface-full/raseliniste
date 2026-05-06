@@ -25,10 +25,10 @@ if (!item) return Astro.redirect("/bwmys");
 ---
 
 <Shell
-  title={`${item.nazev} · B&W Myš`}
+  title={`${item.nazev} · Myši`}
   username={user.username}
   heading={item.nazev}
-  breadcrumb={[{ label: "B&W Myš", href: "/bwmys" }, { label: item.nazev }]}
+  breadcrumb={[{ label: "Myši", href: "/bwmys" }, { label: item.nazev }]}
 >
   <BwMysDetail client:load id={id} />
 </Shell>
