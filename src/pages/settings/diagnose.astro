@@ -1,0 +1,178 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Diagnostika AI · Rašeliniště"
+  username={user.username}
+  heading="Diagnostika AI"
+  breadcrumb={[{ label: "Nastavení", href: "/settings" }, { label: "Diagnostika AI" }]}
+>
+  <div class="max-w-4xl space-y-5">
+    <div class="glass-subtle rounded-xl p-5">
+      <h1 class="font-serif text-2xl tracking-tight mb-2">Stav AI procesů</h1>
+      <p class="text-sm text-muted-foreground leading-relaxed">
+        Co teď běží, co se zaseklo, co selhalo. Pokrývá Myší (entries + evaluace + argumenty),
+        Studánku/Prskavku (souhrny projektů), Health (manuální analýza zdraví).
+        Stránka se sama obnovuje à 10 sekund.
+      </p>
+    </div>
+
+    <div id="diag-root" class="space-y-4">
+      <div class="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
+        Načítám…
+      </div>
+    </div>
+
+    <div class="text-[11px] font-mono text-muted-foreground/60 text-center">
+      Raw data: <a href="/api/diagnose/bwmys" class="hover:underline">/api/diagnose/bwmys</a>
+      <span class="mx-2">·</span>
+      <a href="/api/diagnose/studna" class="hover:underline">/api/diagnose/studna</a>
+    </div>
+  </div>
+
+  <script is:inline>
+    const ROOT = document.getElementById("diag-root");
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function fmtDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+    }
+
+    function renderConclusions(arr) {
+      return `
+        <section class="glass rounded-xl p-4 space-y-1.5">
+          <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">Závěry</div>
+          ${arr.map((c) => `<div class="text-sm leading-relaxed">${escapeHtml(c)}</div>`).join("")}
+        </section>
+      `;
+    }
+
+    function renderMigrations(m) {
+      const missing = m.missing.length > 0;
+      return `
+        <section class="glass rounded-xl p-4">
+          <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2">Migrace</div>
+          ${missing
+            ? `<div class="text-sm text-[var(--tint-rose)] mb-2">⚠ Chybí: ${m.missing.map(escapeHtml).join(", ")}</div>`
+            : `<div class="text-sm text-[var(--tint-sage)]">✓ Všechny očekávané migrace aplikované</div>`}
+          <ul class="mt-2 text-xs font-mono space-y-0.5 text-muted-foreground">
+            ${m.applied.map((a) => `<li>✓ ${escapeHtml(a.migration_name)} <span class="opacity-60">${a.finished_at ? fmtDate(a.finished_at) : "—"}</span></li>`).join("")}
+          </ul>
+        </section>
+      `;
+    }
+
+    function renderProcessing(p) {
+      const items = [
+        ...p.decisionEntries.map((e) => ({ kind: "Myší entry", name: e.decisionName, age: e.ageMin, extra: e.obsahPreview, link: `/bwmys/${e.decisionId}` })),
+        ...p.decisionEvaluations.map((e) => ({ kind: `Myší ${e.typ === "finalni" ? "finální" : "průběžné"}`, name: e.decisionName, age: e.ageMin, extra: "", link: `/bwmys/${e.decisionId}` })),
+        ...p.healthAnalyses.map((h) => ({ kind: "Health analýza", name: `${fmtDate(h.period.from)} → ${fmtDate(h.period.to)}`, age: h.ageMin, extra: "", link: `/health/analyza/${h.id}` })),
+        ...p.projectSummaries.map((s) => ({ kind: "Studna souhrn", name: s.projectName, age: s.ageMin, extra: "", link: `/studna/${s.projectId}` })),
+      ];
+      if (items.length === 0) {
+        return `
+          <section class="glass rounded-xl p-4">
+            <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2">Aktivní processing</div>
+            <div class="text-sm text-muted-foreground italic">Nic neběží.</div>
+          </section>
+        `;
+      }
+      return `
+        <section class="glass rounded-xl p-4">
+          <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2">Aktivní processing (${items.length})</div>
+          <div class="space-y-2">
+            ${items.map((it) => {
+              const stale = it.age >= 5;
+              const color = stale ? "var(--tint-rose)" : "var(--tint-butter)";
+              return `
+                <a href="${it.link}" class="block rounded-md p-2.5 hover:bg-white/5 transition-colors" style="border: 1px solid color-mix(in oklch, ${color} 30%, transparent); background: color-mix(in oklch, ${color} 8%, transparent);">
+                  <div class="flex items-center gap-2 flex-wrap text-sm">
+                    <span class="font-mono text-[10px] uppercase tracking-wider" style="color: ${color}">${escapeHtml(it.kind)}</span>
+                    <span>${escapeHtml(it.name)}</span>
+                    <span class="ml-auto text-xs font-mono text-muted-foreground">${it.age} min ${stale ? "🟡 stuck" : ""}</span>
+                  </div>
+                  ${it.extra ? `<div class="text-xs text-muted-foreground mt-1 truncate">${escapeHtml(it.extra)}</div>` : ""}
+                </a>
+              `;
+            }).join("")}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderErrors(errs) {
+      const all = [
+        ...errs.decisionEntries.map((e) => ({ kind: "Myší entry", name: e.decision.nazev, when: e.datum, msg: e.processingError, link: `/bwmys/${e.decision.id}` })),
+        ...errs.decisionEvaluations.map((e) => ({ kind: `Myší ${e.typ === "finalni" ? "finální" : "průběžné"}`, name: e.decision.nazev, when: e.datum, msg: e.processingError, link: `/bwmys/${e.decision.id}` })),
+        ...errs.healthAnalyses.map((h) => ({ kind: "Health", name: "", when: h.createdAt, msg: h.processingError, link: `/health/analyza/${h.id}` })),
+        ...errs.projectSummaries.map((s) => ({ kind: "Souhrn", name: s.project.name, when: s.createdAt, msg: s.processingError, link: `/studna/${s.project.id}` })),
+      ];
+      all.sort((a, b) => new Date(b.when) - new Date(a.when));
+      if (all.length === 0) {
+        return `
+          <section class="glass rounded-xl p-4">
+            <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2">Errory za 24 h</div>
+            <div class="text-sm text-muted-foreground italic">Žádné selhání.</div>
+          </section>
+        `;
+      }
+      return `
+        <section class="glass rounded-xl p-4">
+          <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2">Errory za 24 h (${all.length})</div>
+          <div class="space-y-2">
+            ${all.slice(0, 20).map((e) => `
+              <a href="${e.link}" class="block rounded-md p-2.5 hover:bg-white/5 transition-colors" style="border: 1px solid color-mix(in oklch, var(--tint-rose) 25%, transparent); background: color-mix(in oklch, var(--tint-rose) 6%, transparent);">
+                <div class="flex items-center gap-2 flex-wrap text-sm">
+                  <span class="font-mono text-[10px] uppercase tracking-wider" style="color: var(--tint-rose)">${escapeHtml(e.kind)}</span>
+                  ${e.name ? `<span>${escapeHtml(e.name)}</span>` : ""}
+                  <span class="ml-auto text-xs font-mono text-muted-foreground">${fmtDate(e.when)}</span>
+                </div>
+                ${e.msg ? `<div class="text-xs text-[var(--tint-rose)]/90 mt-1 font-mono whitespace-pre-wrap">${escapeHtml(e.msg)}</div>` : ""}
+              </a>
+            `).join("")}
+          </div>
+        </section>
+      `;
+    }
+
+    function render(d) {
+      ROOT.innerHTML = [
+        renderConclusions(d.conclusions),
+        renderProcessing(d.processing),
+        renderErrors(d.errors24h),
+        renderMigrations(d.migrations),
+      ].join("");
+    }
+
+    async function load() {
+      try {
+        const res = await fetch("/api/diagnose/bwmys", { cache: "no-store" });
+        if (!res.ok) {
+          ROOT.innerHTML = `<div class="glass rounded-xl p-4 text-sm text-[var(--tint-rose)]">Diagnostika selhala (${res.status})</div>`;
+          return;
+        }
+        render(await res.json());
+      } catch (e) {
+        ROOT.innerHTML = `<div class="glass rounded-xl p-4 text-sm text-[var(--tint-rose)]">Síťová chyba: ${escapeHtml(String(e))}</div>`;
+      }
+    }
+
+    load();
+    setInterval(load, 10000);
+  </script>
+</Shell>
