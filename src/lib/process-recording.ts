@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { transcribeAudio, type RecordingTypeStr } from "./audio-transcribe";
+import { transcribeAudio, analyzeTranscript, type RecordingTypeStr } from "./audio-transcribe";
 
 /**
  * Asynchronní AI zpracování nahrávky. Volá se fire-and-forget z upload
@@ -121,6 +121,96 @@ export async function processRecording(params: {
       }
     } finally {
       // Uvolnit referenci — GC může Promise sebrat
+      inFlight.delete(entry);
+    }
+  })();
+
+  inFlight.add(entry);
+  return entry.promise;
+}
+
+/**
+ * Asynchronní AI zpracování textového vstupu (admin vložil hotový přepis,
+ * např. zápis schůzky). Přeskočí Stage 1 (audio přepis) a spustí jen
+ * Stage 2 (strukturovanou analýzu).
+ */
+export async function processRecordingFromText(params: {
+  recordingId: string;
+  transcript: string;
+  type: RecordingTypeStr;
+  projectContext: string | null;
+  customStandardPrompt?: string | null;
+  customBriefPrompt?: string | null;
+  analysisModel?: string | null;
+}): Promise<void> {
+  const entry: InFlight = {
+    recordingId: params.recordingId,
+    type: params.type,
+    startedAt: Date.now(),
+    promise: Promise.resolve(),
+  };
+
+  entry.promise = (async () => {
+    try {
+      console.log(`[process-recording-text] ${params.recordingId} start (${params.type}, ${params.transcript.length} znaků)`);
+      const result = await analyzeTranscript({
+        transcript: params.transcript,
+        recordingType: params.type,
+        projectContext: params.projectContext,
+        customStandardPrompt: params.customStandardPrompt ?? null,
+        customBriefPrompt: params.customBriefPrompt ?? null,
+        analysisModelOverride: params.analysisModel ?? null,
+      });
+
+      await prisma.projectRecording.update({
+        where: { id: params.recordingId },
+        data: {
+          transcript: result.transcript,
+          analysis: result.analysis as unknown as object,
+          status: "processed",
+          processingError: null,
+        },
+      });
+      console.log(`[process-recording-text] ${params.recordingId} processed OK in ${Date.now() - entry.startedAt}ms`);
+
+      // RAG indexace
+      try {
+        const { indexEntity } = await import("./rag");
+        const rec = await prisma.projectRecording.findUnique({
+          where: { id: params.recordingId },
+          select: { project: { select: { userId: true } } },
+        });
+        if (rec?.project.userId) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const summary = (result.analysis as any)?.summary ?? "";
+          const indexText = [result.transcript, summary].filter(Boolean).join("\n\n");
+          if (indexText.trim()) {
+            void indexEntity({
+              userId: rec.project.userId,
+              sourceType: "studna",
+              sourceId: params.recordingId,
+              text: indexText,
+            });
+          }
+        }
+      } catch (ragErr) {
+        console.warn(`[process-recording-text] RAG index skip:`, ragErr instanceof Error ? ragErr.message : ragErr);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[process-recording-text] ${params.recordingId} failed:`, msg);
+      try {
+        await prisma.projectRecording.update({
+          where: { id: params.recordingId },
+          data: {
+            status: "error",
+            processingError: msg.slice(0, 1000),
+          },
+        });
+      } catch (updateErr) {
+        console.error(`[process-recording-text] couldn't even update DB:`, updateErr);
+      }
+    } finally {
       inFlight.delete(entry);
     }
   })();

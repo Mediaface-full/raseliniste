@@ -228,6 +228,9 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
         onSuccess={onRefresh}
       />
 
+      {/* Admin-only: vložit hotový text (zápis schůzky) bez nahrávky */}
+      <TextInputCard projectId={project.id} onSuccess={onRefresh} />
+
       {project.recordings.length === 0 ? (
         <div className="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
           Zatím žádné záznamy. Nahraj nahoře, nebo pošli odkaz hostům.
@@ -1116,6 +1119,133 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             <Trash2 /> Smazat projekt
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// TextInputCard — admin-only: vložit hotový text (zápis schůzky) jako BRIEF/STANDARD
+// =============================================================================
+function TextInputCard({ projectId, onSuccess }: { projectId: string; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [type, setType] = useState<"STANDARD" | "BRIEF">("BRIEF");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setError(null);
+    if (text.trim().length < 20) {
+      setError("Text musí mít aspoň 20 znaků.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/studna/${projectId}/recording-text`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type, text: text.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Vložení selhalo.");
+        return;
+      }
+      setText("");
+      setOpen(false);
+      onSuccess();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full glass rounded-xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors"
+        style={{ ["--c" as string]: "var(--tint-mint)", borderStyle: "dashed" }}
+      >
+        <FileText className="size-4 text-[var(--tint-mint)]" />
+        Vložit text místo nahrávky (zápis schůzky, brief)
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="glass rounded-xl p-4 space-y-3"
+      style={{ ["--c" as string]: "var(--tint-mint)" }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText className="size-4 text-[var(--tint-mint)]" />
+          <span className="font-serif text-base">Vložit textový přepis</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setError(null); }}
+          className="text-muted-foreground hover:text-foreground text-xs"
+        >
+          zavřít
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Pro hotový zápis schůzky nebo dlouhý brief, který už máš jako text. AI přeskočí
+        přepis a rovnou udělá strukturovanou analýzu — stejnou jako u nahrávky.
+      </p>
+
+      <div className="flex gap-2 items-center text-xs">
+        <span className="text-muted-foreground">Typ:</span>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="radio"
+            name="text-type"
+            checked={type === "BRIEF"}
+            onChange={() => setType("BRIEF")}
+            className="size-3.5"
+          />
+          <strong>Brief</strong> (Pro, hloubková)
+        </label>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="radio"
+            name="text-type"
+            checked={type === "STANDARD"}
+            onChange={() => setType("STANDARD")}
+            className="size-3.5"
+          />
+          Standard (Flash)
+        </label>
+      </div>
+
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Vlož text (zápis schůzky, briefovací poznámky...)"
+        rows={10}
+        className="w-full rounded-md bg-black/30 border border-white/10 p-3 text-sm leading-relaxed font-mono focus:outline-none focus:border-[var(--tint-mint)]/40 resize-y min-h-[200px]"
+      />
+      <div className="flex items-center gap-3 text-[11px] font-mono text-muted-foreground">
+        <span>{text.length.toLocaleString("cs-CZ")} znaků</span>
+        {text.length >= 20 && <span className="text-[var(--tint-sage)]">✓ připraveno</span>}
+      </div>
+
+      {error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <Button onClick={submit} disabled={busy || text.trim().length < 20}>
+          {busy ? <Loader2 className="animate-spin" /> : <Send />} Uložit a analyzovat
+        </Button>
+        <Button variant="ghost" onClick={() => { setText(""); setError(null); }}>
+          Vyčistit
+        </Button>
       </div>
     </div>
   );
