@@ -4,7 +4,9 @@ Osobní informační systém Petra „Gideona" Perniy. Jeden uživatel, maximum 
 
 > **TL;DR:** Astro 6 + React 19 islands + Prisma 7 + PostgreSQL 16, běží na Synology DS718+ v Dockeru, deploy přes ghcr.io. Design **Liquid Glass** na dark navy pozadí. Login je **heslo + passkey (Touch ID)**. Jedenáct živých modulů: Capture, Úkoly, Poznámky, Deník, Zdraví, Kontakty (vCard + Google sync), Gideonův Firewall, Dopisy, Studna, **Kalendář (Google sync — fáze 1a; iCloud + rules + /quickadd ve fázi 1b)**, E-mail SMTP. AI běží na **Vertex AI** (EU region) nebo Gemini API key.
 
-> **NOVÁ SESSION:** přečti nejdřív [`HANDOFF.md`](./HANDOFF.md) — má aktuální stav, rozdělané věci a immediate next steps.
+> **NOVÁ SESSION:** přečti nejdřív [`INSTRUKCE/HANDOFF-2026-05-06.md`](./INSTRUKCE/HANDOFF-2026-05-06.md) — má aktuální stav, rozdělané věci a immediate next steps. Pro detailní metodologii B&W Myš viz [`INSTRUKCE/BWMYS-METODOLOGIE.md`](./INSTRUKCE/BWMYS-METODOLOGIE.md).
+
+> **Stav 2026-05-06:** přidány moduly **Návody** (`/navody`, interní wiki ke 15 modulům), **Studánka per-host keepAudio** + admin text-input pro Brief, **Prskavka audio retention navždy** + výpis 5 záznamů, **B&W Myš Decision Compass** (5. vizualizace s 4 kvadranty signál × pro/proti), **Calendar Portal fix** (modaly + tooltipy přes createPortal), **iCloud recurring jump-forward iterator fix**.
 
 ---
 
@@ -444,8 +446,11 @@ Sdílené projektové boxíky s hlasovými záznamy.
   - **Custom prompt per projekt (NOVÉ 05-03):** `ProjectBox.projectSummaryPrompt @db.Text`. Když vyplněn, posíláme **PLNÉ transkripty** všech nahrávek (ne osekané JSON metadaty), temperature 0.6, maxOutputTokens 32k. Pro kreativní agregaci napříč nahrávkami (mapa kapitol, index osob s `#`, bílá místa, časová osa). Růžová sekce v UI s explicitním varováním že to NENÍ per-recording prompt (tam by to rozhodilo JSON parsing → recording uvázne).
 - **Per-projekt Gemini model (NOVÉ 05-03):** `ProjectBox.analysisModel`. Select Auto/Flash/Pro. Override Stage 2 modelu pro VŠECHNY analýzy v projektu (Stage 1 přepis je vždy Flash). Pro kreativní projekty → Pro 2.5.
 - **Záchrana stuck recording (NOVÉ 05-03):** `POST /api/studna/recordings/:id/mark-error` + tlačítko „zrušit" v UI vedle loaderu. Pro případy kdy Promise umřela, Gemini vrátil neplatný JSON, atd. Status → `error`, Petr může Regenerovat. Doplněk k cronu `retry-stuck-recordings` (10 min threshold).
-- **Cron:** `daily-projects-digest` (**7:00 ráno** — okno posledních 24 h, 200znakové náhledy z transkriptu, předmět "Studna — N nových nahrávek (autoři)", patička link na `/studna/aktivita`; pokud nic nepřibylo, mail neposílá), `cleanup-audio` (03:00 — STANDARD older 14d & not pinned)
+- **Cron:** `daily-projects-digest` (**7:00 ráno** — okno posledních 24 h, 200znakové náhledy z transkriptu, předmět "Studna — N nových nahrávek (autoři)", patička link na `/studna/aktivita`; pokud nic nepřibylo, mail neposílá), `cleanup-audio` (03:00 — STANDARD older 14d & not pinned & **NE keepAudio host** & **NE Prskavka projekt**)
 - **Onboarding PDFs** — 2 šablony (Standard + Brief) generované přes `@react-pdf/renderer`, owner si stáhne v admin a pošle hostovi mailem
+- **Per-host „Zachovávat audio" (NOVÉ 05-06):** `ProjectInvitation.keepAudio Boolean default false`. Per-projekt × per-host flag. Když true, cleanup-audio cron přeskočí STANDARD audio od tohoto hosta (zůstane natrvalo). UI: checkbox `💾 Zachovávat audio` vedle `⭐ Klíčový brief` v záložce Hosti detailu projektu i v pozvánkovém formuláři. Endpoint `POST /api/studna/:id/invite` a `PATCH /api/studna/:id/invitations/:guestId` accept `keepAudio: boolean`. Cron response: `protectedByKeepAudio` counter. Migrace: `add_invitation_keep_audio`.
+- **Hostův výpis 5 posledních záznamů (NOVÉ 05-06):** sekce „Tvé poslední záznamy" pod GuestRecorderem na `/me/<token>`. Top 5 nahrávek hosta napříč všemi jeho projekty (server-side query v `me/[token].astro`). Komponenta `GuestRecordings.tsx` (reusable s props `recordings`, volitelné `heading`, `subtitle`). Klik = inline accordion s **plným transkriptem** (NE AI analýza). Položka: datum + čas + projekt + délka + BRIEF badge (pokud). Processing/error státy zobrazené, neexpandovatelné.
+- **Admin text-input pro Brief/Standard (NOVÉ 05-06):** v záložce Záznamy detailu projektu má owner tlačítko `📄 Vložit text místo nahrávky` (collapsible card s mint border). Pro hotové zápisy schůzek/briefů které už jsou v textu — AI **přeskočí Stage 1** (přepis) a rovnou udělá Stage 2 strukturovanou analýzu. Endpoint `POST /api/studna/:id/recording-text` (auth-only owner, body `{type: STANDARD|BRIEF, text: string}` validace 20-200 000 znaků). Lib `analyzeTranscript()` v `audio-transcribe.ts` — text-only Stage 2 (stejný prompt + per-projekt overrides). Wrapper `processRecordingFromText()` v `process-recording.ts` (fire-and-forget s pinning Set, RAG indexace). Hosté tuto funkci nedostávají.
 
 ### 🚧 Kalendář & Bookingy (fáze 1a hotová — Google sync; 1b+2+3+4 v plánu)
 
@@ -459,6 +464,8 @@ Sdílené projektové boxíky s hlasovými záznamy.
 - Cron: `/api/cron/sync-calendars` (5 min), `/api/cron/sync-contacts` (denně 04:00).
 - Sidebar: Kalendář první v Organizace.
 - **Calendar prep AI (NOVÉ 2026-05-03):** `lib/calendar-prep-ai.ts:extractCalendarPrep({title, description})` přes Gemini Flash vytáhne `prepNote` (max 200 zn) + `itemsToBring` (pole stringů) z popisu události. Hooks v upsertEvent (Google + iCloud) jsou fire-and-forget — sync neblokuje. Petr napíše do popisu eventu „vzít stan, spacák, kameru" → AI to vytáhne → DayView ukáže `📝 prepNote` pod eventem → noční briefing 22:00 agreguje napříč zítřejšími události do `itemsToBringAggregate` → ranní Todoist task má sloučený seznam co vzít. Idempotence: každý sync re-extrahuje (etag check zachován pro Google).
+- **iCloud recurring fix (NOVÉ 2026-05-05):** v `src/lib/icloud-calendar.ts:upsertFromIcs()` byl bug — ICAL.js `event.iterator()` startoval od **původního DTSTART** eventu (např. 2020). Safety limit `safety < 366` se vyčerpal projitím prvních 366 dnů od DTSTART (= rok 2021), takže recurring event nikdy nedosáhl aktuálního sync window (2026-05 ± 60 dní). RODINA kalendář (= ICLOUD_SON) najednou zmizel z UI. **Fix:** jump-forward iterator přes `event.iterator(ICAL.Time.fromJSDate(windowStart, false))` pokud DTSTART < windowStart + safety zvýšen na 2000. Platí pro ICLOUD_SON i ICLOUD_PARTNER (sdílí `upsertFromIcs`). Google nezasažen — používá `singleEvents:true`, recurring rozbaluje server-side.
+- **Calendar tooltip + modal Portal fix (NOVÉ 2026-05-05):** ancestor v Shell/Base layoutu má `transform`/`backdrop-filter` co lámou CSS containing block pro `position:fixed`. Modal se otevíral daleko dole pod scrollem, tooltip 7 cm vedle kurzoru. Fix: **React Portal** přímo do `document.body` — `createPortal((<div className="fixed inset-0 z-[100]...">), document.body)`. Tooltipy sledují kurzor (clientX/Y + 14) s flipem nalevo pokud by přetekly viewport. Hover delay zkrácen z 200 ms → **80 ms**. z-index 100. Aplikováno v `WeekView.tsx`, `MonthView.tsx`, `DayTimeline.tsx` (modaly i tooltipy). **Pravidlo:** v calendar/Studna komponentách s `fixed inset-0` vždy použít Portal — bez něj se chovají relativně k transformovanému ancestorovi.
 
 **V plánu (fáze 1b/2/3/4 — viz brief Petra `raseliniste-kalendar-brief.md` a HANDOFF.md):**
 - 1b: iCloud CalDAV sync (syn + partnerka), pravidlový engine (15+ pravidel), `/quickadd` parser
@@ -489,20 +496,22 @@ Sdílené projektové boxíky s hlasovými záznamy.
   - `miniVyhodnoceni()` — Tok 3, "zrcadlo, ne rozhodnutí" (rozložení nálad, opakující motivy, chybějící úhly, krátká poznámka)
   - `finalniVyhodnoceni()` — Tok 4, **8 sekcí A-H**: A statistika sběru (pocetZapisu, distribuceNalad, distribuceTypu, upozornění při slabém vzorku), B Six Hats analýza (6 pohledů s 2-4 odrážkami), C signál vs. šum (konzistentní/náladově skreslené/recyklované), D pre-mortem (5 nejpravděpodobnějších důvodů selhání), E 10/10/10 (10 minut/měsíců/let), F WRAP check (více variant?, otestované předpoklady?, dostatečný odstup?, plán B?), G kontextová kritéria (pracovni: obchodní/finanční/marketingový/náročnost/strategický fit; osobni: hodnoty/vztahy/čas+energie/reverzibilita/životní fáze; smiseny: oba bloky), H verdikt (doporučení, hlavní pro/proti, co by překlopilo, doporučená revize)
   - `klasifikujUhly()` — subprocess pro entries s "nevybrano", uloží do uhelPohleduAi
-  - `extractArguments()` — vizualizační vrstva (05-02), max 12 argumentů (téma ≠ citace), každý {argument, smer −1..+1, konzistence 0..1, cetnost, nalady_vyskytu}; ukládá do `DecisionEvaluation.argumentsJson`
+  - `extractArguments()` — vizualizační vrstva (05-02), max 12 argumentů (téma ≠ citace), každý {argument, smer −1..+1, konzistence 0..1, cetnost, nalady_vyskytu, **klobouk** (NOVÉ 05-06: Six Hats kategorie fakta/emoce/kritika/prinosy/alternativy/meta, optional s fallback `meta`)}; ukládá do `DecisionEvaluation.argumentsJson`. AI klasifikuje klobouk podle příkladů: „vysoké náklady" → kritika, „cítil bych se dobře" → emoce, „data ukazují růst trhu" → fakta atd.
   - **Tón striktně věcný, NE terapeutický** (PDF specifikace explicitně zakazuje "vidím že tě to trápí" apod.)
 - **UI komponenty:**
   - `BwMysList` — karty aktivních rozhodnutí (kontext ikona, počet zápisů X/5, dní do deadline, klik → detail)
   - `BwMysNew` — multi-step formulář 6 kroků (název+kontext, otázka s validací ?, varianty min 3 + AI návrh tlačítko, předpoklady min 1, termín+délka sběru, souhrn) s progress barem
   - `BwMysDetail` — hlavička (Pencil edit / Trash delete) + zarámování (sbalitelné) + časová osa zápisů (mood barevný puntík + typ + úhel) + vyhodnocení (sekce A-H render s emoji) + akční zóna (4 tlačítka: Jdu/Nejdu/Odložit/Víc dat) + close dialog s 4 módy + reopen dialog + edit framing modal + new entry modal + audio recorder modal
   - `BwMysAudioRecorder` — modal s mikrofonem (5 min limit, useRecordingProtection)
-  - **`BwMysViz/` (vizualizační vrstva 05-02)** — sbalitelná sekce „Vizuální přehled" mezi Zarámováním a Časovou osou:
+  - **`BwMysViz/` (vizualizační vrstva 05-02 + Decision Compass 05-06)** — sbalitelná sekce „Vizuální přehled" mezi Zarámováním a Časovou osou:
+    - **`DecisionCompass` (PRIMÁRNÍ, NOVÉ 05-06)** — custom SVG (NE Recharts) viewBox 0 0 680 600 se 4 kvadranty: SZ silný signál PROTI / SV silný signál PRO (konz>0.5, nahoře, plné body) / JZ šum strach / JV šum euforie (konz<0.5, dole, dashed + opacity 0.55). Mapování: X=340+smer·300, Y=300+(0.5−konz)·480, R=min(32,10+cetnost·2). Fill = `COMPASS_HAT_COLORS[klobouk]` (sytější Six Hats hex z PDF speca: `#444441`/`#993556`/`#0F6E56`/`#854F0B`/`#185FA5`/`#534AB7`). V centru kompasu verdikt podle `decision.status` (čeká `#A0522D` / jdu `#0F6E56` / nejdu `#993556` / odložit `#854F0B` / archiv `#5C5650`) + subtext „opřený o sever/východ/jih/západ" podle dominantního kvadrantu (váha = `Σ cetnost·|smer|` napříč signál argumenty); pokud max < 5 → „slabý signál". 9 statických vrstev: pozadí kvadrantů, osy, středový kruh s radial gradient, popisky kvadrantů, popisky os (← PROTI / PRO →, vysoká konzistence ↑ / náladově zkreslené ↓), legenda velikosti (2×/6×/12×), body, verdikt, legenda klobouků dole. Empty state „Zatím žádné argumenty". Spec: `INSTRUKCE/zadani-decision-compass.pdf`.
     - `SixHatsRadar` — Recharts RadarChart, 6 os, používá `effectiveUhel()` (manuální přebije AI fallback z `uhelPohleduAi`); od 1 klasifikovaného úhlu, varování na chybějící klobouky
     - `MoodCurve` — LineChart s body obarvenými dle nálady (`MOOD_COLORS`), tooltip s prvními 50 znaky obsahu, varování při swing ≥ 3
     - `EntryTypesDonut` — PieChart s `innerRadius`, střed = celkový počet zápisů, textový komentář dle distribuce (např. „převažují vlastní úvahy"); od 3 zápisů
-    - `ArgumentsGrid` — ScatterChart, X = smer (−1..+1), Y = konzistence (0..1), velikost = cetnost (`ZAxis`), opacity = konzistence (≥0.5 plná, <0.5 průhledná), pro = mint, proti = rose, tooltip s textem argumentu + barevné tečky nálad výskytu, 4 popisky kvadrantů
-    - `ArgumentsBanner` ve `FinalEvalRender` — auto-fetch při open, regenerate button (force=1), pod scatterem 3 menší grafy (radar/křivka/donut)
-    - Sdílené barvy v `src/lib/bwmys-colors.ts` (hex přibližně z OKLCH `--tint-*`, Recharts neumí CSS proměnné)
+    - `ArgumentsGrid` — ScatterChart, X = smer (−1..+1), Y = konzistence (0..1), velikost = cetnost (`ZAxis`), opacity = konzistence (≥0.5 plná, <0.5 průhledná), pro = mint, proti = rose, tooltip s textem argumentu + barevné tečky nálad výskytu, 4 popisky kvadrantů (drill-down detail po Compassu)
+    - `ArgumentsBanner` ve `FinalEvalRender` — auto-fetch při open, regenerate button (force=1), předává `decisionStatus` do Compassu. Pořadí: **DecisionCompass nahoře (full-width)** → Mřížka argumentů (ArgumentsGrid) → 3 mini tiles (radar/křivka/donut)
+    - Sdílené barvy v `src/lib/bwmys-colors.ts` — `HAT_COLORS` (klíče bily/cerveny/...) pro radar a interní mapping; `COMPASS_HAT_COLORS` (klíče fakta/emoce/...) sytější varianty pro Compass
+    - **Detailní metodologie:** `INSTRUKCE/BWMYS-METODOLOGIE.md` (frameworky de Bono, Klein/Kahneman, Welch, Heath bros, Porges, Bezos)
   - Archive `/bwmys/archiv` — filtr status (uzavrene_jdu/nejdu/odlozene/all) + filtr kontext, export MD link, klik → detail (kde je tlačítko Znovu otevřít)
 - **Cron `bwmys-tick`** (#15 v seznamu, denně 7:10):
   - Auto-návrat odložených rozhodnutí (status=odlozene + odlozenoDo<=now → status=aktivni)
@@ -570,6 +579,8 @@ Sdílené projektové boxíky s hlasovými záznamy.
   - `/studna/aktivita`, `/studna/nahravka` filtruje `isPrivate: false`
   - `daily-projects-digest` cron filter `isPrivate: false` (Petr si neemailuje sám sobě)
 - **Detail projektu** `/studna/<id>` je sdílený (jeden projekt = jedna stránka, bez ohledu na isPrivate)
+- **Audio retention navždy (NOVÉ 05-06):** cleanup-audio cron přeskakuje Prskavkové projekty (`project: { isPrivate: false }` filtr v query). Audio se nemaže automaticky — jen při smazání projektu (DELETE endpoint čistí `audioPath` soubory na disku). Důvod: u kreativních projektů je audio primární materiál, ne dočasná nahrávka.
+- **Petrův výpis 5 záznamů (NOVÉ 05-06):** na `/prskavka` index page pod `<StudnaList>` se renderuje `<GuestRecordings>` s top 5 nahrávek napříč všemi Prskavkovými projekty Petra (server-side query, filter `project: { userId, isPrivate: true }`). Reuse stejné komponenty jako u hosta na `/me/<token>` s vlastním `heading="Posledních 5 záznamů"`.
 
 ### ✅ Studánka (přejmenování ze Studna, 2026-05-01)
 - **UI rename napříč všemi texty:** sidebar, hlavičky, breadcrumby, email subject, RAG citace, AI prompts editor, onboarding PDF, /me/<token> guest landing
@@ -629,6 +640,16 @@ Sdílené projektové boxíky s hlasovými záznamy.
 - Startup log informuje, který mód běží
 - `GET /api/health/ai` — health check vrátí `{ mode, ok, elapsedMs, sample }` přes test prompt
 - `docker-compose.yml` má volume mount `./gcp-key.json:/app/gcp-key.json:ro`
+
+### ✅ Návody (hotovo 2026-05-06)
+- **Účel:** Petrova interní wiki — popisy modulů, jak je ovládá, proč existují, co umí/neumí, jak jsou napojené. Nejde o dokumentaci pro někoho jiného, ale poznámky pro sebe ať si po pár týdnech nemusí pamatovat detaily.
+- **`/navody`** — grid 15 pastelových boxíků (každý modul = ikona + tint + 1-liner). Klik → detail.
+- **`/navody/<slug>`** — detail se 6 sekcemi v glass panelech: **Co to je / Jak to ovládám / Proč to dělám / Co umí / Co neumí / Kam je to napojené**. Header s ikonou + tint + tlačítko „Otevřít [modul]" vede na ostrý modul.
+- **Obsah:** `src/lib/navody.ts` — TypeScript array `NAVODY: Navod[]`, jeden objekt per modul s `slug`, `title`, `icon` (lucide), `tint` (peach/mint/butter/sky/rose/lavender/sage/pink), `oneLiner`, `href`, `sections` (markdown stringy). `getNavod(slug)` helper.
+- **15 modulů:** Úkoly, Studánka, Prskavka, Kalendář, Ozvěna, Deník, Zeptat se RAG, B&W Myš, ŽIJEŠ?, Výročí, Kontakty+Firewall, Dopisy, Zdraví, Booking, Things-import.
+- **Markdown rendering:** server-side přes `marked.parse()` v `[slug].astro`, vykresluje se přes `set:html` do `prose-rasel` divů.
+- **Sidebar entry:** v sekci „Nastavení" položka `Návody` s ikonou `lucide:book-marked`, butter tint.
+- **Údržba:** Petr edituje obsah přímo v `src/lib/navody.ts` — footer detail stránky to připomíná. Při přidání nového modulu stačí přidat objekt do `NAVODY` array a hotovo.
 
 ### ✅ Settings (hotovo)
 Skupina v sidebaru, sedm podstránek:
