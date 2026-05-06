@@ -1436,6 +1436,11 @@ model DecisionEvaluation {
   promptTokens                Int?
   outputTokens                Int?
 
+  // AI processing status pro fire-and-forget (NOVÉ 2026-05-06)
+  // "ready" = hotovo, "processing" = AI běží na pozadí, "error" = AI selhala
+  status                      String   @default("ready")
+  processingError             String?  @db.Text
+
   @@index([decisionId, datum])
 }
 

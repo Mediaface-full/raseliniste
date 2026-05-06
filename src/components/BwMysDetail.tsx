@@ -59,6 +59,8 @@ interface DecisionEvaluation {
   obsahStrukturovany: unknown;
   argumentsJson: DecisionArgument[] | null;
   pocetVstupuVDobeGenerovani: number;
+  status?: string;            // "ready" | "processing" | "error"
+  processingError?: string | null;
 }
 
 const NALADA_BARVA: Record<number, string> = {
@@ -157,11 +159,13 @@ export default function BwMysDetail({ id }: { id: string }) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
-  // Polling pro audio entries co se zpracovávají na pozadí.
+  // Polling pro audio entries + evaluace co se zpracovávají na pozadí.
   // Petr nemusí ručně refreshovat — jakmile AI pipeline doběhne, UI se updatuje.
   useEffect(() => {
     if (!d) return;
-    const hasProcessing = d.entries.some((e) => e.status === "processing");
+    const hasProcessing =
+      d.entries.some((e) => e.status === "processing") ||
+      d.evaluations.some((ev) => ev.status === "processing");
     if (!hasProcessing) return;
     const interval = setInterval(() => load(), 4000);
     return () => clearInterval(interval);
@@ -351,21 +355,52 @@ export default function BwMysDetail({ id }: { id: string }) {
               <Printer className="size-3" /> PDF
             </button>
           </div>
-          {d.evaluations.map((ev) => (
-            <details key={ev.id} className="glass rounded-xl p-3" open={ev === d.evaluations[0]}>
-              <summary className="cursor-pointer text-sm">
-                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground mr-2">
+          {d.evaluations.map((ev) => {
+            const isProcessing = ev.status === "processing";
+            const isError = ev.status === "error";
+            return (
+            <details
+              key={ev.id}
+              className="glass rounded-xl p-3"
+              open={ev === d.evaluations[0]}
+              style={isProcessing ? { borderColor: "color-mix(in oklch, var(--tint-butter) 35%, transparent)" } : undefined}
+            >
+              <summary className="cursor-pointer text-sm flex items-center flex-wrap gap-2">
+                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                   {ev.typ === "finalni" ? "Finální" : "Průběžné"}
                 </span>
-                {new Date(ev.datum).toLocaleString("cs-CZ")}
-                <span className="text-xs text-muted-foreground ml-2">({ev.pocetVstupuVDobeGenerovani} zápisů)</span>
+                <span>{new Date(ev.datum).toLocaleString("cs-CZ")}</span>
+                <span className="text-xs text-muted-foreground">({ev.pocetVstupuVDobeGenerovani} zápisů)</span>
+                {isProcessing && (
+                  <span className="ml-auto inline-flex items-center gap-1 text-[var(--tint-butter)] text-xs">
+                    <Loader2 className="size-3 animate-spin" /> AI zpracovává…
+                  </span>
+                )}
+                {isError && (
+                  <span className="ml-auto text-[var(--tint-rose)] text-xs">⚠ chyba</span>
+                )}
               </summary>
               <div className="mt-3">
-                {ev.typ === "finalni"
+                {isProcessing ? (
+                  <div className="text-sm text-muted-foreground italic py-6 text-center flex items-center justify-center gap-2">
+                    <Loader2 className="size-4 animate-spin" />
+                    {ev.typ === "finalni"
+                      ? "Generuji finální analýzu (sekce A-H) — typicky 30-60 sekund. Můžeš zavřít stránku a vrátit se."
+                      : "Generuji průběžné zrcadlo — typicky 10-20 sekund."}
+                  </div>
+                ) : isError ? (
+                  <div className="text-sm text-[var(--tint-rose)] bg-[var(--tint-rose)]/10 rounded-md px-3 py-2">
+                    <div className="font-mono text-xs mb-1">Vyhodnocení selhalo:</div>
+                    <div className="text-xs whitespace-pre-wrap">{ev.processingError || "neznámá chyba"}</div>
+                    <div className="text-xs text-muted-foreground mt-2">
+                      Smaž tuto evaluaci a zkus to znovu — typicky pomůže.
+                    </div>
+                  </div>
+                ) : ev.typ === "finalni"
                   ? <FinalEvalRender data={ev.obsahStrukturovany as Record<string, unknown>} evaluation={ev} entries={d.entries} decisionId={d.id} decisionStatus={d.status} />
                   : <MiniEvalRender data={ev.obsahStrukturovany as Record<string, unknown>} />}
               </div>
-              {ev.typ === "finalni" && d.status === "aktivni" && (
+              {ev.typ === "finalni" && d.status === "aktivni" && !isProcessing && !isError && (
                 <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-2">
                   <Button onClick={() => setCloseDialog("jdu")}>
                     ✓ Jdu do toho
@@ -382,7 +417,8 @@ export default function BwMysDetail({ id }: { id: string }) {
                 </div>
               )}
             </details>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -51,69 +51,112 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
     delkaSberuDny: decision.delkaSberuDny,
   };
 
-  // Klasifikace nevybraných úhlů (jen pro finální, ať mini je rychlé)
-  let entriesForAi: EntryForAi[] = decision.entries.map((e) => ({
-    datum: e.datum,
-    nalada: e.nalada,
-    typVstupu: e.typVstupu,
-    uhelPohledu: e.uhelPohledu,
-    obsah: e.obsah,
-  }));
+  // Vytvoříme placeholder evaluation s status=processing — frontend ho hned uvidí
+  // s loaderem a polluje. Finální AI (Gemini Pro, sekce A-H, ~30-60 s) běží na pozadí.
+  const evaluation = await prisma.decisionEvaluation.create({
+    data: {
+      decisionId: id,
+      typ: body.typ,
+      obsahStrukturovany: {} as unknown as object,
+      pocetVstupuVDobeGenerovani: decision.entries.length,
+      modelName: "gemini-2.5-pro",
+      status: "processing",
+    },
+  });
 
-  if (body.typ === "finalni") {
-    const nevybraneIdx: number[] = [];
-    const obsahyKKlasifikaci: string[] = [];
-    decision.entries.forEach((e, i) => {
-      if (e.uhelPohledu === "nevybrano" && !e.uhelPohleduAi) {
-        nevybraneIdx.push(i);
-        obsahyKKlasifikaci.push(e.obsah);
-      }
-    });
+  void runEvalPipeline(evaluation.id, body.typ, dForAi, decision.entries);
 
-    if (obsahyKKlasifikaci.length > 0) {
-      try {
-        const klasifikace = await klasifikujUhly(obsahyKKlasifikaci);
-        // Update DB + entriesForAi
-        for (let k = 0; k < klasifikace.length; k++) {
-          const idx = nevybraneIdx[k];
-          const entry = decision.entries[idx];
-          await prisma.decisionEntry.update({
-            where: { id: entry.id },
-            data: { uhelPohleduAi: klasifikace[k] },
-          });
-          entriesForAi[idx].uhelPohledu = klasifikace[k];
-        }
-      } catch (e) {
-        console.warn("[bwmys] klasifikace selhala, pokračuji bez ní:", e);
-      }
-    } else {
-      // Použij i existující uhelPohleduAi
-      decision.entries.forEach((e, i) => {
-        if (e.uhelPohledu === "nevybrano" && e.uhelPohleduAi) {
-          entriesForAi[i].uhelPohledu = e.uhelPohleduAi as UhelPohledu;
-        }
-      });
-    }
-  }
-
-  try {
-    const obsah = body.typ === "prubezne"
-      ? await miniVyhodnoceni(dForAi, entriesForAi)
-      : await finalniVyhodnoceni(dForAi, entriesForAi);
-
-    const evaluation = await prisma.decisionEvaluation.create({
-      data: {
-        decisionId: id,
-        typ: body.typ,
-        obsahStrukturovany: obsah as unknown as object,
-        pocetVstupuVDobeGenerovani: decision.entries.length,
-        modelName: "gemini-2.5-pro",
-      },
-    });
-    return Response.json({ evaluation });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[bwmys evaluate]", msg);
-    return Response.json({ error: msg }, { status: 500 });
-  }
+  return Response.json({ evaluation, processing: true });
 };
+
+// Module-level Set drží reference na probíhající Promise (anti-GC pattern,
+// jinak Astro/Node fire-and-forget není spolehlivé).
+const inFlight = new Set<Promise<void>>();
+
+async function runEvalPipeline(
+  evaluationId: string,
+  typ: "prubezne" | "finalni",
+  dForAi: DecisionForAi,
+  entries: Array<{
+    id: string;
+    datum: Date;
+    nalada: number;
+    typVstupu: string;
+    uhelPohledu: string;
+    uhelPohleduAi: string | null;
+    obsah: string;
+  }>,
+): Promise<void> {
+  const p = (async () => {
+    try {
+      let entriesForAi: EntryForAi[] = entries.map((e) => ({
+        datum: e.datum,
+        nalada: e.nalada,
+        typVstupu: e.typVstupu,
+        uhelPohledu: e.uhelPohledu,
+        obsah: e.obsah,
+      }));
+
+      // Klasifikace nevybraných úhlů (jen pro finální)
+      if (typ === "finalni") {
+        const nevybraneIdx: number[] = [];
+        const obsahyKKlasifikaci: string[] = [];
+        entries.forEach((e, i) => {
+          if (e.uhelPohledu === "nevybrano" && !e.uhelPohleduAi) {
+            nevybraneIdx.push(i);
+            obsahyKKlasifikaci.push(e.obsah);
+          }
+        });
+        if (obsahyKKlasifikaci.length > 0) {
+          try {
+            const klasifikace = await klasifikujUhly(obsahyKKlasifikaci);
+            for (let k = 0; k < klasifikace.length; k++) {
+              const idx = nevybraneIdx[k];
+              const entry = entries[idx];
+              await prisma.decisionEntry.update({
+                where: { id: entry.id },
+                data: { uhelPohleduAi: klasifikace[k] },
+              });
+              entriesForAi[idx].uhelPohledu = klasifikace[k];
+            }
+          } catch (e) {
+            console.warn("[bwmys eval bg] klasifikace selhala, pokračuji bez ní:", e);
+          }
+        } else {
+          entries.forEach((e, i) => {
+            if (e.uhelPohledu === "nevybrano" && e.uhelPohleduAi) {
+              entriesForAi[i].uhelPohledu = e.uhelPohleduAi as UhelPohledu;
+            }
+          });
+        }
+      }
+
+      const obsah = typ === "prubezne"
+        ? await miniVyhodnoceni(dForAi, entriesForAi)
+        : await finalniVyhodnoceni(dForAi, entriesForAi);
+
+      await prisma.decisionEvaluation.update({
+        where: { id: evaluationId },
+        data: {
+          obsahStrukturovany: obsah as unknown as object,
+          status: "ready",
+          processingError: null,
+        },
+      });
+      console.log(`[bwmys eval bg] ${evaluationId} (${typ}) processed OK`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[bwmys eval bg] ${evaluationId} failed:`, msg);
+      try {
+        await prisma.decisionEvaluation.update({
+          where: { id: evaluationId },
+          data: { status: "error", processingError: msg.slice(0, 1000) },
+        });
+      } catch {}
+    } finally {
+      inFlight.delete(p);
+    }
+  })();
+  inFlight.add(p);
+  return p;
+}
