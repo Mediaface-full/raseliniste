@@ -1,0 +1,109 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import { marked } from "marked";
+import { readSession } from "../../lib/session";
+import { prisma } from "../../lib/db";
+import { getNavod } from "../../lib/navody";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const slug = Astro.params.slug;
+const navod = slug ? getNavod(slug) : null;
+if (!navod) return Astro.redirect("/navody");
+
+const sections = [
+  { key: "co_to_je", label: "Co to je", icon: "lucide:info" },
+  { key: "jak_to_ovladam", label: "Jak to ovládám", icon: "lucide:hand" },
+  { key: "proc", label: "Proč to dělám", icon: "lucide:heart" },
+  { key: "co_umi", label: "Co to umí", icon: "lucide:check-circle-2" },
+  { key: "co_neumi", label: "Co to neumí", icon: "lucide:x-circle" },
+  { key: "napojeni", label: "Kam je to napojené", icon: "lucide:network" },
+] as const;
+
+// Render markdown server-side
+const rendered: Record<string, string> = {};
+for (const s of sections) {
+  rendered[s.key] = marked.parse(navod.sections[s.key].trim()) as string;
+}
+---
+
+<Shell
+  title={`${navod.title} · Návod · Rašeliniště`}
+  username={user.username}
+  breadcrumb={[{ label: "Návody", href: "/navody" }, { label: navod.title }]}
+>
+  <div class="space-y-5 max-w-3xl mx-auto">
+    {/* Header */}
+    <div
+      class="glass rounded-2xl p-6"
+      style={`--c: var(--tint-${navod.tint}); border-color: color-mix(in oklch, var(--c) 30%, transparent); background: color-mix(in oklch, var(--c) 8%, oklch(14% 0.025 260 / 0.9));`}
+    >
+      <div class="flex items-start gap-4">
+        <div
+          class="size-14 rounded-xl grid place-items-center shrink-0"
+          style="background: color-mix(in oklch, var(--c) 22%, transparent); border: 1px solid color-mix(in oklch, var(--c) 40%, transparent);"
+        >
+          <Icon name={navod.icon} class="size-7" style="color: color-mix(in oklch, var(--c) 92%, white);" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <h1
+            class="font-serif text-3xl tracking-tight leading-tight mb-2"
+            style="color: color-mix(in oklch, var(--c) 97%, white);"
+          >
+            {navod.title}
+          </h1>
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            {navod.oneLiner}
+          </p>
+          {navod.href && (
+            <a
+              href={navod.href}
+              class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-md text-xs font-mono"
+              style="background: color-mix(in oklch, var(--c) 16%, transparent); color: color-mix(in oklch, var(--c) 95%, white); border: 1px solid color-mix(in oklch, var(--c) 30%, transparent);"
+            >
+              <Icon name="lucide:external-link" class="size-3" />
+              Otevřít {navod.title}
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {/* Sections */}
+    {sections.map((s) => (
+      <section class="glass-subtle rounded-xl p-5" style={`--c: var(--tint-${navod.tint});`}>
+        <div class="flex items-center gap-2 mb-3">
+          <Icon name={s.icon} class="size-4" style="color: color-mix(in oklch, var(--c) 80%, white);" />
+          <h2
+            class="font-serif text-lg tracking-tight"
+            style="color: color-mix(in oklch, var(--c) 90%, white);"
+          >
+            {s.label}
+          </h2>
+        </div>
+        <div class="prose-rasel text-sm leading-relaxed" set:html={rendered[s.key]} />
+      </section>
+    ))}
+
+    {/* Footer navigation */}
+    <div class="flex items-center justify-between gap-3 pt-4 pb-2">
+      <a
+        href="/navody"
+        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 text-xs font-mono"
+      >
+        <Icon name="lucide:arrow-left" class="size-3.5" /> Zpět na seznam
+      </a>
+      <span class="text-[11px] font-mono text-muted-foreground/60">
+        upravit text → <code>src/lib/navody.ts</code>
+      </span>
+    </div>
+  </div>
+</Shell>

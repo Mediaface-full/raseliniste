@@ -1,0 +1,68 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import { readSession } from "../../lib/session";
+import { prisma } from "../../lib/db";
+import { NAVODY } from "../../lib/navody";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Návody · Rašeliniště"
+  username={user.username}
+  heading="Návody"
+  breadcrumb={[{ label: "Návody" }]}
+>
+  <div class="space-y-5">
+    <div class="glass-subtle rounded-xl p-5">
+      <h1 class="font-serif text-2xl tracking-tight mb-2">Tvoje wiki</h1>
+      <p class="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+        Co každý modul dělá, jak ho ovládáš, proč existuje a kam je napojený.
+        Ne dokumentace pro někoho jiného — poznámky pro sebe, abys to měl po ruce
+        když si po pár týdnech přestaneš pamatovat detaily.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {NAVODY.map((n) => (
+        <a
+          href={`/navody/${n.slug}`}
+          class="glass rounded-xl p-4 group transition-all hover:scale-[1.015] hover:brightness-110 active:scale-[0.99]"
+          style={`--c: var(--tint-${n.tint}); border-color: color-mix(in oklch, var(--c) 25%, transparent); background: color-mix(in oklch, var(--c) 6%, oklch(14% 0.025 260 / 0.85));`}
+        >
+          <div class="flex items-start gap-3">
+            <div
+              class="size-10 rounded-lg grid place-items-center shrink-0"
+              style="background: color-mix(in oklch, var(--c) 18%, transparent); border: 1px solid color-mix(in oklch, var(--c) 35%, transparent);"
+            >
+              <Icon name={n.icon} class="size-5" style="color: color-mix(in oklch, var(--c) 90%, white);" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <h2
+                class="font-serif text-lg tracking-tight leading-tight mb-1"
+                style="color: color-mix(in oklch, var(--c) 96%, white);"
+              >
+                {n.title}
+              </h2>
+              <p class="text-xs text-muted-foreground leading-relaxed">
+                {n.oneLiner}
+              </p>
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+
+    <div class="text-[11px] font-mono text-muted-foreground/70 text-center pt-4">
+      {NAVODY.length} modulů · obsah lze upravit v <code class="text-foreground/80">src/lib/navody.ts</code>
+    </div>
+  </div>
+</Shell>
