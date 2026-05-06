@@ -1154,7 +1154,29 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           />
           Zahrnout do denního souhrnu (e-mail v 7:00 ráno)
         </label>
-        <div className="flex gap-2 pt-2 border-t border-white/5">
+
+        {/* Export přepisů */}
+        <div className="pt-3 border-t border-white/5">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium mb-0.5">Export přepisů</div>
+              <div className="text-xs text-muted-foreground leading-relaxed">
+                Stáhne všechny přepisy záznamů (Standard i Brief) jako čistý Markdown,
+                bez AI analýzy. Pro další zpracování v jiném nástroji.
+              </div>
+            </div>
+            <a
+              href={`/api/studna/${project.id}/export-transcripts`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-[var(--tint-mint)]/15 hover:bg-[var(--tint-mint)]/25 transition-colors"
+              style={{ border: "1px solid color-mix(in oklch, var(--tint-mint) 30%, transparent)" }}
+            >
+              <FileDown className="size-4 text-[var(--tint-mint)]" />
+              Stáhnout .md
+            </a>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-3 border-t border-white/5">
           <Button onClick={save} disabled={saving}>
             {saving ? <Loader2 className="animate-spin" /> : <Check />} Uložit
           </Button>
