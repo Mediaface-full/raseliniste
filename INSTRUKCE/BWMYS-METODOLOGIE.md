@@ -1,6 +1,6 @@
 # B&W Myš — metriky a metody rozhodování
 
-Dokument vysvětluje **co rozhodovací linka v Rašeliništi reálně používá** — jaké modely, jaké metriky, jaké rámce, jaké výstupy. Stav 2026-05-06.
+Dokument vysvětluje **co rozhodovací linka v Rašeliništi reálně používá** — jaké modely, jaké metriky, jaké rámce, jaké výstupy. Stav 2026-05-06 (+ Decision Compass).
 
 URL modulu: **`/bwmys`**
 
@@ -190,18 +190,71 @@ Tyhle metriky napájí **mřížku argumentů** (ScatterChart smer × konzistenc
 **Co dělá:** klasifikuje obsah do jedné ze 6 Six Hats kategorií.
 **Temperature:** 0.1 (deterministic).
 
+### 4.6 Klobouk (Six Hats) v argumentech
+Od **2026-05-06** (Decision Compass spec) `extractArguments()` vrací navíc pole `klobouk` per argument:
+```
+klobouk: "fakta" | "emoce" | "kritika" | "prinosy" | "alternativy" | "meta"
+```
+AI klasifikuje podle převažujícího charakteru obsahu. Příklady:
+- „vysoké náklady" → kritika
+- „cítil bych se dobře" → emoce
+- „data ukazují růst trhu" → fakta
+- „nový kanál distribuce" → prinosy
+- „mohli bychom udělat menší verzi" → alternativy
+- „uvědomuji si že rozhoduji unaveně" → meta
+
+Optional v Zod — legacy argumentsJson bez `klobouk` jsou platné, fallback v UI = `meta` (šedá).
+
 ---
 
 ## 5. Vizualizace (`src/components/BwMysViz/`)
 
 | Komponenta | Co ukazuje | Knihovna |
 |---|---|---|
+| **DecisionCompass** *(NOVÉ 2026-05-06)* | **Primární shrnutí** — SVG kompas se 4 kvadranty (silný signál PRO/PROTI nahoře, šum strach/euforie dole), v centru verdikt + „opřený o sever/východ/jih/západ" | custom SVG |
 | **SixHatsRadar** | 6-hatový radar — kolik zápisů v každé kategorii | Recharts RadarChart |
 | **MoodCurve** | Křivka nálad v čase + tooltip s textem zápisu | Recharts LineChart |
 | **EntryTypesDonut** | Donut rozložení `typVstupu` | Recharts PieChart |
-| **ArgumentsGrid** | **Klíčová viz** — ScatterChart `smer × konzistence`, velikost = `cetnost` | Recharts ScatterChart |
+| **ArgumentsGrid** | ScatterChart `smer × konzistence`, velikost = `cetnost`, drill-down detail | Recharts ScatterChart |
 
-Sdílené barvy v `src/lib/bwmys-colors.ts` (kompozitní podle Six Hats).
+Pořadí v UI: **DecisionCompass je první** (primární „kde rozhodnutí stojí"), ostatní jsou drill-down detaily.
+
+Sdílené barvy v `src/lib/bwmys-colors.ts`:
+- `HAT_COLORS` (s klíči `bily`/`cerveny`/...) pro SixHatsRadar a interní mapping
+- `COMPASS_HAT_COLORS` (s klíči `fakta`/`emoce`/...) — sytější varianty pro fill bodu na světlém SVG (Decision Compass spec)
+
+### DecisionCompass — mapování dat na souřadnice
+
+ViewBox `0 0 680 600`. Argumenty se mapují:
+
+| Atribut | Mapování | Rozsah |
+|---|---|---|
+| Pozice X | `340 + smer * 300` | 40 (proti) až 640 (pro) |
+| Pozice Y | `300 + (0.5 - konzistence) * 480` | 60 (signál nahoře) až 540 (šum dole) |
+| Velikost (r) | `min(32, 10 + cetnost * 2)` | 12 (1×) až 32 (12×+) |
+| Fill | `COMPASS_HAT_COLORS[klobouk]` | per Six Hats |
+| Opacity | `konz > 0.5 ? 0.85 : 0.50` | signal/šum |
+| Stroke | `konz > 0.5 ? solid : dashed (2 2)` | signal/šum |
+| Group opacity | `konz > 0.5 ? 1.0 : 0.55` | signal/šum |
+
+**4 kvadranty:**
+- **SZ** (smer<0, konz>0.5) — silný signál PROTI (konzistentní napříč náladami)
+- **SV** (smer>0, konz>0.5) — silný signál PRO
+- **JZ** (smer<0, konz<0.5) — šum strach (jen v náladě 1–2)
+- **JV** (smer>0, konz<0.5) — šum euforie (jen v náladě 4–5)
+
+**Centrum kompasu** — verdikt:
+| `decision.status` | Text | Barva |
+|---|---|---|
+| `aktivni` | „verdikt: čeká" | terakota `#A0522D` |
+| `uzavrene_jdu` | „verdikt: jdu" | zelená `#0F6E56` |
+| `uzavrene_nejdu` | „verdikt: nejdu" | růžová `#993556` |
+| `odlozene` | „verdikt: odložit" | amber `#854F0B` |
+| `archivovane` | „verdikt: archiv" | šedá `#5C5650` |
+
+**Subtext „opřený o ..."** — kvadrant s nejvyšší váhou. Váha = `Σ cetnost × |smer|` napříč signál argumenty (konz > 0.5). Pokud max < 5 → „slabý signál".
+
+Spec: [`zadani-decision-compass.pdf`](/Users/petrperina/Downloads/zadani-decision-compass.pdf) (květen 2026).
 
 ---
 

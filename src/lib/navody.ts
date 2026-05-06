@@ -385,18 +385,27 @@ Mám CPTSD — emocionální rozhodování v jeden moment je past. Potřebuju st
       co_umi: `
 - 5 AI promptů: varianty, mini-tick, finální, klasifikace úhlů, extrakce argumentů
 - Audio recording entries (Stage 1 Flash + Stage 2 metadata)
-- Cron-driven daily processing
-- Rich vizualizace přes Recharts
-- Reopening — pokud změním názor po závěru, můžu znovu otevřít
+- Cron-driven daily processing (\`bwmys-tick\` denně 7:10)
+- 5 vizualizačních vrstev:
+  - **Decision Compass** (primární, NOVÉ 2026-05-06) — SVG kompas se 4 kvadranty (silný signál PRO/PROTI nahoře, šum strach/euforie dole) + verdikt v centru s labelem "opřený o sever/východ/jih/západ"
+  - SixHatsRadar — kolik zápisů v každé Six Hats kategorii
+  - MoodCurve — křivka nálad v čase
+  - EntryTypesDonut — distribuce \`typVstupu\`
+  - ArgumentsGrid — drill-down ScatterChart \`smer × konzistence\`
+- Reopening — pokud změním názor po závěru, můžu znovu otevřít (s explicitním "novým faktem")
+- Doplněk 2: \`stavSystemu\` (aktivovaný/stažený/klidný) blokuje uzávěr v afektu — nabídne odložení o 48 h
       `,
       co_neumi: `
 - Multi-user pro sdílená rozhodnutí (single-user)
 - Export verdiktu jako PDF
+- Drag-and-drop reorder argumentů
       `,
       napojeni: `
-- **Ozvěna pattern** — Stage 1+2 audio
-- **Cron scheduler** \`/api/cron/scheduler\`
-- Lib \`src/lib/bwmys-ai.ts\` + komponenta \`BwMysViz\`
+- **Ozvěna pattern** — Stage 1+2 audio pro entries
+- **Cron scheduler** \`/api/cron/scheduler\` → \`bwmys-tick\`
+- Lib \`src/lib/bwmys-ai.ts\` (5 promptů) + \`src/lib/bwmys-colors.ts\` (HAT_COLORS + COMPASS_HAT_COLORS)
+- Komponenty \`src/components/BwMysViz/\` (DecisionCompass, SixHatsRadar, MoodCurve, EntryTypesDonut, ArgumentsGrid)
+- Detailní metodologie: [INSTRUKCE/BWMYS-METODOLOGIE.md](#) (frameworky de Bono, Klein, Kahneman, Welch, Heath bros, Porges, Bezos)
       `,
     },
   },
