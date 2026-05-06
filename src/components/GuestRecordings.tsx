@@ -37,18 +37,24 @@ function fmtDuration(sec: number | null): string {
   return `${m} min ${s} s`;
 }
 
-export default function GuestRecordings({ recordings }: { recordings: Recording[] }) {
+export default function GuestRecordings({
+  recordings,
+  heading = "Tvé poslední záznamy",
+  subtitle = "Klikni na záznam pro zobrazení kompletního přepisu — ať víš, kde jsi skončil.",
+}: {
+  recordings: Recording[];
+  heading?: string;
+  subtitle?: string;
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
 
   return (
     <section className="mt-8">
       <div className="flex items-center gap-2 mb-3 px-1">
         <FileText className="size-4 text-[var(--tint-lavender)]" />
-        <h2 className="font-serif text-lg tracking-tight">Tvé poslední záznamy</h2>
+        <h2 className="font-serif text-lg tracking-tight">{heading}</h2>
       </div>
-      <p className="text-xs text-muted-foreground mb-3 px-1">
-        Klikni na záznam pro zobrazení kompletního přepisu — ať víš, kde jsi skončil.
-      </p>
+      <p className="text-xs text-muted-foreground mb-3 px-1">{subtitle}</p>
 
       <div className="space-y-2">
         {recordings.map((r) => {

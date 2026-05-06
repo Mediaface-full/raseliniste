@@ -1,6 +1,7 @@
 ---
 import Shell from "../../layouts/Shell.astro";
 import StudnaList from "../../components/StudnaList";
+import GuestRecordings from "../../components/GuestRecordings";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 
@@ -12,6 +13,32 @@ const user = await prisma.user.findUnique({
   select: { username: true },
 });
 if (!user) return Astro.redirect("/login");
+
+// Posledních 5 záznamů napříč všemi Prskavkovými projekty (isPrivate=true)
+// které vlastní Petr. Petr chce vidět kde skončil v každém kreativním projektu.
+const recs = await prisma.projectRecording.findMany({
+  where: { project: { userId: session.uid, isPrivate: true } },
+  orderBy: { createdAt: "desc" },
+  take: 5,
+  select: {
+    id: true,
+    type: true,
+    status: true,
+    audioDurationSec: true,
+    transcript: true,
+    createdAt: true,
+    project: { select: { name: true } },
+  },
+});
+const recentRecordings = recs.map((r) => ({
+  id: r.id,
+  projectName: r.project.name,
+  type: r.type,
+  status: r.status,
+  durationSec: r.audioDurationSec,
+  transcript: r.transcript,
+  createdAt: r.createdAt.toISOString(),
+}));
 ---
 
 <Shell
@@ -21,4 +48,12 @@ if (!user) return Astro.redirect("/login");
   breadcrumb={[{ label: "Prskavka" }]}
 >
   <StudnaList client:load mode="prskavka" />
+  {recentRecordings.length > 0 && (
+    <GuestRecordings
+      client:load
+      recordings={recentRecordings}
+      heading="Posledních 5 záznamů"
+      subtitle="Klikni na záznam pro plný přepis — kde jsi skončil."
+    />
+  )}
 </Shell>

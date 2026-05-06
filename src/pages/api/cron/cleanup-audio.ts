@@ -19,9 +19,11 @@ export const prerender = false;
  *     * isPinned = false
  *     * createdAt < now - 14 dní
  *     * audioPath != null (ještě tam je)
+ *     * projekt NENÍ Prskavka (isPrivate=false) — Prskavkové audio zůstává navždy
  *     * pozvánka (projekt × host) NEMÁ keepAudio=true
  *   - Transkripty + analýza zůstávají v DB navždy
  *   - Briefy se nemažou nikdy
+ *   - Prskavka (isPrivate=true): audio zůstává natrvalo, mizí jen při smazání projektu
  *   - Hosti s keepAudio=true: audio zůstává natrvalo (per-projekt nastavení)
  */
 
@@ -42,6 +44,10 @@ export const POST: APIRoute = async ({ request }) => {
       isPinned: false,
       createdAt: { lt: cutoff },
       audioPath: { not: null },
+      // Prskavka (isPrivate=true) je Petrův osobní kreativní prostor — audio
+      // se nemaže automaticky, jen při smazání projektu. Cleanup se týká jen
+      // sdílené Studánky (isPrivate=false).
+      project: { isPrivate: false },
     },
     select: { id: true, audioPath: true, projectId: true, guestUserId: true },
   });
