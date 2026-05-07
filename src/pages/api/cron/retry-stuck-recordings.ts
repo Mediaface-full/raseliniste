@@ -11,16 +11,20 @@ export const prerender = false;
  * Auth: x-cron-key
  * Schedule: každých 15 min
  *
- * Najde recordings ve stavu "processing" starší než 10 min — ty pravděpodobně
- * uvázly při restartu kontejneru uprostřed AI processingu (fire-and-forget
- * Promise umřela). Spustí processing znovu z uloženého audia.
+ * Chytá DVA případy:
+ *  1) status="processing" starší 10 min — uvázly při restartu kontejneru,
+ *     fire-and-forget Promise umřela
+ *  2) status="error" mladší než MAX_AGE_FOR_ERROR_RETRY — Gemini timeout,
+ *     JSON parse selhal, etc. Reálné erory automaticky retry-ujeme jednou
+ *     za hodinu (cron 15 min × ERROR_RETRY_INTERVAL_MIN), ale max do 24 h
+ *     stáří, pak je necháme být (skutečně rozbitý záznam).
  *
- * Bezpečné — pokud je kontejner uvnitř právě skutečně processing (pomalý
- * brief), 10 min stačí na to aby Stage 1 doběhl. Reálná doba processing
- * pro 90 min audio je 2-5 min.
+ * Spustí processing znovu z uloženého audia.
  */
 const STUCK_THRESHOLD_MIN = 10;
-const MAX_RETRIES_PER_RUN = 5;
+const ERROR_RETRY_INTERVAL_MIN = 60;        // retry erroru max 1× za hodinu
+const ERROR_MAX_AGE_HOURS = 24;             // po 24 h už neretry-ujeme
+const MAX_RETRIES_PER_RUN = 8;
 
 export const POST: APIRoute = async ({ request }) => {
   const secret = env.CRON_SECRET;
@@ -29,12 +33,21 @@ export const POST: APIRoute = async ({ request }) => {
     return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const cutoff = new Date(Date.now() - STUCK_THRESHOLD_MIN * 60 * 1000);
+  const now = Date.now();
+  const stuckCutoff = new Date(now - STUCK_THRESHOLD_MIN * 60 * 1000);
+  const errorRetryCutoff = new Date(now - ERROR_RETRY_INTERVAL_MIN * 60 * 1000);
+  const errorMaxAge = new Date(now - ERROR_MAX_AGE_HOURS * 60 * 60 * 1000);
 
   const stuck = await prisma.projectRecording.findMany({
     where: {
-      status: "processing",
-      createdAt: { lt: cutoff },
+      OR: [
+        // Případ 1: processing > 10 min
+        { status: "processing", createdAt: { lt: stuckCutoff } },
+        // Případ 2: error mladší 24 h, neaktualizovaný posledních 60 min
+        // (`updatedAt` se updatuje při každém update, takže poslední retry pokus
+        // se přepne sem. 60 min cooldown brání busy-loop kdy Gemini stále padá.)
+        { status: "error", createdAt: { gt: errorMaxAge }, updatedAt: { lt: errorRetryCutoff } },
+      ],
     },
     include: {
       project: { select: { description: true, studnaStandardPrompt: true, studnaBriefPrompt: true, analysisModel: true } },
@@ -68,6 +81,12 @@ export const POST: APIRoute = async ({ request }) => {
 
     try {
       const audio = await readUpload(r.audioPath);
+      // Reset stavu na processing — bumpne updatedAt, takže nový error retry
+      // přijde nejdřív za ERROR_RETRY_INTERVAL_MIN. UI ukáže loader.
+      await prisma.projectRecording.update({
+        where: { id: r.id },
+        data: { status: "processing", processingError: null },
+      });
       // Fire-and-forget — vyhodnotí se na pozadí, cron neblokujeme
       void processRecording({
         recordingId: r.id,

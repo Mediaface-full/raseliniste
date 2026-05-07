@@ -40,13 +40,20 @@ function fmtDuration(sec: number | null): string {
 export default function GuestRecordings({
   recordings,
   heading = "Tvé poslední záznamy",
-  subtitle = "Klikni na záznam pro zobrazení kompletního přepisu — ať víš, kde jsi skončil.",
+  subtitle = "Klikni na záznam pro zobrazení kompletního přepisu — ať už víš, kde jsi skončil.",
+  hideErrors = false,
 }: {
   recordings: Recording[];
   heading?: string;
   subtitle?: string;
+  /** Pokud true, error záznamy se hostovi vůbec nezobrazí (na /me/<token>).
+      Petr je na svých stránkách (Prskavka, Studna admin) má vidět. */
+  hideErrors?: boolean;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const visible = hideErrors ? recordings.filter((r) => r.status !== "error") : recordings;
+
+  if (visible.length === 0) return null;
 
   return (
     <section className="mt-8">
@@ -57,7 +64,7 @@ export default function GuestRecordings({
       <p className="text-xs text-muted-foreground mb-3 px-1">{subtitle}</p>
 
       <div className="space-y-2">
-        {recordings.map((r) => {
+        {visible.map((r) => {
           const isOpen = openId === r.id;
           const isProcessing = r.status === "processing";
           const isError = r.status === "error";

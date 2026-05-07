@@ -234,8 +234,16 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
     }
   }
 
+  // Poslední záznam — preview pro hlavičku
+  const lastRec = project.recordings.find((r) => r.status === "processed");
+
   return (
     <div className="space-y-4">
+      {/* Poslední záznam — preview */}
+      {lastRec && (
+        <LastRecordingPreview recording={lastRec} />
+      )}
+
       {/* Inline recorder — nahrávej rovnou bez odchodu na /studna/nahravka */}
       <OwnerRecorder
         ownerName={ownerName}
@@ -246,6 +254,9 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
 
       {/* Admin-only: vložit hotový text (zápis schůzky) bez nahrávky */}
       <TextInputCard projectId={project.id} onSuccess={onRefresh} />
+
+      {/* Zeptat se projektu — AI dotaz nad všemi záznamy */}
+      <ProjectAskCard projectId={project.id} recordingsCount={project.recordings.filter((r) => r.status === "processed").length} />
 
       {project.recordings.length === 0 ? (
         <div className="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
@@ -285,11 +296,16 @@ function RecordingCard({
   onDelete: () => void;
   onMarkError: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [showAudio, setShowAudio] = useState(false);
   const created = new Date(recording.createdAt);
   const tint = recording.type === "BRIEF" ? "mint" : "butter";
   const a = recording.analysis ?? {};
+  const summarySnippet =
+    typeof a?.summary === "string" && a.summary.trim()
+      ? a.summary.trim().slice(0, 140) + (a.summary.length > 140 ? "…" : "")
+      : (recording.transcript ?? "").trim().slice(0, 140);
 
   return (
     <div
@@ -350,8 +366,30 @@ function RecordingCard({
             {a.sentiment && ` · ${a.sentiment}`}
           </div>
 
+          {/* Collapsed preview — krátký řádek + tlačítko rozbalit */}
+          {recording.status === "processed" && !expanded && summarySnippet && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="mt-2 w-full text-left text-sm text-muted-foreground hover:text-foreground flex items-start gap-2 group"
+              title="Rozbalit záznam"
+            >
+              <ChevronRight className="size-4 mt-0.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-transform" />
+              <span className="line-clamp-2 leading-relaxed italic">{summarySnippet}</span>
+            </button>
+          )}
+          {recording.status === "processed" && expanded && (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="mt-2 inline-flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            >
+              <ChevronDown className="size-3" /> sbalit záznam
+            </button>
+          )}
+
           {/* Strukturovaný rozbor */}
-          {recording.status === "processed" && a && (
+          {expanded && recording.status === "processed" && a && (
             <div className="mt-3 space-y-2.5">
               {/* Témata */}
               {Array.isArray(a.key_themes) && a.key_themes.length > 0 && (
@@ -1532,6 +1570,228 @@ function FilesTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: (
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// LastRecordingPreview — kompaktní karta v hlavičce záložky Záznamy
+// =============================================================================
+function LastRecordingPreview({ recording }: { recording: ProjectDetail["recordings"][number] }) {
+  const created = new Date(recording.createdAt);
+  const a = recording.analysis ?? {};
+  const snippet =
+    typeof a?.summary === "string" && a.summary.trim()
+      ? a.summary.trim().slice(0, 220) + (a.summary.length > 220 ? "…" : "")
+      : (recording.transcript ?? "").trim().slice(0, 220);
+
+  return (
+    <div
+      className="glass-subtle rounded-xl p-3 flex items-start gap-3"
+      style={{ borderLeft: "3px solid var(--tint-mint)" }}
+    >
+      <div
+        className="size-8 rounded-md grid place-items-center shrink-0 mt-0.5"
+        style={{ background: "color-mix(in oklch, var(--tint-mint) 15%, transparent)" }}
+      >
+        {recording.type === "BRIEF" ? (
+          <FileAudio2 className="size-4 text-[var(--tint-mint)]" />
+        ) : (
+          <AudioLines className="size-4 text-[var(--tint-mint)]" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
+            poslední záznam
+          </span>
+          <span className="text-xs font-mono">
+            {created.toLocaleString("cs-CZ", { timeZone: "Europe/Prague", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </span>
+          <span className="text-xs font-mono text-muted-foreground">·</span>
+          <span className="text-xs font-medium">{recording.authorName}</span>
+        </div>
+        {snippet && (
+          <p className="text-sm text-foreground/85 mt-1 leading-relaxed line-clamp-2">{snippet}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// ProjectAskCard — AI Q&A nad všemi přepisy projektu
+// =============================================================================
+function ProjectAskCard({ projectId, recordingsCount }: { projectId: string; recordingsCount: number }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [estimate, setEstimate] = useState<{
+    inputTokens: number;
+    cost: { totalUsd: number };
+    humanReadable: string;
+    recordings: number;
+  } | null>(null);
+  const [busy, setBusy] = useState<"estimate" | "ask" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<string | null>(null);
+
+  async function fetchEstimate() {
+    setError(null);
+    setBusy("estimate");
+    try {
+      const res = await fetch(`/api/studna/${projectId}/ask?q=${encodeURIComponent(q.trim())}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Odhad selhal.");
+        return;
+      }
+      setEstimate({
+        inputTokens: data.estimate.inputTokens,
+        cost: { totalUsd: data.estimate.cost.totalUsd },
+        humanReadable: data.estimate.humanReadable,
+        recordings: data.estimate.recordings,
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function ask() {
+    setError(null);
+    setAnswer(null);
+    setBusy("ask");
+    try {
+      const res = await fetch(`/api/studna/${projectId}/ask`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ q: q.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Dotaz selhal.");
+        return;
+      }
+      setAnswer(data.answer);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (recordingsCount === 0) return null;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full glass rounded-xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors"
+        style={{ ["--c" as string]: "var(--tint-lavender)", borderStyle: "dashed" }}
+      >
+        <Sparkles className="size-4 text-[var(--tint-lavender)]" />
+        Zeptat se projektu (AI nad {recordingsCount} záznamy)
+      </button>
+    );
+  }
+
+  return (
+    <div className="glass rounded-xl p-4 space-y-3" style={{ ["--c" as string]: "var(--tint-lavender)" }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 text-[var(--tint-lavender)]" />
+          <span className="font-serif text-base">Zeptat se projektu</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setQ(""); setEstimate(null); setAnswer(null); setError(null); }}
+          className="text-muted-foreground hover:text-foreground text-xs"
+        >
+          zavřít
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        AI (Gemini Pro) si přečte všech {recordingsCount} přepisů + souhrnů a odpoví na tvou otázku.
+        Cenu odhadneme předem.
+      </p>
+
+      <textarea
+        value={q}
+        onChange={(e) => { setQ(e.target.value); setEstimate(null); setAnswer(null); }}
+        placeholder="Napiš otázku — třeba: Co Radek říkal o financích? Kolik je tam zmínek o Mortykovi? Shrň pro mě klíčová rozhodnutí z briefů."
+        rows={3}
+        className="w-full rounded-md bg-black/30 border border-white/10 p-3 text-sm leading-relaxed focus:outline-none focus:border-[var(--tint-lavender)]/40 resize-y min-h-[80px]"
+        disabled={busy !== null}
+      />
+
+      {error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      {estimate && !answer && (
+        <div
+          className="rounded-md px-3 py-2 text-xs space-y-1"
+          style={{
+            background: "color-mix(in oklch, var(--tint-butter) 8%, transparent)",
+            border: "1px solid color-mix(in oklch, var(--tint-butter) 25%, transparent)",
+          }}
+        >
+          <div className="font-mono">
+            Odhad: <strong>{estimate.inputTokens.toLocaleString("cs-CZ")}</strong> input tokenů ·
+            cena <strong>{estimate.humanReadable}</strong>
+          </div>
+          <div className="text-muted-foreground">
+            (kontext: {estimate.recordings} záznamů, output max 4 000 tokenů ≈ $0.04)
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {!estimate && !answer && (
+          <Button
+            onClick={fetchEstimate}
+            disabled={busy !== null || q.trim().length < 3}
+            variant="outline"
+          >
+            {busy === "estimate" ? <Loader2 className="animate-spin" /> : <Sparkles />}
+            Spočítat cenu
+          </Button>
+        )}
+        {estimate && !answer && (
+          <Button onClick={ask} disabled={busy !== null}>
+            {busy === "ask" ? <Loader2 className="animate-spin" /> : <Send />}
+            Spustit dotaz ({estimate.humanReadable})
+          </Button>
+        )}
+        {(estimate || answer) && (
+          <Button variant="ghost" onClick={() => { setEstimate(null); setAnswer(null); }}>
+            Vyčistit
+          </Button>
+        )}
+      </div>
+
+      {answer && (
+        <div className="rounded-md p-4 space-y-2 mt-3"
+          style={{
+            background: "color-mix(in oklch, var(--tint-lavender) 8%, transparent)",
+            border: "1px solid color-mix(in oklch, var(--tint-lavender) 25%, transparent)",
+          }}
+        >
+          <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground mb-1">
+            Odpověď
+          </div>
+          <div className="text-sm leading-relaxed whitespace-pre-wrap">{answer}</div>
+          <div className="pt-2 border-t border-white/5 flex items-center justify-end gap-2 text-[11px] font-mono text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(answer).catch(() => null)}
+              className="hover:text-foreground inline-flex items-center gap-1"
+            >
+              <Copy className="size-3" /> Zkopírovat
+            </button>
+          </div>
         </div>
       )}
     </div>
