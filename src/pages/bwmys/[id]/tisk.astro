@@ -110,25 +110,7 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
 
     {lastFinal ? (
       <>
-        {/* GRAFY — primární vizuální shrnutí */}
-        <section class="section break-after-section">
-          <h2 class="section-title">Vizuální přehled</h2>
-          <BwMysPrintViz
-            client:load
-            entries={decision.entries.map((e) => ({
-              datum: e.datum.toISOString(),
-              nalada: e.nalada,
-              typVstupu: e.typVstupu,
-              uhelPohledu: e.uhelPohledu,
-              uhelPohleduAi: e.uhelPohleduAi ?? null,
-              obsah: e.obsah,
-            }))}
-            args={(args as any) ?? []}
-            decisionStatus={decision.status}
-          />
-        </section>
-
-        {/* H — VERDIKT (nejdřív, nejdůležitější) */}
+        {/* H — VERDIKT na stránce 1 (nahoře, hned po zarámování) */}
         {H && (
           <section class="section break-inside-avoid verdict-section" style={`border-left: 4px solid ${statusInfo.color};`}>
             <h2 class="section-title">H · Verdikt</h2>
@@ -155,9 +137,27 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
           </section>
         )}
 
+        {/* GRAFY — vlastní stránka */}
+        <section class="section page-break-before">
+          <h2 class="section-title">Vizuální přehled</h2>
+          <BwMysPrintViz
+            client:load
+            entries={decision.entries.map((e) => ({
+              datum: e.datum.toISOString(),
+              nalada: e.nalada,
+              typVstupu: e.typVstupu,
+              uhelPohledu: e.uhelPohledu,
+              uhelPohleduAi: e.uhelPohleduAi ?? null,
+              obsah: e.obsah,
+            }))}
+            args={(args as any) ?? []}
+            decisionStatus={decision.status}
+          />
+        </section>
+
         {/* A — STATISTIKA */}
         {A && (
-          <section class="section break-inside-avoid">
+          <section class="section break-inside-avoid page-break-before">
             <h2 class="section-title">A · Statistika sběru</h2>
             <div class="stats-grid">
               <div class="stat-cell"><div class="stat-num">{A.pocetZapisu}</div><div class="stat-label">zápisů</div></div>
@@ -188,9 +188,9 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
           </section>
         )}
 
-        {/* C — SIGNAL/ŠUM */}
+        {/* C — SIGNAL/ŠUM (vlastní stránka s D, E) */}
         {C && (
-          <section class="section break-inside-avoid">
+          <section class="section break-inside-avoid page-break-before">
             <h2 class="section-title">C · Signál a šum</h2>
             <div class="three-col">
               <div class="signal-box ok">
@@ -232,9 +232,9 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
           </section>
         )}
 
-        {/* F — WRAP CHECK */}
+        {/* F — WRAP CHECK (vlastní stránka s G) */}
         {F && (
-          <section class="section break-inside-avoid">
+          <section class="section break-inside-avoid page-break-before">
             <h2 class="section-title">F · Wrap Check (Heath bros)</h2>
             <dl class="wrap-list">
               <dt>Reálně víc variant?</dt><dd>{F.realneViceVariant}</dd>
@@ -276,9 +276,9 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
           </section>
         )}
 
-        {/* MŘÍŽKA ARGUMENTŮ */}
+        {/* MŘÍŽKA ARGUMENTŮ — vlastní stránka, header se opakuje při page break */}
         {args.length > 0 && (
-          <section class="section">
+          <section class="section page-break-before">
             <h2 class="section-title">Mřížka argumentů ({args.length})</h2>
             <table class="args-table">
               <thead>
@@ -328,9 +328,9 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
       </section>
     )}
 
-    {/* TIMELINE — kompaktní souhrn všech zápisů */}
+    {/* TIMELINE — kompaktní souhrn všech zápisů, vlastní stránka */}
     {decision.entries.length > 0 && (
-      <section class="section">
+      <section class="section page-break-before">
         <h2 class="section-title">Časová osa zápisů ({decision.entries.length})</h2>
         <div class="entries-list">
           {decision.entries.map((e) => (
@@ -709,6 +709,44 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
       margin: 12mm 10mm;
     }
 
+    /* Page-break třídy fungují i mimo @media print (pro print preview konzistentní) */
+    .page-break-before {
+      break-before: page;
+      page-break-before: always;
+    }
+
+    .break-inside-avoid {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    /* Tabulka argumentů — header se opakuje na každé stránce, řádky se nelámou */
+    .args-table { page-break-inside: auto; }
+    .args-table thead {
+      display: table-header-group; /* repeat on each page */
+    }
+    .args-table tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .args-table tbody tr td { break-inside: avoid; }
+
+    /* Recharts SVG fix — print preview musí mít explicit dimensions, žádný % */
+    .print-viz-wrap .recharts-wrapper,
+    .print-viz-wrap .recharts-surface {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .print-viz-wrap .recharts-responsive-container {
+      min-width: 0 !important;
+      min-height: 0 !important;
+    }
+
+    .page-section {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
     @media print {
       :global(html), :global(body) {
         background: white !important;
@@ -721,17 +759,37 @@ const printAuto = Astro.url.searchParams.get("print") === "1";
         font-size: 9.5pt;
       }
       .toolbar { display: none !important; }
-      .section, .verdict-section, .pro-box, .proti-box, .preklopit-box,
-      .stat-cell, .hat-card, .signal-box, .horizon-box, .kontext-pill,
-      .status-badge, .klobouk-pill, .bar, .warning, .premortem-list li::before {
+
+      /* Zachovat barvy všude — Chrome/Safari potřebují explicit pravidlo per element */
+      *, *::before, *::after {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      .break-inside-avoid {
+
+      /* Klíčové: anti-orphan u sekcí — nadpis nesmí osiřet od obsahu */
+      .section-title {
+        break-after: avoid;
+        page-break-after: avoid;
+      }
+
+      /* Glass-style boxy — odstranit shadow v tisku (tiskárna by je rasterizovala) */
+      .section { box-shadow: none; }
+
+      /* Vyhladit lámání barevných boxů v Six Hats / Verdict */
+      .verdict-section, .pro-box, .proti-box, .preklopit-box,
+      .stat-cell, .hat-card, .signal-box, .horizon-box,
+      .kontext-pill, .status-badge, .klobouk-pill, .bar, .warning,
+      .premortem-list li::before {
         break-inside: avoid;
         page-break-inside: avoid;
       }
-      .section { box-shadow: none; }
+
+      /* Recharts svg — držet barvy + plné velikosti */
+      .recharts-wrapper, .recharts-surface, svg {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      svg text { fill: inherit; }
     }
 
     .print\:hidden {}
