@@ -669,6 +669,14 @@ function UploadAudioGuestButton({
           {error}
         </div>
       )}
+      <a
+        href="/help/upload-audio"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block mt-2 text-center text-[11px] font-mono text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+      >
+        Nevíš jak na to? Otevři návod →
+      </a>
     </div>
   );
 }

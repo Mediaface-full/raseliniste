@@ -1953,6 +1953,14 @@ function UploadAudioCard({ projectId, onSuccess }: { projectId: string; onSucces
           {error}
         </div>
       )}
+      <a
+        href="/help/upload-audio"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[11px] font-mono text-muted-foreground hover:text-foreground underline-offset-2 hover:underline self-start"
+      >
+        Návod pro hosty (pro sdílení) →
+      </a>
     </div>
   );
 }

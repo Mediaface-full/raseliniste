@@ -1,0 +1,468 @@
+---
+import Base from "../../layouts/Base.astro";
+---
+
+<Base title="Jak nahrát audio soubor · Studánka">
+  <main class="print-root">
+    {/* Toolbar — schovaný v tisku */}
+    <div class="toolbar print:hidden">
+      <a href="/" class="btn-link">← Zpět</a>
+      <button type="button" onclick="window.print()" class="btn-primary">🖨 Vytisknout / Uložit PDF</button>
+    </div>
+
+    <header class="page-header">
+      <div class="meta-strip">
+        <span class="kontext-pill">Návod pro hosty</span>
+        <span class="date-stamp">Studánka · Rašeliniště</span>
+      </div>
+      <h1 class="title">Jak nahrát audio soubor do Studánky</h1>
+      <p class="subtitle">
+        Stačí jakákoli aplikace, která umí audio uložit do souboru — typicky <strong>Voice Recorder</strong>
+        na iPhone, ale jakákoli jiná funguje stejně.
+      </p>
+    </header>
+
+    {/* === KROK 1 === */}
+    <section class="section break-inside-avoid">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h2>Nahraj nebo otevři audio záznam</h2>
+        <p>
+          Použij svou oblíbenou nahrávací aplikaci (Voice Recorder, Hlasové poznámky, Diktafon).
+          Nebo si můžeš poslat soubor z WhatsAppu, mailu — odkudkoli, co se ti uloží do Files.
+        </p>
+      </div>
+    </section>
+
+    {/* === KROK 2 === */}
+    <section class="section break-inside-avoid">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h2>Ulož ho jako soubor (NE jako přílohu mailu)</h2>
+        <p>
+          Ve Voice Recorder klikni na záznam → ikona <strong>Sdílet</strong> (čtvereček se šipkou nahoru).
+          Z dlouhého seznamu vyber <strong>JEDNU z těchto tří</strong>:
+        </p>
+
+        <table class="options">
+          <thead>
+            <tr><th>Volba</th><th>Doporučení</th><th>Proč</th></tr>
+          </thead>
+          <tbody>
+            <tr class="ok">
+              <td><strong>Save in Photo Album</strong></td>
+              <td>⭐ nejjednodušší</td>
+              <td>Soubor se uloží mezi videa v Galerii. V Studánce ho vybereš přes „Knihovna fotek".</td>
+            </tr>
+            <tr class="ok">
+              <td><strong>Save to iCloud / Save to Files</strong></td>
+              <td>⭐ nejspolehlivější</td>
+              <td>Soubor se uloží do Files (iCloud Drive). V Studánce ho najdeš v „Procházet".</td>
+            </tr>
+            <tr class="ok">
+              <td><strong>Save to Google Drive / Dropbox / OneDrive</strong></td>
+              <td>jen pokud máš apku nainstalovanou</td>
+              <td>Soubor v cloudu, dostupný odkudkoli.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="warn-box">
+          <div class="warn-title">❌ NEPOUŽÍVEJ tyto možnosti:</div>
+          <ul>
+            <li><strong>Send By Email / SMS</strong> — pošle to příjemci, ale lokálně se neuloží</li>
+            <li><strong>Send to Bluetooth / FTP / WiFi Download</strong> — pro Studánku nepoužitelné</li>
+            <li><strong>Post to YouTube / Sound Cloud</strong> — zveřejní to <em>publicky</em></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    {/* === KROK 3 === */}
+    <section class="section break-inside-avoid">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h2>Otevři pozvánku Studánky</h2>
+        <p>
+          Klikni na odkaz, který ti Gideon poslal — tvar <code>https://www.raseliniste.cz/me/…</code>.
+        </p>
+      </div>
+    </section>
+
+    {/* === KROK 4 === */}
+    <section class="section break-inside-avoid">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h2>Klikni na „📎 Nahrát audio soubor"</h2>
+        <p>
+          Lavender tlačítko pod hlavním nahrávacím kruhem.
+        </p>
+      </div>
+    </section>
+
+    {/* === KROK 5 === */}
+    <section class="section break-inside-avoid">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h2>Telefon ti nabídne, odkud chceš soubor vybrat</h2>
+        <p>Nabídka se liší podle toho, kam jsi v kroku 2 uložil:</p>
+        <ul>
+          <li><strong>Save in Photo Album</strong> → zvol <em>„Knihovna fotek"</em> a vyber záznam</li>
+          <li><strong>Save to Files / iCloud</strong> → zvol <em>„Procházet"</em> → najdi soubor v „Recently" nebo v iCloud Drive</li>
+          <li><strong>Google Drive / Dropbox</strong> → tvoje cloudová apka tam bude jako další volba</li>
+        </ul>
+      </div>
+    </section>
+
+    {/* === KROK 6 === */}
+    <section class="section break-inside-avoid">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <h2>Klepni na soubor</h2>
+        <p>
+          Upload se spustí automaticky. Vidíš progress bar (% kolik se nahrálo).
+        </p>
+      </div>
+    </section>
+
+    {/* === KROK 7 === */}
+    <section class="section break-inside-avoid">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <h2>Hotovo</h2>
+        <p>
+          Po nahrání ti Studánka řekne <em>„Hotovo"</em>. Soubor se uložil, <strong>přepis do textu</strong>
+          se připraví na pozadí — vrátíš se kdykoli a v seznamu svých záznamů uvidíš plný text.
+        </p>
+      </div>
+    </section>
+
+    {/* === BLOK Co se po uploadu stane === */}
+    <section class="info-section break-inside-avoid">
+      <h2>Co se po uploadu stane</h2>
+      <table class="stages">
+        <thead><tr><th>Fáze</th><th>Co se děje</th><th>Trvání</th></tr></thead>
+        <tbody>
+          <tr><td>Upload</td><td>Audio jde z telefonu na server</td><td>~2–60 sekund</td></tr>
+          <tr><td>Přepis</td><td>AI (Gemini) si soubor poslechne a doslova ho přepíše</td><td>30 s – 5 min</td></tr>
+          <tr><td>Hotovo</td><td>V seznamu uvidíš záznam s tvým názvem souboru a plným textem</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <p class="note">
+        <strong>Jen přepis, žádná AI analýza.</strong> Tvoje audio + text Gideon najde v projektu, ale AI z toho
+        nedělá shrnutí ani extrakce — když nahráváš podcast nebo zápis schůzky, chceš jen text, ne interpretaci.
+      </p>
+    </section>
+
+    {/* === BLOK Formáty + limity === */}
+    <section class="info-section break-inside-avoid">
+      <h2>Formáty + limity</h2>
+      <div class="two-col">
+        <div>
+          <div class="kicker">Funguje</div>
+          <ul class="ok-list">
+            <li>MP3</li><li>M4A</li><li>WAV</li><li>OGG</li><li>AAC</li><li>FLAC</li><li>WebM</li>
+          </ul>
+        </div>
+        <div>
+          <div class="kicker">Limity</div>
+          <ul>
+            <li>Velikost souboru: <strong>max 500 MB</strong> (cca 6+ hodin v 128 kbps)</li>
+            <li>Počet uploadů: max 20 za hodinu</li>
+            <li>Délka audia: bez stropu — server zvládne i hodinové podcasty</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    {/* === BLOK Časté problémy === */}
+    <section class="info-section break-inside-avoid">
+      <h2>Časté problémy</h2>
+      <dl class="faq">
+        <dt>„Soubor není audio"</dt>
+        <dd>Server poznal, že to není zvuk (např. omylem fotka nebo video). V aplikaci Voice Recorder zkontroluj, že vybíráš zvukový záznam; v exportu zvol M4A nebo MP3.</dd>
+
+        <dt>„Soubor je moc velký"</dt>
+        <dd>Přes 500 MB. Buď rozsekni audio na kratší úseky v editoru, nebo re-encodni na nižší bitrate (Voice Recorder má volbu kvality).</dd>
+
+        <dt>Nahrávání trvá věčně</dt>
+        <dd>Velký soubor + slabší WiFi. Počkej. Pokud se to nepodaří, ne posílej znovu hned — zkus lepší síť.</dd>
+
+        <dt>Po uploadu nevidím přepis</dt>
+        <dd>AI ho zpracovává na pozadí — typicky 30 s až 5 min. Dej mu chvíli a obnov stránku. Pokud po 10 minutách pořád nic, napiš Gideonovi.</dd>
+      </dl>
+    </section>
+
+    <footer class="page-footer">
+      Studánka · Rašeliniště · {new Date().toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric" })}
+    </footer>
+  </main>
+
+  <style>
+    :global(body) {
+      background: white !important;
+      color: #1a1a1a !important;
+    }
+
+    .print-root {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 16mm 14mm;
+      font-family: "Geist Variable", system-ui, sans-serif;
+      font-size: 11pt;
+      line-height: 1.55;
+      color: #1a1a1a;
+      background: white;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    .btn-link {
+      color: #555;
+      text-decoration: none;
+      font-size: 13px;
+      padding: 6px 10px;
+    }
+    .btn-link:hover { background: #f3f3f3; border-radius: 4px; }
+    .btn-primary {
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      margin-left: auto;
+    }
+
+    .page-header { margin-bottom: 24pt; }
+    .meta-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 9pt;
+      color: #666;
+      margin-bottom: 8pt;
+    }
+    .kontext-pill {
+      padding: 2pt 8pt;
+      border-radius: 100px;
+      background: #E6F5EE;
+      color: #0F6E56;
+      font-weight: 500;
+    }
+    .date-stamp { margin-left: auto; font-family: ui-monospace, monospace; }
+    .title {
+      font-family: "Fraunces Variable", Georgia, serif;
+      font-size: 24pt;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0 0 6pt 0;
+      color: #1a1a1a;
+    }
+    .subtitle {
+      font-size: 12pt;
+      color: #444;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    /* Steps */
+    .section {
+      display: grid;
+      grid-template-columns: 48pt 1fr;
+      gap: 14pt;
+      margin-bottom: 16pt;
+      padding: 12pt 14pt;
+      background: #fafafa;
+      border: 1px solid #e8e8e8;
+      border-radius: 6pt;
+    }
+    .step-num {
+      width: 32pt;
+      height: 32pt;
+      border-radius: 50%;
+      background: #534AB7;
+      color: white;
+      display: grid;
+      place-items: center;
+      font-family: "Fraunces Variable", Georgia, serif;
+      font-size: 16pt;
+      font-weight: 600;
+    }
+    .step-body h2 {
+      font-family: "Fraunces Variable", Georgia, serif;
+      font-size: 14pt;
+      font-weight: 600;
+      margin: 0 0 6pt 0;
+      color: #1a1a1a;
+    }
+    .step-body p { margin: 0 0 6pt 0; }
+    .step-body p:last-child { margin-bottom: 0; }
+    .step-body ul { margin: 6pt 0 0 0; padding-left: 18pt; }
+    .step-body li { margin-bottom: 3pt; }
+    .step-body code {
+      background: #f0f0f0;
+      padding: 1pt 4pt;
+      border-radius: 3pt;
+      font-size: 9.5pt;
+    }
+
+    /* Options table */
+    .options {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8pt 0;
+      font-size: 10pt;
+    }
+    .options th, .options td {
+      padding: 6pt 8pt;
+      text-align: left;
+      border-bottom: 1px solid #e8e8e8;
+      vertical-align: top;
+    }
+    .options th {
+      background: #f0f0f0;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #555;
+      font-weight: 600;
+    }
+    .options tr.ok td { background: #fcfdfb; }
+
+    .warn-box {
+      margin: 10pt 0 0 0;
+      padding: 8pt 12pt;
+      background: #FBEAE8;
+      border-left: 3px solid #993556;
+      border-radius: 4pt;
+    }
+    .warn-title {
+      font-weight: 600;
+      color: #993556;
+      margin-bottom: 4pt;
+      font-size: 10pt;
+    }
+    .warn-box ul { margin: 0; padding-left: 16pt; }
+    .warn-box li { font-size: 9.5pt; }
+
+    /* Info sections (po krocích) */
+    .info-section {
+      margin: 18pt 0;
+      padding: 14pt 16pt;
+      background: #FBFAF7;
+      border: 1px solid #d8d4cc;
+      border-radius: 6pt;
+    }
+    .info-section h2 {
+      font-family: "Fraunces Variable", Georgia, serif;
+      font-size: 14pt;
+      font-weight: 600;
+      margin: 0 0 10pt 0;
+      padding-bottom: 6pt;
+      border-bottom: 2px solid #1a1a1a;
+    }
+
+    .stages {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10pt;
+      margin-bottom: 8pt;
+    }
+    .stages th, .stages td {
+      padding: 5pt 8pt;
+      text-align: left;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .stages th {
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #555;
+    }
+    .note {
+      margin: 8pt 0 0 0;
+      padding: 8pt 12pt;
+      background: #E8F1FB;
+      border-left: 3px solid #185FA5;
+      border-radius: 4pt;
+      font-size: 10pt;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16pt;
+    }
+    .kicker {
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #777;
+      font-weight: 600;
+      margin-bottom: 4pt;
+      font-family: ui-monospace, monospace;
+    }
+    .two-col ul { margin: 0; padding-left: 16pt; font-size: 10pt; }
+    .ok-list li { color: #0F6E56; font-weight: 500; }
+
+    /* FAQ */
+    .faq dt {
+      font-weight: 600;
+      margin-top: 10pt;
+      color: #1a1a1a;
+    }
+    .faq dt:first-child { margin-top: 0; }
+    .faq dd {
+      margin: 4pt 0 0 0;
+      padding-left: 12pt;
+      font-size: 10pt;
+      color: #444;
+    }
+
+    .page-footer {
+      margin-top: 24pt;
+      padding-top: 10pt;
+      border-top: 1px solid #e5e5e5;
+      font-size: 8.5pt;
+      color: #aaa;
+      font-family: ui-monospace, monospace;
+      text-align: center;
+    }
+
+    /* PRINT */
+    @page { size: A4; margin: 14mm 12mm; }
+
+    .break-inside-avoid {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    @media print {
+      :global(html), :global(body) {
+        background: white !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .print-root { padding: 0; max-width: none; font-size: 10pt; }
+      .toolbar { display: none !important; }
+      *, *::before, *::after {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      h1, h2 {
+        break-after: avoid;
+        page-break-after: avoid;
+      }
+    }
+
+    .print\:hidden {}
+    @media print { .print\:hidden { display: none !important; } }
+  </style>
+</Base>
