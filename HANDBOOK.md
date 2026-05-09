@@ -4,9 +4,9 @@ Osobní informační systém Petra „Gideona" Perniy. Jeden uživatel, maximum 
 
 > **TL;DR:** Astro 6 + React 19 islands + Prisma 7 + PostgreSQL 16, běží na Synology DS718+ v Dockeru, deploy přes ghcr.io. Design **Liquid Glass** na dark navy pozadí. Login je **heslo + passkey (Touch ID)**. Jedenáct živých modulů: Capture, Úkoly, Poznámky, Deník, Zdraví, Kontakty (vCard + Google sync), Gideonův Firewall, Dopisy, Studna, **Kalendář (Google sync — fáze 1a; iCloud + rules + /quickadd ve fázi 1b)**, E-mail SMTP. AI běží na **Vertex AI** (EU region) nebo Gemini API key.
 
-> **NOVÁ SESSION:** přečti nejdřív [`INSTRUKCE/HANDOFF-2026-05-06.md`](./INSTRUKCE/HANDOFF-2026-05-06.md) — má aktuální stav, rozdělané věci a immediate next steps. Pro detailní metodologii B&W Myš viz [`INSTRUKCE/BWMYS-METODOLOGIE.md`](./INSTRUKCE/BWMYS-METODOLOGIE.md).
+> **NOVÁ SESSION:** přečti nejdřív [`INSTRUKCE/HANDOFF-2026-05-07.md`](./INSTRUKCE/HANDOFF-2026-05-07.md) — má aktuální stav, rozdělané věci a immediate next steps. Pro detailní metodologii B&W Myš viz [`INSTRUKCE/BWMYS-METODOLOGIE.md`](./INSTRUKCE/BWMYS-METODOLOGIE.md).
 
-> **Stav 2026-05-06:** přidány moduly **Návody** (`/navody`, interní wiki ke 15 modulům), **Studánka per-host keepAudio** + admin text-input pro Brief, **Prskavka audio retention navždy** + výpis 5 záznamů, **B&W Myš Decision Compass** (5. vizualizace s 4 kvadranty signál × pro/proti), **Calendar Portal fix** (modaly + tooltipy přes createPortal), **iCloud recurring jump-forward iterator fix**.
+> **Stav 2026-05-07:** přidán modul **Spíž** (`/spiz`, sdílení souborů s 14denní expirací, public `/g/<token>`), **UPLOAD recordings** (3. typ — host/admin nahrává hotová audia, jen přepis bez AI analýzy), **AI dotaz nad projektem** s token estimate, **PDF export Myší** (barevný layout s grafy + Decision Compass), **Návody modul** (`/navody`), **export přepisů .md**, **fire-and-forget napříč** (Health analýza, Studna summary, Myší vyhodnocení, audio entry — vše s 5min stale cleanup), **karty záznamů collapse-default**, **skrytí processing kolečka** (matoucí pro CPTSD).
 
 ---
 
@@ -659,6 +659,38 @@ Skupina v sidebaru, sedm podstránek:
 - `/settings/ingest` — návod pro Health Auto Export
 - `/settings/letter-senders` — odesílatelé dopisů (CRUD + logo/podpis upload + per-sender prompt + theme)
 - `/settings/tokens` — Rašeliniště API tokeny (pro iOS shortcut)
+
+### ✅ Spíž (hotovo 2026-05-07)
+- **Účel:** rychle nasdílet soubor s automatickým mazáním po 14 dnech. Petr nahraje → dostane URL → pošle komukoliv → po 14 dnech auto-delete.
+- **DB model:** `SharedFile` (token base64url 24 znaků = 144 bit entropie, originalName, mime, bytes, storagePath, expiresAt, downloadCount, lastDownloadAt). Migrace `add_shared_file`.
+- **API (owner):**
+  - POST `/api/spiz/upload` (multipart, max 500 MB) → vrátí `{ token, shareUrl, expiresAt }`. expiresAt = uploadedAt + 14 dní.
+  - GET `/api/spiz` → list ne-expirovaných souborů
+  - DELETE `/api/spiz/[id]` → manuální smazání před 14 dny (DB row + soubor na disku)
+- **API (public):**
+  - GET `/api/spiz/d/[token]` → stream s `Content-Disposition: attachment`, inkrement `downloadCount` + `lastDownloadAt` fire-and-forget; 410 pokud `expiresAt < now`
+- **Cron `cleanup-spiz`** (denně 3:10): smaže rows kde `expiresAt < now` + jejich soubory na disku
+- **Admin `/spiz`:** drag-drop nebo file picker, progress bar přes XHR upload event, po úspěchu **auto-clipboard** share URL přes `navigator.clipboard.writeText`. List posledních 14 dní s tlačítky Copy / Download / Smazat hned. Sidebar entry „Spíž" v sekci Organizace, mintová `lucide:archive`.
+- **Public `/g/[token]`:** G logo + nadpis „Vítejte ve spíži Gideona." + „Stáhněte si nasdílený soubor." + mintová karta s názvem souboru + velikost + zbývající dny + velký Download button. Patička s konkrétním datem expirace. Expirované/neexistující: „Spíž je prázdná" placeholder.
+
+### ✅ UPLOAD recordings (hotovo 2026-05-07)
+- **Účel:** host/admin nahraje hotový audio soubor (podcast, zápis schůzky, audiokniha) — JEN přepis, žádná Stage 2 AI analýza. Audio + text se uchovávají natrvalo.
+- **Schema:** rozšířen `RecordingType` enum o `UPLOAD` value. `ProjectInvitation.canUploadAudio Boolean default false`. `ProjectRecording.uploadedFilename String?` (původní jméno z disku uploadera, zobrazí se v UI místo authora). Migrace `add_upload_recording`.
+- **API:**
+  - POST `/api/studna/[id]/upload-audio` (owner) — Studánka i Prskavka, max 500 MB, mime `audio/*` whitelist
+  - POST `/api/me/[token]/upload-audio` (host) — vyžaduje `invitation.canUploadAudio=true`, jinak 403; rate limit 20/h per guest
+- **Lib:** `transcribeAudioOnly()` v `audio-transcribe.ts` — Stage 1 only, doslovný přepis bez cleanup výplňových slov, kritická pravidla přesnosti subjekt/objekt. `processUploadAudio()` v `process-recording.ts` — fire-and-forget pipeline, jen transcript+RAG indexace, žádná Stage 2 analýza.
+- **Cleanup-audio cron** přeskakuje UPLOAD type (existující filtr `type=STANDARD` to už dělá).
+- **UI:**
+  - GuestsTab StudnaDetail: nový checkbox 📎 „Upload audio" vedle „Klíčový brief" a „Zachovávat audio"
+  - InviteForm: stejný checkbox při vytváření pozvánky
+  - FeedTab StudnaDetail: nová `UploadAudioCard` (collapsible, lavender dashed) pro Petra
+  - GuestRecorder: `UploadAudioGuestButton` zobrazený jen pokud `selected.canUploadAudio`. `<input type="file" accept="audio/*">` — iOS otevře Files / iCloud / Photos / etc.
+  - `me/[token].astro`: server-side filter UPLOAD recordings — host bez `canUploadAudio` v daném projektu UPLOAD typy nevidí v top-5 listu
+  - RecordingCard: lavender tint pro UPLOAD type, Upload ikona místo AudioLines, „📎 Upload" badge, jako title `uploadedFilename` (host pozná podle filename z disku)
+- **Návod:** public stránka `/help/upload-audio` (bez auth, print-friendly) + `INSTRUKCE/UPLOAD-AUDIO-NAVOD.md` jako primární zdroj. 7 kroků step-by-step pro Voice Recorder iPhone, tabulka 3 doporučených cílů uložení (Save in Photo Album / Save to Files / Save to Cloud) + 3 zakázané (Email/Bluetooth/YouTube). Sekce „Pro Gideona — úkoly a deník" s odlišením limitů (úkoly 50 MB, deník 100 MB, Studánka 500 MB).
+- **Linky „Návod →"** v UploadAudioCard (admin) + UploadAudioGuestButton (host).
+- **Také pro Úkoly + Deník:** existující endpointy `/api/ukoly/audio` + `/api/denik/audio` byly fire-and-forget od začátku, jen UI měl skrytý file input. Teď v `DiktatRecorder` + `TaskAudioRecorder` prominentní lavender card pod mikrofonem. V boardu `/ukoly` a `/denik` druhé tlačítko 📎 Nahrát soubor → `/ozvena?mode={task,journal}&upload=1` → DiktatRecorder reaguje na `?upload=1` a auto-otevře file picker po 250 ms.
 
 ### 🔜 V plánu
 - **Capture iPhone Shortcut** — zatím v návodu, JSON body připravený

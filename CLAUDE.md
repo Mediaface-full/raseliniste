@@ -6,18 +6,24 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/HANDOFF-2026-05-06.md`** ← **PRIMÁRNÍ ZDROJ pro novou session**
-   - Calendar tooltip + Portal fix (containing block bug)
-   - iCloud RODINA recurring events fix (jump-forward iterator)
-   - Studánka per-host „Zachovávat audio" + výpis 5 záznamů pro hosta
-   - Prskavka audio retention + výpis 5 záznamů pro Petra
-   - Push + deploy instrukce
-   - Kompletní matice audio retence (Studánka × Prskavka × keepAudio × isPinned)
+1. **`INSTRUKCE/HANDOFF-2026-05-07.md`** ← **PRIMÁRNÍ ZDROJ pro novou session**
+   - Spíž — sdílení souborů s 14denní expirací
+   - UPLOAD recordings (host i admin nahraje hotové audio, jen přepis)
+   - Skrytí processing kolečka napříč Studánkou (matoucí pro CPTSD)
+   - Auto-retry erroru cron (60min cooldown)
+   - AI dotaz nad projektem s estimate před spuštěním (token cost)
+   - Karty záznamů collapse-default (šetří screen real estate)
+   - Export přepisů projektu jako .md (bez AI analýzy)
+   - PDF export Myší (krásný layout s grafy + Decision Compass)
+   - Návody modul (`/navody` — interní wiki)
+   - Návod /help/upload-audio (public + tisknutelný)
+   - Bezpečnostní audit endpointů + migrace
 2. `INSTRUKCE/PRO-CLAUDINE-COACHE.md` — kontext o Petrovi, filozofie systému
 3. `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
 4. `INSTRUKCE/05-styl-prace.md` — komunikace
-5. `INSTRUKCE/03-moduly.md` — moduly, URL, status (aktualizováno 2026-05-06)
+5. `INSTRUKCE/03-moduly.md` — moduly, URL, status (aktualizováno 2026-05-07)
 6. `INSTRUKCE/04-todo-list.md` — manuální DSM akce
+7. `HANDBOOK.md` — referenční doc (sekce „Stav 2026-05-07" v hlavičce)
 
 **Tento CLAUDE.md je z dubna 2026 a v některých detailech zastaralý** — `HANDOFF-*.md` jsou freshest.
 
@@ -25,6 +31,7 @@ Starší HANDOFFs (zaarchivovány, nečíst pro orientaci):
 - `INSTRUKCE/HANDOFF-2026-05-02-vecer.md`
 - `INSTRUKCE/HANDOFF-2026-05-03.md`
 - `INSTRUKCE/HANDOFF-2026-05-04.md`
+- `INSTRUKCE/HANDOFF-2026-05-06.md`
 - `INSTRUKCE/HANDOFF-bwmys-viz.md` (B&W myš vizualizace, dokončeno)
 
 ---

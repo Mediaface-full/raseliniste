@@ -1,6 +1,6 @@
 # 03 — Moduly (přehled)
 
-Stav 2026-05-06 (Studánka keepAudio + výpis 5 záznamů pro hosta + Prskavka audio retention). Detail jednotlivých modulů v `Návody/*.pdf`.
+Stav 2026-05-07 (Spíž modul + UPLOAD recordings + AI dotaz nad projektem + skrytí processing kolečka + PDF export Myší). Detail jednotlivých modulů v `Návody/*.pdf`.
 
 ## 🌅 Vstupní stránka
 
@@ -100,12 +100,29 @@ Stav 2026-05-06 (Studánka keepAudio + výpis 5 záznamů pro hosta + Prskavka a
 | Owner nahrávka | `/studna/nahravka` | ✅ Grid dlaždic + localStorage poslední projekt |
 | Guest landing | `/me/<token>` | ✅ public |
 
-- 4 záložky v detail: Záznamy, Hosti, Souhrny, Nastavení
-- STANDARD (Flash, max 10 min) vs BRIEF (Pro, max 90 min, file upload)
-- Two-stage AI pipeline: transcript + analysis (klíčová témata, myšlenky, otevřené otázky, sentiment)
+- 5 záložek v detail: Záznamy, Hosti, Souhrny, **Soubory** (admin přílohy PDF/XLS od 05-06), Nastavení
+- **3 typy záznamů:** STANDARD (Flash, max 10 min), BRIEF (Pro, max 90 min, file upload), **UPLOAD** (NOVÉ 05-07 — host/admin nahraje hotové audio, jen Stage 1 přepis bez Stage 2 analýzy, lavender tint, ProjectInvitation.canUploadAudio flag)
+- Two-stage AI pipeline pro STANDARD/BRIEF: transcript + analysis (klíčová témata, myšlenky, otevřené otázky, sentiment)
+- UPLOAD: jen Stage 1 (transcribeAudioOnly) — žádná analýza
 - BRIEF má navíc glossary, actors, decision_history
-- Auto-retry stuck recordings cron à 15 min
+- **Auto-retry** stuck recordings cron à 15 min — chytá processing > 10 min I error mladší 24 h s 60min cooldown (NOVÉ 05-07)
 - Manuální „Regenerovat" tlačítko pro každý záznam
+- **AI dotaz nad projektem** (NOVÉ 05-07) — `/api/studna/[id]/ask`, Gemini Pro nad všemi přepisy, GET=estimate (token cost), POST=execute. UI v záložce Záznamy.
+- **Export přepisů .md** (NOVÉ 05-07) — `/api/studna/[id]/export-transcripts` v záložce Nastavení, Markdown se všemi přepisy bez AI analýzy
+- **Karty záznamů collapse-default** (NOVÉ 05-07) — jen 2řádková preview, klik = rozbalí celý strukturovaný rozbor + transcript
+- **Skrytí processing kolečka** (NOVÉ 05-07) — host i Petr nevidí spinner, polling à 5 s tichý
+- **Návod /help/upload-audio** — public stránka pro hosty (jak nahrát soubor z Voice Recorder app)
+
+## 📦 Spíž (sdílení souborů, NOVÉ 2026-05-07)
+
+| Modul | URL | Status |
+|---|---|---|
+| Admin uploader + list | `/spiz` | ✅ Drag-drop nebo file picker, max 500 MB, auto-clipboard share URL po uploadu, list posledních 14 dní s tlačítky Copy / Download / Smazat hned |
+| Public landing | `/g/<token>` | ✅ public — G logo + „Vítejte ve spíži Gideona." + „Stáhněte si nasdílený soubor." + download button |
+
+- DB: `SharedFile` (token base64url 24 znaků = 144 bit entropie, expiresAt, downloadCount). Migrace `add_shared_file`.
+- Cron `cleanup-spiz` denně 3:10 — automatické mazání po 14 dnech (DB row + soubor na disku)
+- Žádná aplikační integrace — host dostane prostý odkaz, klikne, stáhne. Defense-in-depth: token dlouhý + 14denní auto-expire.
 
 ## ⚙️ Settings (sjednocené pod /settings landing)
 
