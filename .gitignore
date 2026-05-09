@@ -55,3 +55,4 @@ next-env.d.ts
 
 # nahrané soubory (loga, podpisy, vygenerovaná PDF)
 /uploads/
+.claude/worktrees/
