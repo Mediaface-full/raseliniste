@@ -95,14 +95,9 @@ export default function GuestRecordings({
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5 truncate">
                     {r.projectName} · {fmtDuration(r.durationSec)}
-                    {isProcessing && (
-                      <span className="ml-2 inline-flex items-center gap-1 text-[var(--tint-butter)]">
-                        <Loader2 className="size-3 animate-spin" /> zpracovává se
-                      </span>
-                    )}
-                    {isError && (
-                      <span className="ml-2 text-[var(--tint-rose)]">chyba zpracování</span>
-                    )}
+                    {/* Processing/error stav schován od uživatele (Petr 2026-05-07).
+                        Pro Petra (hideErrors=false) se error-status karta ani
+                        nezobrazí jako klikatelná, jen tichá. */}
                   </div>
                 </div>
               </button>

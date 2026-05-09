@@ -13,16 +13,19 @@ let projects: Array<{
   homeTitle: string | null;
   description: string | null;
   canRecordBrief: boolean;
+  canUploadAudio: boolean;
 }> = [];
 let recentRecordings: Array<{
   id: string;
   projectName: string;
-  type: "STANDARD" | "BRIEF";
+  type: "STANDARD" | "BRIEF" | "UPLOAD";
   status: string;
   durationSec: number | null;
   transcript: string;
   createdAt: string;
+  uploadedFilename: string | null;
 }> = [];
+let canUploadAudioAny = false;
 
 if (token) {
   const g = await prisma.guestUser.findUnique({
@@ -44,14 +47,18 @@ if (token) {
       homeTitle: inv.project.homeTitle,
       description: inv.project.description,
       canRecordBrief: inv.canRecordBrief,
+      canUploadAudio: inv.canUploadAudio,
     }));
+    canUploadAudioAny = projects.some((p) => p.canUploadAudio);
 
     // Posledních 5 vlastních nahrávek hosta napříč všemi jeho projekty.
     // Petr chce ať host vidí kde skončil — tedy plný transkript, ne AI analýzu.
+    // Pokud host nemá v žádném projektu canUploadAudio, UPLOAD typy filtrujeme.
+    const projectsWithUpload = new Set(projects.filter((p) => p.canUploadAudio).map((p) => p.id));
     const recs = await prisma.projectRecording.findMany({
       where: { guestUserId: g.id },
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: 20,
       select: {
         id: true,
         type: true,
@@ -59,10 +66,15 @@ if (token) {
         audioDurationSec: true,
         transcript: true,
         createdAt: true,
+        uploadedFilename: true,
+        projectId: true,
         project: { select: { name: true } },
       },
     });
-    recentRecordings = recs.map((r) => ({
+    const filtered = recs.filter((r) =>
+      r.type !== "UPLOAD" || projectsWithUpload.has(r.projectId),
+    ).slice(0, 5);
+    recentRecordings = filtered.map((r) => ({
       id: r.id,
       projectName: r.project.name,
       type: r.type,
@@ -70,6 +82,7 @@ if (token) {
       durationSec: r.audioDurationSec,
       transcript: r.transcript,
       createdAt: r.createdAt.toISOString(),
+      uploadedFilename: r.uploadedFilename,
     }));
 
     // Touch lastSeenAt asynchronně (fire-and-forget)

@@ -8,6 +8,7 @@ export const prerender = false;
 const PatchBody = z.object({
   canRecordBrief: z.boolean().optional(),
   keepAudio: z.boolean().optional(),
+  canUploadAudio: z.boolean().optional(),
 });
 
 export const PATCH: APIRoute = async ({ request, cookies, params }) => {
@@ -33,6 +34,7 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
   const data: Record<string, unknown> = {};
   if (body.canRecordBrief !== undefined) data.canRecordBrief = body.canRecordBrief;
   if (body.keepAudio !== undefined) data.keepAudio = body.keepAudio;
+  if (body.canUploadAudio !== undefined) data.canUploadAudio = body.canUploadAudio;
 
   const invitation = await prisma.projectInvitation.update({
     where: { projectId_guestUserId: { projectId, guestUserId: guestId } },

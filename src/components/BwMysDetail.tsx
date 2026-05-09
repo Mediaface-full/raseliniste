@@ -312,11 +312,8 @@ export default function BwMysDetail({ id }: { id: string }) {
                       · {UHEL_LABEL[e.uhelPohledu]?.label}
                     </span>
                   )}
-                  {isProcessing && (
-                    <span className="ml-auto inline-flex items-center gap-1 text-[var(--tint-butter)]">
-                      <Loader2 className="size-3 animate-spin" /> AI zpracovává…
-                    </span>
-                  )}
+                  {/* Processing kolečko schováno (Petr 2026-05-07) — matoucí.
+                      Polling à 4 s zápis automaticky doplní. */}
                   {isError && (
                     <span className="ml-auto text-[var(--tint-rose)]">
                       ⚠ chyba zpracování
@@ -373,22 +370,15 @@ export default function BwMysDetail({ id }: { id: string }) {
                 </span>
                 <span>{new Date(ev.datum).toLocaleString("cs-CZ")}</span>
                 <span className="text-xs text-muted-foreground">({ev.pocetVstupuVDobeGenerovani} zápisů)</span>
-                {isProcessing && (
-                  <span className="ml-auto inline-flex items-center gap-1 text-[var(--tint-butter)] text-xs">
-                    <Loader2 className="size-3 animate-spin" /> AI zpracovává…
-                  </span>
-                )}
+                {/* Processing kolečko schováno (Petr 2026-05-07). */}
                 {isError && (
                   <span className="ml-auto text-[var(--tint-rose)] text-xs">⚠ chyba</span>
                 )}
               </summary>
               <div className="mt-3">
                 {isProcessing ? (
-                  <div className="text-sm text-muted-foreground italic py-6 text-center flex items-center justify-center gap-2">
-                    <Loader2 className="size-4 animate-spin" />
-                    {ev.typ === "finalni"
-                      ? "Generuji finální analýzu (sekce A-H) — typicky 30-60 sekund. Můžeš zavřít stránku a vrátit se."
-                      : "Generuji průběžné zrcadlo — typicky 10-20 sekund."}
+                  <div className="text-sm text-muted-foreground italic py-4 text-center">
+                    Vyhodnocení se připravuje na pozadí. Sám se objeví, můžeš zavřít stránku.
                   </div>
                 ) : isError ? (
                   <div className="text-sm text-[var(--tint-rose)] bg-[var(--tint-rose)]/10 rounded-md px-3 py-2">

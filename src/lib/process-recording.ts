@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { transcribeAudio, analyzeTranscript, type RecordingTypeStr } from "./audio-transcribe";
+import { transcribeAudio, analyzeTranscript, transcribeAudioOnly, type RecordingTypeStr } from "./audio-transcribe";
 
 /**
  * Asynchronní AI zpracování nahrávky. Volá se fire-and-forget z upload
@@ -210,6 +210,79 @@ export async function processRecordingFromText(params: {
       } catch (updateErr) {
         console.error(`[process-recording-text] couldn't even update DB:`, updateErr);
       }
+    } finally {
+      inFlight.delete(entry);
+    }
+  })();
+
+  inFlight.add(entry);
+  return entry.promise;
+}
+
+/**
+ * Asynchronní AI zpracování UPLOAD audio recordings — pouze přepis,
+ * žádná Stage 2 strukturovaná analýza. Audio + přepis se uchovávají natrvalo.
+ */
+export async function processUploadAudio(params: {
+  recordingId: string;
+  audio: Buffer;
+  mimeType: string;
+  projectContext: string | null;
+}): Promise<void> {
+  const entry: InFlight = {
+    recordingId: params.recordingId,
+    type: "STANDARD", // diagnostic snapshot field — UPLOAD nemá vlastní typ v interfaceu
+    startedAt: Date.now(),
+    promise: Promise.resolve(),
+  };
+
+  entry.promise = (async () => {
+    try {
+      console.log(`[process-upload-audio] ${params.recordingId} start (${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB)`);
+      const result = await transcribeAudioOnly({
+        audio: params.audio,
+        mimeType: params.mimeType,
+        projectContext: params.projectContext,
+      });
+
+      await prisma.projectRecording.update({
+        where: { id: params.recordingId },
+        data: {
+          transcript: result.transcript,
+          analysis: undefined, // žádná Stage 2 — necháme null/undefined
+          status: "processed",
+          processingError: null,
+        },
+      });
+      console.log(`[process-upload-audio] ${params.recordingId} processed OK in ${Date.now() - entry.startedAt}ms`);
+
+      // RAG indexace — i UPLOAD recordings se hodí mít searchable
+      try {
+        const { indexEntity } = await import("./rag");
+        const rec = await prisma.projectRecording.findUnique({
+          where: { id: params.recordingId },
+          select: { project: { select: { userId: true } } },
+        });
+        if (rec?.project.userId && result.transcript.trim()) {
+          void indexEntity({
+            userId: rec.project.userId,
+            sourceType: "studna",
+            sourceId: params.recordingId,
+            text: result.transcript,
+          });
+        }
+      } catch (ragErr) {
+        console.warn(`[process-upload-audio] RAG index skip:`, ragErr instanceof Error ? ragErr.message : ragErr);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[process-upload-audio] ${params.recordingId} failed:`, msg);
+      try {
+        await prisma.projectRecording.update({
+          where: { id: params.recordingId },
+          data: { status: "error", processingError: msg.slice(0, 1000) },
+        });
+      } catch {}
     } finally {
       inFlight.delete(entry);
     }

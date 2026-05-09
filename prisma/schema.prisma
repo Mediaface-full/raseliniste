@@ -693,6 +693,11 @@ model ProjectInvitation {
   // Při true → cleanup-audio cron tento konkrétní pár (projekt × host) přeskočí.
   keepAudio       Boolean  @default(false)
 
+  // Per-projekt × per-host: může nahrát audio SOUBOR (MP3/M4A/...) jako UPLOAD
+  // recording. Žádná AI analýza, jen přepis. Bez tohoto flagu host neuvidí
+  // Upload tlačítko ani UPLOAD recordingy ve výpisu.
+  canUploadAudio  Boolean  @default(false)
+
   invitedAt       DateTime @default(now())
 
   @@unique([projectId, guestUserId])
@@ -725,6 +730,11 @@ model ProjectRecording {
   // čísla — věci co se hlasem zkomolí). Není to AI analyzováno, jen uloženo.
   // Nepovinné, max ~8000 znaků. Petr to vidí v detailu nahrávky.
   guestNote       String?  @db.Text
+
+  // Pro type=UPLOAD: původní filename ze stroje uploadera. V UI se zobrazuje
+  // jako název záznamu (host pozná podle filename z disku). Null pro audio
+  // záznamy nahrávané přes mikrofon (STANDARD/BRIEF).
+  uploadedFilename String?
 
   // Strukturovaný rozbor z Gemini (volné JSON pro flexibilitu)
   // {
@@ -759,6 +769,7 @@ model ProjectRecording {
 enum RecordingType {
   STANDARD       // < 10 min, Flash, audio mizí za 14 dní (pokud nepinned)
   BRIEF          // klíčový brief, Pro s deep analýzou, audio se nikdy nemaže
+  UPLOAD         // host/admin nahrál audio soubor — JEN přepis, bez Stage 2 analýzy, audio se nemaže
 }
 
 model ProjectSummary {

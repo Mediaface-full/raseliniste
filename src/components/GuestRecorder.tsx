@@ -8,6 +8,7 @@ interface Project {
   homeTitle: string | null;
   description: string | null;
   canRecordBrief: boolean;
+  canUploadAudio?: boolean;
 }
 
 type Phase = "idle" | "recording" | "uploading" | "processing" | "done" | "error";
@@ -328,6 +329,14 @@ export default function GuestRecorder({
               </button>
             )}
 
+            {selected?.canUploadAudio && (
+              <UploadAudioGuestButton
+                token={token}
+                projectId={selected.id}
+                onSuccess={() => { setPhase("done"); setTimeout(() => setPhase("idle"), 1500); }}
+              />
+            )}
+
             {/* Textový vzkaz — buď doplněk k nahrávce, nebo SAMOSTATNĚ (host
                 může poslat jen text bez audio). Lavender highlight, výrazné. */}
             <div className="w-full max-w-md mt-4 pt-4 border-t border-white/10">
@@ -565,4 +574,101 @@ function getExtensionFromMime(mime: string): string {
   if (mime.includes("wav")) return "wav";
   if (mime.includes("ogg")) return "ogg";
   return "bin";
+}
+
+/**
+ * Upload audio button pro hosty s canUploadAudio=true v invitation.
+ * MP3/M4A/WAV/... → POST /api/me/<token>/upload-audio.
+ * Žádné spinning kolečko (Petr 2026-05-07 — matoucí), jen progress bar.
+ */
+function UploadAudioGuestButton({
+  token,
+  projectId,
+  onSuccess,
+}: {
+  token: string;
+  projectId: string;
+  onSuccess: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  async function uploadFile(file: File) {
+    setError(null);
+    setUploading(true);
+    setProgress(0);
+    try {
+      const fd = new FormData();
+      fd.append("projectId", projectId);
+      fd.append("file", file);
+
+      const xhr = new XMLHttpRequest();
+      const done = new Promise<void>((resolve, reject) => {
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+        });
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              reject(new Error(data.error ?? `HTTP ${xhr.status}`));
+            } catch {
+              reject(new Error(`HTTP ${xhr.status}`));
+            }
+          }
+        });
+        xhr.addEventListener("error", () => reject(new Error("Síťová chyba")));
+        xhr.open("POST", `/api/me/${token}/upload-audio`);
+        xhr.send(fd);
+      });
+      await done;
+      onSuccess();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
+  }
+
+  return (
+    <div className="w-full max-w-md mt-3">
+      <label
+        className={`block w-full text-center py-3 rounded-md cursor-pointer transition-colors text-sm ${
+          uploading ? "cursor-not-allowed opacity-60" : "hover:bg-[var(--tint-lavender)]/[0.08]"
+        }`}
+        style={{
+          border: "1px dashed color-mix(in oklch, var(--tint-lavender) 40%, transparent)",
+          background: "color-mix(in oklch, var(--tint-lavender) 6%, transparent)",
+          color: "color-mix(in oklch, var(--tint-lavender) 92%, white)",
+        }}
+      >
+        <Upload className="size-4 inline mr-2" />
+        {uploading ? `Nahrávám soubor… ${progress}%` : "📎 Nahrát audio soubor (MP3/M4A/...)"}
+        <input
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) uploadFile(f);
+            e.target.value = "";
+          }}
+        />
+      </label>
+      {uploading && (
+        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mt-2">
+          <div className="h-full bg-[var(--tint-lavender)] transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      {error && (
+        <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 text-xs px-3 py-2 text-left">
+          {error}
+        </div>
+      )}
+    </div>
+  );
 }

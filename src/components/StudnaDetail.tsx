@@ -24,6 +24,7 @@ interface ProjectDetail {
   invitations: Array<{
     canRecordBrief: boolean;
     keepAudio: boolean;
+    canUploadAudio: boolean;
     invitedAt: string;
     guestUser: {
       id: string;
@@ -38,7 +39,7 @@ interface ProjectDetail {
     id: string;
     authorName: string;
     isOwner: boolean;
-    type: "STANDARD" | "BRIEF";
+    type: "STANDARD" | "BRIEF" | "UPLOAD";
     status: string;
     processingError: string | null;
     audioPath: string | null;
@@ -49,6 +50,7 @@ interface ProjectDetail {
     transcript: string;
     guestNote: string | null;
     createdAt: string;
+    uploadedFilename: string | null;
   }>;
   summaries: Array<{
     id: string;
@@ -255,6 +257,9 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
       {/* Admin-only: vložit hotový text (zápis schůzky) bez nahrávky */}
       <TextInputCard projectId={project.id} onSuccess={onRefresh} />
 
+      {/* Admin-only: nahrát hotový audio soubor (UPLOAD type) */}
+      <UploadAudioCard projectId={project.id} onSuccess={onRefresh} />
+
       {/* Zeptat se projektu — AI dotaz nad všemi záznamy */}
       <ProjectAskCard projectId={project.id} recordingsCount={project.recordings.filter((r) => r.status === "processed").length} />
 
@@ -300,7 +305,8 @@ function RecordingCard({
   const [showTranscript, setShowTranscript] = useState(false);
   const [showAudio, setShowAudio] = useState(false);
   const created = new Date(recording.createdAt);
-  const tint = recording.type === "BRIEF" ? "mint" : "butter";
+  const isUpload = recording.type === "UPLOAD";
+  const tint = recording.type === "BRIEF" ? "mint" : isUpload ? "lavender" : "butter";
   const a = recording.analysis ?? {};
   const summarySnippet =
     typeof a?.summary === "string" && a.summary.trim()
@@ -320,20 +326,27 @@ function RecordingCard({
             color: "var(--c)",
           }}
         >
-          {recording.type === "BRIEF" ? <FileAudio2 className="size-5" /> : <AudioLines className="size-5" />}
+          {recording.type === "BRIEF" ? <FileAudio2 className="size-5" /> : isUpload ? <Upload className="size-5" /> : <AudioLines className="size-5" />}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium">
-              {recording.authorName}
-              {recording.isOwner && <span className="ml-1 text-[10px] font-mono opacity-60">(owner)</span>}
+            <span className="font-medium truncate">
+              {isUpload && recording.uploadedFilename
+                ? recording.uploadedFilename
+                : recording.authorName}
+              {recording.isOwner && !isUpload && <span className="ml-1 text-[10px] font-mono opacity-60">(owner)</span>}
+              {isUpload && (
+                <span className="ml-1 text-[10px] font-mono opacity-60">
+                  · {recording.authorName}{recording.isOwner ? " (owner)" : ""}
+                </span>
+              )}
             </span>
             <span
               className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded"
               style={{ background: "color-mix(in oklch, var(--c) 20%, transparent)", color: "var(--c)" }}
             >
-              {recording.type === "BRIEF" ? "Brief" : "Záznam"}
+              {recording.type === "BRIEF" ? "Brief" : isUpload ? "📎 Upload" : "Záznam"}
             </span>
             {recording.isPinned && (
               <span className="text-[10px] uppercase font-mono tracking-wider text-[var(--tint-peach)] flex items-center gap-1">
@@ -343,21 +356,20 @@ function RecordingCard({
             {recording.status === "error" && (
               <span className="text-[10px] uppercase font-mono tracking-wider text-destructive">chyba zpracování</span>
             )}
+            {/* Processing stav schován od uživatele (Petr 2026-05-07) — kolečko
+                je matoucí ("můžu odejít?"). Záznam tu prostě je, polling
+                ho automaticky doplní. "zrušit" tlačítko zachované, ale
+                tiché — Petr ho najde když potřebuje. */}
             {recording.status === "processing" && (
-              <>
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground flex items-center gap-1">
-                  <Loader2 className="size-3 animate-spin" /> zpracovávám
-                </span>
-                <button
-                  type="button"
-                  onClick={onMarkError}
-                  disabled={busy}
-                  className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground hover:text-destructive underline-offset-2 hover:underline disabled:opacity-50"
-                  title="Zrušit zpracování (pokud uvázlo) — pak můžeš Regenerovat"
-                >
-                  zrušit
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={onMarkError}
+                disabled={busy}
+                className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground/40 hover:text-destructive disabled:opacity-50"
+                title="Zrušit zpracování (pokud uvázlo) — pak můžeš Regenerovat"
+              >
+                ⨯
+              </button>
             )}
           </div>
           <div className="text-xs font-mono text-muted-foreground mt-0.5">
@@ -696,6 +708,20 @@ function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: 
     }
   }
 
+  async function toggleUploadAudio(guestId: string, current: boolean) {
+    setBusy(guestId);
+    try {
+      await fetch(`/api/studna/${project.id}/invitations/${guestId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ canUploadAudio: !current }),
+      });
+      onRefresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function removeInvite(guestId: string) {
     if (!confirm("Odebrat hosta z projektu? Jeho předchozí záznamy zůstanou.")) return;
     setBusy(guestId);
@@ -778,6 +804,19 @@ function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: 
                   />
                   💾 Zachovávat audio
                 </label>
+                <label
+                  className="flex items-center gap-2 text-xs cursor-pointer select-none"
+                  title="Host může nahrávat hotové audio soubory (MP3/M4A/...). Spustí se jen přepis, žádná AI analýza. Audio + přepis se uchovávají natrvalo."
+                >
+                  <input
+                    type="checkbox"
+                    checked={inv.canUploadAudio}
+                    onChange={() => toggleUploadAudio(inv.guestUser.id, inv.canUploadAudio)}
+                    disabled={busy === inv.guestUser.id}
+                    className="size-3.5"
+                  />
+                  📎 Upload audio
+                </label>
                 <div className="flex gap-1">
                   <Button size="sm" variant="outline" onClick={() => copyLink(inv.guestUser.guestToken)}>
                     {copied === inv.guestUser.guestToken ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -824,6 +863,7 @@ function InviteForm({
   const [phone, setPhone] = useState("");
   const [canBrief, setCanBrief] = useState(false);
   const [keepAudio, setKeepAudio] = useState(false);
+  const [canUploadAudio, setCanUploadAudio] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -840,6 +880,7 @@ function InviteForm({
           phone: phone.trim() || null,
           canRecordBrief: canBrief,
           keepAudio,
+          canUploadAudio,
         }),
       });
       const data = await res.json();
@@ -866,6 +907,10 @@ function InviteForm({
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" checked={keepAudio} onChange={(e) => setKeepAudio(e.target.checked)} className="size-4" />
         💾 <strong>Zachovávat audio</strong> (audio nahrávky tohoto hosta se nemažou po 14 dnech)
+      </label>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" checked={canUploadAudio} onChange={(e) => setCanUploadAudio(e.target.checked)} className="size-4" />
+        📎 <strong>Upload audio</strong> (host smí nahrávat hotové audio soubory MP3/M4A/... — jen přepis, žádná AI analýza, audio se uchovává)
       </label>
       {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">{error}</div>}
       <div className="flex gap-2">
@@ -936,20 +981,15 @@ function SummariesTab({ project, onRefresh }: { project: ProjectDetail; onRefres
               <span className="text-[11px] font-mono text-muted-foreground ml-2">
                 {s.model} · {s.recordingsIncluded} záznamů ({s.briefsIncluded} briefů)
               </span>
-              {isProcessing && (
-                <span className="ml-auto inline-flex items-center gap-1 text-[var(--tint-butter)] text-xs">
-                  <Loader2 className="size-3 animate-spin" /> AI píše souhrn…
-                </span>
-              )}
+              {/* Processing souhrn — kolečko schováno (Petr 2026-05-07).
+                  Karta jen čeká, polling ji aktualizuje. */}
               {isError && (
                 <span className="ml-auto text-[var(--tint-rose)] text-xs">⚠ chyba</span>
               )}
             </summary>
             {isProcessing ? (
-              <div className="mt-2 text-sm text-muted-foreground italic py-4 text-center flex items-center justify-center gap-2">
-                <Loader2 className="size-4 animate-spin" />
-                Generuji souhrn projektu — Gemini Pro nad plnými transkripty,
-                typicky 30–120 s. Můžeš zavřít stránku a vrátit se.
+              <div className="mt-2 text-sm text-muted-foreground italic py-4 text-center">
+                Souhrn se připravuje na pozadí. Vrať se za chvíli — sám se objeví.
               </div>
             ) : isError ? (
               <div className="mt-2 text-sm text-[var(--tint-rose)] bg-[var(--tint-rose)]/10 rounded-md px-3 py-2">
@@ -1792,6 +1832,125 @@ function ProjectAskCard({ projectId, recordingsCount }: { projectId: string; rec
               <Copy className="size-3" /> Zkopírovat
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// UploadAudioCard — admin upload audio souboru (MP3/M4A/...) jako UPLOAD recording
+// =============================================================================
+function UploadAudioCard({ projectId, onSuccess }: { projectId: string; onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  async function uploadFile(file: File) {
+    setError(null);
+    setUploading(true);
+    setProgress(0);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const xhr = new XMLHttpRequest();
+      const done = new Promise<void>((resolve, reject) => {
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+        });
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              reject(new Error(data.error ?? `HTTP ${xhr.status}`));
+            } catch {
+              reject(new Error(`HTTP ${xhr.status}`));
+            }
+          }
+        });
+        xhr.addEventListener("error", () => reject(new Error("Síťová chyba")));
+        xhr.open("POST", `/api/studna/${projectId}/upload-audio`);
+        xhr.send(fd);
+      });
+      await done;
+      onSuccess();
+      setOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full glass rounded-xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors"
+        style={{ ["--c" as string]: "var(--tint-lavender)", borderStyle: "dashed" }}
+      >
+        <Upload className="size-4 text-[var(--tint-lavender)]" />
+        Nahrát audio soubor (MP3/M4A/... — jen přepis, bez AI analýzy)
+      </button>
+    );
+  }
+
+  return (
+    <div className="glass rounded-xl p-4 space-y-3" style={{ ["--c" as string]: "var(--tint-lavender)" }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Upload className="size-4 text-[var(--tint-lavender)]" />
+          <span className="font-serif text-base">Nahrát audio soubor</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setError(null); }}
+          className="text-muted-foreground hover:text-foreground text-xs"
+          disabled={uploading}
+        >
+          zavřít
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Hotová nahrávka (podcast, zápis schůzky, audiokniha…). MP3/M4A/WAV/OGG/AAC/FLAC, max 500 MB.
+        Spustí se <strong>jen přepis</strong> — žádná AI analýza, audio + text zůstávají natrvalo.
+      </p>
+
+      <label
+        className={`block w-full text-center py-4 rounded-md cursor-pointer transition-colors ${
+          uploading ? "cursor-not-allowed opacity-60" : "hover:bg-[var(--tint-lavender)]/[0.08]"
+        }`}
+        style={{ border: "1px dashed color-mix(in oklch, var(--tint-lavender) 35%, transparent)" }}
+      >
+        <Upload className="size-5 mx-auto mb-1 text-[var(--tint-lavender)]" />
+        <div className="text-sm">{uploading ? `Nahrávám… ${progress}%` : "Vybrat audio soubor"}</div>
+        <input
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) uploadFile(f);
+            e.target.value = "";
+          }}
+        />
+      </label>
+
+      {uploading && (
+        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-full bg-[var(--tint-lavender)] transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">
+          {error}
         </div>
       )}
     </div>

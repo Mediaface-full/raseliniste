@@ -13,6 +13,7 @@ const Body = z.object({
   phone: z.string().max(40).nullable().optional(),
   canRecordBrief: z.boolean().optional(),
   keepAudio: z.boolean().optional(),
+  canUploadAudio: z.boolean().optional(),
 });
 
 function makeGuestToken(): string {
@@ -83,10 +84,12 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
       guestUserId: guest.id,
       canRecordBrief: body.canRecordBrief ?? false,
       keepAudio: body.keepAudio ?? false,
+      canUploadAudio: body.canUploadAudio ?? false,
     },
     update: {
       canRecordBrief: body.canRecordBrief ?? false,
       ...(body.keepAudio !== undefined ? { keepAudio: body.keepAudio } : {}),
+      ...(body.canUploadAudio !== undefined ? { canUploadAudio: body.canUploadAudio } : {}),
     },
   });
 
