@@ -175,12 +175,28 @@ export default function TaskAudioRecorder() {
             <div className="text-xs text-muted-foreground/80 max-w-sm leading-relaxed text-center">
               {recordingProtectionTip(protection.wakeLockSupported)}
             </div>
-            <button
-              onClick={() => briefInputRef.current?.click()}
-              className="mt-2 text-xs font-mono text-muted-foreground hover:text-foreground underline"
-            >
-              <Upload className="inline size-3 mr-1" />Nahrát soubor →
-            </button>
+            <div className="w-full max-w-sm mt-4 pt-4 border-t border-white/10">
+              <button
+                onClick={() => briefInputRef.current?.click()}
+                className="w-full px-4 py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
+                style={{
+                  background: "color-mix(in oklch, var(--tint-lavender) 14%, transparent)",
+                  border: "1px dashed color-mix(in oklch, var(--tint-lavender) 40%, transparent)",
+                  color: "color-mix(in oklch, var(--tint-lavender) 92%, white)",
+                }}
+              >
+                <Upload className="size-4" />
+                📎 Nahrát hotový audio soubor (MP3/M4A/...)
+              </button>
+              <a
+                href="/help/upload-audio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block mt-2 text-center text-[11px] font-mono text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+              >
+                Nevíš jak na to? Otevři návod →
+              </a>
+            </div>
             <input
               ref={briefInputRef}
               type="file"

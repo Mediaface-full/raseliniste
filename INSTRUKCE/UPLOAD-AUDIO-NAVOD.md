@@ -111,13 +111,27 @@ AI ho zpracovává na pozadí — typicky 30 s až 5 min. Dej mu chvíli a obnov
 
 ## Pro Gideona (vlastní upload)
 
-Stejný postup, ale tlačítko najdeš v Rašeliništi:
+Tlačítko **📎 Nahrát audio soubor** najdeš na **třech místech** v Rašeliništi:
 
-1. Otevři projekt v `/studna/<id>` nebo `/prskavka/<id>`
-2. Záložka **Záznamy** → karta **„Nahrát audio soubor"**
-3. Vyber soubor → upload → přepis na pozadí
+### Studánka / Prskavka
+- Otevři projekt v `/studna/<id>` nebo `/prskavka/<id>`
+- Záložka **Záznamy** → karta **„Nahrát audio soubor"**
+- Žádná AI analýza, jen přepis. Audio + text natrvalo.
+
+### Úkoly (Ozvěna)
+- Otevři `/ozvena?mode=task`
+- Místo kliknutí na velký mikrofon klikni **📎 Nahrát soubor** pod ním
+- AI extrahuje strukturované úkoly → review screen → push do Todoistu
+- **Limit: 50 MB** (cca 10 min)
+
+### Deník (Ozvěna)
+- Otevři `/ozvena?mode=journal`
+- Stejný file picker pod mikrofonem
+- AI vytvoří strukturovaný zápis (METADATA + tělo + POZNÁMKY EDITORA + NÁPADY)
+- **Limit: 100 MB** (~60 min — Plaud nahrávky se vejdou)
 
 V Prskavce je to bez permission flagu (jsi jediný uživatel = automaticky povoleno).
+V úkolech a deníku stejně — jen pro tebe.
 
 ---
 

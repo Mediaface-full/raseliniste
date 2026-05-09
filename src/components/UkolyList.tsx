@@ -151,8 +151,11 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
       {/* Hlavička s tlačítky */}
       <div className="flex items-center gap-2 flex-wrap">
         <Button onClick={() => setCreating(true)}><Plus /> Nový úkol</Button>
-        <a href="/ozvena">
+        <a href="/ozvena?mode=task">
           <Button variant="outline"><Mic /> Nadiktovat úkoly</Button>
+        </a>
+        <a href="/ozvena?mode=task&upload=1">
+          <Button variant="outline">📎 Nahrát soubor</Button>
         </a>
       </div>
 
