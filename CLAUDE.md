@@ -6,24 +6,21 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/HANDOFF-2026-05-07.md`** ← **PRIMÁRNÍ ZDROJ pro novou session**
-   - Spíž — sdílení souborů s 14denní expirací
-   - UPLOAD recordings (host i admin nahraje hotové audio, jen přepis)
-   - Skrytí processing kolečka napříč Studánkou (matoucí pro CPTSD)
-   - Auto-retry erroru cron (60min cooldown)
-   - AI dotaz nad projektem s estimate před spuštěním (token cost)
-   - Karty záznamů collapse-default (šetří screen real estate)
-   - Export přepisů projektu jako .md (bez AI analýzy)
-   - PDF export Myší (krásný layout s grafy + Decision Compass)
-   - Návody modul (`/navody` — interní wiki)
-   - Návod /help/upload-audio (public + tisknutelný)
-   - Bezpečnostní audit endpointů + migrace
-2. `INSTRUKCE/PRO-CLAUDINE-COACHE.md` — kontext o Petrovi, filozofie systému
-3. `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
-4. `INSTRUKCE/05-styl-prace.md` — komunikace
-5. `INSTRUKCE/03-moduly.md` — moduly, URL, status (aktualizováno 2026-05-07)
-6. `INSTRUKCE/04-todo-list.md` — manuální DSM akce
-7. `HANDBOOK.md` — referenční doc (sekce „Stav 2026-05-07" v hlavičce)
+1. **`INSTRUKCE/HANDOFF-2026-05-10.md`** ← **PRIMÁRNÍ ZDROJ pro novou session**
+   - Triage UI s t-* dropdown (trvání úkolu)
+   - Smart routing 6-úrovňový (klient-tag / klient-kontakt / tým / lidé / personal-tag / fallback)
+   - Contact.isTeam + clientTag fields + RoutingAuditLog model
+   - AI extract prompt s dynamickým seznamem klientů + zákaz halucinace slugu
+   - UI: badges v /contacts list, edit blok routingu, Smart routing v /settings/integrations, Audit log v /settings/crons
+   - Konfigurace nutná po deploy (isTeam toggles, clientTag, project names)
+2. `INSTRUKCE/SMART-ROUTING.md` — operativní návod jak routing nakonfigurovat a debugovat
+3. `INSTRUKCE/HANDOFF-2026-05-07.md` — předchozí stav (Spíž, UPLOAD, fire-and-forget napříč)
+4. `INSTRUKCE/PRO-CLAUDINE-COACHE.md` — kontext o Petrovi, filozofie systému
+5. `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
+6. `INSTRUKCE/05-styl-prace.md` — komunikace
+7. `INSTRUKCE/03-moduly.md` — moduly, URL, status (aktualizováno 2026-05-10)
+8. `INSTRUKCE/04-todo-list.md` — manuální DSM akce
+9. `HANDBOOK.md` — referenční doc (sekce „Stav 2026-05-10" v hlavičce)
 
 **Tento CLAUDE.md je z dubna 2026 a v některých detailech zastaralý** — `HANDOFF-*.md` jsou freshest.
 
@@ -32,6 +29,7 @@ Starší HANDOFFs (zaarchivovány, nečíst pro orientaci):
 - `INSTRUKCE/HANDOFF-2026-05-03.md`
 - `INSTRUKCE/HANDOFF-2026-05-04.md`
 - `INSTRUKCE/HANDOFF-2026-05-06.md`
+- `INSTRUKCE/HANDOFF-2026-05-07.md`
 - `INSTRUKCE/HANDOFF-bwmys-viz.md` (B&W myš vizualizace, dokončeno)
 
 ---

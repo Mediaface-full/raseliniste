@@ -4,9 +4,9 @@ Osobní informační systém Petra „Gideona" Perniy. Jeden uživatel, maximum 
 
 > **TL;DR:** Astro 6 + React 19 islands + Prisma 7 + PostgreSQL 16, běží na Synology DS718+ v Dockeru, deploy přes ghcr.io. Design **Liquid Glass** na dark navy pozadí. Login je **heslo + passkey (Touch ID)**. Jedenáct živých modulů: Capture, Úkoly, Poznámky, Deník, Zdraví, Kontakty (vCard + Google sync), Gideonův Firewall, Dopisy, Studna, **Kalendář (Google sync — fáze 1a; iCloud + rules + /quickadd ve fázi 1b)**, E-mail SMTP. AI běží na **Vertex AI** (EU region) nebo Gemini API key.
 
-> **NOVÁ SESSION:** přečti nejdřív [`INSTRUKCE/HANDOFF-2026-05-07.md`](./INSTRUKCE/HANDOFF-2026-05-07.md) — má aktuální stav, rozdělané věci a immediate next steps. Pro detailní metodologii B&W Myš viz [`INSTRUKCE/BWMYS-METODOLOGIE.md`](./INSTRUKCE/BWMYS-METODOLOGIE.md).
+> **NOVÁ SESSION:** přečti nejdřív [`INSTRUKCE/HANDOFF-2026-05-10.md`](./INSTRUKCE/HANDOFF-2026-05-10.md) — má aktuální stav, rozdělané věci a immediate next steps. Pro detailní metodologii B&W Myš viz [`INSTRUKCE/BWMYS-METODOLOGIE.md`](./INSTRUKCE/BWMYS-METODOLOGIE.md). Pro smart routing operativně [`INSTRUKCE/SMART-ROUTING.md`](./INSTRUKCE/SMART-ROUTING.md).
 
-> **Stav 2026-05-07:** přidán modul **Spíž** (`/spiz`, sdílení souborů s 14denní expirací, public `/g/<token>`), **UPLOAD recordings** (3. typ — host/admin nahrává hotová audia, jen přepis bez AI analýzy), **AI dotaz nad projektem** s token estimate, **PDF export Myší** (barevný layout s grafy + Decision Compass), **Návody modul** (`/navody`), **export přepisů .md**, **fire-and-forget napříč** (Health analýza, Studna summary, Myší vyhodnocení, audio entry — vše s 5min stale cleanup), **karty záznamů collapse-default**, **skrytí processing kolečka** (matoucí pro CPTSD).
+> **Stav 2026-05-10:** přidán **Triage UI** s t-* dropdown trvání úkolu (`t-30m`/`t-1h`/`t-2h`/`t-půlden`/`t-celý-den`/`t-?`) v audio review screenu. **Smart routing** 6-úrovňový pro Todoist push: klient-tag → klient-kontakt → tým → obecný kontakt → tag-projekt → fallback. Nové fieldy `Contact.isTeam` + `Contact.clientTag`, model `RoutingAuditLog` viditelný v `/settings/crons`. AI extract prompt rozšířen o klient-* konvenci s dynamickým seznamem slugů + zákaz halucinace slugu. UI: badges v /contacts, blok Routing v editaci kontaktu, Smart routing config v `/settings/integrations`.
 
 ---
 
@@ -691,6 +691,36 @@ Skupina v sidebaru, sedm podstránek:
 - **Návod:** public stránka `/help/upload-audio` (bez auth, print-friendly) + `INSTRUKCE/UPLOAD-AUDIO-NAVOD.md` jako primární zdroj. 7 kroků step-by-step pro Voice Recorder iPhone, tabulka 3 doporučených cílů uložení (Save in Photo Album / Save to Files / Save to Cloud) + 3 zakázané (Email/Bluetooth/YouTube). Sekce „Pro Gideona — úkoly a deník" s odlišením limitů (úkoly 50 MB, deník 100 MB, Studánka 500 MB).
 - **Linky „Návod →"** v UploadAudioCard (admin) + UploadAudioGuestButton (host).
 - **Také pro Úkoly + Deník:** existující endpointy `/api/ukoly/audio` + `/api/denik/audio` byly fire-and-forget od začátku, jen UI měl skrytý file input. Teď v `DiktatRecorder` + `TaskAudioRecorder` prominentní lavender card pod mikrofonem. V boardu `/ukoly` a `/denik` druhé tlačítko 📎 Nahrát soubor → `/ozvena?mode={task,journal}&upload=1` → DiktatRecorder reaguje na `?upload=1` a auto-otevře file picker po 250 ms.
+
+### ✅ Smart routing (hotovo 2026-05-10)
+- **Účel:** automatické rozhodování kam Todoist úkol pushnout — klient/tým/projekt/fallback. Vypíchne Petra z mentální zátěže „kam zařadit".
+- **6 pravidel** v `src/lib/task-todoist-push.ts:resolveRoute()` (top-down, první match):
+  - **#1** Tag `klient-<slug>` → projekt „Práce" / sekce `humanizeSlug(<slug>)`
+  - **#2** `assignedToContact.clientTag` → projekt „Práce" / sekce
+  - **#3** `assignedToContact.isTeam` → projekt „Práce" / sekce `<jméno>`
+  - **#4** `assignedToContact` (obecný) → top-level shared project, jinak „Lidé" / sekce
+  - **#5** Tag z `config.tagToProject` mapy → konfigurovatelný projekt/sekce
+  - **#6** Fallback → `cfg.mojeUkoly` nebo Inbox
+- **t-\* tagy filtrované** z routing logiky (jen meta, neovlivňují cíl)
+- **Auto-create:** pokud projekt/sekce neexistuje, `ensureProject()` / `ensureSection()` ji v Todoistu vytvoří + zaloguje do `RoutingAuditLog` s `autoCreatedProject` / `autoCreatedSection` flagem
+- **Schema** (migrace `add_smart_routing` 2026-05-10):
+  - `Contact.isTeam Boolean @default(false)` — kolega/dlouhodobý spolupracovník
+  - `Contact.clientTag String?` — slug klienta (regex `^[a-z0-9-]*$`, max 60)
+  - `RoutingAuditLog` — taskId, taskTitle, rule, matchedValue, todoistProjectName, todoistSectionName, autoCreatedProject, autoCreatedSection
+- **AI extract prompt** (`process-task-audio.ts` + `ai-prompts.ts:ozvena-stage2-task`):
+  - Dynamický seznam `clientSlugs` z DB (`SELECT DISTINCT clientTag FROM Contact`)
+  - Pravidla pro `klient-*` prefix POVINNÁ:
+    - Existující klient → PŘESNĚ slug, žádné fuzzy úpravy
+    - Nový klient → lowercase-bez-diakritiky-pomlčkami slug
+    - Max 1 `klient-*` per úkol, žádný pokud nejistý
+  - Pravidla pro `t-*` tagy: povolené hodnoty, jen pokud Petr explicitně řekne v audiu
+- **UI:**
+  - `/contacts` list: badge „tým" (mint) + „klient-{slug}" (sky) viditelné pod jménem
+  - `/contacts` edit modal: blok „Routing úkolů do Todoistu" — checkbox `isTeam` + input `clientTag` s náhledem cíle
+  - `/settings/integrations` Todoist: blok „Smart routing" — `praceProjectName`, `peopleProjectName`, dynamický mapping tag → projekt/sekce s + Přidat
+  - `/settings/crons`: tabulka „Routing audit log" posledních 30 push, butter badge `✦ project auto-create` / mint `✦ section auto-create`
+- **Triage t-\* dropdown** (commit `bcb6b8a`): v `/ukoly/audio/[batchId]/review` u každého úkolu Hourglass dropdown s pevným setem `t-?` / `t-30m` / `t-1h` / `t-2h` / `t-půlden` / `t-celý-den`. Hodnota uložena jako extra tag, t-* filtrováno z chip listu (nezdvojuje se).
+- **Operativní návod:** `INSTRUKCE/SMART-ROUTING.md` — jak nakonfigurovat (isTeam, clientTag, tagToProject), jak debug v audit logu, FAQ.
 
 ### 🔜 V plánu
 - **Capture iPhone Shortcut** — zatím v návodu, JSON body připravený

@@ -56,7 +56,18 @@ Když delegování trvá víc než 30 sekund, neudělám ho — proto smart rout
       `,
       co_umi: `
 - 5stage AI pipeline: přepis (Flash) → cleanup → strukturovaná extrakce (Pro) → review → push
-- **Smart routing** delegace: top-level projekt jménem assignee → projekt „Lidé" → sekce jména
+- **Triage UI s t-* dropdown** (NOVÉ 05-10) — v review screenu Hourglass dropdown s pevným setem trvání: \`t-30m\` / \`t-1h\` / \`t-2h\` / \`t-půlden\` / \`t-celý-den\` / \`t-?\`. Hodnota se ukládá jako extra tag.
+- **Smart routing 6-úrovňový** (NOVÉ 05-10):
+  1. tag \`klient-<slug>\` → projekt „Práce" / sekce klienta
+  2. \`assignedToContact.clientTag\` → Práce / sekce
+  3. \`assignedToContact.isTeam\` → Práce / sekce <jméno>
+  4. obecný kontakt → top-level shared project nebo Lidé / sekce
+  5. tag z config mapy (např. \`dum\` → Osobní/Domov) → konfigurovatelný projekt/sekce
+  6. fallback → mojeUkoly / Inbox
+- **t-\* tagy** filtrované z routing logiky (jen meta, neovlivňují cíl)
+- **Auto-create projektu/sekce** při neexistenci, logované do RoutingAuditLog
+- **Routing audit log** v \`/settings/crons\` — tabulka 30 posledních push s pravidlem + auto-create flagy
+- **AI prompt** dostává distinct seznam clientSlugs z DB + pravidla proti halucinaci slugu (žádné fuzzy úpravy existujících)
 - Parent + children (subtasks)
 - Tagy: dynamicky z \`Task.tags\` + \`TodoistLabelMirror\`
 - Filtry: status (open/done/all), assignee (me/all/per kontakt), tagy
@@ -66,14 +77,17 @@ Když delegování trvá víc než 30 sekund, neudělám ho — proto smart rout
 - **Recurring tasks** v Todoistu — naše DB má jen single \`dueAt\`, recurrence se rozjede
 - DELETE leak když je Todoist down — lokální delete proběhne, Todoist task zůstane
 - Idempotency-Key header při createTask (race duplikáty)
+- Cleanup audit logu — RoutingAuditLog neomezeně roste, řešit když překročí 10k záznamů
       `,
       napojeni: `
 - **Todoist** (obousměrný sync à 5 min, lib \`todoist-sync.ts\`)
 - **Ozvěna** — audio diktát úkolů
-- **Kontakty** — assignee picker, smart routing
+- **Kontakty** — assignee picker, smart routing (\`Contact.isTeam\` + \`Contact.clientTag\`)
 - **Firewall (VIP)** — VIP zpráva s termínem vytvoří úkol
 - **Things import** — bulk import z Things 3 přes \`/things-import\`
 - **Dashboard** — KPI „X otevřených, Y dnes, Z přes termín"
+- **/settings/integrations** — Smart routing config (praceProjectName, peopleProjectName, tagToProject)
+- **Operativní návod:** \`INSTRUKCE/SMART-ROUTING.md\`
       `,
     },
   },

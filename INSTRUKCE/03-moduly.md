@@ -1,6 +1,6 @@
 # 03 — Moduly (přehled)
 
-Stav 2026-05-07 (Spíž modul + UPLOAD recordings + AI dotaz nad projektem + skrytí processing kolečka + PDF export Myší). Detail jednotlivých modulů v `Návody/*.pdf`.
+Stav 2026-05-10 (Smart routing 6-úrovňový + Triage t-* dropdown + RoutingAuditLog). Detail jednotlivých modulů v `Návody/*.pdf`.
 
 ## 🌅 Vstupní stránka
 
@@ -43,8 +43,17 @@ Stav 2026-05-07 (Spíž modul + UPLOAD recordings + AI dotaz nad projektem + skr
 
 - Manuální create + edit + delegate + push do Todoistu
 - Filtry: status (open/done/all), assignee (me/all/per kontakt), tagy
-- **Smart Todoist routing pro delegaci:** top-level projekt jménem assignee → projekt „Lidé" → sekce jménem assignee (vytvoří automaticky)
+- **Smart Todoist routing 6-úrovňový (NOVÉ 05-10):**
+  1. tag `klient-<slug>` → Práce / sekce klienta
+  2. `assignedToContact.clientTag` → Práce / sekce
+  3. `assignedToContact.isTeam` → Práce / sekce <jméno>
+  4. obecný kontakt → top-level shared project nebo Lidé / sekce
+  5. tag z `tagToProject` mapy → konfigurovatelný projekt/sekce
+  6. fallback → mojeUkoly / Inbox
+  - t-* tagy filtrované, auto-create logovaný do RoutingAuditLog
 - Audio diktát: Vertex Pro extrakce úkolů z přepisu, review screen pro schválení
+- **Triage UI s t-* dropdown (NOVÉ 05-10):** v review screenu Hourglass dropdown s `t-30m/t-1h/t-2h/t-půlden/t-celý-den/t-?` (default `t-?`). Hodnota uložená jako extra tag.
+- **Routing audit log:** v `/settings/crons` tabulka 30 posledních push s rule + autoCreate flagy. Detail v `INSTRUKCE/SMART-ROUTING.md`.
 
 **Capture inbox** (`/tasks`) = legacy Entry-based, zachováno paralelně.
 
