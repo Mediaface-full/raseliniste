@@ -1,9 +1,39 @@
 import { useState, useEffect } from "react";
 import {
-  Loader2, Check, X, Edit3, Trash2, AlertTriangle, RotateCw, Clock, UserCheck, Tag, ChevronDown,
+  Loader2, Check, X, Edit3, Trash2, AlertTriangle, RotateCw, Clock, UserCheck, Tag, ChevronDown, Hourglass,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
+
+/**
+ * Trvání úkolu — pevný set hodnot. Petr si v Triage zvolí dropdown,
+ * hodnota se uloží jako extra tag na Task před pushem do Todoistu.
+ *
+ * Default `t-?` znamená "nezvoleno" — Petr může pushnout bez výběru,
+ * ale tag pak bude `t-?` a v Todoistu bude vidět co potřebuje doladit.
+ */
+const T_TAGS = ["t-?", "t-30m", "t-1h", "t-2h", "t-půlden", "t-celý-den"] as const;
+type TTag = typeof T_TAGS[number];
+
+const T_LABEL: Record<TTag, string> = {
+  "t-?": "?",
+  "t-30m": "30 min",
+  "t-1h": "1 h",
+  "t-2h": "2 h",
+  "t-půlden": "půlden",
+  "t-celý-den": "celý den",
+};
+
+/** Vrátí t-* tag z proposal.tags (první match), nebo "t-?" pokud žádný. */
+function getTTag(tags: string[]): TTag {
+  const found = tags.find((t) => (T_TAGS as readonly string[]).includes(t));
+  return (found as TTag) ?? "t-?";
+}
+
+/** Vrátí tagy bez jakéhokoli t-* — pro filtraci před zápisem nového. */
+function stripTTag(tags: string[]): string[] {
+  return tags.filter((t) => !(T_TAGS as readonly string[]).includes(t));
+}
 
 interface Contact {
   id: string;
@@ -83,8 +113,16 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
       const cs = await ensureContacts();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       function hydrate(p: any, idPrefix: string): Proposal {
+        // Doplň t-? tag pokud chybí — ať je dropdown vždy něčím vybraný.
+        // Případné existující t-* tag z AI extrakce zachováme (Gemini může
+        // odhadnout délku z kontextu „rychle to vyřídím" → t-30m).
+        const incomingTags: string[] = Array.isArray(p.tags) ? p.tags : [];
+        const tagsWithT = (T_TAGS as readonly string[]).some((t) => incomingTags.includes(t))
+          ? incomingTags
+          : [...incomingTags, "t-?"];
         return {
           ...p,
+          tags: tagsWithT,
           _checked: true,
           _id: idPrefix,
           _editing: false,
@@ -396,6 +434,25 @@ function ProposalRow({
             <>
               <div className="text-sm">{proposal.title}</div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs">
+                {/* Dropdown Trvání — vždy viditelný, pevný set hodnot. Hodnota se
+                    ukládá jako extra tag (t-*). Default t-? = nezvoleno. */}
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <Hourglass className="size-3 text-[var(--tint-lavender)]" />
+                  <select
+                    value={getTTag(proposal.tags)}
+                    onChange={(e) => {
+                      const newTTag = e.target.value as TTag;
+                      const stripped = stripTTag(proposal.tags);
+                      onChange({ tags: [...stripped, newTTag] });
+                    }}
+                    className="bg-black/30 border border-white/10 rounded px-1.5 py-0.5 text-xs cursor-pointer hover:border-white/30 focus:outline-none focus:border-[var(--tint-lavender)]/50 font-mono"
+                    title="Trvání úkolu — uloží se jako tag"
+                  >
+                    {T_TAGS.map((t) => (
+                      <option key={t} value={t}>{T_LABEL[t]}</option>
+                    ))}
+                  </select>
+                </label>
                 {dueObj && (
                   <span className="flex items-center gap-1 font-mono text-muted-foreground">
                     <Clock className="size-3" />
@@ -416,9 +473,10 @@ function ProposalRow({
                 )}
                 {proposal.priority === "high" && <span className="text-[var(--tint-rose)] font-mono">! priorita</span>}
                 {proposal.priority === "low" && <span className="text-muted-foreground font-mono">↓ low</span>}
-                {proposal.tags.length > 0 && (
+                {/* Tagy bez t-* (ty má dropdown výše). */}
+                {stripTTag(proposal.tags).length > 0 && (
                   <span className="flex items-center gap-1 text-muted-foreground">
-                    <Tag className="size-3" /> {proposal.tags.map((t) => `#${t}`).join(" ")}
+                    <Tag className="size-3" /> {stripTTag(proposal.tags).map((t) => `#${t}`).join(" ")}
                   </span>
                 )}
               </div>
@@ -463,9 +521,12 @@ function ProposalEdit({
   const [title, setTitle] = useState(proposal.title);
   const [notes, setNotes] = useState(proposal.notes ?? "");
   const [dueAt, setDueAt] = useState(proposal.dueAt ? proposal.dueAt.slice(0, 10) : "");
-  const [tags, setTags] = useState(proposal.tags.join(", "));
+  // Tags bez t-* — ten řešíme dropdownem mimo edit form
+  const [tags, setTags] = useState(stripTTag(proposal.tags).join(", "));
   const [priority, setPriority] = useState(proposal.priority);
   const [assigned, setAssigned] = useState(proposal.assignedToContactId ?? "");
+  // Stávající t-* tag zachovat při uložení edit formu
+  const existingTTag = getTTag(proposal.tags);
 
   return (
     <div className="space-y-2 mt-1">
@@ -498,7 +559,11 @@ function ProposalEdit({
           title,
           notes: notes || null,
           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
-          tags: tags.split(",").map((s) => s.trim()).filter(Boolean),
+          // Spojí user-edited tagy + zachovaný t-* z dropdownu před editem
+          tags: [
+            ...stripTTag(tags.split(",").map((s) => s.trim()).filter(Boolean)),
+            existingTTag,
+          ],
           priority,
           assignedToContactId: assigned || null,
         })}><Check /> OK</Button>
