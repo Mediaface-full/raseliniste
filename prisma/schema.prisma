@@ -58,6 +58,8 @@ model User {
   todoistLabels    TodoistLabelMirror[]
   thingsImports    ThingsImport[]
   customRituals    CustomRitual[]
+  smsMessages      SmsMessage[]
+  smsReplies       SmsReply[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -1568,4 +1570,104 @@ model DecisionReopening {
   schvaleno         Boolean  // uživatel sám potvrzuje že to je opravdu nový fakt
 
   @@index([decisionId, datum])
+}
+
+// ============================================================================
+// SMS — GoSMS integrace (univerzální modul, použitelný napříč Rašeliništěm)
+// Doc: https://doc.gosms.eu/?lang=cs
+// Credentials per-user v UserIntegration(provider="gosms").
+// ============================================================================
+
+enum SmsStatus {
+  pending      // čekající na odeslání (scheduled v budoucnosti)
+  sent         // odesláno do GoSMS, bez potvrzení doručení
+  delivered    // doručenka přišla (alespoň 1 příjemce)
+  undelivered  // explicitně neuspělo (operátor vrátil neúspěch)
+  failed       // chyba při odesílání nebo invalidní příjemci
+  cancelled    // zrušeno před odesláním přes DELETE
+}
+
+model SmsMessage {
+  id                String     @id @default(cuid())
+  userId            String
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ID zprávy v GoSMS (z `link: api/v1/messages/{id}`). Null jen v okamžiku
+  // mezi vytvořením DB rowy a úspěšným POSTem do GoSMS — pak se update.
+  gosmsMessageId    String?    @unique
+
+  // Příjemci jako pole E.164 čísel — snapshot v okamžiku odeslání.
+  recipients        String[]   @default([])
+  // Příjemci nevalidní podle GoSMS (čísla která API odmítlo)
+  invalidRecipients String[]   @default([])
+
+  body              String     @db.Text
+  channelId         Int        // GoSMS channel ID použitý pro tuto zprávu
+
+  status            SmsStatus  @default(pending)
+
+  // Volitelné odložené odeslání (předáno jako expectedSendStart do API)
+  scheduledFor      DateTime?
+
+  // Odkaz na entitu která SMS vyvolala — JSON `{type: "task", id: "..."}`.
+  // Možné typy zatím: "task" | "contact" | "recording" | "ad-hoc"
+  // (rozšiřitelné bez migrace; sirotčí odkazy jsou OK — log je audit trail).
+  linkedEntity      Json?
+
+  // Cena za odeslání (CZK/EUR podle organizace) — vyplněno když známe z API.
+  cost              Float?
+  currency          String?
+
+  // Pinned = neuklizovat 90denním cleanup cronem (pro důležité zprávy).
+  isPinned          Boolean    @default(false)
+
+  sentAt            DateTime?  // kdy server odeslal POST do GoSMS
+  deliveredAt       DateTime?  // čas první doručenky
+  failedAt          DateTime?
+  errorMessage      String?    @db.Text
+
+  // Doručenky per recipient — JSON `{ "+420...": "2026-05-10T17:32:45Z", ... }`
+  // Aktualizováno z webhooku nebo polling cronu.
+  deliveryDetails   Json?
+
+  replies           SmsReply[]
+
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([gosmsMessageId])
+}
+
+model SmsReply {
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Spárování na původní zprávu (pokud webhook poslal `links.message`).
+  // Null = nespárovaná odpověď (přišla bez kontextu).
+  smsMessageId      String?
+  smsMessage        SmsMessage? @relation(fields: [smsMessageId], references: [id], onDelete: SetNull)
+
+  // ID odpovědi v GoSMS (deduplikace).
+  gosmsReplyId      String      @unique
+
+  fromNumber        String      // E.164 normalized
+  toSourceNumber    String?     // číslo/sender ID na které přišla
+  body              String      @db.Text
+  receivedAt        DateTime
+
+  // Pro multipart SMS (více částí) — uchováme metadata pro pozdější rekonstrukci.
+  partNumber        Int?
+  partsCount        Int?
+  messageReferenceNumber Int?
+
+  // Petr v UI označí jako přečtené.
+  seenAt            DateTime?
+
+  createdAt         DateTime    @default(now())
+
+  @@index([userId, receivedAt])
+  @@index([smsMessageId])
 }
