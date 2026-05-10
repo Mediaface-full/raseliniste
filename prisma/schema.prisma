@@ -290,6 +290,17 @@ model Contact {
   // a v audiu je rozpoznává jako tag `klient-<slug>`. NOVÉ 2026-05-10.
   clientTag           String?
 
+  // Aliases pro AI extract (NOVÉ 2026-05-10, alias systém):
+  // - aliases: jak jinak Petr v audiu kontakt nazývá (např. "TK", "Tékáčko",
+  //   "Karel z TK") → AI fuzzy match a vyplní assignedToContactName
+  //   kanonickým displayName/firstName.
+  // - clientTagAliases: synonyma pro slug klienta (např. clientTag="tk-stavby"
+  //   + aliases ["TK", "TK Stavby", "Tékáčko"]) → AI v audiu rozpozná
+  //   a generuje kanonický klient-tk-stavby tag.
+  // Routing s aliases nepracuje — pracuje s kanonickou hodnotou.
+  aliases             String[]       @default([])
+  clientTagAliases    String[]       @default([])
+
   // Narozeniny — stačí den a měsíc (rok obvykle neznámý)
   birthMonth   Int?
   birthDay     Int?

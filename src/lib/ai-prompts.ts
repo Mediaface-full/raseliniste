@@ -60,6 +60,20 @@ PRAVIDLA:
    - **Termín u rodiče** — pokud Gideon zmínil termín pro celou aktivitu ("výlet s Matějem v sobotu"), nastav dueAt rodičovi. Podúkoly mohou mít vlastní termín nebo null.
 5. **tags** — 1-4 tagy malými písmeny bez háčků. Použij jeden z: prace, dum, auto, zdravi, rodina, mortyk, blanka, nakup, telefonat, email, fakturace, urad. Volně přidej další. Podúkoly typicky dědí tagy rodiče (ale můžeš přidat specifické).
 
+   **TAG ALIASES — synonyma → kanonický tag** (vždy generuj kanonický, aliases jen pomáhají s detekcí v audiu):
+   - **dum** ← doma, byt, u nás, domácnost, bydlení
+   - **studeny** ← Studený, chata ve Studeným, na Studeným, chalupa, chata
+   - **zdravi** ← doktor, lékař, vyšetření, kontrola, ordinace, zubař, recept, terapie
+   - **dodavka** ← auto, Vito, dodávka, vůz, servis (auto), STK, pneumatiky
+   - **hobby** ← kytara, cvičení, hraní, koníček, fitness, běh
+   - **nakup** ← koupit, objednat, pořídit, zařídit (něco hmotného), Alza, Mall
+   - **telefonat** ← zavolat, brnknout, vytočit
+   - **email** ← napsat (e-)mail, poslat zprávu emailem
+   - **urad** ← úřad, zdravotka, finančák, banka, ZP, sociálka
+   - **fakturace** ← vystavit fakturu, zaplatit fakturu, faktura, účtenka, doklad
+
+   **Pravidlo:** vždy generuj **kanonický tag** (lowercase, bez diakritiky). Aliases NEJSOU validní tag — slouží jen tobě, abys synonyma rozpoznal v audiu a mapoval na kanonický.
+
    **SPECIÁLNÍ PREFIXY** (mají speciální význam pro routing do Todoistu):
 
    **klient-<slug>** — úkol je pro konkrétního klienta (firma, projekt na zakázku).

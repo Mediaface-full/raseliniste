@@ -14,6 +14,8 @@ interface Contact {
   isVip: boolean;
   isTeam: boolean;
   clientTag: string | null;
+  aliases: string[];
+  clientTagAliases: string[];
   callLogToken: string | null;
   callLogTokenCreatedAt: string | null;
   birthMonth: number | null;
@@ -347,6 +349,10 @@ function ContactEditor({ contact, onClose }: EditorProps) {
   const [isVip, setIsVip] = useState(contact?.isVip ?? false);
   const [isTeam, setIsTeam] = useState(contact?.isTeam ?? false);
   const [clientTag, setClientTag] = useState(contact?.clientTag ?? "");
+  // Aliases — input je čárkou oddělený řetězec, parsujeme při uložení.
+  // Display chip list pod inputem ukazuje aktuálně uložené hodnoty.
+  const [aliasesInput, setAliasesInput] = useState((contact?.aliases ?? []).join(", "));
+  const [clientTagAliasesInput, setClientTagAliasesInput] = useState((contact?.clientTagAliases ?? []).join(", "));
   const [birthDay, setBirthDay] = useState(contact?.birthDay?.toString() ?? "");
   const [birthMonth, setBirthMonth] = useState(contact?.birthMonth?.toString() ?? "");
   const [bdayRemind, setBdayRemind] = useState<number>(
@@ -379,6 +385,9 @@ function ContactEditor({ contact, onClose }: EditorProps) {
       isTeam,
       // clientTag — povolíme jen lowercase + pomlčky bez diakritiky (server to taky validuje).
       clientTag: clientTag.trim() ? clientTag.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || null : null,
+      // Parse comma-separated aliases — server pak trim+lowercase+dedup
+      aliases: aliasesInput.split(",").map((s) => s.trim()).filter((s) => s.length > 0),
+      clientTagAliases: clientTagAliasesInput.split(",").map((s) => s.trim()).filter((s) => s.length > 0),
       birthDay: Number.isFinite(bd) && bd >= 1 && bd <= 31 ? bd : null,
       birthMonth: Number.isFinite(bm) && bm >= 1 && bm <= 12 ? bm : null,
       birthdayReminderDaysBefore: bdayRemind >= 0 ? bdayRemind : null,
@@ -514,6 +523,24 @@ function ContactEditor({ contact, onClose }: EditorProps) {
                 Pokud má kontakt slug, úkoly delegované jemu i úkoly s tagem <code>klient-{clientTag || "<slug>"}</code> půjdou do projektu „Práce" / sekce „{clientTag ? clientTag.split("-").map(w => w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)).join(" ") : "<klient>"}".
               </p>
             </div>
+
+            <AliasField
+              label="Aliases (čárkou oddělené)"
+              hint={`Jak v audiu kontakt nazývám — AI fuzzy match přes všechny synonyma. Např. "TK", "Tékáčko", "Karel z TK".`}
+              value={aliasesInput}
+              onChange={setAliasesInput}
+              tint="lavender"
+            />
+
+            <AliasField
+              label="Aliasy pro clientTag (čárkou oddělené)"
+              hint={`Synonyma pro klienta. Např. clientTag "tk-stavby" + aliasy "TK", "TK Stavby", "Tékáčko". AI v audiu rozpozná a generuje kanonický klient-tk-stavby tag.`}
+              value={clientTagAliasesInput}
+              onChange={setClientTagAliasesInput}
+              tint="sky"
+              disabled={!clientTag.trim()}
+              disabledReason="Nejdřív vyplň Klient slug výše"
+            />
           </div>
 
           <div>
@@ -800,6 +827,65 @@ function BackfillTokensButton({ onDone }: { onDone: () => void }) {
         <span className="text-xs font-mono text-[var(--tint-sage)]">
           ✓ {result.generated} nových{result.failed > 0 && `, ${result.failed} chyb`}
         </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Alias input field — comma-separated input + chip list pod ním.
+ * Pro Contact.aliases a Contact.clientTagAliases v edit modalu.
+ */
+function AliasField({
+  label,
+  hint,
+  value,
+  onChange,
+  tint,
+  disabled = false,
+  disabledReason,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (v: string) => void;
+  tint: "lavender" | "sky" | "mint";
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
+  // Live preview chipů — co bude uloženo (trim + lowercase + dedup)
+  const chips = Array.from(new Set(
+    value.split(",").map((s) => s.trim().toLowerCase()).filter((s) => s.length > 0),
+  ));
+
+  return (
+    <div>
+      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block mb-1">
+        {label}
+      </label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={disabled ? disabledReason ?? "" : "alias1, alias2, alias3"}
+        disabled={disabled}
+      />
+      <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{hint}</p>
+      {chips.length > 0 && !disabled && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {chips.map((c, i) => (
+            <span
+              key={i}
+              className="text-[11px] font-mono px-1.5 py-0.5 rounded"
+              style={{
+                background: `color-mix(in oklch, var(--tint-${tint}) 14%, transparent)`,
+                color: `color-mix(in oklch, var(--tint-${tint}) 92%, white)`,
+                border: `1px solid color-mix(in oklch, var(--tint-${tint}) 30%, transparent)`,
+              }}
+            >
+              {c}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );

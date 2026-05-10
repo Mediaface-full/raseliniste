@@ -19,6 +19,12 @@ const PatchBody = z.object({
   // Slug klienta — povolen jen lowercase, číslice, pomlčka. Server-side
   // poslední bezpečnost před AI-generated slugy.
   clientTag: z.string().max(60).regex(/^[a-z0-9-]*$/, "Slug může obsahovat jen malá písmena, číslice a pomlčky").nullable().optional(),
+  // Aliases pro AI extract — synonyma jak Petr v audiu kontakt/klienta
+  // nazývá (např. "TK", "Tékáčko", "Karel z TK"). Každý alias je trimmed
+  // + lowercase při uložení. Routing pracuje s kanonizovanou hodnotou,
+  // ne s aliases.
+  aliases: z.array(z.string().min(1).max(80)).max(20).optional(),
+  clientTagAliases: z.array(z.string().min(1).max(80)).max(20).optional(),
   birthMonth: z.number().int().min(1).max(12).nullable().optional(),
   birthDay: z.number().int().min(1).max(31).nullable().optional(),
   birthdayReminderDaysBefore: z.number().int().min(0).max(60).nullable().optional(),
@@ -88,6 +94,13 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
       ...(body.isVip !== undefined ? { isVip: body.isVip } : {}),
       ...(body.isTeam !== undefined ? { isTeam: body.isTeam } : {}),
       ...(body.clientTag !== undefined ? { clientTag: body.clientTag || null } : {}),
+      // Aliases — trim + lowercase + dedup
+      ...(body.aliases !== undefined ? {
+        aliases: Array.from(new Set(body.aliases.map((a) => a.trim().toLowerCase()).filter((a) => a.length > 0))),
+      } : {}),
+      ...(body.clientTagAliases !== undefined ? {
+        clientTagAliases: Array.from(new Set(body.clientTagAliases.map((a) => a.trim().toLowerCase()).filter((a) => a.length > 0))),
+      } : {}),
       ...(body.birthMonth !== undefined ? { birthMonth: body.birthMonth } : {}),
       ...(body.birthDay !== undefined ? { birthDay: body.birthDay } : {}),
       ...(body.birthdayReminderDaysBefore !== undefined ? { birthdayReminderDaysBefore: body.birthdayReminderDaysBefore } : {}),
