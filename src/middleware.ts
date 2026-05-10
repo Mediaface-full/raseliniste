@@ -25,6 +25,8 @@ function isPublic(pathname: string): boolean {
   if (pathname === "/api/health-ingest") return true;
   // Cron endpointy mají vlastní x-cron-key autorizaci.
   if (pathname.startsWith("/api/cron/")) return true;
+  // GoSMS webhooky (doručenky + odpovědi) — autorizace přes ?token=<webhookSecret>
+  if (pathname.startsWith("/api/webhooks/gosms/")) return true;
   // Studna — pozvánkové linky pro hosty (autorizace přes guestToken v URL).
   if (pathname.startsWith("/me/")) return true;
   if (pathname.startsWith("/api/me/")) return true;
