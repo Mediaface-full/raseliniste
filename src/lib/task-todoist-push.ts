@@ -131,12 +131,80 @@ interface RouteResolution {
   autoCreatedSection: boolean;
 }
 
+/**
+ * Pravidlo pro routing #5. Multi-tag — pravidlo matchne když task.tags obsahuje
+ * KTERÝKOLIV z `tags`. `name` je jen pro orientaci uživatele v UI, nepoužívá
+ * se v logice. NOVÝ TVAR 2026-05-10.
+ */
+export interface TagRule {
+  name?: string | null;
+  tags: string[];
+  project: string;
+  section: string | null;
+}
+
+/**
+ * Backwards-compat helper: starý config `tagToProject` byl `Record<string, {project, section}>`
+ * (klíč = single tag). Nový tvar je `TagRule[]` (multi-tag per pravidlo).
+ * Při čtení normalizujeme oba formáty na pole pravidel — postupně se přepíše
+ * při příštím Save v UI.
+ */
+export function normalizeTagRules(raw: unknown): TagRule[] {
+  if (!raw) return [];
+  // Nový tvar: array
+  if (Array.isArray(raw)) {
+    const rules: TagRule[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const r = item as Record<string, unknown>;
+      const project = typeof r.project === "string" ? r.project.trim() : "";
+      if (!project) continue;
+      const tags = Array.isArray(r.tags)
+        ? (r.tags as unknown[])
+            .filter((t): t is string => typeof t === "string")
+            .map((t) => t.trim().toLowerCase())
+            .filter(Boolean)
+        : [];
+      if (tags.length === 0) continue;
+      rules.push({
+        name: typeof r.name === "string" && r.name.trim() ? r.name.trim() : null,
+        tags: [...new Set(tags)],
+        project,
+        section:
+          typeof r.section === "string" && r.section.trim() ? r.section.trim() : null,
+      });
+    }
+    return rules;
+  }
+  // Starý tvar: dict { tag: { project, section } } → převést na array
+  if (typeof raw === "object") {
+    const rules: TagRule[] = [];
+    for (const [tag, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (!value || typeof value !== "object") continue;
+      const v = value as Record<string, unknown>;
+      const project = typeof v.project === "string" ? v.project.trim() : "";
+      if (!project) continue;
+      const normTag = tag.trim().toLowerCase();
+      if (!normTag) continue;
+      rules.push({
+        name: null,
+        tags: [normTag],
+        project,
+        section:
+          typeof v.section === "string" && v.section.trim() ? v.section.trim() : null,
+      });
+    }
+    return rules;
+  }
+  return [];
+}
+
 interface RouteContext {
   token: string;
   fallbackProjectId: string | undefined;     // mojeUkoly / Inbox
   praceProjectName: string;                  // typicky "Práce"
   peopleProjectName: string;                 // typicky "Lidé"
-  tagToProject: Record<string, { project: string; section: string | null }>;
+  tagRules: TagRule[];                       // routing #5 pravidla (multi-tag)
 }
 
 /**
@@ -250,24 +318,27 @@ async function resolveRoute(
     };
   }
 
-  // ---- #5 Tag z tagToProject mapy → konfigurovatelný projekt/sekce ----
-  for (const tag of routableTags) {
-    const mapping = ctx.tagToProject[tag];
-    if (!mapping) continue;
-    const project = await ensureProject(ctx.token, mapping.project, audit);
+  // ---- #5 Tag z tagRules → konfigurovatelný projekt/sekce ----
+  // Pravidlo matchne když task.tags obsahuje KTERÝKOLIV z rule.tags.
+  // Pořadí pravidel v poli = priorita (první match vyhrává).
+  const routableTagsLower = routableTags.map((t) => t.toLowerCase());
+  for (const rule of ctx.tagRules) {
+    const matchedTag = rule.tags.find((t) => routableTagsLower.includes(t));
+    if (!matchedTag) continue;
+    const project = await ensureProject(ctx.token, rule.project, audit);
     let sectionId: string | undefined;
     let sectionName: string | null = null;
-    if (mapping.section) {
-      const section = await ensureSection(ctx.token, project.id, mapping.section, audit);
+    if (rule.section) {
+      const section = await ensureSection(ctx.token, project.id, rule.section, audit);
       sectionId = section.id;
       sectionName = section.name;
     }
     return {
       projectId: project.id,
       sectionId,
-      routedHow: `[personal-tag] "${project.name}"${sectionName ? ` → "${sectionName}"` : ""}`,
+      routedHow: `[personal-tag${rule.name ? `:${rule.name}` : ""}] "${project.name}"${sectionName ? ` → "${sectionName}"` : ""}`,
       rule: "personal-tag",
-      matchedValue: tag,
+      matchedValue: rule.name ? `${rule.name} (${matchedTag})` : matchedTag,
       projectName: project.name,
       sectionName,
       ...audit,
@@ -302,7 +373,9 @@ interface IntegrationConfig {
   mojeUkoly?: string;
   praceProjectName?: string;
   peopleProjectName?: string;
-  tagToProject?: Record<string, { project: string; section: string | null }>;
+  // Nový tvar: TagRule[] (multi-tag per pravidlo).
+  // Starý tvar: Record<string, {project, section}> — normalizován přes normalizeTagRules().
+  tagToProject?: unknown;
 }
 
 export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: string; projectId: string; routedHow: string }> {
@@ -365,7 +438,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
       fallbackProjectId: cfg.mojeUkoly,
       praceProjectName: cfg.praceProjectName ?? DEFAULT_PRACE_PROJECT,
       peopleProjectName: cfg.peopleProjectName ?? DEFAULT_PEOPLE_PROJECT,
-      tagToProject: cfg.tagToProject ?? {},
+      tagRules: normalizeTagRules(cfg.tagToProject),
     };
     try {
       routeMeta = await resolveRoute(ctx, {

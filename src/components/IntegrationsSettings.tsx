@@ -3,7 +3,13 @@ import { Check, Loader2, Plug, Trash2, TriangleAlert, Key, Folder, Star } from "
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
-interface TagMapping {
+/**
+ * Pravidlo pro routing #5 — multi-tag (matchne když task.tags obsahuje kterýkoli z `tags`).
+ * `name` je volitelný popisek pro orientaci v dlouhém seznamu — nepoužívá se v logice.
+ */
+interface TagRuleInitial {
+  name: string | null;
+  tags: string[];
   project: string;
   section: string | null;
 }
@@ -15,7 +21,8 @@ interface InitialProps {
   mojeUkolyProjectId: string | null;
   praceProjectName: string | null;
   peopleProjectName: string | null;
-  tagToProject: Record<string, TagMapping>;
+  // Nový tvar: pole pravidel. Astro stránka při čtení DB normalizuje starý dict.
+  tagRules: TagRuleInitial[];
   lastUsedAt: string | null;
   lastError: string | null;
 }
@@ -40,11 +47,17 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
   // Smart routing config — názvy projektů (Petr přepíše defaultní pokud chce jiný název)
   const [praceProjectName, setPraceProjectName] = useState(initial.praceProjectName ?? "Práce");
   const [peopleProjectName, setPeopleProjectName] = useState(initial.peopleProjectName ?? "Lidé");
-  // Mapping tag → projekt/sekce. Editujeme jako list (tag, project, section).
-  const initialTagRows = Object.entries(initial.tagToProject).map(([tag, m]) => ({ tag, project: m.project, section: m.section ?? "" }));
-  const [tagRows, setTagRows] = useState<{ tag: string; project: string; section: string }[]>(
-    initialTagRows.length > 0 ? initialTagRows : []
-  );
+  // Multi-tag pravidla. Tags v UI editujeme jako comma-separated string (tagsInput),
+  // ale chip preview pod inputem ukazuje co se uloží (split + trim + lowercase).
+  const initialTagRows = initial.tagRules.map((r) => ({
+    name: r.name ?? "",
+    tagsInput: r.tags.join(", "),
+    project: r.project,
+    section: r.section ?? "",
+  }));
+  const [tagRows, setTagRows] = useState<
+    { name: string; tagsInput: string; project: string; section: string }[]
+  >(initialTagRows);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const lastUsed = initial.lastUsedAt ? new Date(initial.lastUsedAt) : null;
   const lastErr = initial.lastError;
@@ -94,13 +107,32 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
     setError(null);
     setSaving(true);
     try {
-      // Sestav tagToProject mapu (vynechaj prázdné tagy nebo projekty)
-      const tagToProject: Record<string, { project: string; section: string | null }> = {};
+      // Sestav array pravidel — vynech pravidla bez tagů nebo bez projektu.
+      // Tagy: comma split → trim → lowercase → dedup; prázdné odfiltrovat.
+      const tagToProject: Array<{
+        name?: string | null;
+        tags: string[];
+        project: string;
+        section: string | null;
+      }> = [];
       for (const r of tagRows) {
-        const tag = r.tag.trim().toLowerCase();
         const project = r.project.trim();
-        if (!tag || !project) continue;
-        tagToProject[tag] = { project, section: r.section.trim() || null };
+        if (!project) continue;
+        const tags = Array.from(
+          new Set(
+            r.tagsInput
+              .split(",")
+              .map((t) => t.trim().toLowerCase())
+              .filter(Boolean),
+          ),
+        );
+        if (tags.length === 0) continue;
+        tagToProject.push({
+          name: r.name.trim() || null,
+          tags,
+          project,
+          section: r.section.trim() || null,
+        });
       }
       const res = await fetch("/api/integrations/todoist/config", {
         method: "PATCH",
@@ -129,13 +161,28 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
   }
 
   function addTagRow() {
-    setTagRows((prev) => [...prev, { tag: "", project: "", section: "" }]);
+    setTagRows((prev) => [...prev, { name: "", tagsInput: "", project: "", section: "" }]);
   }
-  function updateTagRow(idx: number, patch: Partial<{ tag: string; project: string; section: string }>) {
+  function updateTagRow(
+    idx: number,
+    patch: Partial<{ name: string; tagsInput: string; project: string; section: string }>,
+  ) {
     setTagRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
   function removeTagRow(idx: number) {
     setTagRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  /** Parse comma-separated tagy → array (pro chip preview pod inputem). */
+  function parseTagsPreview(input: string): string[] {
+    return Array.from(
+      new Set(
+        input
+          .split(",")
+          .map((t) => t.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
   }
 
   async function testConnection() {
@@ -358,40 +405,85 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
                     Mapping tag → projekt / sekce (pravidlo #5)
                   </div>
                   <p className="text-[11px] text-muted-foreground mb-2 leading-relaxed">
-                    Když úkol obsahuje tag (např. <code>dum</code>, <code>zdravi</code>) a žádné vyšší pravidlo nesedlo, jde do tohoto projektu. Sekce volitelná.
+                    Když úkol obsahuje <strong>kterýkoli</strong> z tagů pravidla (např. <code>dum, doma, byt, chata</code>) a žádné vyšší pravidlo nesedlo, jde do tohoto projektu. Sekce volitelná. Pořadí pravidel = priorita (první match vyhrává).
                   </p>
-                  <div className="space-y-2">
-                    {tagRows.map((row, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Input
-                          value={row.tag}
-                          onChange={(e) => updateTagRow(idx, { tag: e.target.value })}
-                          placeholder="tag"
-                          className="flex-1 min-w-0"
-                        />
-                        <span className="text-muted-foreground text-xs">→</span>
-                        <Input
-                          value={row.project}
-                          onChange={(e) => updateTagRow(idx, { project: e.target.value })}
-                          placeholder="projekt"
-                          className="flex-1 min-w-0"
-                        />
-                        <Input
-                          value={row.section}
-                          onChange={(e) => updateTagRow(idx, { section: e.target.value })}
-                          placeholder="sekce (volit.)"
-                          className="flex-1 min-w-0"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeTagRow(idx)}
-                          className="p-1.5 rounded hover:bg-destructive/15 text-muted-foreground hover:text-destructive"
-                          title="Smazat řádek"
+                  <div className="space-y-3">
+                    {tagRows.map((row, idx) => {
+                      const tagsPreview = parseTagsPreview(row.tagsInput);
+                      return (
+                        <div
+                          key={idx}
+                          className="border border-border/60 rounded-lg p-3 space-y-2 bg-background/30"
                         >
-                          <Trash2 className="size-4" />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 space-y-2">
+                              <div>
+                                <label className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground block mb-0.5">
+                                  Název pravidla (volitelné)
+                                </label>
+                                <Input
+                                  value={row.name}
+                                  onChange={(e) => updateTagRow(idx, { name: e.target.value })}
+                                  placeholder="např. Domov"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground block mb-0.5">
+                                  Tagy (čárkou oddělené)
+                                </label>
+                                <Input
+                                  value={row.tagsInput}
+                                  onChange={(e) => updateTagRow(idx, { tagsInput: e.target.value })}
+                                  placeholder="dum, doma, byt, chata"
+                                />
+                                {tagsPreview.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {tagsPreview.map((t) => (
+                                      <span
+                                        key={t}
+                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-tint-lavender/15 text-tint-lavender border border-tint-lavender/30"
+                                      >
+                                        {t}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground block mb-0.5">
+                                    Projekt
+                                  </label>
+                                  <Input
+                                    value={row.project}
+                                    onChange={(e) => updateTagRow(idx, { project: e.target.value })}
+                                    placeholder="Domov"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground block mb-0.5">
+                                    Sekce (volitelná)
+                                  </label>
+                                  <Input
+                                    value={row.section}
+                                    onChange={(e) => updateTagRow(idx, { section: e.target.value })}
+                                    placeholder=""
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeTagRow(idx)}
+                              className="p-1.5 rounded hover:bg-destructive/15 text-muted-foreground hover:text-destructive shrink-0"
+                              title="Smazat pravidlo"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                     <Button variant="outline" size="sm" onClick={addTagRow}>
                       + Přidat pravidlo
                     </Button>

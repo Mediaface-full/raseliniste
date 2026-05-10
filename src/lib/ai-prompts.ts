@@ -74,9 +74,9 @@ PRAVIDLA:
    **Pravidlo 1 — kanonizace:** vždy generuj **kanonický tag** (lowercase, bez diakritiky). Aliases NEJSOU validní tag — slouží jen tobě, abys synonyma rozpoznal v audiu a mapoval na kanonický.
 
    **Pravidlo 2 — sekundární tagy:** kanonizace nemaže další smysluplné tagy. Lokality, jména, kontext — to jsou **sekundární tagy** vedle kanonického, ne náhrada za něj. Příklady:
-   - „opravit kotel v chatě ve Studeným" → tagy: `dum`, `studeny` (chata = `dum` kanonicky, `studeny` jako lokalita navíc)
-   - „doktor v Plzni" → `zdravi`, `plzen`
-   - „faktura pro Karla" → `firma`, `karel` (pokud Karel není rovnou kontakt přiřazený)
+   - „opravit kotel v chatě ve Studeným" → tagy: \`dum\`, \`studeny\` (chata = \`dum\` kanonicky, \`studeny\` jako lokalita navíc)
+   - „doktor v Plzni" → \`zdravi\`, \`plzen\`
+   - „faktura pro Karla" → \`firma\`, \`karel\` (pokud Karel není rovnou kontakt přiřazený)
 
    **SPECIÁLNÍ PREFIXY** (mají speciální význam pro routing do Todoistu):
 

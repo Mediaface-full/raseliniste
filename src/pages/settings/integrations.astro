@@ -6,6 +6,7 @@ import SmsLog from "../../components/SmsLog";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 import { env } from "../../lib/env";
+import { normalizeTagRules } from "../../lib/task-todoist-push";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -28,8 +29,10 @@ const config = (integration?.config ?? {}) as {
   mojeUkoly?: string;
   praceProjectName?: string;
   peopleProjectName?: string;
-  tagToProject?: Record<string, { project: string; section: string | null }>;
+  // tagToProject: starý dict nebo nový array — `normalizeTagRules` zvládne oba.
+  tagToProject?: unknown;
 };
+const tagRules = normalizeTagRules(config.tagToProject);
 
 // GoSMS integrace
 const gosmsIntegration = await prisma.userIntegration.findUnique({
@@ -66,7 +69,7 @@ const publicBaseUrl = env.APP_URL || "https://www.raseliniste.cz";
         mojeUkolyProjectId: config.mojeUkoly ?? null,
         praceProjectName: config.praceProjectName ?? null,
         peopleProjectName: config.peopleProjectName ?? null,
-        tagToProject: config.tagToProject ?? {},
+        tagRules,
         lastUsedAt: integration?.lastUsedAt?.toISOString() ?? null,
         lastError: integration?.lastError ?? null,
       }}

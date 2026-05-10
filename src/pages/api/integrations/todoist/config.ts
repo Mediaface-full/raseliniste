@@ -5,6 +5,16 @@ import { readSession } from "@/lib/session";
 
 export const prerender = false;
 
+// Nový tvar tagToProject (2026-05-10 vrstva 2): array TagRule[] s multi-tag matchem.
+// Backwards-compat: i starý dict tvar `Record<string, {project, section}>` je akceptován;
+// při čtení v task-todoist-push.ts ho `normalizeTagRules()` převede na array.
+const TagRuleSchema = z.object({
+  name: z.string().max(80).nullable().optional(),
+  tags: z.array(z.string().min(1).max(60)).min(1).max(20),
+  project: z.string().min(1).max(80),
+  section: z.string().max(80).nullable(),
+});
+
 const Body = z.object({
   vyruseni: z.string().nullable().optional(),
   vip: z.string().nullable().optional(),
@@ -12,13 +22,18 @@ const Body = z.object({
   // Smart routing — NOVÉ 2026-05-10
   praceProjectName: z.string().max(80).nullable().optional(),
   peopleProjectName: z.string().max(80).nullable().optional(),
-  tagToProject: z.record(
-    z.string(),
-    z.object({
-      project: z.string().max(80),
-      section: z.string().max(80).nullable(),
-    }),
-  ).optional(),
+  tagToProject: z
+    .union([
+      z.array(TagRuleSchema).max(50), // nový tvar
+      z.record(
+        z.string(),
+        z.object({
+          project: z.string().max(80),
+          section: z.string().max(80).nullable(),
+        }),
+      ), // starý dict tvar pro zpětnou kompatibilitu
+    ])
+    .optional(),
 });
 
 export const PATCH: APIRoute = async ({ request, cookies }) => {
