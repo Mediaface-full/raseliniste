@@ -1,8 +1,10 @@
 ---
 import Shell from "../../layouts/Shell.astro";
 import IntegrationsSettings from "../../components/IntegrationsSettings";
+import GosmsSettings from "../../components/GosmsSettings";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
+import { env } from "../../lib/env";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -27,6 +29,25 @@ const config = (integration?.config ?? {}) as {
   peopleProjectName?: string;
   tagToProject?: Record<string, { project: string; section: string | null }>;
 };
+
+// GoSMS integrace
+const gosmsIntegration = await prisma.userIntegration.findUnique({
+  where: { userId_provider: { userId: session.uid, provider: "gosms" } },
+  select: { lastUsedAt: true, lastError: true, config: true },
+});
+const gosmsConfig = (gosmsIntegration?.config ?? {}) as {
+  clientId?: string;
+  defaultChannel?: number;
+  webhookSecret?: string;
+  organization?: {
+    currentCredit: number;
+    invoicingType: "Prepaid" | "Postpaid";
+    currency: "CZK" | "EUR";
+    channels: Array<{ id: number; name: string; sourceNumber: string }>;
+  };
+  organizationFetchedAt?: string;
+};
+const publicBaseUrl = env.APP_URL || "https://www.raseliniste.cz";
 ---
 
 <Shell
@@ -34,7 +55,7 @@ const config = (integration?.config ?? {}) as {
   username={user.username}
   breadcrumb={[{ label: "Nastavení" }, { label: "Integrace" }]}
 >
-  <div class="max-w-2xl">
+  <div class="max-w-2xl space-y-6">
     <IntegrationsSettings
       client:load
       initial={{
@@ -47,6 +68,21 @@ const config = (integration?.config ?? {}) as {
         tagToProject: config.tagToProject ?? {},
         lastUsedAt: integration?.lastUsedAt?.toISOString() ?? null,
         lastError: integration?.lastError ?? null,
+      }}
+    />
+
+    <GosmsSettings
+      client:load
+      initial={{
+        hasCredentials: Boolean(gosmsIntegration),
+        clientId: gosmsConfig.clientId ?? null,
+        defaultChannel: gosmsConfig.defaultChannel ?? null,
+        webhookSecret: gosmsConfig.webhookSecret ?? null,
+        organization: gosmsConfig.organization ?? null,
+        organizationFetchedAt: gosmsConfig.organizationFetchedAt ?? null,
+        publicBaseUrl,
+        lastUsedAt: gosmsIntegration?.lastUsedAt?.toISOString() ?? null,
+        lastError: gosmsIntegration?.lastError ?? null,
       }}
     />
   </div>
