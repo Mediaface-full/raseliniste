@@ -6,7 +6,7 @@ Osobní informační systém Petra „Gideona" Perniy. Jeden uživatel, maximum 
 
 > **NOVÁ SESSION:** přečti nejdřív [`INSTRUKCE/HANDOFF-2026-05-10.md`](./INSTRUKCE/HANDOFF-2026-05-10.md) — má aktuální stav, rozdělané věci a immediate next steps. Pro detailní metodologii B&W Myš viz [`INSTRUKCE/BWMYS-METODOLOGIE.md`](./INSTRUKCE/BWMYS-METODOLOGIE.md). Pro smart routing operativně [`INSTRUKCE/SMART-ROUTING.md`](./INSTRUKCE/SMART-ROUTING.md).
 
-> **Stav 2026-05-10:** přidán **Triage UI** s t-* dropdown trvání úkolu (`t-30m`/`t-1h`/`t-2h`/`t-půlden`/`t-celý-den`/`t-?`) v audio review screenu. **Smart routing** 6-úrovňový pro Todoist push: klient-tag → klient-kontakt → tým → obecný kontakt → tag-projekt → fallback. Nové fieldy `Contact.isTeam` + `Contact.clientTag`, model `RoutingAuditLog` viditelný v `/settings/crons`. AI extract prompt rozšířen o klient-* konvenci s dynamickým seznamem slugů + zákaz halucinace slugu. UI: badges v /contacts, blok Routing v editaci kontaktu, Smart routing config v `/settings/integrations`. **Sekce „Úkoly tento týden"** pod týdenním kalendářovým gridem (fáze 1) — plochý seznam s výškou karet úměrnou t-* tagu (30/60/120/240/480 px), sticky header s počtem + součtem hodin, read-only review.
+> **Stav 2026-05-10:** přidán **Triage UI** s t-* dropdown trvání úkolu (`t-30m`/`t-1h`/`t-2h`/`t-půlden`/`t-celý-den`/`t-?`) v audio review screenu. **Smart routing** 6-úrovňový pro Todoist push: klient-tag → klient-kontakt → tým → obecný kontakt → tag-projekt → fallback. Nové fieldy `Contact.isTeam` + `Contact.clientTag`, model `RoutingAuditLog` viditelný v `/settings/crons`. AI extract prompt rozšířen o klient-* konvenci s dynamickým seznamem slugů + zákaz halucinace slugu. UI: badges v /contacts, blok Routing v editaci kontaktu, Smart routing config v `/settings/integrations`. **Sekce „Úkoly tento týden"** pod týdenním kalendářovým gridem (fáze 1) — plochý seznam s výškou karet úměrnou t-* tagu (30/60/120/240/480 px), sticky header s počtem + součtem hodin, read-only review. **Alias systém** (`Contact.aliases` + `Contact.clientTagAliases` String[] + hardcoded TAG ALIASES v promptu) — AI fuzzy match přes synonyma, ale do tagu/jména vždy kanonická hodnota.
 
 ---
 
@@ -721,6 +721,20 @@ Skupina v sidebaru, sedm podstránek:
   - `/settings/crons`: tabulka „Routing audit log" posledních 30 push, butter badge `✦ project auto-create` / mint `✦ section auto-create`
 - **Triage t-\* dropdown** (commit `bcb6b8a`): v `/ukoly/audio/[batchId]/review` u každého úkolu Hourglass dropdown s pevným setem `t-?` / `t-30m` / `t-1h` / `t-2h` / `t-půlden` / `t-celý-den`. Hodnota uložena jako extra tag, t-* filtrováno z chip listu (nezdvojuje se).
 - **Operativní návod:** `INSTRUKCE/SMART-ROUTING.md` — jak nakonfigurovat (isTeam, clientTag, tagToProject), jak debug v audit logu, FAQ.
+
+### ✅ Alias systém pro AI extract (hotovo 2026-05-10, commit `9ee7a6e`)
+- **Účel:** Petr v audiu mluví o lidech a klientech různými způsoby (*„TK", „Tékáčko", „Karel z TK"*) — AI musí všechny varianty mapovat na **kanonickou** hodnotu pro routing.
+- **Schema** (migrace `add_contact_aliases`):
+  - `Contact.aliases String[] @default([])` — synonyma pro displayName/firstName
+  - `Contact.clientTagAliases String[] @default([])` — synonyma pro clientTag slug
+- **API:** `/api/contacts` POST + PATCH přijímají oba pole (max 20 položek, 1-80 znaků), server-side trim+lowercase+dedup
+- **UI:** komponenta `AliasField` v `ContactsManager.tsx` — comma-separated input + chip list pod ním (live preview). Lavender pro `aliases`, sky pro `clientTagAliases`. clientTagAliases pole je disabled pokud `clientTag` prázdný.
+- **AI extract** (`process-task-audio.ts`):
+  - Kontakty: formát `Karel Novák (aka TK, Tékáčko)` v promptu — AI fuzzy match, ale do JSON dá kanonické jméno
+  - Klient slugy: formát `tk-stavby (aka TK, TK Stavby, Tékáčko)` — AI generuje kanonický `klient-tk-stavby`
+- **AI prompt** (`ai-prompts.ts:ozvena-stage2-task`) — sekce **TAG ALIASES** s 10 hardcoded mapováními pro obecné tagy (dum/studeny/zdravi/dodavka/hobby/nakup/telefonat/email/urad/fakturace). Vždy generuj kanonický tag, aliases NEJSOU validní tag.
+- **Smart routing** v `task-todoist-push.ts` — **beze změny**. Pracuje s kanonizovanou hodnotou.
+- **Editace hardcoded TAG ALIASES:** v `src/lib/ai-prompts.ts:ozvena-stage2-task` — Petr nemá konfigurační UI, mapa je v kódu (změny v kódu, ne v DB).
 
 ### ✅ Úkoly tento týden v kalendáři — fáze 1 (hotovo 2026-05-10, commit `d9c45dc`)
 - **Účel:** vidět všechny Tasky s `dueAt` v aktuálním týdnu pod týdenním gridem se proporcionálně velkými kartami podle t-* tagu. Petr okamžitě vidí kolik času mu týden zabere bez nutnosti scrollovat /ukoly.

@@ -532,6 +532,8 @@ texty „Gíďo, máš misi", vokativ z DB. Cross-VIP průsak fyzicky nemožný 
 - VIP termín → Todoist \`due_date\` (od 2026-05-03 bez termínu = bez data, Today se neplní)
 - Mise na \`/call-log/thanks\` — VIP vidí co mu zbývá
 - Backfill tlačítko v \`/contacts\` pro existující VIP bez tokenu
+- **Smart routing fields (NOVÉ 05-10):** \`isTeam\` checkbox (kolega/dlouhodobý spolupracovník) + \`clientTag\` slug (kontaktní osoba klienta). Badges v listu: mint „tým", sky „klient-{slug}".
+- **Alias systém (NOVÉ 05-10):** \`aliases\` (synonyma jména v audiu — „Karel", „Kája") + \`clientTagAliases\` (synonyma klient slugu — „TK", „Tékáčko"). AI v extract promptu fuzzy match přes všechna synonyma, ale do JSON/tagu vždy KANONICKÁ hodnota. Comma-separated input s chip listem v edit modalu.
       `,
       co_neumi: `
 - Sdílení kontaktu mezi víc adresářů
@@ -540,9 +542,10 @@ texty „Gíďo, máš misi", vokativ z DB. Cross-VIP průsak fyzicky nemožný 
       `,
       napojeni: `
 - **Firewall** \`/firewall\` — historie zpráv s rose badge u VIP s termínem
-- **Úkoly** — VIP termín → \`Task\` + Todoist
+- **Úkoly** — VIP termín → \`Task\` + Todoist; aliases + clientTag pro smart routing
 - **Push notifikace** — VIP zpráva
 - **Dopisy** — recipient picker
+- **AI extract** (Ozvěna) — \`process-task-audio.ts\` predává seznam kontaktů s aliases ve formátu „Karel Novák (aka TK, Tékáčko)"
       `,
     },
   },

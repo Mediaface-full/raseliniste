@@ -37,6 +37,44 @@ Slug = lowercase, bez diakritiky, oddělovač pomlčka. Příklady:
 
 Můžeš mít víc kontaktních osob u jednoho klienta — všichni dostanou stejný `clientTag`. Routing pak posílá úkoly do **Práce / sekce TK Stavby** ať už delegujeme na kohokoli z nich.
 
+### 2b. Aliases — synonyma pro fuzzy match (NOVÉ 2026-05-10)
+V audiu mluvíš o lidech a klientech různě (*„TK", „Tékáčko", „Karel z TK"*). AI musí všechny varianty pochopit jako jeden kanonický klient nebo jeden kontakt. K tomu slouží alias systém.
+
+**Kde:** `/contacts` → editace → blok „Routing" → dvě pole **„Aliases"** + **„Aliasy pro clientTag"**
+
+**Aliases** (jméno kontaktu):
+- Pro: jak v audiu kontakt nazýváš jinak než jeho `displayName`/`firstName`
+- Formát: čárkou oddělené (`karlík, KN, Karel z TK`)
+- Ukládá se: trim + lowercase + dedup
+- AI v JSON proposalu vždy uloží **kanonické** jméno (displayName/firstName)
+- Pod inputem chip list ukáže co se uložilo (lavender)
+
+**Aliasy pro clientTag** (slug klienta):
+- Pro: jak klienta v audiu zmiňuješ
+- Příklad: `clientTag = "tk-stavby"` + aliases `TK, TK Stavby, Tékáčko`
+- AI v audiu rozpozná kterýkoli alias a vyrobí **kanonický** tag `klient-tk-stavby`
+- Pole je **disabled** dokud nemáš vyplněný clientTag (alias bez kanonu nedává smysl)
+- Pod inputem chip list (sky)
+
+**Routing s aliases nepracuje** — pracuje s kanonickou hodnotou (`clientTag` string). AI v extraktu už trefil správnou kanonizaci, routing pak prostě dělá svou práci.
+
+**Hardcoded TAG ALIASES** (obecné synonyma):
+AI dále zná hardcoded mapování synonym pro běžné tagy v `src/lib/ai-prompts.ts`:
+- `dum` ← doma, byt, u nás, domácnost, bydlení
+- `studeny` ← Studený, chata ve Studeným, chalupa
+- `zdravi` ← doktor, lékař, vyšetření, kontrola, zubař, recept
+- `dodavka` ← auto, Vito, vůz, servis, STK, pneumatiky
+- `hobby` ← kytara, cvičení, hraní, fitness, běh
+- `nakup` ← koupit, objednat, Alza, Mall
+- `telefonat` ← zavolat, brnknout, vytočit
+- `email` ← napsat mail, poslat zprávu
+- `urad` ← úřad, finančák, banka, ZP, sociálka
+- `fakturace` ← vystavit fakturu, doklad
+
+Když řekneš v audiu „zavolat doktorovi", AI vyrobí tagy `[telefonat, zdravi]` (kanonické tagy, žádný alias jako tag).
+
+**Editace hardcoded mapy:** pokud chceš přidat/upravit, edituj `ozvena-stage2-task` v `src/lib/ai-prompts.ts`.
+
 ### 3. Todoist konfigurace
 **Kde:** `/settings/integrations` → Todoist → blok „Smart routing"
 

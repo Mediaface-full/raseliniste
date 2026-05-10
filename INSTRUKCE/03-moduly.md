@@ -1,6 +1,6 @@
 # 03 — Moduly (přehled)
 
-Stav 2026-05-10 (Smart routing 6-úrovňový + Triage t-* dropdown + RoutingAuditLog). Detail jednotlivých modulů v `Návody/*.pdf`.
+Stav 2026-05-10 (Smart routing 6-úrovňový + Triage t-* dropdown + RoutingAuditLog + WeekTasksList + alias systém). Detail jednotlivých modulů v `Návody/*.pdf`.
 
 ## 🌅 Vstupní stránka
 
@@ -155,7 +155,7 @@ Stav 2026-05-10 (Smart routing 6-úrovňový + Triage t-* dropdown + RoutingAudi
 
 | Modul | URL | Status |
 |---|---|---|
-| Kontakty | `/contacts` | ✅ Pole pro narozeniny (birthMonth+birthDay) + 5. pád (firstNameVocative) — manuální override pro VIP oslovení. |
+| Kontakty | `/contacts` | ✅ Pole pro narozeniny (birthMonth+birthDay) + 5. pád (firstNameVocative) — manuální override pro VIP oslovení. **NOVÉ 05-10:** smart routing fields (`isTeam` checkbox + `clientTag` slug), badges v listu (mint „tým", sky „klient-{slug}"). **Alias systém** — `aliases` (synonyma jména) + `clientTagAliases` (synonyma klient slugu); comma-separated input s chip listem v edit modalu. AI v extract promptu fuzzy match přes všechna synonyma, ale do tagu/jména dá kanonickou hodnotu. |
 | Firewall historie | `/firewall` | ✅ U VIP vzkazů s vyplněným termínem rose badge „📅 do DD. M. RRRR". |
 | **Veřejné submit (Firewall)** | `/call-log` | ✅ public **DVĚ varianty** — NONVIP_TEXTS / VIP_TEXTS jako konstanty v souboru. VIP detekce přes `?phone=` v URL → DB lookup. VIP má: 5. pád oslovení, datum splnění (volitelné, type=date, min +2 dny → Todoist `due_date`), texty „Gíďo, máš misi" / „Vypusť Gíďu". Ne-VIP: „Gideon teď nezvedá". |
 | Thanks | `/call-log/thanks` | ✅ public Detekuje VIP **primárně přes `?t=<callLogToken>`** (privátní per-VIP klíč; defense-in-depth — odebrat VIP zruší link), fallback `?phone=` jen pro VIP texty. **Sekce „Giďoušovy mise"** se zobrazí POUZE pro token-ověřené VIP (otevřené nahoře, sbalitelné Hotové za 14 dní; mise zmizí automaticky když Gideon odškrtne v Todoistu). On-demand Todoist sync pokud >5 min. Ne-VIP: „Vzkaz doručen". |
