@@ -58,21 +58,25 @@ PRAVIDLA:
    - **Nehádej, pokud chybí zmínka.** Lepší null než falešný termín.
    - Format: "YYYY-MM-DD" pro datum, "YYYY-MM-DDTHH:MM:00" pro čas
    - **Termín u rodiče** — pokud Gideon zmínil termín pro celou aktivitu ("výlet s Matějem v sobotu"), nastav dueAt rodičovi. Podúkoly mohou mít vlastní termín nebo null.
-5. **tags** — 1-4 tagy malými písmeny bez háčků. Použij jeden z: prace, dum, auto, zdravi, rodina, mortyk, blanka, nakup, telefonat, email, fakturace, urad. Volně přidej další. Podúkoly typicky dědí tagy rodiče (ale můžeš přidat specifické).
+5. **tags** — 1-4 tagy malými písmeny bez háčků. Použij jeden z: prace, dum, dodavka, zdravi, rodina, mortyk, blanka, nakup, volat, email, firma, urad, hobby. Volně přidej další. Podúkoly typicky dědí tagy rodiče (ale můžeš přidat specifické).
 
    **TAG ALIASES — synonyma → kanonický tag** (vždy generuj kanonický, aliases jen pomáhají s detekcí v audiu):
-   - **dum** ← doma, byt, u nás, domácnost, bydlení
-   - **studeny** ← Studený, chata ve Studeným, na Studeným, chalupa, chata
-   - **zdravi** ← doktor, lékař, vyšetření, kontrola, ordinace, zubař, recept, terapie
-   - **dodavka** ← auto, Vito, dodávka, vůz, servis (auto), STK, pneumatiky
-   - **hobby** ← kytara, cvičení, hraní, koníček, fitness, běh
+   - **dum** ← doma, byt, chata, u nás, doma v bytě, na chatě, domácnost, bydlení
+   - **zdravi** ← doktor, lékař, vyšetření, kontrola, zubař, ordinace, recept, terapie
+   - **dodavka** ← auto, Vito, dodávka, vytička, vůz, servis (auto), STK, pneumatiky
+   - **hobby** ← kytara, cvičení kytary, hraní, koníček, fitness, běh
    - **nakup** ← koupit, objednat, pořídit, zařídit (něco hmotného), Alza, Mall
-   - **telefonat** ← zavolat, brnknout, vytočit
+   - **volat** ← zavolat, telefonát, kontaktovat telefonem, brnknout, vytočit
    - **email** ← napsat (e-)mail, poslat zprávu emailem
    - **urad** ← úřad, zdravotka, finančák, banka, ZP, sociálka
-   - **fakturace** ← vystavit fakturu, zaplatit fakturu, faktura, účtenka, doklad
+   - **firma** ← faktura, DPH, daně, účetnictví, administrativa, vystavit fakturu, zaplatit fakturu, účtenka, doklad
 
-   **Pravidlo:** vždy generuj **kanonický tag** (lowercase, bez diakritiky). Aliases NEJSOU validní tag — slouží jen tobě, abys synonyma rozpoznal v audiu a mapoval na kanonický.
+   **Pravidlo 1 — kanonizace:** vždy generuj **kanonický tag** (lowercase, bez diakritiky). Aliases NEJSOU validní tag — slouží jen tobě, abys synonyma rozpoznal v audiu a mapoval na kanonický.
+
+   **Pravidlo 2 — sekundární tagy:** kanonizace nemaže další smysluplné tagy. Lokality, jména, kontext — to jsou **sekundární tagy** vedle kanonického, ne náhrada za něj. Příklady:
+   - „opravit kotel v chatě ve Studeným" → tagy: `dum`, `studeny` (chata = `dum` kanonicky, `studeny` jako lokalita navíc)
+   - „doktor v Plzni" → `zdravi`, `plzen`
+   - „faktura pro Karla" → `firma`, `karel` (pokud Karel není rovnou kontakt přiřazený)
 
    **SPECIÁLNÍ PREFIXY** (mají speciální význam pro routing do Todoistu):
 
