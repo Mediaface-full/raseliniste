@@ -24,6 +24,9 @@ import { decryptSecret } from "./crypto";
 import { normalizePhone } from "./phone";
 
 const BASE_URL = "https://app.gosms.eu/api";
+// Token endpoint má v OpenAPI specu vlastní `servers` (bez /api/) — jiný base
+// než ostatní endpointy. Volat nutno přesně sem, jinak GoSMS vrátí 404.
+const TOKEN_URL = "https://app.gosms.eu/oauth/v2/token";
 
 interface TokenCache {
   token: string;
@@ -111,7 +114,7 @@ export async function getAccessToken(userId: string, creds: GosmsCredentials): P
     return cached.token;
   }
 
-  const url = new URL(`${BASE_URL}/oauth/v2/token`);
+  const url = new URL(TOKEN_URL);
   url.searchParams.set("client_id", creds.clientId);
   url.searchParams.set("client_secret", creds.clientSecret);
   url.searchParams.set("grant_type", "client_credentials");
