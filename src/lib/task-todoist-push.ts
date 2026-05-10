@@ -13,21 +13,35 @@ import {
  * Push standalone Task (modul Úkoly /ukoly) do Todoistu.
  * Idempotent přes Task.todoistTaskId.
  *
- * Routing podle delegace (assignedToContact):
+ * Smart routing — pořadí pravidel (top-down, první match vyhrává):
  *
- * 1. Top-level projekt s přesně jménem assignee → push tam (sdílený s daným člověkem)
- * 2. Projekt "Lidé" / "People" → najdi/vytvoř sekci jménem assignee → push tam
- * 3. Pokud "Lidé" projekt neexistuje, **vytvoř ho** + sekci s assignee → push tam
- * 4. Bez assignee → push do default mojeUkoly projektu
+ *   #0 VIP firewall submit (řeší samostatný path call-log/submit, ne tady)
+ *   #1 Tag `klient-<slug>` → projekt "Práce" / sekce <slug>
+ *   #2 assignedToContact.clientTag → projekt "Práce" / sekce <clientTag>
+ *   #3 assignedToContact.isTeam → projekt "Práce" / sekce <jméno>
+ *   #4 assignedToContact (obecný kontakt) → projekt "Lidé" / sekce <jméno>
+ *   #5 Tag z `tagToProject` mapy (např. dum → Osobní/Domov) → projekt/sekce
+ *   #6 Fallback → mojeUkoly nebo Inbox
  *
- * Tím Petr automaticky organizuje delegované úkoly do Lidé/<jméno>, a pokud
- * ten projekt sdílí s lidmi (Dominik, Agáta, ...), oni sekci uvidí nativně.
+ * t-* tagy (trvání: t-30m, t-1h, ...) se z routing logiky filtrují —
+ * jsou jen metadata, neovlivňují cíl.
+ *
+ * Auto-create projektu i sekce: pokud cíl neexistuje, Rašeliniště ho v
+ * Todoistu vytvoří. Každý auto-create se loguje do RoutingAuditLog —
+ * Petr to vidí v /settings/crons (sekce "Routing audit log").
  */
 
-const PEOPLE_PROJECT_NAME = "Lidé"; // standardní název; lze v budoucnu konfigurovat
+// Konfigurovatelné default project názvy — pokud uživatel v config nemá custom.
+const DEFAULT_PEOPLE_PROJECT = "Lidé";
+const DEFAULT_PRACE_PROJECT = "Práce";
 
-// Priority mapping je centralizován v src/lib/todoist.ts (taskPriorityToTodoist),
-// PRIORITY_MAP je lokální alias kvůli zachování signatury níže.
+// t-* tagy (trvání úkolu) — filtrujeme z routing logiky.
+const T_TAG_PREFIX = "t-";
+
+// klient-* tagy — pravidlo #1.
+const KLIENT_TAG_PREFIX = "klient-";
+
+// Priority mapping je centralizován v src/lib/todoist.ts (taskPriorityToTodoist).
 const PRIORITY_MAP = {
   high: taskPriorityToTodoist("high"),
   normal: taskPriorityToTodoist("normal"),
@@ -38,7 +52,6 @@ const PRIORITY_MAP = {
 interface CacheEntry {
   at: number;
   projects: { id: string; name: string }[];
-  // sectionsByProjectId: lazy-loaded podle potřeby
   sectionsByProjectId: Map<string, { id: string; name: string }[]>;
 }
 const cacheByToken = new Map<string, CacheEntry>();
@@ -61,78 +74,242 @@ function invalidateCache(token: string) {
   cacheByToken.delete(token);
 }
 
-/**
- * Resolve cílový projekt + sekci pro daný kontakt (firstName preferred).
- * Vytvoří Lidé projekt nebo sekci pokud chybí.
- */
-async function resolveAssigneeRoute(
+/** Najde projekt podle jména (case-insensitive). */
+function findProject(cache: CacheEntry, name: string): { id: string; name: string } | undefined {
+  const lower = name.toLowerCase();
+  return cache.projects.find((p) => p.name.toLowerCase() === lower);
+}
+
+/** Najde nebo vytvoří projekt + zaloguje auto-create info do `audit`. */
+async function ensureProject(
   token: string,
-  displayName: string,
-  firstName: string | null,
-): Promise<{ projectId: string; sectionId?: string; routedHow: string }> {
-  const candidates = [firstName, displayName].filter(Boolean) as string[];
+  name: string,
+  audit: { autoCreatedProject: boolean },
+): Promise<{ id: string; name: string }> {
   const cache = await getCache(token);
+  const existing = findProject(cache, name);
+  if (existing) return existing;
+  const created = await todoistCreateProject(token, name);
+  audit.autoCreatedProject = true;
+  invalidateCache(token);
+  return { id: created.id, name: created.name };
+}
 
-  // 1) Top-level projekt s přesně jménem
-  for (const cand of candidates) {
-    const lower = cand.toLowerCase();
-    const exact = cache.projects.find((p) => p.name.toLowerCase() === lower);
-    if (exact) {
-      return { projectId: exact.id, routedHow: `top-level project "${exact.name}"` };
-    }
-  }
-
-  // 2) Projekt "Lidé" → sekce
-  let peopleProj = cache.projects.find(
-    (p) => p.name.toLowerCase() === PEOPLE_PROJECT_NAME.toLowerCase() ||
-           p.name.toLowerCase() === "people" ||
-           p.name.toLowerCase() === "team" ||
-           p.name.toLowerCase() === "tým",
-  );
-
-  // 3) Pokud Lidé neexistuje → vytvoř
-  if (!peopleProj) {
-    const created = await todoistCreateProject(token, PEOPLE_PROJECT_NAME);
-    peopleProj = { id: created.id, name: created.name };
-    invalidateCache(token);
-  }
-
-  // Načti sekce v Lidé (cache hit pokud už načteno)
-  let sections = cache.sectionsByProjectId.get(peopleProj.id);
+/** Najde nebo vytvoří sekci v projektu + zaloguje auto-create info. */
+async function ensureSection(
+  token: string,
+  projectId: string,
+  sectionName: string,
+  audit: { autoCreatedSection: boolean },
+): Promise<{ id: string; name: string }> {
+  const cache = await getCache(token);
+  let sections = cache.sectionsByProjectId.get(projectId);
   if (!sections) {
-    const fetched = await todoistListSections(token, peopleProj.id);
+    const fetched = await todoistListSections(token, projectId);
     sections = fetched.map((s) => ({ id: s.id, name: s.name }));
-    cache.sectionsByProjectId.set(peopleProj.id, sections);
+    cache.sectionsByProjectId.set(projectId, sections);
+  }
+  const lower = sectionName.toLowerCase();
+  const existing = sections.find((s) => s.name.toLowerCase() === lower);
+  if (existing) return existing;
+  const created = await todoistCreateSection(token, sectionName, projectId);
+  const fresh = { id: created.id, name: created.name };
+  sections.push(fresh);
+  audit.autoCreatedSection = true;
+  return fresh;
+}
+
+interface RouteResolution {
+  projectId: string | undefined;
+  sectionId?: string;
+  routedHow: string;
+  rule: string;
+  matchedValue: string | null;
+  projectName: string | null;
+  sectionName: string | null;
+  autoCreatedProject: boolean;
+  autoCreatedSection: boolean;
+}
+
+interface RouteContext {
+  token: string;
+  fallbackProjectId: string | undefined;     // mojeUkoly / Inbox
+  praceProjectName: string;                  // typicky "Práce"
+  peopleProjectName: string;                 // typicky "Lidé"
+  tagToProject: Record<string, { project: string; section: string | null }>;
+}
+
+/**
+ * Resolve cílový projekt + sekci.
+ * Vrací RouteResolution s metadaty pro audit log.
+ */
+async function resolveRoute(
+  ctx: RouteContext,
+  task: {
+    tags: string[];
+    assignedToContact: {
+      displayName: string;
+      firstName: string | null;
+      isTeam: boolean;
+      clientTag: string | null;
+    } | null;
+  },
+): Promise<RouteResolution> {
+  const audit = { autoCreatedProject: false, autoCreatedSection: false };
+
+  // Filtr t-* (jsou meta, ne routing) — pravidlo #1 i #5 hledá v očištěném seznamu
+  const routableTags = task.tags.filter((t) => !t.startsWith(T_TAG_PREFIX));
+
+  // ---- #1 Tag klient-<slug> → Práce / sekce <slug> ----
+  const klientTag = routableTags.find((t) => t.startsWith(KLIENT_TAG_PREFIX));
+  if (klientTag) {
+    const slug = klientTag.slice(KLIENT_TAG_PREFIX.length);
+    const sectionName = humanizeSlug(slug);
+    const project = await ensureProject(ctx.token, ctx.praceProjectName, audit);
+    const section = await ensureSection(ctx.token, project.id, sectionName, audit);
+    return {
+      projectId: project.id,
+      sectionId: section.id,
+      routedHow: `[klient-tag] "${ctx.praceProjectName}" → "${section.name}"`,
+      rule: "klient-tag",
+      matchedValue: slug,
+      projectName: project.name,
+      sectionName: section.name,
+      ...audit,
+    };
   }
 
-  // Najdi sekci podle jména
-  let section: { id: string; name: string } | undefined;
-  for (const cand of candidates) {
-    const lower = cand.toLowerCase();
-    section = sections.find((s) => s.name.toLowerCase() === lower);
-    if (section) break;
+  // ---- #2 assignedToContact.clientTag → Práce / sekce ----
+  if (task.assignedToContact?.clientTag) {
+    const slug = task.assignedToContact.clientTag;
+    const sectionName = humanizeSlug(slug);
+    const project = await ensureProject(ctx.token, ctx.praceProjectName, audit);
+    const section = await ensureSection(ctx.token, project.id, sectionName, audit);
+    return {
+      projectId: project.id,
+      sectionId: section.id,
+      routedHow: `[klient-contact] "${ctx.praceProjectName}" → "${section.name}"`,
+      rule: "klient-contact",
+      matchedValue: `${task.assignedToContact.displayName} → ${slug}`,
+      projectName: project.name,
+      sectionName: section.name,
+      ...audit,
+    };
   }
 
-  // Vytvoř sekci pokud neexistuje
-  if (!section) {
-    const sectionName = firstName ?? displayName;
-    const createdSection = await todoistCreateSection(token, sectionName, peopleProj.id);
-    section = { id: createdSection.id, name: createdSection.name };
-    sections.push(section);
+  // ---- #3 assignedToContact.isTeam → Práce / sekce <jméno> ----
+  if (task.assignedToContact?.isTeam) {
+    const sectionName = task.assignedToContact.firstName ?? task.assignedToContact.displayName;
+    const project = await ensureProject(ctx.token, ctx.praceProjectName, audit);
+    const section = await ensureSection(ctx.token, project.id, sectionName, audit);
+    return {
+      projectId: project.id,
+      sectionId: section.id,
+      routedHow: `[team] "${ctx.praceProjectName}" → "${section.name}"`,
+      rule: "team",
+      matchedValue: sectionName,
+      projectName: project.name,
+      sectionName: section.name,
+      ...audit,
+    };
   }
 
+  // ---- #4 assignedToContact (obecný kontakt) → Lidé / sekce <jméno> ----
+  if (task.assignedToContact) {
+    // Edge case: top-level projekt s přesně jménem kontaktu (sdílený projekt)
+    // — preferovat před sekcí v Lidé. Zachováno z předchozí logiky.
+    const cache = await getCache(ctx.token);
+    const candidates = [task.assignedToContact.firstName, task.assignedToContact.displayName].filter(Boolean) as string[];
+    for (const cand of candidates) {
+      const exact = findProject(cache, cand);
+      if (exact) {
+        return {
+          projectId: exact.id,
+          routedHow: `[shared-project] "${exact.name}"`,
+          rule: "people",
+          matchedValue: cand,
+          projectName: exact.name,
+          sectionName: null,
+          ...audit,
+        };
+      }
+    }
+
+    const sectionName = task.assignedToContact.firstName ?? task.assignedToContact.displayName;
+    const project = await ensureProject(ctx.token, ctx.peopleProjectName, audit);
+    const section = await ensureSection(ctx.token, project.id, sectionName, audit);
+    return {
+      projectId: project.id,
+      sectionId: section.id,
+      routedHow: `[people] "${ctx.peopleProjectName}" → "${section.name}"`,
+      rule: "people",
+      matchedValue: sectionName,
+      projectName: project.name,
+      sectionName: section.name,
+      ...audit,
+    };
+  }
+
+  // ---- #5 Tag z tagToProject mapy → konfigurovatelný projekt/sekce ----
+  for (const tag of routableTags) {
+    const mapping = ctx.tagToProject[tag];
+    if (!mapping) continue;
+    const project = await ensureProject(ctx.token, mapping.project, audit);
+    let sectionId: string | undefined;
+    let sectionName: string | null = null;
+    if (mapping.section) {
+      const section = await ensureSection(ctx.token, project.id, mapping.section, audit);
+      sectionId = section.id;
+      sectionName = section.name;
+    }
+    return {
+      projectId: project.id,
+      sectionId,
+      routedHow: `[personal-tag] "${project.name}"${sectionName ? ` → "${sectionName}"` : ""}`,
+      rule: "personal-tag",
+      matchedValue: tag,
+      projectName: project.name,
+      sectionName,
+      ...audit,
+    };
+  }
+
+  // ---- #6 Fallback → mojeUkoly nebo Inbox ----
   return {
-    projectId: peopleProj.id,
-    sectionId: section.id,
-    routedHow: `project "${peopleProj.name}" → section "${section.name}"`,
+    projectId: ctx.fallbackProjectId,
+    routedHow: ctx.fallbackProjectId ? "[fallback] mojeUkoly" : "[fallback] Inbox",
+    rule: "fallback",
+    matchedValue: null,
+    projectName: null,
+    sectionName: null,
+    ...audit,
   };
+}
+
+/** Slug → human-readable section name. Např. "tk-stavby" → "TK Stavby". */
+function humanizeSlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((w) => {
+      // Zachovat zkratky (TK, IT, OSVČ) v capslocku pokud kratší než 4 a vše malé
+      if (w.length <= 3 && w === w.toLowerCase()) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(" ");
+}
+
+interface IntegrationConfig {
+  mojeUkoly?: string;
+  praceProjectName?: string;
+  peopleProjectName?: string;
+  tagToProject?: Record<string, { project: string; section: string | null }>;
 }
 
 export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: string; projectId: string; routedHow: string }> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: {
-      assignedToContact: { select: { displayName: true, firstName: true } },
+      assignedToContact: { select: { displayName: true, firstName: true, isTeam: true, clientTag: true } },
       parent: { select: { id: true, todoistTaskId: true, todoistProjectId: true } },
     },
   });
@@ -145,8 +322,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
     };
   }
 
-  // Pokud má rodiče, ten musí být pushnutý PŘED dětmi (potřebujeme jeho Todoist ID).
-  // Auto-push parent rekurzivně pokud chybí.
+  // Subtask: musí jít do stejného projektu jako rodič (Todoist requirement).
   let todoistParentId: string | undefined;
   let parentRoutedProjectId: string | undefined;
   if (task.parentId) {
@@ -154,7 +330,6 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
       todoistParentId = task.parent.todoistTaskId;
       parentRoutedProjectId = task.parent.todoistProjectId ?? undefined;
     } else {
-      // Recurzivní push rodiče (max 1 úroveň, hierarchii máme jen 1 hloubku)
       const parentResult = await pushTaskToTodoist(task.parentId);
       todoistParentId = parentResult.taskId;
       parentRoutedProjectId = parentResult.projectId || undefined;
@@ -173,30 +348,36 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
     iv: integration.tokenIv,
     tag: integration.tokenTag,
   });
-  const cfg = ((integration.config as unknown) ?? {}) as { mojeUkoly?: string };
+  const cfg = ((integration.config as unknown) ?? {}) as IntegrationConfig;
 
-  // Routing
-  // Pokud je to subtask, MUSÍ jít do stejného projektu jako rodič (Todoist requirement).
-  // Routing podle assignee se v tom případě ignoruje — subtask dědí kontext rodiče.
-  let projectId: string | undefined = parentRoutedProjectId ?? cfg.mojeUkoly ?? undefined;
+  // Routing — subtask dědí z rodiče, jinak smart routing.
+  let projectId: string | undefined;
   let sectionId: string | undefined;
-  let routedHow = todoistParentId
-    ? "inherited from parent"
-    : "default mojeUkoly";
+  let routedHow: string;
+  let routeMeta: RouteResolution | null = null;
 
-  if (task.assignedToContact && !todoistParentId) {
+  if (todoistParentId) {
+    projectId = parentRoutedProjectId;
+    routedHow = "inherited from parent";
+  } else {
+    const ctx: RouteContext = {
+      token,
+      fallbackProjectId: cfg.mojeUkoly,
+      praceProjectName: cfg.praceProjectName ?? DEFAULT_PRACE_PROJECT,
+      peopleProjectName: cfg.peopleProjectName ?? DEFAULT_PEOPLE_PROJECT,
+      tagToProject: cfg.tagToProject ?? {},
+    };
     try {
-      const r = await resolveAssigneeRoute(
-        token,
-        task.assignedToContact.displayName,
-        task.assignedToContact.firstName,
-      );
-      projectId = r.projectId;
-      sectionId = r.sectionId;
-      routedHow = r.routedHow;
+      routeMeta = await resolveRoute(ctx, {
+        tags: task.tags,
+        assignedToContact: task.assignedToContact ?? null,
+      });
+      projectId = routeMeta.projectId;
+      sectionId = routeMeta.sectionId;
+      routedHow = routeMeta.routedHow;
     } catch (e) {
-      // Fallback na default při chybě (např. Todoist 5xx)
-      console.warn(`[task-todoist-push] resolveAssigneeRoute failed:`, e);
+      console.warn("[task-todoist-push] resolveRoute failed:", e);
+      projectId = cfg.mojeUkoly;
       routedHow = `fallback default (resolve failed: ${e instanceof Error ? e.message : String(e)})`;
     }
   }
@@ -207,9 +388,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
   if (task.rawSnippet) descLines.push(`\n_„${task.rawSnippet}"_`);
   descLines.push(`\n_Z Rašeliniště — ${new Date(task.createdAt).toLocaleString("cs-CZ")} · ${routedHow}_`);
 
-  // Due — Todoist v1 má 3 oddělená pole. due_string je natural-language parser
-  // ("today", "tomorrow at 9am") → tam ISO necpat. Pro datum-only → due_date,
-  // pro datum+čas → due_datetime (RFC3339, timezone-aware).
+  // Due — Todoist v1 má 3 oddělená pole.
   let due_date: string | undefined;
   let due_datetime: string | undefined;
   if (task.dueAt) {
@@ -220,10 +399,11 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
     }
   }
 
-  // Labels — diakritika removed + lowercase + slug
+  // Labels — diakritika removed + lowercase + slug. t-* a klient-* už jsou
+  // formátované, ale projedou normalizací bezpečně.
   const labels = ["raseliniste", ...task.tags].map((t) =>
     t.normalize("NFD").replace(/[̀-ͯ]/g, "")
-      .toLowerCase().replace(/\s+/g, "-").slice(0, 30),
+      .toLowerCase().replace(/\s+/g, "-").slice(0, 60),
   );
 
   try {
@@ -232,7 +412,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
       description: descLines.join("\n").slice(0, 16000) || undefined,
       project_id: projectId,
       section_id: sectionId,
-      parent_id: todoistParentId, // pokud subtask, vytvoří se pod rodičem
+      parent_id: todoistParentId,
       priority: PRIORITY_MAP[task.priority],
       due_date,
       due_datetime,
@@ -253,6 +433,25 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
       where: { id: integration.id },
       data: { lastUsedAt: new Date(), lastError: null },
     });
+
+    // Audit log — fire-and-forget (nejde o critical path)
+    if (routeMeta) {
+      void prisma.routingAuditLog.create({
+        data: {
+          userId: task.userId,
+          taskId: task.id,
+          taskTitle: task.title.slice(0, 500),
+          rule: routeMeta.rule,
+          matchedValue: routeMeta.matchedValue,
+          todoistProjectName: routeMeta.projectName,
+          todoistSectionName: routeMeta.sectionName,
+          todoistProjectId: created.project_id,
+          todoistSectionId: created.section_id ?? null,
+          autoCreatedProject: routeMeta.autoCreatedProject,
+          autoCreatedSection: routeMeta.autoCreatedSection,
+        },
+      }).catch((err) => console.warn("[task-todoist-push] audit log skip:", err));
+    }
 
     return { taskId: created.id, projectId: created.project_id, routedHow };
   } catch (e) {

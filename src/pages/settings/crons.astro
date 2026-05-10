@@ -17,6 +17,23 @@ if (!user) return Astro.redirect("/login");
 const runs = await prisma.cronRun.findMany();
 const map = new Map(runs.map((r) => [r.jobName, r]));
 
+// Routing audit log — posledních 30 záznamů, auto-create flagy zvýrazněné
+const auditLogs = await prisma.routingAuditLog.findMany({
+  where: { userId: session.uid },
+  orderBy: { createdAt: "desc" },
+  take: 30,
+});
+
+const RULE_LABEL: Record<string, string> = {
+  "vip": "🔒 VIP firewall",
+  "klient-tag": "#1 klient-* tag",
+  "klient-contact": "#2 klient-kontakt",
+  "team": "#3 tým",
+  "people": "#4 obecný kontakt",
+  "personal-tag": "#5 osobní tag",
+  "fallback": "#6 fallback",
+};
+
 function describeSchedule(s: Schedule): string {
   switch (s.type) {
     case "every": return `každých ${s.minutes} min`;
@@ -119,6 +136,85 @@ const latestTrigger = runs.reduce<Date | null>((acc, r) => {
       <div><strong>Manuální spuštění úlohy:</strong> každý job má vlastní endpoint <code class="font-mono">/api/cron/&lt;name&gt;</code> (POST s <code class="font-mono">x-cron-key</code>). Slouží pro debug i mimo scheduler.</div>
       <div><strong>Dry-run:</strong> <code class="font-mono">POST /api/cron/scheduler?dryRun=1</code> vrátí co BY se spustilo, nic neexecutuje.</div>
       <div><strong>Definice:</strong> <code class="font-mono">src/lib/cron-schedule.ts</code> (změny v kódu, ne v DSM UI).</div>
+    </div>
+
+    {/* === Routing audit log === */}
+    <div class="glass-strong rounded-xl p-4 space-y-3 mt-6">
+      <div class="flex items-baseline gap-3 flex-wrap">
+        <h2 class="font-serif text-xl">Routing audit log</h2>
+        <span class="text-xs font-mono text-muted-foreground">
+          posledních {auditLogs.length} push do Todoistu
+        </span>
+      </div>
+      <p class="text-xs text-muted-foreground leading-relaxed">
+        Smart routing rozhoduje kam Todoist úkol půjde. Auto-create projektu/sekce (=
+        Rašeliniště vytvořilo nový resource v Todoistu) je zvýrazněn — koukni jestli to
+        odpovídá očekávání nebo zda nedochází k „klient-*" halucinacím.
+      </p>
+
+      {auditLogs.length === 0 ? (
+        <div class="rounded-md p-4 text-center text-sm text-muted-foreground bg-black/20">
+          Zatím žádné push do Todoistu. Po prvním pushtí úkolu se zobrazí tady.
+        </div>
+      ) : (
+        <div class="overflow-x-auto -mx-4 px-4">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b border-white/10">
+                <th class="px-2 py-1.5 font-mono">kdy</th>
+                <th class="px-2 py-1.5 font-mono">pravidlo</th>
+                <th class="px-2 py-1.5 font-mono">úkol</th>
+                <th class="px-2 py-1.5 font-mono">→ Todoist</th>
+              </tr>
+            </thead>
+            <tbody>
+              {auditLogs.map((log) => (
+                <tr class="border-b border-white/[0.04]">
+                  <td class="px-2 py-2 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                    {log.createdAt.toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td class="px-2 py-2 whitespace-nowrap">
+                    <span class="font-mono text-[11px]">{RULE_LABEL[log.rule] ?? log.rule}</span>
+                    {log.matchedValue && (
+                      <div class="text-[10px] text-muted-foreground/80 mt-0.5">{log.matchedValue}</div>
+                    )}
+                  </td>
+                  <td class="px-2 py-2 max-w-xs truncate" title={log.taskTitle}>{log.taskTitle}</td>
+                  <td class="px-2 py-2">
+                    <div class="flex items-baseline gap-1.5 flex-wrap">
+                      <span class="font-medium">{log.todoistProjectName ?? "(default)"}</span>
+                      {log.todoistSectionName && (
+                        <>
+                          <span class="text-muted-foreground">/</span>
+                          <span>{log.todoistSectionName}</span>
+                        </>
+                      )}
+                      {log.autoCreatedProject && (
+                        <span
+                          class="text-[9px] uppercase tracking-wider font-mono px-1 py-0.5 rounded"
+                          style="background: color-mix(in oklch, var(--tint-butter) 18%, transparent); color: color-mix(in oklch, var(--tint-butter) 95%, white);"
+                          title="Projekt vznikl automaticky při push"
+                        >
+                          ✦ project auto-create
+                        </span>
+                      )}
+                      {log.autoCreatedSection && (
+                        <span
+                          class="text-[9px] uppercase tracking-wider font-mono px-1 py-0.5 rounded"
+                          style="background: color-mix(in oklch, var(--tint-mint) 18%, transparent); color: color-mix(in oklch, var(--tint-mint) 95%, white);"
+                          title="Sekce vznikla automaticky při push"
+                        >
+                          ✦ section auto-create
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   </div>
 </Shell>

@@ -19,7 +19,14 @@ const integration = await prisma.userIntegration.findUnique({
 });
 
 const hasToken = Boolean(integration);
-const config = (integration?.config ?? {}) as { vyruseni?: string; vip?: string; mojeUkoly?: string };
+const config = (integration?.config ?? {}) as {
+  vyruseni?: string;
+  vip?: string;
+  mojeUkoly?: string;
+  praceProjectName?: string;
+  peopleProjectName?: string;
+  tagToProject?: Record<string, { project: string; section: string | null }>;
+};
 ---
 
 <Shell
@@ -35,6 +42,9 @@ const config = (integration?.config ?? {}) as { vyruseni?: string; vip?: string;
         vyruseniProjectId: config.vyruseni ?? null,
         vipProjectId: config.vip ?? null,
         mojeUkolyProjectId: config.mojeUkoly ?? null,
+        praceProjectName: config.praceProjectName ?? null,
+        peopleProjectName: config.peopleProjectName ?? null,
+        tagToProject: config.tagToProject ?? {},
         lastUsedAt: integration?.lastUsedAt?.toISOString() ?? null,
         lastError: integration?.lastError ?? null,
       }}

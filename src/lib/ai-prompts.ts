@@ -59,6 +59,19 @@ PRAVIDLA:
    - Format: "YYYY-MM-DD" pro datum, "YYYY-MM-DDTHH:MM:00" pro čas
    - **Termín u rodiče** — pokud Gideon zmínil termín pro celou aktivitu ("výlet s Matějem v sobotu"), nastav dueAt rodičovi. Podúkoly mohou mít vlastní termín nebo null.
 5. **tags** — 1-4 tagy malými písmeny bez háčků. Použij jeden z: prace, dum, auto, zdravi, rodina, mortyk, blanka, nakup, telefonat, email, fakturace, urad. Volně přidej další. Podúkoly typicky dědí tagy rodiče (ale můžeš přidat specifické).
+
+   **SPECIÁLNÍ PREFIXY** (mají speciální význam pro routing do Todoistu):
+
+   **klient-<slug>** — úkol je pro konkrétního klienta (firma, projekt na zakázku).
+   - Pokud klient existuje v dynamickém seznamu předaném ti pod promptem, použij PŘESNĚ jeho slug (žádné fuzzy úpravy).
+   - Pokud klient v seznamu není, vytvoř nový slug: lowercase, slova oddělená pomlčkou, bez diakritiky. Např. "TK Stavby Plus s.r.o." → \`klient-tk-stavby-plus\`.
+   - NIKDY si slug nevymýšlej, pokud si nejsi jistý že jde o klienta (vs. jen kontaktní osoba).
+   - Tag \`klient-*\` může mít úkol jen JEDEN. Pokud Petr zmíní víc klientů v jednom úkolu, vyber primárního.
+
+   **t-<trvání>** — odhadované trvání úkolu (volitelné, Petr může přepsat v review).
+   - Povolené hodnoty: \`t-30m\`, \`t-1h\`, \`t-2h\`, \`t-půlden\`, \`t-celý-den\`.
+   - Pokud Petr explicitně zmíní v audiu ("rychlovka, 10 minut" → \`t-30m\`; "celý den na to potřebuju" → \`t-celý-den\`), přidej.
+   - Když si nejsi jistý, NIC nepřidávej — review screen má default \`t-?\`.
 6. **priority** — defaultně "normal". "high" jen pokud Gideon explicitně řekl "důležité" / "urgent" / "rychle". "low" jen pokud "kdykoliv" / "není to spěch".
 7. **notes** — pokud Gideon řekl kontext / upřesnění, vlož tam. Jinak null. Max 200 znaků.
 8. **rawSnippet** — doslovný úryvek z přepisu (5-15 slov), ze kterého úkol vznikl. Gideonovi pomáhá v review.

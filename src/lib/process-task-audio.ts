@@ -130,13 +130,20 @@ export async function extractTaskProposals(transcript: string, opts?: { userId?:
   // Kontakty (delegace) — filtr na vlastníka pokud znám userId.
   const contacts = await prisma.contact.findMany({
     where: userId ? { userId } : undefined,
-    select: { displayName: true, firstName: true },
+    select: { displayName: true, firstName: true, clientTag: true, isTeam: true },
     take: 200,
   });
   const contactNames = Array.from(new Set([
     ...contacts.map((c) => c.firstName).filter(Boolean) as string[],
     ...contacts.map((c) => c.displayName),
   ])).filter((n) => n.length >= 2);
+
+  // Distinct seznam slugů klientů — používá se v promptu pro routing #1
+  // (Gemini má povolené přidat tag `klient-<slug>`, MUSÍ vybrat ze seznamu
+  // nebo vytvořit nový — žádné fuzzy úpravy existujícího slugu).
+  const clientSlugs = Array.from(new Set(
+    contacts.map((c) => c.clientTag).filter(Boolean) as string[],
+  )).sort();
 
   // Dynamický seznam tagů — top tagy z existujících Task + Todoist labels mirror.
   // AI tak používá Petrovu skutečnou strukturu, ne hardcoded whitelist v promptu.
@@ -184,6 +191,16 @@ ${contactNames.length > 0 ? contactNames.slice(0, 50).join(", ") : "(žádné)"}
 
 PREFEROVANÉ TAGY (skutečné struktury Petrova systému — vyber primárně z těchto, jen pokud ne padne přesně, klidně přidej nový):
 ${preferredTags.length > 0 ? preferredTags.join(", ") : "(žádné — použij obecné kategorie z hlavního promptu)"}
+
+KLIENT TAGY — pravidlo prefixu \`klient-<slug>\`:
+Stávající klienti (slug → název v DB): ${clientSlugs.length > 0 ? clientSlugs.join(", ") : "(žádný)"}
+
+PRAVIDLA pro klient-* tagy (POVINNĚ DODRŽ, nesmíš porušit):
+- Když v audiu Petr mluví o úkolu pro KLIENTA (firma, projekt na zakázku), přidej tag \`klient-<slug>\`.
+- Pokud klient JIŽ EXISTUJE v seznamu výše, použij PŘESNĚ ten slug — žádné fuzzy úpravy ("tk-stavby" NIKDY ne "tk_stavby" / "tkstavby" / "stavby-tk").
+- Pokud klient v seznamu NENÍ, vytvoř NOVÝ slug podle vzoru: lowercase, slova oddělená pomlčkou, bez diakritiky. Příklad: "TK Stavby Plus s.r.o." → \`klient-tk-stavby-plus\`. "Mortyk Design" → \`klient-mortyk-design\`.
+- NIKDY si slug nevymýšlej. Pokud si nejsi 100% jistý, že jde o klienta (vs. jen kontakt = osoba), tag \`klient-*\` nepřidávej.
+- Tag \`klient-*\` může mít úkol jen JEDEN. Pokud Petr zmíní víc klientů v jednom úkolu, vyber primárního.
 
 REFERENCE DATE: dnes je ${todayStr} (${dayCz})
 

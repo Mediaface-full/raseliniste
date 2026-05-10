@@ -278,6 +278,18 @@ model Contact {
   isFamily            Boolean        @default(false)
   defaultBookingMode  BookingMode?
 
+  // Tým member — pro Todoist smart routing #3 (tým = lidé s kterými Petr
+  // dlouhodobě pracuje, např. Dominik, Agáta). NOVÉ 2026-05-10.
+  // Routing: assignee s isTeam=true → projekt "Práce" / sekce <jméno>.
+  isTeam              Boolean        @default(false)
+
+  // Slug klienta — kontakt patří k tomuto klientovi (např. tk-stavby).
+  // Jeden kontakt = jeden klient (kontaktní osoba). Routing #2: assignee
+  // s clientTag → projekt "Práce" / sekce odpovídající slugu.
+  // Také použito v AI extract promptu — Gemini získá distinct seznam slugů
+  // a v audiu je rozpoznává jako tag `klient-<slug>`. NOVÉ 2026-05-10.
+  clientTag           String?
+
   // Narozeniny — stačí den a měsíc (rok obvykle neznámý)
   birthMonth   Int?
   birthDay     Int?
@@ -1484,6 +1496,31 @@ model CronRun {
   errorCount      Int       @default(0)
 
   @@index([jobName])
+}
+
+// Audit log pro Todoist routing — kde úkol skončil + proč.
+// Viditelný v /settings/crons (sekce "Routing audit log").
+// Smaže se po 30 dnech (cron cleanup-audit-log nebo manuálně).
+// NOVÉ 2026-05-10 — kvůli auto-create projektu/sekce ať Petr vidí
+// kdy a proč Rašeliniště vytvořilo nový Todoist resource.
+model RoutingAuditLog {
+  id              String    @id @default(cuid())
+  userId          String
+  taskId          String?   // Task.id v Rašeliništi (může být null pro VIP route)
+  taskTitle       String    // snapshot — task se může smazat
+  rule            String    // "vip" | "klient-tag" | "klient-contact" | "team" | "people" | "personal-tag" | "fallback"
+  matchedValue    String?   // konkrétní hodnota co matchla (např. "tk-stavby", "Dominik", "dum")
+  todoistProjectName String?
+  todoistSectionName String?
+  todoistProjectId   String?
+  todoistSectionId   String?
+  autoCreatedProject Boolean @default(false) // true pokud projekt vznikl při push
+  autoCreatedSection Boolean @default(false) // true pokud sekce vznikla při push
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, autoCreatedProject])
+  @@index([userId, autoCreatedSection])
 }
 
 model DecisionEvaluation {

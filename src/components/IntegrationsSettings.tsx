@@ -3,11 +3,19 @@ import { Check, Loader2, Plug, Trash2, TriangleAlert, Key, Folder, Star } from "
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
+interface TagMapping {
+  project: string;
+  section: string | null;
+}
+
 interface InitialProps {
   hasToken: boolean;
   vyruseniProjectId: string | null;
   vipProjectId: string | null;
   mojeUkolyProjectId: string | null;
+  praceProjectName: string | null;
+  peopleProjectName: string | null;
+  tagToProject: Record<string, TagMapping>;
   lastUsedAt: string | null;
   lastError: string | null;
 }
@@ -29,6 +37,14 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
   const [vyruseni, setVyruseni] = useState(initial.vyruseniProjectId ?? "");
   const [vip, setVip] = useState(initial.vipProjectId ?? "");
   const [mojeUkoly, setMojeUkoly] = useState(initial.mojeUkolyProjectId ?? "");
+  // Smart routing config — názvy projektů (Petr přepíše defaultní pokud chce jiný název)
+  const [praceProjectName, setPraceProjectName] = useState(initial.praceProjectName ?? "Práce");
+  const [peopleProjectName, setPeopleProjectName] = useState(initial.peopleProjectName ?? "Lidé");
+  // Mapping tag → projekt/sekce. Editujeme jako list (tag, project, section).
+  const initialTagRows = Object.entries(initial.tagToProject).map(([tag, m]) => ({ tag, project: m.project, section: m.section ?? "" }));
+  const [tagRows, setTagRows] = useState<{ tag: string; project: string; section: string }[]>(
+    initialTagRows.length > 0 ? initialTagRows : []
+  );
   const [loadingProjects, setLoadingProjects] = useState(false);
   const lastUsed = initial.lastUsedAt ? new Date(initial.lastUsedAt) : null;
   const lastErr = initial.lastError;
@@ -78,6 +94,14 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
     setError(null);
     setSaving(true);
     try {
+      // Sestav tagToProject mapu (vynechaj prázdné tagy nebo projekty)
+      const tagToProject: Record<string, { project: string; section: string | null }> = {};
+      for (const r of tagRows) {
+        const tag = r.tag.trim().toLowerCase();
+        const project = r.project.trim();
+        if (!tag || !project) continue;
+        tagToProject[tag] = { project, section: r.section.trim() || null };
+      }
       const res = await fetch("/api/integrations/todoist/config", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -85,6 +109,9 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
           vyruseni: vyruseni || null,
           vip: vip || null,
           mojeUkoly: mojeUkoly || null,
+          praceProjectName: praceProjectName.trim() || null,
+          peopleProjectName: peopleProjectName.trim() || null,
+          tagToProject,
         }),
       });
       const data = await res.json();
@@ -99,6 +126,16 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
     } finally {
       setSaving(false);
     }
+  }
+
+  function addTagRow() {
+    setTagRows((prev) => [...prev, { tag: "", project: "", section: "" }]);
+  }
+  function updateTagRow(idx: number, patch: Partial<{ tag: string; project: string; section: string }>) {
+    setTagRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
+  function removeTagRow(idx: number) {
+    setTagRows((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function testConnection() {
@@ -271,6 +308,95 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
                 <p className="text-[11px] text-muted-foreground">
                   Kam chodí tvoje vlastní úkoly z diktátu přes tlačítko „Do Todoistu" na stránce /tasks.
                 </p>
+              </div>
+
+              {/* Smart routing — nový blok 2026-05-10 */}
+              <div
+                className="rounded-lg p-4 space-y-3 mt-2"
+                style={{
+                  background: "color-mix(in oklch, var(--tint-mint) 5%, transparent)",
+                  border: "1px solid color-mix(in oklch, var(--tint-mint) 25%, transparent)",
+                }}
+              >
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground mb-1">
+                    Smart routing
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Pravidla pro Todoist routing úkolů (top-down):
+                    klient-tag → Práce/sekce, klient-kontakt → Práce/sekce, tým → Práce/sekce,
+                    obecný kontakt → Lidé/sekce, tag → konfigurovaný projekt, jinak fallback.
+                    Pokud projekt/sekce neexistuje, Rašeliniště ji v Todoistu vytvoří
+                    (auto-create se loguje v <a href="/settings/crons" class="underline">Routing audit logu</a>).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground block mb-1">
+                    Název projektu „Práce" (kam jdou úkoly s klient-* tagy + tým)
+                  </label>
+                  <Input
+                    value={praceProjectName}
+                    onChange={(e) => setPraceProjectName(e.target.value)}
+                    placeholder="Práce"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground block mb-1">
+                    Název projektu „Lidé" (kam jdou delegace na obecné kontakty)
+                  </label>
+                  <Input
+                    value={peopleProjectName}
+                    onChange={(e) => setPeopleProjectName(e.target.value)}
+                    placeholder="Lidé"
+                  />
+                </div>
+
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground mb-1">
+                    Mapping tag → projekt / sekce (pravidlo #5)
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mb-2 leading-relaxed">
+                    Když úkol obsahuje tag (např. <code>dum</code>, <code>zdravi</code>) a žádné vyšší pravidlo nesedlo, jde do tohoto projektu. Sekce volitelná.
+                  </p>
+                  <div className="space-y-2">
+                    {tagRows.map((row, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          value={row.tag}
+                          onChange={(e) => updateTagRow(idx, { tag: e.target.value })}
+                          placeholder="tag"
+                          className="flex-1 min-w-0"
+                        />
+                        <span className="text-muted-foreground text-xs">→</span>
+                        <Input
+                          value={row.project}
+                          onChange={(e) => updateTagRow(idx, { project: e.target.value })}
+                          placeholder="projekt"
+                          className="flex-1 min-w-0"
+                        />
+                        <Input
+                          value={row.section}
+                          onChange={(e) => updateTagRow(idx, { section: e.target.value })}
+                          placeholder="sekce (volit.)"
+                          className="flex-1 min-w-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeTagRow(idx)}
+                          className="p-1.5 rounded hover:bg-destructive/15 text-muted-foreground hover:text-destructive"
+                          title="Smazat řádek"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addTagRow}>
+                      + Přidat pravidlo
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               <Button onClick={saveConfig} disabled={saving}>

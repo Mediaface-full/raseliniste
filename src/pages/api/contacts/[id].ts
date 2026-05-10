@@ -15,6 +15,10 @@ const PatchBody = z.object({
   lastName: z.string().max(100).nullable().optional(),
   note: z.string().max(2000).nullable().optional(),
   isVip: z.boolean().optional(),
+  isTeam: z.boolean().optional(),
+  // Slug klienta — povolen jen lowercase, číslice, pomlčka. Server-side
+  // poslední bezpečnost před AI-generated slugy.
+  clientTag: z.string().max(60).regex(/^[a-z0-9-]*$/, "Slug může obsahovat jen malá písmena, číslice a pomlčky").nullable().optional(),
   birthMonth: z.number().int().min(1).max(12).nullable().optional(),
   birthDay: z.number().int().min(1).max(31).nullable().optional(),
   birthdayReminderDaysBefore: z.number().int().min(0).max(60).nullable().optional(),
@@ -82,6 +86,8 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
       ...(body.lastName !== undefined ? { lastName: body.lastName } : {}),
       ...(body.note !== undefined ? { note: body.note } : {}),
       ...(body.isVip !== undefined ? { isVip: body.isVip } : {}),
+      ...(body.isTeam !== undefined ? { isTeam: body.isTeam } : {}),
+      ...(body.clientTag !== undefined ? { clientTag: body.clientTag || null } : {}),
       ...(body.birthMonth !== undefined ? { birthMonth: body.birthMonth } : {}),
       ...(body.birthDay !== undefined ? { birthDay: body.birthDay } : {}),
       ...(body.birthdayReminderDaysBefore !== undefined ? { birthdayReminderDaysBefore: body.birthdayReminderDaysBefore } : {}),

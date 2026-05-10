@@ -12,6 +12,8 @@ interface Contact {
   lastName: string | null;
   note: string | null;
   isVip: boolean;
+  isTeam: boolean;
+  clientTag: string | null;
   callLogToken: string | null;
   callLogTokenCreatedAt: string | null;
   birthMonth: number | null;
@@ -58,6 +60,15 @@ export default function ContactsManager() {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ isVip: !c.isVip }),
+    });
+    if (res.ok) load();
+  }
+
+  async function toggleTeam(c: Contact) {
+    const res = await fetch(`/api/contacts/${c.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ isTeam: !c.isTeam }),
     });
     if (res.ok) load();
   }
@@ -216,9 +227,34 @@ export default function ContactsManager() {
                   {c.displayName.slice(0, 1).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <div className="font-medium truncate">{c.displayName}</div>
                     {c.isVip && <Star className="size-3.5 shrink-0" style={{ color: "var(--c)" }} />}
+                    {c.isTeam && (
+                      <span
+                        className="text-[10px] uppercase tracking-wider font-mono px-1.5 py-0.5 rounded"
+                        style={{
+                          background: "color-mix(in oklch, var(--tint-mint) 15%, transparent)",
+                          color: "color-mix(in oklch, var(--tint-mint) 90%, white)",
+                          border: "1px solid color-mix(in oklch, var(--tint-mint) 30%, transparent)",
+                        }}
+                      >
+                        tým
+                      </span>
+                    )}
+                    {c.clientTag && (
+                      <span
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                        style={{
+                          background: "color-mix(in oklch, var(--tint-sky) 15%, transparent)",
+                          color: "color-mix(in oklch, var(--tint-sky) 92%, white)",
+                          border: "1px solid color-mix(in oklch, var(--tint-sky) 30%, transparent)",
+                        }}
+                        title={`Klient: ${c.clientTag}`}
+                      >
+                        klient-{c.clientTag}
+                      </span>
+                    )}
                   </div>
                   {c.phones[0] && (
                     <div className="text-xs font-mono text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -309,6 +345,8 @@ function ContactEditor({ contact, onClose }: EditorProps) {
   const [lastName, setLastName] = useState(contact?.lastName ?? "");
   const [note, setNote] = useState(contact?.note ?? "");
   const [isVip, setIsVip] = useState(contact?.isVip ?? false);
+  const [isTeam, setIsTeam] = useState(contact?.isTeam ?? false);
+  const [clientTag, setClientTag] = useState(contact?.clientTag ?? "");
   const [birthDay, setBirthDay] = useState(contact?.birthDay?.toString() ?? "");
   const [birthMonth, setBirthMonth] = useState(contact?.birthMonth?.toString() ?? "");
   const [bdayRemind, setBdayRemind] = useState<number>(
@@ -338,6 +376,9 @@ function ContactEditor({ contact, onClose }: EditorProps) {
       lastName: lastName.trim() || null,
       note: note.trim() || null,
       isVip,
+      isTeam,
+      // clientTag — povolíme jen lowercase + pomlčky bez diakritiky (server to taky validuje).
+      clientTag: clientTag.trim() ? clientTag.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || null : null,
       birthDay: Number.isFinite(bd) && bd >= 1 && bd <= 31 ? bd : null,
       birthMonth: Number.isFinite(bm) && bm >= 1 && bm <= 12 ? bm : null,
       birthdayReminderDaysBefore: bdayRemind >= 0 ? bdayRemind : null,
@@ -443,6 +484,37 @@ function ContactEditor({ contact, onClose }: EditorProps) {
           {contact?.isVip && contact?.id && (
             <VipLinkSection contactId={contact.id} initialToken={contact.callLogToken} />
           )}
+
+          {/* Smart routing — Tým + Klient */}
+          <div className="rounded-md p-3 space-y-2.5"
+            style={{
+              background: "color-mix(in oklch, var(--tint-mint) 5%, transparent)",
+              border: "1px solid color-mix(in oklch, var(--tint-mint) 20%, transparent)",
+            }}
+          >
+            <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
+              Routing úkolů do Todoistu
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={isTeam} onChange={(e) => setIsTeam(e.target.checked)} className="size-4" />
+              <span className="text-sm">
+                <strong>Tým</strong> — úkoly delegované této osobě → projekt „Práce" / sekce <em>{firstName || "(jméno)"}</em>
+              </span>
+            </label>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block mb-1">
+                Klient slug (volitelně) — např. <code>tk-stavby</code>
+              </label>
+              <Input
+                value={clientTag}
+                onChange={(e) => setClientTag(e.target.value)}
+                placeholder="prázdné = běžný kontakt v projektu Lidé"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                Pokud má kontakt slug, úkoly delegované jemu i úkoly s tagem <code>klient-{clientTag || "<slug>"}</code> půjdou do projektu „Práce" / sekce „{clientTag ? clientTag.split("-").map(w => w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)).join(" ") : "<klient>"}".
+              </p>
+            </div>
+          </div>
 
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
