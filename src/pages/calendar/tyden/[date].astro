@@ -71,6 +71,32 @@ const anniversaryEvents = generateAnniversaryEvents(
   sunday,
 );
 
+// Úkoly tento týden — Task entity s dueAt v okně Po-Ne. Zobrazí se pod gridem
+// jako WeekTasksList, výška karty úměrná t-* tagu (NOVÉ 2026-05-10).
+const weekTaskRows = await prisma.task.findMany({
+  where: {
+    userId: session.uid,
+    status: "open",
+    dueAt: { gte: monday, lte: sunday },
+  },
+  include: {
+    assignedToContact: { select: { displayName: true, firstName: true } },
+  },
+  orderBy: [{ dueAt: "asc" }, { priority: "desc" }],
+});
+const weekTasks = weekTaskRows.map((t) => ({
+  id: t.id,
+  title: t.title,
+  notes: t.notes,
+  dueAt: t.dueAt?.toISOString() ?? null,
+  dueIsTime: t.dueIsTime,
+  tags: t.tags,
+  priority: t.priority as "low" | "normal" | "high",
+  status: t.status as string,
+  assignedToContactName:
+    t.assignedToContact?.firstName ?? t.assignedToContact?.displayName ?? null,
+}));
+
 // Interpretace
 const interpretationInput = events.map((e) => ({
   source: e.source,
@@ -154,6 +180,7 @@ const layoutProps = isFullscreen
       fullscreenHref={fullscreenHref}
       isFullscreen={isFullscreen}
       exitFullscreenHref={exitFullscreenHref}
+      weekTasks={weekTasks}
     />
   </div>
 </Layout>

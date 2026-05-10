@@ -15,6 +15,19 @@ import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Maximize2, MapPin, X, Sparkles, Printer } from "lucide-react";
 import { marked } from "marked";
 import { DEFAULT_RITUAL_TEMPLATES, type RitualType } from "@/lib/week-rituals";
+import WeekTasksList from "./WeekTasksList";
+
+interface WeekTask {
+  id: string;
+  title: string;
+  notes: string | null;
+  dueAt: string | null;
+  dueIsTime: boolean;
+  tags: string[];
+  priority: "low" | "normal" | "high";
+  status: string;
+  assignedToContactName: string | null;
+}
 
 function ritualTypeFromId(id: string): RitualType | null {
   if (id.startsWith("ritual-morning-")) return "morning_day";
@@ -48,6 +61,9 @@ interface Props {
   fullscreenHref?: string; // pokud zobrazení není fullscreen, link na fullscreen variantu
   isFullscreen?: boolean;
   exitFullscreenHref?: string; // pokud isFullscreen=true
+  // Úkoly s dueAt v aktuálním týdnu — sekce „Úkoly tento týden" pod gridem.
+  // Default [] (zpětná kompatibilita s místy kde se WeekView použije bez tasks).
+  weekTasks?: WeekTask[];
 }
 
 const HOUR_START = 6;
@@ -81,6 +97,7 @@ export default function WeekView({
   fullscreenHref,
   isFullscreen,
   exitFullscreenHref,
+  weekTasks = [],
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -675,6 +692,11 @@ export default function WeekView({
           ))}
         </ul>
       </div>
+
+      {/* Úkoly tento týden — pod kalendářovým gridem (NOVÉ 2026-05-10).
+          Plochý seznam Tasků s dueAt v aktuálním týdnu, výška karty úměrná
+          t-* tagu. Read-only review, klik vede na /ukoly. */}
+      <WeekTasksList weekStart={weekStart} tasks={weekTasks} />
     </div>
   );
 }
