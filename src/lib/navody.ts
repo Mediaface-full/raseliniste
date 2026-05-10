@@ -223,6 +223,7 @@ mozek potřebuje vidět **prostor**: kde v dni jsem, co mě obklopuje, co je nej
 - Past eventy ztlumené (opacity 0.45)
 - **Hover tooltip** sleduje kurzor (Portal-rendered, 80 ms delay)
 - **Klik = fixed modal** s plným popisem (Portal, neutíká pod scroll)
+- **Úkoly tento týden pod gridem** (NOVÉ 05-10) — plochý seznam Tasků s dueAt v okně Po-Ne, výška karty úměrná t-* tagu (30/60/120/240/480 px). Sticky header s počtem + součtem hodin. Tint per kategorie (sky=klient, rose=high priority, lavender=delegace, peach=vlastní). Komponenta \`WeekTasksList.tsx\`.
 - **Booking link** \`/i/<token>\` pro klienty
       `,
       co_neumi: `

@@ -6,7 +6,7 @@ Osobní informační systém Petra „Gideona" Perniy. Jeden uživatel, maximum 
 
 > **NOVÁ SESSION:** přečti nejdřív [`INSTRUKCE/HANDOFF-2026-05-10.md`](./INSTRUKCE/HANDOFF-2026-05-10.md) — má aktuální stav, rozdělané věci a immediate next steps. Pro detailní metodologii B&W Myš viz [`INSTRUKCE/BWMYS-METODOLOGIE.md`](./INSTRUKCE/BWMYS-METODOLOGIE.md). Pro smart routing operativně [`INSTRUKCE/SMART-ROUTING.md`](./INSTRUKCE/SMART-ROUTING.md).
 
-> **Stav 2026-05-10:** přidán **Triage UI** s t-* dropdown trvání úkolu (`t-30m`/`t-1h`/`t-2h`/`t-půlden`/`t-celý-den`/`t-?`) v audio review screenu. **Smart routing** 6-úrovňový pro Todoist push: klient-tag → klient-kontakt → tým → obecný kontakt → tag-projekt → fallback. Nové fieldy `Contact.isTeam` + `Contact.clientTag`, model `RoutingAuditLog` viditelný v `/settings/crons`. AI extract prompt rozšířen o klient-* konvenci s dynamickým seznamem slugů + zákaz halucinace slugu. UI: badges v /contacts, blok Routing v editaci kontaktu, Smart routing config v `/settings/integrations`.
+> **Stav 2026-05-10:** přidán **Triage UI** s t-* dropdown trvání úkolu (`t-30m`/`t-1h`/`t-2h`/`t-půlden`/`t-celý-den`/`t-?`) v audio review screenu. **Smart routing** 6-úrovňový pro Todoist push: klient-tag → klient-kontakt → tým → obecný kontakt → tag-projekt → fallback. Nové fieldy `Contact.isTeam` + `Contact.clientTag`, model `RoutingAuditLog` viditelný v `/settings/crons`. AI extract prompt rozšířen o klient-* konvenci s dynamickým seznamem slugů + zákaz halucinace slugu. UI: badges v /contacts, blok Routing v editaci kontaktu, Smart routing config v `/settings/integrations`. **Sekce „Úkoly tento týden"** pod týdenním kalendářovým gridem (fáze 1) — plochý seznam s výškou karet úměrnou t-* tagu (30/60/120/240/480 px), sticky header s počtem + součtem hodin, read-only review.
 
 ---
 
@@ -721,6 +721,26 @@ Skupina v sidebaru, sedm podstránek:
   - `/settings/crons`: tabulka „Routing audit log" posledních 30 push, butter badge `✦ project auto-create` / mint `✦ section auto-create`
 - **Triage t-\* dropdown** (commit `bcb6b8a`): v `/ukoly/audio/[batchId]/review` u každého úkolu Hourglass dropdown s pevným setem `t-?` / `t-30m` / `t-1h` / `t-2h` / `t-půlden` / `t-celý-den`. Hodnota uložena jako extra tag, t-* filtrováno z chip listu (nezdvojuje se).
 - **Operativní návod:** `INSTRUKCE/SMART-ROUTING.md` — jak nakonfigurovat (isTeam, clientTag, tagToProject), jak debug v audit logu, FAQ.
+
+### ✅ Úkoly tento týden v kalendáři — fáze 1 (hotovo 2026-05-10, commit `d9c45dc`)
+- **Účel:** vidět všechny Tasky s `dueAt` v aktuálním týdnu pod týdenním gridem se proporcionálně velkými kartami podle t-* tagu. Petr okamžitě vidí kolik času mu týden zabere bez nutnosti scrollovat /ukoly.
+- **Komponenta:** `src/components/WeekTasksList.tsx`
+- **Data:** server-side v `src/pages/calendar/tyden/[date].astro` přes `prisma.task.findMany({ userId, status: open, dueAt: { gte: monday, lte: sunday } })` s include assignedToContact (firstName/displayName)
+- **Prop chain:** `WeekView.weekTasks?: WeekTask[]` (default `[]`, zpětná kompatibilita)
+- **Vizuální výška karty** přesně podle Petr-spec:
+  - `t-30m` → 30 px
+  - `t-1h` → 60 px
+  - `t-2h` → 120 px
+  - `t-půlden` → 240 px
+  - `t-celý-den` → 480 px
+  - `t-?` → 60 px (placeholder, butter pill s `?`)
+- **Tint:** sky pro klient-*, rose pro high priority, lavender pro delegaci, peach default. Levý border 3 px tint pro rychlý visual scan.
+- **Sticky header:** počet úkolů + součet hodin z t-* tagů (`fmtMinutes`), t-? se nezapočítává, zobrazí se zvlášť „N× t-?" v butter.
+- **Per karta:** title + Hourglass badge, meta řádek (den, čas, priorita, kontakt s UserCheck ikonou, klient pill s Briefcase ikonou + humanizeSlug, ostatní tagy), notes line-clamp-3 jen u t-2h+ karet.
+- **Sortění:** dueAt asc, pak priority desc (high → normal → low).
+- **Klik:** `href="/ukoly#task-<id>"` — read-only review, žádný drag-and-drop, žádný edit.
+- **Empty state:** glass card s linkem na `/ukoly`.
+- **Fáze 2+ čeká na feedback:** drag-and-drop, filter bar, bulk push, splnit z karty, hover preview, stejná sekce pod MonthView (volitelné).
 
 ### 🔜 V plánu
 - **Capture iPhone Shortcut** — zatím v návodu, JSON body připravený
