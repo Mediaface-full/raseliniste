@@ -2,6 +2,7 @@
 import Shell from "../../layouts/Shell.astro";
 import IntegrationsSettings from "../../components/IntegrationsSettings";
 import GosmsSettings from "../../components/GosmsSettings";
+import SmsLog from "../../components/SmsLog";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 import { env } from "../../lib/env";
@@ -85,5 +86,7 @@ const publicBaseUrl = env.APP_URL || "https://www.raseliniste.cz";
         lastError: gosmsIntegration?.lastError ?? null,
       }}
     />
+
+    <SmsLog client:load enabled={Boolean(gosmsIntegration)} />
   </div>
 </Shell>
