@@ -148,4 +148,16 @@ export const CRON_JOBS: CronJobDef[] = [
     schedule: { type: "every", minutes: 5 },
     description: "Todoist obousměrný sync (status + nové úkoly)",
   },
+  {
+    name: "poll-sms-status",
+    endpoint: "/api/cron/poll-sms-status",
+    schedule: { type: "every", minutes: 30 },
+    description: "GoSMS — fallback polling stavu odeslaných SMS (kdyby webhook spadl)",
+  },
+  {
+    name: "cleanup-sms",
+    endpoint: "/api/cron/cleanup-sms",
+    schedule: { type: "daily", hour: 3, minute: 30 },
+    description: "GoSMS — mazání SmsMessage starších 90 dní (mimo isPinned)",
+  },
 ];
