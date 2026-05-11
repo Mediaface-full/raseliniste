@@ -204,12 +204,19 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
 
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
-  async function syncProjects() {
+  async function syncProjects(fullReset = false) {
+    if (fullReset && !confirm("Plný reset: smaže lokální mirror Todoist projektů + labelů a načte vše čerstvě z Todoistu. Pro vyřešení starých/přejmenovaných projektů co se neprománou. Pokračovat?")) {
+      return;
+    }
     setSyncing(true);
     setError(null);
     setSyncResult(null);
     try {
-      const res = await fetch("/api/integrations/todoist/sync", { method: "POST" });
+      const res = await fetch("/api/integrations/todoist/sync", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fullReset }),
+      });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Sync selhal.");
@@ -217,10 +224,11 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
       }
       const s = data.stats ?? {};
       setSyncResult(
-        `✓ Projekty: ${s.projectsReceived ?? 0} (${s.projectsUpserted ?? 0} updated), ` +
+        (fullReset ? "✓ FULL RESET — " : "✓ ") +
+          `Projekty: ${s.projectsReceived ?? 0} (${s.projectsUpserted ?? 0} updated), ` +
           `labels: ${s.labelsReceived ?? 0}, úkoly: ${s.itemsReceived ?? 0}`,
       );
-      setTimeout(() => setSyncResult(null), 6000);
+      setTimeout(() => setSyncResult(null), 10000);
       // Obnov dropdown projektů
       loadProjects(true);
     } catch {
@@ -308,8 +316,11 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
               <Button variant="outline" onClick={testConnection} disabled={testing}>
                 {testing ? <><Loader2 className="animate-spin" /> Testuju…</> : "Test připojení"}
               </Button>
-              <Button variant="outline" onClick={syncProjects} disabled={syncing}>
+              <Button variant="outline" onClick={() => syncProjects(false)} disabled={syncing}>
                 {syncing ? <><Loader2 className="animate-spin" /> Sync…</> : "Sync projektů + labelů"}
+              </Button>
+              <Button variant="ghost" onClick={() => syncProjects(true)} disabled={syncing}>
+                Full reset mirroru
               </Button>
               <Button variant="ghost" onClick={removeToken} disabled={saving}>
                 <Trash2 /> Smazat

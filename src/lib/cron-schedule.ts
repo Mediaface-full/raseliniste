@@ -146,7 +146,6 @@ export const CRON_JOBS: CronJobDef[] = [
     name: "todoist-sync",
     endpoint: "/api/cron/todoist-sync",
     schedule: { type: "every", minutes: 5 },
-    enabled: false, // DOČASNĚ vypnuto 2026-05-11: rate limit (429) po Things importu, časovač reset každých 5 min. Zapni zpět až bude things-import retry hotový.
     description: "Todoist obousměrný sync (status + nové úkoly)",
   },
   {
