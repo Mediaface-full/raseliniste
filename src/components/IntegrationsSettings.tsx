@@ -202,6 +202,34 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
     }
   }
 
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  async function syncProjects() {
+    setSyncing(true);
+    setError(null);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/integrations/todoist/sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Sync selhal.");
+        return;
+      }
+      const s = data.stats ?? {};
+      setSyncResult(
+        `✓ Projekty: ${s.projectsReceived ?? 0} (${s.projectsUpserted ?? 0} updated), ` +
+          `labels: ${s.labelsReceived ?? 0}, úkoly: ${s.itemsReceived ?? 0}`,
+      );
+      setTimeout(() => setSyncResult(null), 6000);
+      // Obnov dropdown projektů
+      loadProjects(true);
+    } catch {
+      setError("Síťová chyba.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function removeToken() {
     if (!confirm("Opravdu smazat Todoist token?")) return;
     setSaving(true);
@@ -276,14 +304,20 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
                 <span className="font-mono">{lastErr}</span>
               </div>
             )}
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-wrap gap-2 pt-2">
               <Button variant="outline" onClick={testConnection} disabled={testing}>
                 {testing ? <><Loader2 className="animate-spin" /> Testuju…</> : "Test připojení"}
+              </Button>
+              <Button variant="outline" onClick={syncProjects} disabled={syncing}>
+                {syncing ? <><Loader2 className="animate-spin" /> Sync…</> : "Sync projektů + labelů"}
               </Button>
               <Button variant="ghost" onClick={removeToken} disabled={saving}>
                 <Trash2 /> Smazat
               </Button>
             </div>
+            {syncResult && (
+              <div className="text-xs text-emerald-400 font-mono pt-1">{syncResult}</div>
+            )}
           </div>
         )}
       </div>
