@@ -358,23 +358,23 @@ export default function ThingsImportView() {
           {/* Plný errorLog — agregovaný seznam plných error messages
               (pushResult je truncated 200 znaků, errorLog má full).
               Plus tlačítko "Stáhnout" — pro AI co vyrobí opravený JSON. */}
-          {data.import.errorLog && Array.isArray(data.import.errorLog) && (data.import.errorLog as unknown[]).length > 0 && (
+          {active.import.errorLog && Array.isArray(active.import.errorLog) && (active.import.errorLog as unknown[]).length > 0 && (
             <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/[0.05]">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-destructive/20">
                 <span className="text-xs font-mono text-destructive font-semibold flex-1">
-                  ✗ ErrorLog — {(data.import.errorLog as unknown[]).length} chyb
+                  ✗ ErrorLog — {(active.import.errorLog as unknown[]).length} chyb
                 </span>
                 <button
                   type="button"
                   onClick={() => {
                     const log = {
-                      importId: data.import.id,
-                      filename: data.import.filename ?? "import",
-                      executedAt: data.import.completedAt,
-                      counts: data.counts,
-                      errors: data.import.errorLog,
+                      importId: active.import.id,
+                      filename: active.import.filename ?? "import",
+                      executedAt: active.import.completedAt,
+                      counts: active.counts,
+                      errors: active.import.errorLog,
                       // Vč. pushResult pro VŠECHNY items — full audit pro AI co opraví JSON
-                      items: data.import.items?.map((it) => ({
+                      items: active.import.items?.map((it) => ({
                         thingsUuid: it.thingsUuid,
                         title: it.title,
                         decision: it.decision,
@@ -387,7 +387,7 @@ export default function ThingsImportView() {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = url;
-                    a.download = `things-import-errors-${data.import.id.slice(0, 8)}.json`;
+                    a.download = `things-import-errors-${active.import.id.slice(0, 8)}.json`;
                     a.click();
                     URL.revokeObjectURL(url);
                   }}
@@ -398,7 +398,7 @@ export default function ThingsImportView() {
                 </button>
               </div>
               <ul className="px-3 py-2 space-y-2 text-xs font-mono max-h-[480px] overflow-y-auto">
-                {(data.import.errorLog as Array<{ thingsUuid: string; title: string; error: string }>).map((e, i) => (
+                {(active.import.errorLog as Array<{ thingsUuid: string; title: string; error: string }>).map((e, i) => (
                   <li key={i} className="border-l-2 border-destructive/40 pl-2">
                     <div className="text-foreground font-semibold">{e.title}</div>
                     <div className="text-[10px] text-muted-foreground">uuid: {e.thingsUuid}</div>
