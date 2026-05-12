@@ -3,6 +3,7 @@ import Shell from "../layouts/Shell.astro";
 import { Icon } from "astro-icon/components";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
+import { searchPosta, type SearchHit } from "../lib/posta-search";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -13,7 +14,11 @@ const user = await prisma.user.findUnique({
 });
 if (!user) return Astro.redirect("/login");
 
-// --- Filter from query string ---
+// --- Mode detection: search vs list ---
+const search = (Astro.url.searchParams.get("q") || "").trim();
+const isSearchMode = search.length > 0;
+
+// --- List mode filter (jen mimo search) ---
 type ActionFilter = "action_required" | "waiting_external" | "informational" | "noise" | "resolved";
 const FILTER_OPTIONS: Array<{ value: ActionFilter; label: string }> = [
   { value: "action_required", label: "Vyřídit" },
@@ -22,76 +27,119 @@ const FILTER_OPTIONS: Array<{ value: ActionFilter; label: string }> = [
   { value: "noise", label: "Šum" },
   { value: "resolved", label: "Vyřízené" },
 ];
-
 const filterRaw = (Astro.url.searchParams.get("filter") || "action_required") as ActionFilter;
 const filter: ActionFilter = FILTER_OPTIONS.some((o) => o.value === filterRaw)
   ? filterRaw
   : "action_required";
 
-const search = (Astro.url.searchParams.get("q") || "").trim();
+// --- Search mode facets (z query params) ---
+const facetFrom = (Astro.url.searchParams.get("from") || "").trim();
+const facetUrgency = (Astro.url.searchParams.get("urgency") || "").trim();
+const facetContentType = (Astro.url.searchParams.get("contentType") || "").trim();
+const facetActionType = (Astro.url.searchParams.get("actionType") || "").trim();
+const facetDateFrom = (Astro.url.searchParams.get("dateFrom") || "").trim();
+const facetDateTo = (Astro.url.searchParams.get("dateTo") || "").trim();
 
-// --- WHERE clause ---
-const baseWhere: Record<string, unknown> = { userId: session.uid };
+// --- Načti data podle módu ---
+let emails: Array<{
+  id: string;
+  gmailMessageId: string;
+  threadId: string;
+  fromAddress: string;
+  fromName: string | null;
+  toAddresses: string[];
+  subject: string | null;
+  snippet: string | null;
+  labels: string[];
+  receivedAt: Date;
+  resolvedAt: Date | null;
+  classification: {
+    actionType: string;
+    contentType: string;
+    urgency: string;
+    escalation: boolean;
+    suggestedAction: string | null;
+    projectHint: string | null;
+    reason: string;
+    classifiedAt: Date;
+    model: string;
+    confidence: number | null;
+    escalationDbOverride: boolean;
+  } | null;
+}> = [];
+let searchHits: SearchHit[] = [];
+let searchStats: { totalHits: number; vectorCandidates: number; ilikeCandidates: number; durationMs: number } | null = null;
 
-if (filter === "resolved") {
-  baseWhere.resolvedAt = { not: null };
+if (isSearchMode) {
+  const { hits, stats } = await searchPosta(session.uid, {
+    query: search,
+    filters: {
+      from: facetFrom || undefined,
+      urgency: (facetUrgency as "low" | "medium" | "high") || undefined,
+      contentType: facetContentType || undefined,
+      actionType: facetActionType || undefined,
+      dateFrom: facetDateFrom ? new Date(facetDateFrom) : undefined,
+      dateTo: facetDateTo ? new Date(facetDateTo + "T23:59:59") : undefined,
+    },
+    limit: 50,
+  });
+  searchHits = hits;
+  searchStats = stats;
 } else {
-  baseWhere.resolvedAt = null;
-  baseWhere.classification = { actionType: filter };
+  // --- List mode WHERE clause ---
+  const baseWhere: Record<string, unknown> = { userId: session.uid };
+  if (filter === "resolved") {
+    baseWhere.resolvedAt = { not: null };
+  } else {
+    baseWhere.resolvedAt = null;
+    baseWhere.classification = { actionType: filter };
+  }
+
+  emails = await prisma.emailMessage.findMany({
+    where: baseWhere as never,
+    orderBy: { receivedAt: "desc" },
+    take: 100,
+    select: {
+      id: true,
+      gmailMessageId: true,
+      threadId: true,
+      fromAddress: true,
+      fromName: true,
+      toAddresses: true,
+      subject: true,
+      snippet: true,
+      labels: true,
+      receivedAt: true,
+      resolvedAt: true,
+      classification: true,
+    },
+  });
 }
 
-if (search) {
-  baseWhere.OR = [
-    { subject: { contains: search, mode: "insensitive" } },
-    { fromAddress: { contains: search, mode: "insensitive" } },
-    { fromName: { contains: search, mode: "insensitive" } },
-    { snippet: { contains: search, mode: "insensitive" } },
-  ];
-}
-
-// --- Načti maily (max 100, novější první) ---
-const emails = await prisma.emailMessage.findMany({
-  where: baseWhere as never,
-  orderBy: { receivedAt: "desc" },
-  take: 100,
-  select: {
-    id: true,
-    gmailMessageId: true,
-    threadId: true,
-    fromAddress: true,
-    fromName: true,
-    toAddresses: true,
-    subject: true,
-    snippet: true,
-    labels: true,
-    receivedAt: true,
-    resolvedAt: true,
-    classification: true,
-  },
-});
-
-// --- Counts per filter chip (pro UI badges) ---
+// --- Counts per filter chip (pro UI badges) — JEN v list módu ---
 const [actionRequiredCount, waitingExternalCount, informationalCount, noiseCount, resolvedCount, totalCount] =
-  await Promise.all([
-    prisma.emailMessage.count({
-      where: { userId: session.uid, resolvedAt: null, classification: { actionType: "action_required" } },
-    }),
-    prisma.emailMessage.count({
-      where: { userId: session.uid, resolvedAt: null, classification: { actionType: "waiting_external" } },
-    }),
-    prisma.emailMessage.count({
-      where: { userId: session.uid, resolvedAt: null, classification: { actionType: "informational" } },
-    }),
-    prisma.emailMessage.count({
-      where: { userId: session.uid, resolvedAt: null, classification: { actionType: "noise" } },
-    }),
-    prisma.emailMessage.count({
-      where: { userId: session.uid, resolvedAt: { not: null } },
-    }),
-    prisma.emailMessage.count({
-      where: { userId: session.uid },
-    }),
-  ]);
+  isSearchMode
+    ? [0, 0, 0, 0, 0, 0]
+    : await Promise.all([
+        prisma.emailMessage.count({
+          where: { userId: session.uid, resolvedAt: null, classification: { actionType: "action_required" } },
+        }),
+        prisma.emailMessage.count({
+          where: { userId: session.uid, resolvedAt: null, classification: { actionType: "waiting_external" } },
+        }),
+        prisma.emailMessage.count({
+          where: { userId: session.uid, resolvedAt: null, classification: { actionType: "informational" } },
+        }),
+        prisma.emailMessage.count({
+          where: { userId: session.uid, resolvedAt: null, classification: { actionType: "noise" } },
+        }),
+        prisma.emailMessage.count({
+          where: { userId: session.uid, resolvedAt: { not: null } },
+        }),
+        prisma.emailMessage.count({
+          where: { userId: session.uid },
+        }),
+      ]);
 
 const COUNT_MAP: Record<ActionFilter, number> = {
   action_required: actionRequiredCount,
@@ -101,14 +149,15 @@ const COUNT_MAP: Record<ActionFilter, number> = {
   resolved: resolvedCount,
 };
 
-// --- Dnešní digest (pokud existuje) ---
+// --- Dnešní digest (jen v list módu, nezatěžovat search výsledky) ---
 const today = new Date();
 today.setHours(0, 0, 0, 0);
-const digest = await prisma.emailDigest.findUnique({
-  where: { userId_forDate: { userId: session.uid, forDate: today } },
-});
+const digest = isSearchMode
+  ? null
+  : await prisma.emailDigest.findUnique({
+      where: { userId_forDate: { userId: session.uid, forDate: today } },
+    });
 
-// Označ digest jako prohlédnutý (fire-and-forget)
 if (digest && !digest.viewedAt) {
   void prisma.emailDigest
     .update({ where: { id: digest.id }, data: { viewedAt: new Date() } })
@@ -137,17 +186,14 @@ function fmtAbsolute(d: Date): string {
   return new Intl.DateTimeFormat("cs-CZ", { dateStyle: "short", timeStyle: "short" }).format(d);
 }
 
-// Buduje URL pro filter link (zachovává search query)
 function buildFilterHref(target: ActionFilter): string {
   const params = new URLSearchParams();
   params.set("filter", target);
-  if (search) params.set("q", search);
   return `/posta?${params.toString()}`;
 }
 
 const currentFullUrl = `/posta?${Astro.url.searchParams.toString()}`;
 
-// Build digest content type-safe
 interface DigestContent {
   topActions?: Array<{ emailId: string; subject: string; fromName?: string; urgency?: string; suggestedAction?: string; reason?: string }>;
   escalations?: Array<{ emailId: string; subject: string; fromName?: string; urgency?: string; reason?: string }>;
@@ -168,9 +214,9 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
 >
   <div class="max-w-3xl space-y-4" style="--c: var(--tint-cool-blue);">
     {/* ============================================================
-        DIGEST sekce (horní)
+        DIGEST sekce (jen v list módu)
         ============================================================ */}
-    {digest && digestContent ? (
+    {!isSearchMode && digest && digestContent ? (
       <section class="glass rounded-2xl p-5 space-y-4">
         <header class="flex items-baseline justify-between gap-3">
           <div>
@@ -182,13 +228,11 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
             </p>
           </div>
         </header>
-
         {digestContent.summary && (
           <p class="text-sm leading-relaxed text-foreground/85 italic border-l-2 pl-3" style="border-color: color-mix(in oklch, var(--c) 50%, transparent);">
             {digestContent.summary}
           </p>
         )}
-
         {digestContent.topActions && digestContent.topActions.length > 0 && (
           <div>
             <h3 class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2">
@@ -197,12 +241,7 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
             <ul class="space-y-1.5">
               {digestContent.topActions.slice(0, 5).map((item) => (
                 <li class="flex items-start gap-2 text-sm">
-                  {item.urgency === "high" && (
-                    <span class="size-1.5 rounded-full mt-2 shrink-0" style="background: var(--tint-butter);" title="urgency: high"></span>
-                  )}
-                  {item.urgency !== "high" && (
-                    <span class="size-1.5 rounded-full mt-2 shrink-0 bg-foreground/20"></span>
-                  )}
+                  <span class:list={["size-1.5 rounded-full mt-2 shrink-0", item.urgency === "high" ? "" : "bg-foreground/20"]} style={item.urgency === "high" ? "background: var(--tint-butter);" : ""}></span>
                   <div class="flex-1 min-w-0">
                     <div class="truncate">{item.subject}</div>
                     {item.suggestedAction && (
@@ -214,7 +253,6 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
             </ul>
           </div>
         )}
-
         {digestContent.escalations && digestContent.escalations.length > 0 && (
           <div>
             <h3 class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2">
@@ -235,16 +273,8 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
             </ul>
           </div>
         )}
-
-        {digestContent.counts?.actionType && (
-          <div class="flex flex-wrap gap-3 text-[11px] font-mono text-muted-foreground pt-2 border-t border-white/5">
-            {Object.entries(digestContent.counts.actionType).map(([key, val]) => (
-              <span><span class="text-foreground">{val}</span> {key}</span>
-            ))}
-          </div>
-        )}
       </section>
-    ) : (
+    ) : !isSearchMode && (
       <section class="glass rounded-2xl p-5 space-y-3">
         <header class="flex items-baseline justify-between gap-3">
           <div>
@@ -262,249 +292,446 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
     )}
 
     {/* ============================================================
-        FILTER chips
+        SEARCH FORM (v obou módech, vždy v top oblasti)
         ============================================================ */}
-    <nav class="flex flex-wrap gap-1.5" aria-label="Filtr">
-      {FILTER_OPTIONS.map((opt) => {
-        const isActive = opt.value === filter;
-        const count = COUNT_MAP[opt.value];
-        return (
+    <form method="GET" action="/posta" class="space-y-2">
+      <div class="flex items-center gap-2">
+        <Icon name="lucide:search" class="size-4 text-muted-foreground shrink-0" />
+        <input
+          type="text"
+          name="q"
+          value={search}
+          placeholder="Hledat v poště (semantic + fulltext)…"
+          class="flex-1 bg-background/40 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:border-[color-mix(in_oklch,var(--c)_40%,transparent)]"
+        />
+        {isSearchMode && (
           <a
-            href={buildFilterHref(opt.value)}
-            class:list={[
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono transition-colors",
-              isActive
-                ? "bg-[color-mix(in_oklch,var(--c)_22%,transparent)] text-foreground border border-[color-mix(in_oklch,var(--c)_40%,transparent)]"
-                : "bg-white/3 text-muted-foreground hover:bg-white/8 hover:text-foreground border border-transparent",
-            ]}
+            href="/posta"
+            class="text-xs text-muted-foreground hover:text-foreground px-2 py-1 whitespace-nowrap"
           >
-            <span>{opt.label}</span>
-            <span class="opacity-60">{count}</span>
+            Zrušit hledání
           </a>
-        );
-      })}
-    </nav>
-
-    {/* ============================================================
-        SEARCH (fulltext přes DB ILIKE — embedding až fáze 4)
-        ============================================================ */}
-    <form method="GET" action="/posta" class="flex items-center gap-2">
-      <input type="hidden" name="filter" value={filter} />
-      <input
-        type="text"
-        name="q"
-        value={search}
-        placeholder="Hledat v předmětu, odesílateli, snippetu…"
-        class="flex-1 bg-background/40 border border-border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-[color-mix(in_oklch,var(--c)_40%,transparent)]"
-      />
-      {search && (
-        <a
-          href={`/posta?filter=${filter}`}
-          class="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
-        >
-          Vyčistit
-        </a>
+        )}
+      </div>
+      {isSearchMode && (
+        <div class="flex flex-wrap gap-2 text-xs">
+          <select name="actionType" class="bg-background/40 border border-border rounded px-2 py-1 font-mono">
+            <option value="">action: vše</option>
+            <option value="action_required" selected={facetActionType === "action_required"}>action_required</option>
+            <option value="waiting_external" selected={facetActionType === "waiting_external"}>waiting_external</option>
+            <option value="informational" selected={facetActionType === "informational"}>informational</option>
+            <option value="noise" selected={facetActionType === "noise"}>noise</option>
+          </select>
+          <select name="contentType" class="bg-background/40 border border-border rounded px-2 py-1 font-mono">
+            <option value="">obsah: vše</option>
+            <option value="klient" selected={facetContentType === "klient"}>klient</option>
+            <option value="osobni" selected={facetContentType === "osobni"}>osobni</option>
+            <option value="admin" selected={facetContentType === "admin"}>admin</option>
+            <option value="newsletter" selected={facetContentType === "newsletter"}>newsletter</option>
+            <option value="reklama" selected={facetContentType === "reklama"}>reklama</option>
+            <option value="systemovy" selected={facetContentType === "systemovy"}>systemovy</option>
+            <option value="bezpecnostni" selected={facetContentType === "bezpecnostni"}>bezpecnostni</option>
+            <option value="spam" selected={facetContentType === "spam"}>spam</option>
+          </select>
+          <select name="urgency" class="bg-background/40 border border-border rounded px-2 py-1 font-mono">
+            <option value="">urgency: vše</option>
+            <option value="high" selected={facetUrgency === "high"}>high</option>
+            <option value="medium" selected={facetUrgency === "medium"}>medium</option>
+            <option value="low" selected={facetUrgency === "low"}>low</option>
+          </select>
+          <input
+            type="text"
+            name="from"
+            value={facetFrom}
+            placeholder="from (substring)"
+            class="bg-background/40 border border-border rounded px-2 py-1 font-mono"
+          />
+          <input
+            type="date"
+            name="dateFrom"
+            value={facetDateFrom}
+            class="bg-background/40 border border-border rounded px-2 py-1 font-mono"
+          />
+          <input
+            type="date"
+            name="dateTo"
+            value={facetDateTo}
+            class="bg-background/40 border border-border rounded px-2 py-1 font-mono"
+          />
+          <button type="submit" class="px-3 py-1 rounded bg-white/5 hover:bg-white/10 text-foreground/80 font-mono">
+            Filtrovat
+          </button>
+        </div>
       )}
     </form>
 
     {/* ============================================================
-        LIST mailů jako karty s <details> expand
+        FILTER chips (jen v list módu)
         ============================================================ */}
-    {emails.length === 0 ? (
-      <div class="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
-        Žádné maily v této kategorii
-        {search && (
-          <span> pro hledání „<strong>{search}</strong>"</span>
-        )}.
-      </div>
-    ) : (
-      <ul class="space-y-2" data-posta-list>
-        {emails.map((email) => {
-          const cls = email.classification;
-          const urgencyHigh = cls?.urgency === "high";
-          const escalation = cls?.escalation === true;
-          const isResolved = email.resolvedAt !== null;
+    {!isSearchMode && (
+      <nav class="flex flex-wrap gap-1.5" aria-label="Filtr">
+        {FILTER_OPTIONS.map((opt) => {
+          const isActive = opt.value === filter;
+          const count = COUNT_MAP[opt.value];
           return (
-            <li>
-              <details
-                class:list={[
-                  "group glass rounded-xl border transition-colors",
-                  isResolved
-                    ? "border-white/5 opacity-65"
-                    : "border-border hover:border-[color-mix(in_oklch,var(--c)_30%,transparent)]",
-                ]}
-              >
-                <summary class="cursor-pointer list-none px-4 py-3 flex items-start gap-3">
-                  {/* Subtilní amber tečka pro urgency high (per Petrovo zadání:
-                      ne ostrá barva, jen jemný akcent) */}
-                  <span
-                    class:list={[
-                      "size-2 rounded-full mt-2 shrink-0",
-                      urgencyHigh
-                        ? "bg-[var(--tint-butter)]"
-                        : escalation
-                          ? "bg-[var(--tint-rose)]/40"
-                          : "bg-foreground/15",
-                    ]}
-                    title={
-                      urgencyHigh
-                        ? "urgency: high"
-                        : escalation
-                          ? "escalation"
-                          : `urgency: ${cls?.urgency ?? "—"}`
-                    }
-                  ></span>
-
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-baseline gap-2 text-xs text-muted-foreground font-mono">
-                      <span class="truncate">{email.fromName ?? email.fromAddress}</span>
-                      <span class="opacity-60 shrink-0">{fmtRelative(email.receivedAt)}</span>
-                    </div>
-                    <div class="font-medium text-sm mt-0.5 truncate">
-                      {email.subject ?? "(bez předmětu)"}
-                    </div>
-
-                    {/* LLM 1-věta reason — výstižné shrnutí proč ta klasifikace */}
-                    {cls?.reason && (
-                      <p class="text-xs text-muted-foreground mt-1 line-clamp-2">{cls.reason}</p>
-                    )}
-
-                    {cls?.suggestedAction && (
-                      <div class="text-[11px] text-foreground/70 mt-1.5 flex items-center gap-1">
-                        <Icon name="lucide:arrow-right" class="size-3 shrink-0" />
-                        <span>{cls.suggestedAction}</span>
-                      </div>
-                    )}
-
-                    <div class="flex flex-wrap items-center gap-1.5 mt-2 text-[10px] font-mono">
-                      {cls && (
-                        <>
-                          <span class="px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
-                            {cls.contentType}
-                          </span>
-                          <span class="px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
-                            urgency: {cls.urgency}
-                          </span>
-                          {escalation && (
-                            <span class="px-1.5 py-0.5 rounded text-[var(--tint-rose)]" style="background: color-mix(in oklch, var(--tint-rose) 12%, transparent);">
-                              eskalace
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {isResolved && (
-                        <span class="px-1.5 py-0.5 rounded text-emerald-400/80" style="background: color-mix(in oklch, rgb(52, 211, 153) 10%, transparent);">
-                          vyřízeno {fmtRelative(email.resolvedAt!)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <Icon
-                    name="lucide:chevron-down"
-                    class="size-4 mt-2 text-muted-foreground shrink-0 transition-transform group-open:rotate-180"
-                  />
-                </summary>
-
-                {/* EXPAND content */}
-                <div class="px-4 pb-4 pt-1 border-t border-white/5 space-y-3">
-                  {/* Plný snippet (Gmail-generated) */}
-                  {email.snippet && (
-                    <div class="text-sm text-foreground/80 leading-relaxed">{email.snippet}</div>
-                  )}
-
-                  {/* Metadata */}
-                  <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono text-muted-foreground">
-                    <div class="col-span-2">
-                      <dt class="inline text-foreground/60">Od:</dt>
-                      <dd class="inline ml-1">{email.fromAddress}</dd>
-                    </div>
-                    {email.toAddresses.length > 0 && (
-                      <div class="col-span-2">
-                        <dt class="inline text-foreground/60">Pro:</dt>
-                        <dd class="inline ml-1">{email.toAddresses.slice(0, 3).join(", ")}{email.toAddresses.length > 3 ? ` +${email.toAddresses.length - 3}` : ""}</dd>
-                      </div>
-                    )}
-                    <div>
-                      <dt class="inline text-foreground/60">Přijato:</dt>
-                      <dd class="inline ml-1">{fmtAbsolute(email.receivedAt)}</dd>
-                    </div>
-                    {cls?.projectHint && (
-                      <div>
-                        <dt class="inline text-foreground/60">Projekt:</dt>
-                        <dd class="inline ml-1">{cls.projectHint}</dd>
-                      </div>
-                    )}
-                    {email.labels.length > 0 && (
-                      <div class="col-span-2">
-                        <dt class="inline text-foreground/60">Labely:</dt>
-                        <dd class="inline ml-1">{email.labels.join(", ")}</dd>
-                      </div>
-                    )}
-                    {cls && (
-                      <div class="col-span-2 pt-1 text-[10px] opacity-70">
-                        klasifikováno {fmtRelative(cls.classifiedAt)} ({cls.model}, confidence{" "}
-                        {cls.confidence?.toFixed(2) ?? "?"})
-                        {cls.escalationDbOverride && (
-                          <span class="ml-1">· DB override</span>
-                        )}
-                      </div>
-                    )}
-                  </dl>
-
-                  {/* AKCE */}
-                  <div class="flex flex-wrap items-center gap-2 pt-1">
-                    <a
-                      href={gmailDeepLink(email.threadId)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-white/5 hover:bg-white/10 text-foreground/85 transition-colors"
-                    >
-                      <Icon name="lucide:external-link" class="size-3.5" />
-                      Otevřít v Gmailu
-                    </a>
-
-                    {!isResolved ? (
-                      <form method="POST" action={`/api/posta/${email.id}/resolve`}>
-                        <input type="hidden" name="from" value={currentFullUrl} />
-                        <button
-                          type="submit"
-                          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors"
-                          style="background: color-mix(in oklch, var(--c) 14%, transparent); color: color-mix(in oklch, var(--c) 92%, white);"
-                        >
-                          <Icon name="lucide:check" class="size-3.5" />
-                          Označit jako vyřízené
-                        </button>
-                      </form>
-                    ) : (
-                      <form method="POST" action={`/api/posta/${email.id}/unresolve`}>
-                        <input type="hidden" name="from" value={currentFullUrl} />
-                        <button
-                          type="submit"
-                          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-                        >
-                          <Icon name="lucide:rotate-ccw" class="size-3.5" />
-                          Vrátit do aktivních
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                </div>
-              </details>
-            </li>
+            <a
+              href={buildFilterHref(opt.value)}
+              class:list={[
+                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono transition-colors",
+                isActive
+                  ? "bg-[color-mix(in_oklch,var(--c)_22%,transparent)] text-foreground border border-[color-mix(in_oklch,var(--c)_40%,transparent)]"
+                  : "bg-white/3 text-muted-foreground hover:bg-white/8 hover:text-foreground border border-transparent",
+              ]}
+            >
+              <span>{opt.label}</span>
+              <span class="opacity-60">{count}</span>
+            </a>
           );
         })}
-      </ul>
+      </nav>
     )}
 
-    {emails.length === 100 && (
+    {/* ============================================================
+        SEARCH RESULTS mode
+        ============================================================ */}
+    {isSearchMode && (
+      <>
+        <div class="text-[11px] font-mono text-muted-foreground flex flex-wrap items-baseline gap-3">
+          <span><strong class="text-foreground">{searchHits.length}</strong> výsledků</span>
+          {searchStats && (
+            <>
+              <span>vector: {searchStats.vectorCandidates}</span>
+              <span>fulltext: {searchStats.ilikeCandidates}</span>
+              <span>{searchStats.durationMs}ms</span>
+            </>
+          )}
+        </div>
+
+        {searchHits.length === 0 ? (
+          <div class="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
+            Nic se nepodařilo najít pro „<strong>{search}</strong>".
+            <div class="text-[11px] font-mono mt-2 opacity-70">
+              Tip: pokud jsi RAG ještě nezindexoval, spusť <code>npm run posta:backfill -- --confirm</code> nebo počkej na cron.
+            </div>
+          </div>
+        ) : (
+          <ul class="space-y-2">
+            {searchHits.map((hit) => {
+              const cls = hit.classification;
+              const urgencyHigh = cls?.urgency === "high";
+              const escalation = cls?.escalation === true;
+              const isResolved = hit.resolvedAt !== null;
+              return (
+                <li>
+                  <details
+                    class:list={[
+                      "group glass rounded-xl border transition-colors",
+                      isResolved
+                        ? "border-white/5 opacity-65"
+                        : "border-border hover:border-[color-mix(in_oklch,var(--c)_30%,transparent)]",
+                    ]}
+                  >
+                    <summary class="cursor-pointer list-none px-4 py-3 flex items-start gap-3">
+                      <span
+                        class:list={[
+                          "size-2 rounded-full mt-2 shrink-0",
+                          urgencyHigh
+                            ? "bg-[var(--tint-butter)]"
+                            : escalation
+                              ? "bg-[var(--tint-rose)]/40"
+                              : "bg-foreground/15",
+                        ]}
+                      ></span>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-baseline gap-2 text-xs text-muted-foreground font-mono">
+                          <span class="truncate">{hit.fromName ?? hit.fromAddress}</span>
+                          <span class="opacity-60 shrink-0">{fmtRelative(hit.receivedAt)}</span>
+                          <span class="ml-auto opacity-60 shrink-0">
+                            score {hit.combinedScore.toFixed(2)}
+                          </span>
+                        </div>
+                        <div class="font-medium text-sm mt-0.5 truncate">
+                          {hit.subject ?? "(bez předmětu)"}
+                        </div>
+
+                        {/* Matched chunk — wabi-sabi highlight: subtilní border-left + bg */}
+                        {hit.matchedChunkText && (
+                          <div
+                            class="mt-2 text-xs text-foreground/80 border-l-2 pl-2.5 py-1 leading-relaxed line-clamp-3"
+                            style="border-color: color-mix(in oklch, var(--c) 40%, transparent); background: color-mix(in oklch, var(--c) 4%, transparent);"
+                          >
+                            {hit.matchedChunkText.slice(0, 400)}
+                            {hit.matchedChunkText.length > 400 && "…"}
+                          </div>
+                        )}
+
+                        {cls?.reason && (
+                          <p class="text-xs text-muted-foreground mt-1 line-clamp-2">{cls.reason}</p>
+                        )}
+
+                        <div class="flex flex-wrap items-center gap-1.5 mt-2 text-[10px] font-mono">
+                          {cls && (
+                            <>
+                              <span class="px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
+                                {cls.actionType}
+                              </span>
+                              <span class="px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
+                                {cls.contentType}
+                              </span>
+                              <span class="px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
+                                urgency: {cls.urgency}
+                              </span>
+                            </>
+                          )}
+                          {hit.vectorScore !== null && (
+                            <span class="px-1.5 py-0.5 rounded text-muted-foreground opacity-60">
+                              vec {hit.vectorScore.toFixed(2)} · text {hit.ilikeScore.toFixed(2)}
+                            </span>
+                          )}
+                          {isResolved && (
+                            <span class="px-1.5 py-0.5 rounded text-emerald-400/80" style="background: color-mix(in oklch, rgb(52, 211, 153) 10%, transparent);">
+                              vyřízeno
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Icon
+                        name="lucide:chevron-down"
+                        class="size-4 mt-2 text-muted-foreground shrink-0 transition-transform group-open:rotate-180"
+                      />
+                    </summary>
+                    <div class="px-4 pb-4 pt-1 border-t border-white/5 space-y-3">
+                      {hit.snippet && (
+                        <div class="text-sm text-foreground/80 leading-relaxed">{hit.snippet}</div>
+                      )}
+                      <div class="flex flex-wrap items-center gap-2 pt-1">
+                        <a
+                          href={gmailDeepLink(hit.threadId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-white/5 hover:bg-white/10 text-foreground/85 transition-colors"
+                        >
+                          <Icon name="lucide:external-link" class="size-3.5" />
+                          Otevřít v Gmailu
+                        </a>
+                        {!isResolved ? (
+                          <form method="POST" action={`/api/posta/${hit.emailId}/resolve`}>
+                            <input type="hidden" name="from" value={currentFullUrl} />
+                            <button
+                              type="submit"
+                              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors"
+                              style="background: color-mix(in oklch, var(--c) 14%, transparent); color: color-mix(in oklch, var(--c) 92%, white);"
+                            >
+                              <Icon name="lucide:check" class="size-3.5" />
+                              Označit jako vyřízené
+                            </button>
+                          </form>
+                        ) : (
+                          <form method="POST" action={`/api/posta/${hit.emailId}/unresolve`}>
+                            <input type="hidden" name="from" value={currentFullUrl} />
+                            <button
+                              type="submit"
+                              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                            >
+                              <Icon name="lucide:rotate-ccw" class="size-3.5" />
+                              Vrátit do aktivních
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </div>
+                  </details>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </>
+    )}
+
+    {/* ============================================================
+        LIST mode (default — bez search)
+        ============================================================ */}
+    {!isSearchMode && (
+      emails.length === 0 ? (
+        <div class="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
+          Žádné maily v této kategorii.
+        </div>
+      ) : (
+        <ul class="space-y-2" data-posta-list>
+          {emails.map((email) => {
+            const cls = email.classification;
+            const urgencyHigh = cls?.urgency === "high";
+            const escalation = cls?.escalation === true;
+            const isResolved = email.resolvedAt !== null;
+            return (
+              <li>
+                <details
+                  class:list={[
+                    "group glass rounded-xl border transition-colors",
+                    isResolved
+                      ? "border-white/5 opacity-65"
+                      : "border-border hover:border-[color-mix(in_oklch,var(--c)_30%,transparent)]",
+                  ]}
+                >
+                  <summary class="cursor-pointer list-none px-4 py-3 flex items-start gap-3">
+                    <span
+                      class:list={[
+                        "size-2 rounded-full mt-2 shrink-0",
+                        urgencyHigh
+                          ? "bg-[var(--tint-butter)]"
+                          : escalation
+                            ? "bg-[var(--tint-rose)]/40"
+                            : "bg-foreground/15",
+                      ]}
+                      title={
+                        urgencyHigh
+                          ? "urgency: high"
+                          : escalation
+                            ? "escalation"
+                            : `urgency: ${cls?.urgency ?? "—"}`
+                      }
+                    ></span>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-baseline gap-2 text-xs text-muted-foreground font-mono">
+                        <span class="truncate">{email.fromName ?? email.fromAddress}</span>
+                        <span class="opacity-60 shrink-0">{fmtRelative(email.receivedAt)}</span>
+                      </div>
+                      <div class="font-medium text-sm mt-0.5 truncate">
+                        {email.subject ?? "(bez předmětu)"}
+                      </div>
+                      {cls?.reason && (
+                        <p class="text-xs text-muted-foreground mt-1 line-clamp-2">{cls.reason}</p>
+                      )}
+                      {cls?.suggestedAction && (
+                        <div class="text-[11px] text-foreground/70 mt-1.5 flex items-center gap-1">
+                          <Icon name="lucide:arrow-right" class="size-3 shrink-0" />
+                          <span>{cls.suggestedAction}</span>
+                        </div>
+                      )}
+                      <div class="flex flex-wrap items-center gap-1.5 mt-2 text-[10px] font-mono">
+                        {cls && (
+                          <>
+                            <span class="px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
+                              {cls.contentType}
+                            </span>
+                            <span class="px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">
+                              urgency: {cls.urgency}
+                            </span>
+                            {escalation && (
+                              <span class="px-1.5 py-0.5 rounded text-[var(--tint-rose)]" style="background: color-mix(in oklch, var(--tint-rose) 12%, transparent);">
+                                eskalace
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {isResolved && (
+                          <span class="px-1.5 py-0.5 rounded text-emerald-400/80" style="background: color-mix(in oklch, rgb(52, 211, 153) 10%, transparent);">
+                            vyřízeno {fmtRelative(email.resolvedAt!)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Icon
+                      name="lucide:chevron-down"
+                      class="size-4 mt-2 text-muted-foreground shrink-0 transition-transform group-open:rotate-180"
+                    />
+                  </summary>
+                  <div class="px-4 pb-4 pt-1 border-t border-white/5 space-y-3">
+                    {email.snippet && (
+                      <div class="text-sm text-foreground/80 leading-relaxed">{email.snippet}</div>
+                    )}
+                    <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono text-muted-foreground">
+                      <div class="col-span-2">
+                        <dt class="inline text-foreground/60">Od:</dt>
+                        <dd class="inline ml-1">{email.fromAddress}</dd>
+                      </div>
+                      {email.toAddresses.length > 0 && (
+                        <div class="col-span-2">
+                          <dt class="inline text-foreground/60">Pro:</dt>
+                          <dd class="inline ml-1">{email.toAddresses.slice(0, 3).join(", ")}{email.toAddresses.length > 3 ? ` +${email.toAddresses.length - 3}` : ""}</dd>
+                        </div>
+                      )}
+                      <div>
+                        <dt class="inline text-foreground/60">Přijato:</dt>
+                        <dd class="inline ml-1">{fmtAbsolute(email.receivedAt)}</dd>
+                      </div>
+                      {cls?.projectHint && (
+                        <div>
+                          <dt class="inline text-foreground/60">Projekt:</dt>
+                          <dd class="inline ml-1">{cls.projectHint}</dd>
+                        </div>
+                      )}
+                      {email.labels.length > 0 && (
+                        <div class="col-span-2">
+                          <dt class="inline text-foreground/60">Labely:</dt>
+                          <dd class="inline ml-1">{email.labels.join(", ")}</dd>
+                        </div>
+                      )}
+                      {cls && (
+                        <div class="col-span-2 pt-1 text-[10px] opacity-70">
+                          klasifikováno {fmtRelative(cls.classifiedAt)} ({cls.model}, confidence{" "}
+                          {cls.confidence?.toFixed(2) ?? "?"})
+                          {cls.escalationDbOverride && (
+                            <span class="ml-1">· DB override</span>
+                          )}
+                        </div>
+                      )}
+                    </dl>
+                    <div class="flex flex-wrap items-center gap-2 pt-1">
+                      <a
+                        href={gmailDeepLink(email.threadId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs bg-white/5 hover:bg-white/10 text-foreground/85 transition-colors"
+                      >
+                        <Icon name="lucide:external-link" class="size-3.5" />
+                        Otevřít v Gmailu
+                      </a>
+                      {!isResolved ? (
+                        <form method="POST" action={`/api/posta/${email.id}/resolve`}>
+                          <input type="hidden" name="from" value={currentFullUrl} />
+                          <button
+                            type="submit"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors"
+                            style="background: color-mix(in oklch, var(--c) 14%, transparent); color: color-mix(in oklch, var(--c) 92%, white);"
+                          >
+                            <Icon name="lucide:check" class="size-3.5" />
+                            Označit jako vyřízené
+                          </button>
+                        </form>
+                      ) : (
+                        <form method="POST" action={`/api/posta/${email.id}/unresolve`}>
+                          <input type="hidden" name="from" value={currentFullUrl} />
+                          <button
+                            type="submit"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                          >
+                            <Icon name="lucide:rotate-ccw" class="size-3.5" />
+                            Vrátit do aktivních
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                </details>
+              </li>
+            );
+          })}
+        </ul>
+      )
+    )}
+
+    {!isSearchMode && emails.length === 100 && (
       <p class="text-[11px] text-muted-foreground font-mono text-center pt-2">
         Zobrazeno prvních 100 mailů — zúžit přes vyhledávání nebo filter.
       </p>
     )}
 
-    <p class="text-[11px] text-muted-foreground font-mono text-center pt-2">
-      Celkem v DB: {totalCount} mailů. Sync + klasifikace běží automaticky každých 15 min.
-    </p>
+    {!isSearchMode && (
+      <p class="text-[11px] text-muted-foreground font-mono text-center pt-2">
+        Celkem v DB: {totalCount} mailů. Sync + klasifikace + embed běží automaticky každých 5-15 min.
+      </p>
+    )}
   </div>
 </Shell>
