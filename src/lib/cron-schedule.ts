@@ -191,6 +191,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pošta — Gmail watch renewal (fáze 5: prodlouží watch expirující v < 48h; Gmail max lifetime 7d)",
   },
   {
+    name: "posta-commitment-detect",
+    endpoint: "/api/cron/posta-commitment-detect",
+    schedule: { type: "every", minutes: 15 },
+    description: "Pošta — detector vyšumělých závazků (fáze 6: LLM scan outbound mailů, dedup soft-link, confidence routing >=0.85 auto)",
+  },
+  {
     name: "cleanup-sms",
     endpoint: "/api/cron/cleanup-sms",
     schedule: { type: "daily", hour: 3, minute: 30 },
