@@ -142,6 +142,7 @@ Stav 2026-05-10 (Smart routing 6-úrovňový + Triage t-* dropdown + RoutingAudi
 | iCloud integrace | `/settings/integrations/icloud` | ✅ |
 | Todoist integrace | `/settings/integrations` | ✅ |
 | **GoSMS integrace** | `/settings/integrations` (blok pod Todoist) | ✅ NOVÉ 05-10 — univerzální SMS brána. Setup viz `INSTRUKCE/GOSMS-SETUP.md`. Webhooky pro instant doručenky + replies, fallback polling cron à 30 min. |
+| **Pošta integrace (fáze 1)** | `/settings/integrations/google` (karta pod Calendar/Contacts) | ✅ NOVÉ 05-12 — Email Intelligence skeleton: OAuth scope gmail.readonly+metadata, EmailMessage tabulka, cron `posta-sync` 15 min (max 100/sync), init endpoint pro první import. Bez klasifikace/UI/RAG — to fáze 2. Detail: `INSTRUKCE/POSTA-PHASE-1.md`. |
 | E-mail (SMTP) | `/settings/reports` | ✅ |
 | iPhone Shortcuts | `/settings/shortcuts` | ✅ |
 | Health Auto Export | `/settings/ingest` | ✅ |

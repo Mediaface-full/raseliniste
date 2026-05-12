@@ -6,14 +6,9 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/HANDOFF-2026-05-10.md`** ← **PRIMÁRNÍ ZDROJ pro novou session**
-   - Triage UI s t-* dropdown (trvání úkolu)
-   - Smart routing 6-úrovňový (klient-tag / klient-kontakt / tým / lidé / personal-tag / fallback)
-   - Contact.isTeam + clientTag fields + RoutingAuditLog model
-   - AI extract prompt s dynamickým seznamem klientů + zákaz halucinace slugu
-   - UI: badges v /contacts list, edit blok routingu, Smart routing v /settings/integrations, Audit log v /settings/crons
-   - Konfigurace nutná po deploy (isTeam toggles, clientTag, project names)
-2. `INSTRUKCE/SMART-ROUTING.md` — operativní návod jak routing nakonfigurovat a debugovat
+1. **`INSTRUKCE/POSTA-PHASE-1.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence modul „Pošta" fáze 1 hotová (Gmail OAuth + import skeleton, max 100 mailů/sync, cron 15 min). Fáze 2 (klasifikace, RAG, vyšumělé závazky, UI) čeká. Tři otevřené otázky na konci dokumentu.
+2. `INSTRUKCE/HANDOFF-2026-05-10.md` — předchozí stav: Triage t-* dropdown, smart routing 6-úrovňový, Contact.isTeam + clientTag + aliases, RoutingAuditLog, GoSMS modul, Things-import (částečně dořešen — 217 nedoimportovaných mailů v `Downloads/things-finale.md`)
+3. `INSTRUKCE/SMART-ROUTING.md` — operativní návod jak routing nakonfigurovat a debugovat
 3. `INSTRUKCE/HANDOFF-2026-05-07.md` — předchozí stav (Spíž, UPLOAD, fire-and-forget napříč)
 4. `INSTRUKCE/PRO-CLAUDINE-COACHE.md` — kontext o Petrovi, filozofie systému
 5. `INSTRUKCE/00-START-HERE.md` — vstup, pravidla
