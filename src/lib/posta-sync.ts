@@ -23,6 +23,7 @@ import {
   parseGmailMessage,
   type ParsedEmail,
 } from "./gmail";
+import { encryptBody, isEncryptionEnabled, ensureEncryptionKeyRegistered } from "./email-body-crypto";
 
 export interface PostaSyncStats {
   userId: string;
@@ -76,6 +77,15 @@ export async function syncPostaForUser(userId: string): Promise<PostaSyncStats> 
 
   stats.historyIdBefore = user.gmailHistoryId;
   stats.mode = user.gmailHistoryId ? "incremental" : "init";
+
+  // Faze 5: pri prvnim pouziti zaregistruj klic do EncryptionKey tabulky
+  // (idempotent, lazy — zavola se i kdyz klic neni nakonfigurovany s tichym
+  // fall-through na plain text storage)
+  if (isEncryptionEnabled()) {
+    await ensureEncryptionKeyRegistered().catch((e) => {
+      console.warn(`[posta-sync] ensureEncryptionKeyRegistered failed: ${e instanceof Error ? e.message : e}`);
+    });
+  }
 
   try {
     // Krok 1: aktuální profile (historyId pro uložení po sync)
@@ -165,6 +175,12 @@ export async function syncPostaForUser(userId: string): Promise<PostaSyncStats> 
 }
 
 async function upsertEmailMessage(userId: string, parsed: ParsedEmail): Promise<void> {
+  // Faze 5: AES-256-GCM encryption pokud EMAIL_BODY_ENCRYPTION_KEY je v env.
+  // Pokud klíč není (dev / pre-fáze-5 instance), zapadne zpět na plain bodyText/Html.
+  const encEnabled = isEncryptionEnabled();
+  const bodyTextPacket = encEnabled ? encryptBody(parsed.bodyText) : null;
+  const bodyHtmlPacket = encEnabled ? encryptBody(parsed.bodyHtml) : null;
+
   await prisma.emailMessage.upsert({
     where: { gmailMessageId: parsed.gmailMessageId },
     create: {
@@ -178,8 +194,14 @@ async function upsertEmailMessage(userId: string, parsed: ParsedEmail): Promise<
       bccAddresses: parsed.bccAddresses,
       subject: parsed.subject,
       snippet: parsed.snippet,
-      bodyText: parsed.bodyText,
-      bodyHtml: parsed.bodyHtml,
+      // Encryption-aware: pokud klíč existuje, ukládáme do ciphertext sloupců.
+      // Legacy bodyText/Html zůstávají null (encryption-migrate skript může
+      // pozdě převést starý plain text).
+      bodyText: encEnabled ? null : parsed.bodyText,
+      bodyHtml: encEnabled ? null : parsed.bodyHtml,
+      bodyTextCiphertext: bodyTextPacket?.ciphertext ?? null,
+      bodyHtmlCiphertext: bodyHtmlPacket?.ciphertext ?? null,
+      bodyEncryptionKeyId: encEnabled ? (bodyTextPacket?.keyId ?? bodyHtmlPacket?.keyId ?? null) : null,
       labels: parsed.labels,
       hasAttachments: parsed.hasAttachments,
       attachments: parsed.attachments.length > 0 ? (parsed.attachments as unknown as object) : undefined,

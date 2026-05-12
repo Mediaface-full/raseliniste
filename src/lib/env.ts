@@ -19,6 +19,12 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   SESSION_SECRET: z.string().min(32),
 
+  // Pošta — fáze 5 (2026-05-12): šifrování email bodyText/bodyHtml at-rest.
+  // 64 hex znaků = 32 bytes = AES-256 klíč. Generuj: `openssl rand -hex 32`.
+  // Volitelný — pokud null, bodyText/Html se ukládá nešifrovaný (back-compat
+  // pro existující instance + dev). Pro produkci POVINNÝ.
+  EMAIL_BODY_ENCRYPTION_KEY: emptyToUndef(z.string().regex(/^[a-fA-F0-9]{64}$/).optional()),
+
   // ==== Defaulty (vždy mají hodnotu) ====
   APP_URL: emptyToUndef(z.string().url().optional()).pipe(
     z.string().default("http://localhost:3000"),

@@ -129,10 +129,15 @@ export async function searchPosta(
     // Pokračujeme jen s ILIKE
   }
 
-  // --- ILIKE search (subject + fromAddress + fromName + snippet + bodyText) ---
-  // Pattern matching s wildcards
-  const ilikePattern = `%${escapePercentUnderscore(query)}%`;
-  const ilikeMatches = await prisma.emailMessage.findMany({
+  // --- ILIKE search ---
+  // Faze 5: bodyText je AES-256-GCM šifrovaný → ILIKE nad ním nelze.
+  // Fulltext source = RagChunk.text (plain text, chunkovaný body) + plus
+  // unencrypted metadata: subject, fromAddress, fromName, snippet.
+  // Tj. ILIKE search má SHODNÝ recall jako pre-fáze-5 (chunks.text obsahuje
+  // body content) jen mírně jiná granularita (chunk-level místo whole body).
+
+  // 5a) Metadata search (subject/from/snippet)
+  const metaMatches = await prisma.emailMessage.findMany({
     where: {
       userId,
       OR: [
@@ -140,25 +145,46 @@ export async function searchPosta(
         { fromAddress: { contains: query, mode: "insensitive" } },
         { fromName: { contains: query, mode: "insensitive" } },
         { snippet: { contains: query, mode: "insensitive" } },
-        { bodyText: { contains: query, mode: "insensitive" } },
       ],
     },
-    select: { id: true, subject: true, fromAddress: true, fromName: true, snippet: true, bodyText: true },
+    select: { id: true, subject: true, fromAddress: true, fromName: true, snippet: true },
     take: 100,
   });
 
-  // ILIKE skore: subject match = 3, from = 2, snippet = 1, body = 1
-  // Normalizace na 0-1 (rozdelime max nalezeným)
-  const ilikeRaw: IlikeRow[] = ilikeMatches.map((e) => {
+  // 5b) Chunk text search (replacement pro pre-fáze-5 bodyText ILIKE)
+  const chunkMatches = await prisma.ragChunk.findMany({
+    where: {
+      userId,
+      sourceType: "email",
+      text: { contains: query, mode: "insensitive" },
+    },
+    select: { sourceId: true },
+    take: 200,
+  });
+  const emailsWithChunkHit = new Set(chunkMatches.map((c) => c.sourceId));
+
+  // ILIKE skóre per email: subject=3, from=2, snippet=1, chunk(=body proxy)=1
+  // Normalizace na 0-1 (max hits across results)
+  const ilikeRawMap = new Map<string, number>();
+  const q = query.toLowerCase();
+  for (const e of metaMatches) {
     let hits = 0;
-    const q = query.toLowerCase();
     if (e.subject?.toLowerCase().includes(q)) hits += 3;
     if (e.fromAddress.toLowerCase().includes(q)) hits += 2;
     if (e.fromName?.toLowerCase().includes(q)) hits += 2;
     if (e.snippet?.toLowerCase().includes(q)) hits += 1;
-    if (e.bodyText?.toLowerCase().includes(q)) hits += 1;
-    return { emailId: e.id, hits };
-  });
+    if (emailsWithChunkHit.has(e.id)) hits += 1;
+    ilikeRawMap.set(e.id, hits);
+  }
+  // Plus emaily co matchly chunk ale ne metadata
+  for (const sourceId of emailsWithChunkHit) {
+    if (!ilikeRawMap.has(sourceId)) ilikeRawMap.set(sourceId, 1);
+  }
+
+  const ilikeRaw: IlikeRow[] = Array.from(ilikeRawMap.entries()).map(([emailId, hits]) => ({
+    emailId,
+    hits,
+  }));
   const maxIlikeHits = Math.max(1, ...ilikeRaw.map((r) => r.hits));
   const ilikeScoreMap = new Map<string, number>();
   for (const r of ilikeRaw) {

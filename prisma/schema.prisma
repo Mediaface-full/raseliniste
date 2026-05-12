@@ -64,6 +64,8 @@ model User {
   emailDigests     EmailDigest[]
   postaEmbedFailures PostaEmbedFailure[]
   postaDeletionLogs  PostaDeletionLog[]
+  // EncryptionKey nemá user FK — klíče jsou global (jeden klíč šifruje
+  // všechny usery v single-user instance + key versioning pro rotace).
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -1305,6 +1307,32 @@ model PostaEmbedFailure {
 // recovery. Audit log zustava NAVZDY (i kdyz mail samotny + chunks zmizely).
 // ============================================================================
 
+// ============================================================================
+// EncryptionKey — versioning pro AES-256-GCM klíče (faze 5).
+//
+// Petrovo zadani: záznam pro ENV-loaded klíč obsahuje placeholder hash,
+// NE plain key. Skutečný klíč je v EMAIL_BODY_ENCRYPTION_KEY env var.
+// keyId v této tabulce = stabilní identifikátor pro foreign key z
+// EmailMessage.bodyEncryptionKeyId.
+//
+// Rotace: nový klíč → nový row s nove keyId. Stará data zůstávají
+// dešifrovatelná pokud Petr stary klíč drží (např. v separate
+// EMAIL_BODY_ENCRYPTION_KEY_v1, ..._v2). Migrace re-šifruje na novou verzi
+// postupně (future work, ne fáze 5).
+// ============================================================================
+
+model EncryptionKey {
+  id          Int      @id @default(autoincrement())
+  keyId       String   @unique  // "env:current" nebo explicit "env:v1" atd.
+  createdAt   DateTime @default(now())
+  retiredAt   DateTime?           // null = aktivni, non-null = jen pro decrypt
+                                  // starych dat
+  // Placeholder hash (SHA-256 z env klíče) pro detekci nesprávně načteného
+  // ENV nebo přepsání mezi rotacemi. Plain key NIKDY v DB.
+  keyHashSha256 String
+  note        String?  @db.Text   // např. "rotated 2026-05-12 — kompromitace klíče v1"
+}
+
 model PostaDeletionLog {
   id            String   @id @default(cuid())
   userId        String
@@ -1745,17 +1773,19 @@ model EmailMessage {
   subject           String?    @db.Text
   snippet           String?    @db.Text      // Gmail-generated preview (~150 znaků)
 
-  // Tělo — fáze 1 ukládáme oba formáty pokud Gmail vrátí. AI klasifikace
-  // bude později pracovat s bodyText (čistší). Šifrování at-rest přes
-  // crypto.ts při zápisu, decrypt jen on-demand v UI/AI handleru.
-  // Šifrované hodnoty mají tvar `enc:iv:tag` (base64 oddělené dvojtečkou)
-  // — single column místo 3 jako u UserIntegration, jednodušší při bulk insertu.
-  bodyText          String?    @db.Text
-  bodyHtml          String?    @db.Text
+  // Tělo — fáze 5 (2026-05-12): AES-256-GCM šifrování at-rest.
+  // POKUD bodyTextCiphertext IS NOT NULL → encrypted, použij EmailBodyCrypto.decrypt()
+  // POKUD bodyText IS NOT NULL → legacy plain text (back-compat pro pre-fáze-5 data)
+  // Migration script encryption-migrate-existing.ts šifruje legacy řádky postupně.
+  bodyText          String?    @db.Text     // legacy plain (deprecated, retain pro back-compat)
+  bodyHtml          String?    @db.Text     // legacy plain (deprecated)
 
-  // Pro fázi 1 NEŠIFRUJEME — single-user instance, DB je v interní síti.
-  // Šifrování bude přidáno ve fázi 2 současně s vystavením /posta endpointu.
-  // bodyEncrypted     Boolean    @default(false)
+  // Faze 5 encrypted blobs — format: AES-256-GCM s 12B nonce + 16B tag.
+  // bodyTextCiphertext = base64(nonce(12B) || ciphertext(N) || tag(16B))
+  // bodyEncryptionKeyId = FK na EncryptionKey.keyId (versioning pro rotace)
+  bodyTextCiphertext String?   @db.Text
+  bodyHtmlCiphertext String?   @db.Text
+  bodyEncryptionKeyId String?  // EncryptionKey.keyId; null = nešifrované (legacy)
 
   // Gmail labely (např. ["INBOX", "IMPORTANT", "CATEGORY_PERSONAL"]).
   labels            String[]   @default([])

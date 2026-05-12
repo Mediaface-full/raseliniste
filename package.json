@@ -14,7 +14,8 @@
     "db:generate": "prisma generate",
     "health:import": "tsx scripts/import-health-export.ts",
     "posta:backfill": "tsx scripts/posta-backfill.ts",
-    "posta:cleanup": "tsx scripts/posta-cleanup.ts"
+    "posta:cleanup": "tsx scripts/posta-cleanup.ts",
+    "posta:encrypt-migrate": "tsx scripts/posta-encrypt-migrate.ts"
   },
   "dependencies": {
     "@astrojs/node": "^10.0.5",

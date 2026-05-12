@@ -22,6 +22,7 @@
 import { prisma } from "./db";
 import { getGemini, DEFAULT_MODEL } from "./gemini";
 import { trackGeminiCall } from "./gemini-usage";
+import { getDecryptedBodyText, getDecryptedBodyHtml } from "./email-body-crypto";
 
 const PROMPT_VERSION = "classify_v1";
 
@@ -161,8 +162,12 @@ export async function classifyEmail(
       toAddresses: true,
       subject: true,
       snippet: true,
+      // Faze 5: čteme i encrypted varianty + key id pro on-demand decrypt
       bodyText: true,
       bodyHtml: true,
+      bodyTextCiphertext: true,
+      bodyHtmlCiphertext: true,
+      bodyEncryptionKeyId: true,
       receivedAt: true,
       labels: true,
       classification: { select: { id: true } },
@@ -183,10 +188,13 @@ export async function classifyEmail(
     return result;
   }
 
-  // Body fallback: text → HTML stripped → snippet
+  // Body fallback: decrypted text → decrypted HTML stripped → snippet → fallback
+  // getDecryptedBodyText handluje encrypted vs legacy plain transparentně
+  const decryptedText = getDecryptedBodyText(email);
+  const decryptedHtml = decryptedText ? null : getDecryptedBodyHtml(email);
   const bodyTextOrSnippet =
-    (email.bodyText && email.bodyText.slice(0, BODY_MAX_CHARS)) ||
-    (email.bodyHtml && stripHtml(email.bodyHtml).slice(0, BODY_MAX_CHARS)) ||
+    (decryptedText && decryptedText.slice(0, BODY_MAX_CHARS)) ||
+    (decryptedHtml && stripHtml(decryptedHtml).slice(0, BODY_MAX_CHARS)) ||
     email.snippet ||
     "(prázdné tělo)";
 

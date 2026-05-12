@@ -24,6 +24,7 @@
 import { prisma } from "./db";
 import { embedTextsBatch, vectorLiteral } from "./rag";
 import { chunkEmailBody } from "./posta-chunking";
+import { getDecryptedBodyText, getDecryptedBodyHtml } from "./email-body-crypto";
 
 const MAX_RETRY_BEFORE_DLQ = 3;
 const EMBED_CONCURRENCY = 5;
@@ -55,8 +56,12 @@ export async function embedEmail(emailId: string, options: EmbedOptions = {}): P
       id: true,
       userId: true,
       subject: true,
+      // Faze 5: čteme oba — legacy plain a encrypted varianty
       bodyText: true,
       bodyHtml: true,
+      bodyTextCiphertext: true,
+      bodyHtmlCiphertext: true,
+      bodyEncryptionKeyId: true,
       snippet: true,
       embeddedAt: true,
     },
@@ -75,10 +80,12 @@ export async function embedEmail(emailId: string, options: EmbedOptions = {}): P
     return stats;
   }
 
-  // Body fallback: text → HTML stripped → snippet
+  // Body fallback: decrypted text → decrypted HTML stripped → snippet
+  const decryptedText = getDecryptedBodyText(email);
+  const decryptedHtml = decryptedText ? null : getDecryptedBodyHtml(email);
   const bodyText =
-    email.bodyText ||
-    (email.bodyHtml ? stripHtml(email.bodyHtml) : "") ||
+    decryptedText ||
+    (decryptedHtml ? stripHtml(decryptedHtml) : "") ||
     email.snippet ||
     "";
 
