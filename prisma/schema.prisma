@@ -1701,10 +1701,80 @@ model EmailMessage {
   importedAt        DateTime   @default(now())
   bodyDeletedAt     DateTime?  // 96denní retention cron nuluje bodyText/HTML, metadata zůstává
 
+  // Faze 6 hint — placeholder pro budouci detekci vychozich zavazku.
+  // Schema je tu pripraveno, populace prijde s implementaci DetectedCommitment.
+  // Default false; po klasifikaci faze 6 nastavi na true u odeslanych mailu
+  // se signalama jako "ozvu se", "poslu do patku", atd. Diky tomu nemusime
+  // pri rescanu prochazet vsechny maily, jen ty s candidates.
+  hasOutboundCommitmentCandidates Boolean @default(false)
+
+  classification    EmailClassification?
+
   @@index([userId, receivedAt])
   @@index([userId, threadId])
   @@index([threadId])
   @@index([userId, importedAt])
+  @@index([userId, hasOutboundCommitmentCandidates])
+}
+
+// ============================================================================
+// Klasifikace mailu — faze 2 (2026-05-12)
+// Ortogonalni schema dle INSTRUKCE/POSTA-DESIGN-DECISIONS.md
+//   action_type   x   content_type   x   urgency   x   escalation
+// + suggestedAction, projectHint, reason
+//
+// Jeden zaznam per EmailMessage (1:1). Reklasifikace = update existujiciho
+// zaznamu (NE novy radek — historii klasifikaci pro fazi 2 nepotrebujeme).
+// ============================================================================
+
+model EmailClassification {
+  id              String       @id @default(cuid())
+
+  messageId       String       @unique
+  message         EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  // CO S TIM DELAT (akce)
+  // action_required   — ceka na moji akci (odpoved, rozhodnuti, akce)
+  // waiting_external  — poslal jsem neco, ceka se na druhou stranu
+  // informational     — k precteni/povedomi, zadna akce
+  // noise             — archivovat (marketing, automaty, spam)
+  actionType      String
+
+  // CO TO JE (obsah)
+  // klient | osobni | admin | newsletter | reklama
+  // | systemovy | bezpecnostni | spam
+  contentType     String
+
+  // low | medium | high
+  urgency         String
+
+  // true pokud LLM detekoval eskalacni markery V TEXTU, NEBO
+  // post-processing DB check naslo >=2 nedavne maily od stejneho
+  // odesilatele bez moji odpovedi v poslednich 7 dnech.
+  escalation      Boolean      @default(false)
+
+  // Kratky akcni navrh — "odpovedet dnes do 18h", "schválit fakturu",
+  // "delegovat na Karla", "archivovat".
+  suggestedAction String?
+
+  // Volny odhad projektu/tematu — pro pozdejsi clusterovani v UI/digestu.
+  projectHint     String?
+
+  // 1 veta proc takhle — pro debug + zobrazeni v digestu.
+  reason          String       @db.Text
+
+  // Audit metadata
+  model           String       // "gemini-2.5-flash"
+  confidence      Float?       // 0-1, self-report z LLM (nullable kvuli pripadu kdy LLM nedonese)
+  classifiedAt    DateTime     @default(now())
+  // Pokud LLM vraci escalation=false ale post-processing override na true,
+  // ulozime tu flag pro debug.
+  escalationDbOverride Boolean @default(false)
+
+  @@index([actionType])
+  @@index([contentType])
+  @@index([urgency])
+  @@index([escalation])
 }
 
 model SmsReply {
