@@ -90,6 +90,14 @@ model User {
   gmailWatchExpiresAt DateTime?
   gmailWatchTopicName String?
   gmailLastPushAt     DateTime?
+
+  // Faze 6 (2026-05-12) — Petrova email adresa z Gmail profilu.
+  // Detector commitmentu potrebuje vedet "from = ja", aby skenoval JEN odeslane
+  // maily (outbound). Populated v posta-sync.ts pres gmail.users.getProfile().
+  // Single-user typicky 1 hodnota, ale schema toleruje update (alias addresses).
+  gmailEmailAddress    String?
+
+  detectedCommitments DetectedCommitment[]
 }
 
 model WebauthnCredential {
@@ -1344,6 +1352,87 @@ model EncryptionKey {
   note        String?  @db.Text   // např. "rotated 2026-05-12 — kompromitace klíče v1"
 }
 
+// ============================================================================
+// DetectedCommitment — vysumele zavazky z odeslanych mailu (faze 6).
+//
+// Primarka v nasi DB, Todoist je sekundarni mirror (1-way DB→Todoist sync).
+// Vyhneme se konflikt resolution peklu dvousmerne synchronizace.
+//
+// Detector worker: LLM scan over outbound emails (from = User.gmailEmailAddress)
+// → kandidati s confidence 0-1 → routing:
+//   >=0.85: status=active, auto_created=true, auto-sync do Todoist
+//   0.55-0.84: status=active, auto_created=false, jen v UI (needs confirm)
+//   <0.55: skip (jen debug log, NE vytvořit záznam)
+//
+// Lifecycle: active → confirmed | rejected | resolved | merged | stale
+// ============================================================================
+
+model DetectedCommitment {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Zdroj — mail ze kterého byl závazek detekován
+  sourceEmailId   String
+  sourceEmail     EmailMessage @relation("CommitmentSource", fields: [sourceEmailId], references: [id], onDelete: Cascade)
+
+  detectedAt      DateTime @default(now())
+
+  // Závazek samotný
+  quotedText      String   @db.Text  // přesný citát z mailu
+  recipient       String?              // komu byl závazek dán (jméno, nullable)
+  recipientEmail  String?              // email recipientu (parsed z To/Cc)
+  proposedTitle   String   @db.Text   // LLM návrh názvu úkolu
+  deadlineHint    String?              // LLM odhad "do pátku" / "this week"
+  parsedDeadline  DateTime?            // pokud se podařilo parsnout na konkrétní datum
+
+  // Dedup — cosine similarity > 0.85 + same recipient + within 7d
+  // → soft-link, NE auto-skip. UI nabídne "sloučit" / "jsou to jiné".
+  // related_to[] = pole id existujicich active commitmentu se similar quoted_text
+  relatedTo       String[] @default([])
+  // Po slouceni: druhotny commitment dostane mergedInto = primary.id + status=merged
+  mergedInto      String?
+
+  // AI metadata
+  confidence      Float                // 0-1 LLM self-report
+  promptVersion   String              // "classify_commitment_v1" — version verzování
+
+  // Routing výstup
+  // active        — pending decision (auto pokud confidence>=0.85, jinak needs-confirm)
+  // confirmed     — Petr explicitne akceptoval (i auto_created Petr můze "ujasnit")
+  // rejected      — "tohle není závazek" (auditní data pro budouci prompt revizi)
+  // resolved      — splneno, Todoist task closed
+  // merged        — soft-merged do jineho commitmentu (viz mergedInto)
+  // stale         — 30+ dni bez last_action_at update → auto-archive
+  status          String   @default("active")
+  autoCreated     Boolean  @default(false) // confidence >= 0.85 = true
+
+  // Timestampy lifecycle
+  confirmedAt     DateTime?
+  rejectedAt      DateTime?
+  resolvedAt      DateTime?
+  staleAt         DateTime?
+  rejectionReason String?  @db.Text
+
+  // Klíčové pole pro stale detection
+  // Aktualizuje se při: (a) vzniku, (b) update statusu, (c) související
+  // mail dorazí v threadu source mailu (related_email_ids append)
+  lastActionAt    DateTime @default(now())
+
+  // Todoist sync (jednosměrný DB → Todoist, status closed/labeled)
+  todoistTaskId   String?
+
+  // Všechny maily co se vážou k tomuto commitmentu (thread + keyword match)
+  // Append při příchodu nového mailu — drží commitment "alive" (lastActionAt update)
+  relatedEmailIds String[] @default([])
+
+  @@index([userId, status])
+  @@index([userId, lastActionAt])
+  @@index([sourceEmailId])
+  @@index([userId, detectedAt])
+  @@index([todoistTaskId])
+}
+
 model PostaDeletionLog {
   id            String   @id @default(cuid())
   userId        String
@@ -1831,6 +1920,7 @@ model EmailMessage {
   embeddedAt        DateTime?
 
   classification    EmailClassification?
+  sourceCommitments DetectedCommitment[] @relation("CommitmentSource")
 
   @@index([userId, receivedAt])
   @@index([userId, threadId])

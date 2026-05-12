@@ -93,6 +93,14 @@ export async function syncPostaForUser(userId: string): Promise<PostaSyncStats> 
     stats.emailAddress = profile.emailAddress;
     stats.historyIdAfter = profile.historyId;
 
+    // Faze 6: ulož Petrovu email adresu (detector commitmentu potřebuje
+    // "from = ja" filter pro outbound only). Idempotent — overwrite OK.
+    if (profile.emailAddress) {
+      await prisma.user
+        .update({ where: { id: userId }, data: { gmailEmailAddress: profile.emailAddress } })
+        .catch(() => null);
+    }
+
     // Krok 2: získat seznam ID
     // Faze 1: pro INIT i INCREMENTAL používáme messages.list s q filtrem.
     // INIT pulluje newer_than:7d (max 100), INCREMENTAL newer_than:1d
