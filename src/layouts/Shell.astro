@@ -3,6 +3,8 @@ import Base from "./Base.astro";
 import LogoutButton from "@/components/LogoutButton";
 import SidebarToggle from "@/components/SidebarToggle";
 import { Icon } from "astro-icon/components";
+import { readSession } from "@/lib/session";
+import { getPostaBadgeCount } from "@/lib/posta-badge";
 
 interface Props {
   title: string;
@@ -14,7 +16,26 @@ interface Props {
 const { title, username, heading, breadcrumb = [] } = Astro.props;
 const path = Astro.url.pathname;
 
-type NavItem = { href: string; label: string; icon: string; tint: string; enabled?: boolean };
+// Sidebar badge counters — server-side, cache 60s in-memory.
+// Jen pokud existuje session (na public stránkách neřešíme).
+const session = await readSession(Astro.cookies);
+let postaBadge = 0;
+if (session) {
+  try {
+    postaBadge = await getPostaBadgeCount(session.uid);
+  } catch {
+    // Pošta není nakonfigurovaná, count = 0. Tichý fail, sidebar nesmí padnout.
+  }
+}
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: string;
+  tint: string;
+  enabled?: boolean;
+  badge?: number;
+};
 
 const nav: { group: string; items: NavItem[] }[] = [
   { group: "Přehled", items: [
@@ -42,6 +63,11 @@ const nav: { group: string; items: NavItem[] }[] = [
     { href: "/studna",   label: "Studánka",  icon: "lucide:waves",        tint: "butter", enabled: true },
     { href: "/prskavka", label: "Prskavka",  icon: "lucide:sparkles",     tint: "butter", enabled: true },
     { href: "/spiz",     label: "Spíž",      icon: "lucide:archive",      tint: "mint",   enabled: true },
+  ]},
+  { group: "Komunikace", items: [
+    // Pošta (Email Intelligence) — fáze 1+2 hotové, fáze 3 = tato stránka.
+    // Tint cool-blue. Skupina připravena pro budoucí Slack/WhatsApp aggregátor.
+    { href: "/posta", label: "Pošta", icon: "lucide:mail", tint: "cool-blue", enabled: true, badge: postaBadge },
   ]},
   { group: "Data", items: [
     { href: "/health",   label: "Zdraví",    icon: "lucide:heart-pulse", tint: "rose", enabled: true },
@@ -133,6 +159,15 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
                       )}
                       <Icon name={item.icon} class="size-4 shrink-0" style="color: var(--c);" />
                       <span>{item.label}</span>
+                      {item.badge !== undefined && item.badge > 0 && (
+                        <span
+                          class="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-mono font-medium"
+                          style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
+                          title="Aktivní action_required (urgency high nebo escalation)"
+                        >
+                          {item.badge}
+                        </span>
+                      )}
                       {disabled && (
                         <span class="ml-auto text-[9px] uppercase tracking-widest text-muted-foreground font-mono">
                           soon
