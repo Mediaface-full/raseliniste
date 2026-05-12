@@ -62,6 +62,7 @@ model User {
   smsReplies       SmsReply[]
   emailMessages    EmailMessage[]
   emailDigests     EmailDigest[]
+  postaEmbedFailures PostaEmbedFailure[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -1245,10 +1246,20 @@ model RagChunk {
 
   // Reference do zdrojové entity (volně, bez FK aby šlo soft-mazat zdroj
   // bez kaskády — chunk se promaže reindexem nebo cleanup cronem).
-  sourceType  String   // "journal" | "task" | "studna"
+  sourceType  String   // "journal" | "task" | "studna" | "email" (NOVE faze 4)
   sourceId    String
   chunkIdx    Int      // 0..N-1 pořadí chunku v rámci zdroje
   text        String   @db.Text
+
+  // Faze 4 (2026-05-12) — metadata pro Posta hybrid chunking + debugging:
+  // - chunkCount: celkovy pocet chunku pro tento sourceId (denormalized
+  //   pro snadny lookup "kolik celkem mailo X chunku")
+  // - tokenCount: priblizny pocet tokenu (znaky/4 heuristic, ne presny)
+  // - sourceKind: pro email "body" | "thread_message" (per Petrovo zadani
+  //   thread = kazda zprava samostatne); pro journal/task/studna null
+  chunkCount  Int?
+  tokenCount  Int?
+  sourceKind  String?
 
   // Vektor pgvector. Unsupported = Prisma nezná typ, ale generuje sloupec.
   // Vyhledávání + insert zajišťuje raw SQL (viz src/lib/rag.ts).
@@ -1259,6 +1270,30 @@ model RagChunk {
 
   @@unique([sourceType, sourceId, chunkIdx])
   @@index([userId, sourceType])
+}
+
+// ============================================================================
+// PostaEmbedFailure — dead letter queue pro selhaly embed pokus (faze 4).
+// Po N retries (default 3) zustavaji zde pro manualni inspekci/reklasifikaci.
+// ============================================================================
+
+model PostaEmbedFailure {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailId         String   // EmailMessage.id — soft reference (no FK kvuli
+                           // moznosti, ze mail bude smazan retention cronem)
+  chunkIndex      Int      // 0-based; -1 pro chyby na urovni celeho mailu
+                           // (napr. chunking selhal pred dosazenim per-chunk)
+  error           String   @db.Text
+  retryCount      Int      @default(0)
+  lastAttemptedAt DateTime
+
+  createdAt       DateTime @default(now())
+
+  @@unique([emailId, chunkIndex])
+  @@index([userId, lastAttemptedAt])
 }
 
 // ============================================================================
@@ -1715,6 +1750,11 @@ model EmailMessage {
   resolvedAt        DateTime?
   resolvedReason    String?    // "manual" | "auto-archive-newsletter" (faze 5+) | atd.
 
+  // Faze 4 (2026-05-12) — RAG embeddings. null = jeste neembededovano.
+  // Worker cron `posta-embed` (every 5 min) hleda WHERE classification IS NOT NULL
+  // AND embeddedAt IS NULL LIMIT 50, generuje chunks + embeddings do RagChunk.
+  embeddedAt        DateTime?
+
   classification    EmailClassification?
 
   @@index([userId, receivedAt])
@@ -1723,6 +1763,7 @@ model EmailMessage {
   @@index([userId, importedAt])
   @@index([userId, hasOutboundCommitmentCandidates])
   @@index([userId, resolvedAt])
+  @@index([userId, embeddedAt])
 }
 
 // ============================================================================
