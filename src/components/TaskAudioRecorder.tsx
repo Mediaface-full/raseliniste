@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, Square, Loader2, AlertTriangle, Upload, Lock, EyeOff } from "lucide-react";
+import { Mic, Square, Loader2, AlertTriangle, Upload, Lock, EyeOff, Check } from "lucide-react";
 import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 const TICK_MS = 250;
@@ -10,7 +10,7 @@ const LIMIT_OPTIONS = [
 ] as const;
 const LIMIT_STORAGE_KEY = "ukoly-audio-limit-min";
 
-type Phase = "idle" | "recording" | "uploading" | "redirecting" | "error";
+type Phase = "idle" | "recording" | "uploading" | "done" | "error";
 
 function loadLimit(): number {
   if (typeof window === "undefined") return 10;
@@ -115,9 +115,9 @@ export default function TaskAudioRecorder() {
         setError(data.error ?? `Server vrátil ${res.status}`);
         return;
       }
-      setPhase("redirecting");
-      // Přesměruj na review screen — UI tam pollne dokud nebude status=review
-      window.location.href = `/ukoly/audio/${data.batchId}/review`;
+      // Žádné přesměrování — AI běží na pozadí. Petr nemusí čekat.
+      // Salvu najde v /ukoly (sekce „Čeká na review"). Na PC v klidu projde Triage.
+      setPhase("done");
     } catch (e) {
       setPhase("error");
       setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
@@ -254,14 +254,36 @@ export default function TaskAudioRecorder() {
           </>
         )}
 
-        {(phase === "uploading" || phase === "redirecting") && (
+        {phase === "uploading" && (
           <>
             <Loader2 className="size-12 animate-spin text-[var(--tint-peach)]" />
-            <div className="text-base font-medium">
-              {phase === "uploading" ? "Nahrávám…" : "Otevírám review…"}
+            <div className="text-base font-medium">Nahrávám…</div>
+            <div className="text-xs text-muted-foreground">audio na server</div>
+          </>
+        )}
+
+        {phase === "done" && (
+          <>
+            <div className="size-20 rounded-full bg-[var(--tint-sage)]/20 grid place-items-center">
+              <Check className="size-10 text-[var(--tint-sage)]" />
             </div>
-            <div className="text-xs text-muted-foreground">
-              {phase === "uploading" ? "audio na server" : "AI běží na pozadí"}
+            <div className="text-base font-medium">Hotovo, salva nahrána</div>
+            <div className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+              AI zpracovává úkoly na pozadí. Až bude hotovo, najdeš ji v sekci „Čeká na review" v <a href="/ukoly" className="underline">Úkolech</a>. Můžeš v klidu pokračovat dál (i z PC).
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+              <button
+                onClick={() => { setPhase("idle"); setElapsedMs(0); }}
+                className="px-4 py-2 rounded-md bg-[var(--tint-peach)]/15 border border-[var(--tint-peach)]/30 text-sm hover:bg-[var(--tint-peach)]/25 transition-colors"
+              >
+                Nadiktovat další
+              </button>
+              <a
+                href="/ukoly"
+                className="px-4 py-2 rounded-md hover:bg-white/5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Otevřít Úkoly
+              </a>
             </div>
           </>
         )}

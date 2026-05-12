@@ -1,6 +1,7 @@
 ---
 import Shell from "../layouts/Shell.astro";
 import UkolyList from "../components/UkolyList";
+import { Icon } from "astro-icon/components";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 
@@ -19,6 +20,36 @@ const todoistConfigured = Boolean(
     select: { id: true },
   }),
 );
+
+// Audio batche čekající na review nebo zpracovávané AI (last 48h).
+// Petr nahraje na mobilu → AI běží na pozadí → tady to najde a otevře Triage.
+const pendingBatches = await prisma.taskAudioBatch.findMany({
+  where: {
+    userId: session.uid,
+    status: { in: ["processing", "review", "error"] },
+    createdAt: { gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+  },
+  orderBy: { createdAt: "desc" },
+  select: {
+    id: true,
+    status: true,
+    audioDurationSec: true,
+    createdAt: true,
+    processingError: true,
+    proposalsJson: true,
+  },
+  take: 10,
+});
+
+function fmtTime(d: Date) {
+  return new Intl.DateTimeFormat("cs-CZ", { dateStyle: "short", timeStyle: "short" }).format(d);
+}
+function fmtDuration(sec: number | null) {
+  if (!sec) return null;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m} min ${s} s` : `${s} s`;
+}
 ---
 
 <Shell
@@ -27,7 +58,56 @@ const todoistConfigured = Boolean(
   heading="Úkoly"
   breadcrumb={[{ label: "Organizace" }, { label: "Úkoly" }]}
 >
-  <div class="max-w-3xl">
+  <div class="max-w-3xl space-y-4">
+    {pendingBatches.length > 0 && (
+      <section class="glass rounded-xl p-4 space-y-3" style="--c: var(--tint-peach);">
+        <div class="flex items-center gap-2">
+          <Icon name="lucide:inbox" class="size-4" style="color: var(--c);" />
+          <h2 class="font-serif text-lg">Audio salvy čekají na review</h2>
+          <span class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+            {pendingBatches.length}
+          </span>
+        </div>
+        <ul class="space-y-1.5">
+          {pendingBatches.map((b) => {
+            const proposals = Array.isArray(b.proposalsJson) ? b.proposalsJson.length : 0;
+            const isReady = b.status === "review";
+            const isProcessing = b.status === "processing";
+            const isError = b.status === "error";
+            return (
+              <li>
+                <a
+                  href={`/ukoly/audio/${b.id}/review`}
+                  class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition-colors border border-white/5"
+                >
+                  <span class="size-8 rounded-md grid place-items-center shrink-0" style={`background: color-mix(in oklch, var(--c) ${isReady ? 18 : 10}%, transparent);`}>
+                    {isReady && <Icon name="lucide:check-circle-2" class="size-4" style="color: var(--c);" />}
+                    {isProcessing && <Icon name="lucide:loader-2" class="size-4 animate-spin text-muted-foreground" />}
+                    {isError && <Icon name="lucide:alert-triangle" class="size-4 text-destructive" />}
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm">
+                      {isReady && `${proposals} úkolů k potvrzení`}
+                      {isProcessing && "AI zpracovává…"}
+                      {isError && "Chyba zpracování"}
+                    </div>
+                    <div class="text-[11px] text-muted-foreground font-mono">
+                      {fmtTime(b.createdAt)}
+                      {b.audioDurationSec ? ` · ${fmtDuration(b.audioDurationSec)}` : ""}
+                    </div>
+                    {isError && b.processingError && (
+                      <div class="text-[11px] text-destructive/80 mt-0.5 line-clamp-2">{b.processingError}</div>
+                    )}
+                  </div>
+                  <Icon name="lucide:chevron-right" class="size-4 text-muted-foreground shrink-0" />
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    )}
+
     <UkolyList client:load todoistConfigured={todoistConfigured} />
   </div>
 </Shell>
