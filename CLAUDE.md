@@ -6,10 +6,11 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/POSTA-PHASE-2.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence „Pošta" fáze 2 HOTOVÁ. Ortogonální klasifikace (action_type/content_type/urgency/escalation + suggestedAction/projectHint/reason) přes Gemini Flash + structured JSON output + post-processing escalation DB override + cron 15 min + manuální endpoint + UI dashboard v `/settings/integrations/google`. Tři nezodpovězené otázky na konci pro fázi 3 (UI `/posta` modul).
-1b. `INSTRUKCE/POSTA-PHASE-1.md` — předchozí fáze (OAuth + import skeleton)
-1c. `INSTRUKCE/POSTA-DESIGN-DECISIONS.md` — **závazná specifikace pro fáze 2-6** (klasifikace ortogonálně, RAG hybrid, závazky confidence routing)
-1d. `prompts/classify_v1.md` — versionovaná spec klasifikátoru
+1. **`INSTRUKCE/POSTA-PHASE-3.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence „Pošta" fáze 3 HOTOVÁ. UI modul `/posta` (SSR Astro, zero JS islands): digest sekce + filter chips (Vyřídit default / Čeká na druhé / K přečtení / Šum / Vyřízené) + search ILIKE + karty s `<details>` expand + POST form pro „označit jako vyřízené" + Gmail deeplink. Sidebar skupina „Komunikace" → „Pošta" s cool-blue tintem + badge counter (60s cache). Digest cron `posta-digest` daily 7:00 (Gemini Flash summary, CPTSD-aware tone). Tři otázky pro fázi 4 (RAG embeddings + search).
+1b. `INSTRUKCE/POSTA-PHASE-2.md` — předchozí fáze (klasifikace 7-polí, prompts/classify_v1.md, post-processing escalation DB override)
+1c. `INSTRUKCE/POSTA-PHASE-1.md` — fáze 1 (OAuth + import skeleton)
+1d. `INSTRUKCE/POSTA-DESIGN-DECISIONS.md` — **závazná specifikace pro fáze 2-6** (klasifikace ortogonálně, RAG hybrid, závazky confidence routing)
+1e. `prompts/classify_v1.md` — versionovaná spec klasifikátoru
 2. `INSTRUKCE/HANDOFF-2026-05-10.md` — předchozí stav: Triage t-* dropdown, smart routing 6-úrovňový, Contact.isTeam + clientTag + aliases, RoutingAuditLog, GoSMS modul, Things-import (částečně dořešen — 217 nedoimportovaných mailů v `Downloads/things-finale.md`)
 3. `INSTRUKCE/SMART-ROUTING.md` — operativní návod jak routing nakonfigurovat a debugovat
 3. `INSTRUKCE/HANDOFF-2026-05-07.md` — předchozí stav (Spíž, UPLOAD, fire-and-forget napříč)
