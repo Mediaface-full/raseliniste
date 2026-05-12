@@ -261,7 +261,7 @@ export default function OwnerRecorder({
             <input
               ref={briefInputRef}
               type="file"
-              accept="audio/*,.m4a,.mp3,.wav,.webm,.mp4"
+              accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.webm,.mp4,.flac"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];

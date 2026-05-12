@@ -1931,7 +1931,7 @@ function UploadAudioCard({ projectId, onSuccess }: { projectId: string; onSucces
         <div className="text-sm">{uploading ? `Nahrávám… ${progress}%` : "Vybrat audio soubor"}</div>
         <input
           type="file"
-          accept="audio/*"
+          accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.webm,.mp4,.flac"
           className="hidden"
           disabled={uploading}
           onChange={(e) => {

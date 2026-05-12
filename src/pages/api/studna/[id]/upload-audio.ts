@@ -3,11 +3,11 @@ import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
 import { saveUpload } from "@/lib/uploads";
 import { processUploadAudio } from "@/lib/process-recording";
+import { resolveAudioMime } from "@/lib/audio-mime";
 
 export const prerender = false;
 
 const MAX_BYTES = 500 * 1024 * 1024; // 500 MB
-const ALLOWED_AUDIO_PREFIX = "audio/";
 
 /**
  * POST /api/studna/:id/upload-audio
@@ -38,9 +38,15 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
   if (file.size > MAX_BYTES) {
     return Response.json({ error: `Soubor je moc velký (max ${MAX_BYTES / 1024 / 1024} MB).` }, { status: 413 });
   }
-  const mime = (file.type || "").toLowerCase();
-  if (!mime.startsWith(ALLOWED_AUDIO_PREFIX)) {
-    return Response.json({ error: `Soubor není audio (mime: ${mime || "neznámý"}).` }, { status: 400 });
+  // iPhone Files app často pošle prázdný file.type — odvodíme MIME z přípony.
+  const mime = resolveAudioMime(file.type, file.name);
+  if (!mime) {
+    return Response.json(
+      {
+        error: `Soubor není rozpoznán jako audio (mime: "${file.type || "prázdný"}", filename: "${file.name || "?"}"). Podporované formáty: m4a, mp3, wav, ogg, opus, aac, webm, mp4, flac.`,
+      },
+      { status: 400 },
+    );
   }
 
   const buf = Buffer.from(await file.arrayBuffer());

@@ -452,7 +452,7 @@ export default function GuestRecorder({
                 <input
                   ref={briefInputRef}
                   type="file"
-                  accept="audio/*,.m4a,.mp3,.wav,.webm,.mp4"
+                  accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.webm,.mp4,.flac"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
@@ -649,7 +649,7 @@ function UploadAudioGuestButton({
         {uploading ? `Nahrávám soubor… ${progress}%` : "📎 Nahrát audio soubor (MP3/M4A/...)"}
         <input
           type="file"
-          accept="audio/*"
+          accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.webm,.mp4,.flac"
           className="hidden"
           disabled={uploading}
           onChange={(e) => {
