@@ -63,6 +63,7 @@ model User {
   emailMessages    EmailMessage[]
   emailDigests     EmailDigest[]
   postaEmbedFailures PostaEmbedFailure[]
+  postaDeletionLogs  PostaDeletionLog[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -1294,6 +1295,39 @@ model PostaEmbedFailure {
 
   @@unique([emailId, chunkIndex])
   @@index([userId, lastAttemptedAt])
+}
+
+// ============================================================================
+// PostaDeletionLog — audit log full-delete operaci (faze 5).
+//
+// Plne smazani mailu (DELETE /api/posta/emails/:id?full=true) je destructive
+// operace — pro GDPR-style "right to be forgotten" requesty nebo mistake
+// recovery. Audit log zustava NAVZDY (i kdyz mail samotny + chunks zmizely).
+// ============================================================================
+
+model PostaDeletionLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Snapshot pole z EmailMessage v okamziku smazani (po DELETE jiz nedostupne)
+  emailId       String   // puvodni EmailMessage.id
+  gmailMessageId String  // Gmail ID — pripadny re-import by vytvoril novou row
+  threadId      String
+  subject       String?  @db.Text
+  fromAddress   String
+  receivedAt    DateTime
+
+  // Operace metadata
+  deletedAt     DateTime @default(now())
+  requestedBy   String   // userId kdo smazani vyvolal (typicky stejny jako userId,
+                         // ale schema dovoluje admin-iniciovany delete v multi-user
+                         // setupu)
+  reason        String?  @db.Text  // pro audit: "GDPR request", "mistake", "spam batch"
+  chunksDeleted Int      @default(0) // pocet smazanych RagChunk recordu
+
+  @@index([userId, deletedAt])
+  @@index([gmailMessageId])
 }
 
 // ============================================================================
