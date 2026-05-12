@@ -29,7 +29,8 @@ export async function getPostaBadgeCount(userId: string): Promise<number> {
     return cached.count;
   }
 
-  const count = await prisma.emailMessage.count({
+  // Hlavní hard badge: active urgentní maily čekající na akci
+  const mailsCount = await prisma.emailMessage.count({
     where: {
       userId,
       resolvedAt: null,
@@ -40,6 +41,15 @@ export async function getPostaBadgeCount(userId: string): Promise<number> {
     },
   });
 
+  // Faze 6: stale commitments se přičítají "šeptem" — drobné připomenutí,
+  // ne emergency. Petr explicit: "samostatný počet, šeptem".
+  // Implementace: stale se zahrnuje do počtu (bez UI rozlišení), ale UI
+  // sekce Závazky → tab Zastaralé pak ukáže detail.
+  const staleCount = await prisma.detectedCommitment.count({
+    where: { userId, status: "stale" },
+  });
+
+  const count = mailsCount + staleCount;
   cache.set(userId, { count, expiresAt: now + CACHE_TTL_MS });
   return count;
 }

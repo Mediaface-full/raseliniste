@@ -18,6 +18,57 @@ if (!user) return Astro.redirect("/login");
 const search = (Astro.url.searchParams.get("q") || "").trim();
 const isSearchMode = search.length > 0;
 
+// Faze 6: top-level section switch — "mails" (default) vs "commitments"
+type Section = "mails" | "commitments";
+const sectionRaw = (Astro.url.searchParams.get("section") || "mails") as Section;
+const section: Section = sectionRaw === "commitments" ? "commitments" : "mails";
+
+// Commitments subtab (jen pokud section=commitments)
+type CommitmentTab = "active" | "stale" | "resolved" | "rejected";
+const cTabRaw = (Astro.url.searchParams.get("ctab") || "active") as CommitmentTab;
+const commitmentTab: CommitmentTab = ["active", "stale", "resolved", "rejected"].includes(cTabRaw)
+  ? cTabRaw
+  : "active";
+
+// Načti commitmenty pro sekci Závazky (jen pokud section=commitments)
+const commitments = section === "commitments"
+  ? await prisma.detectedCommitment.findMany({
+      where: { userId: session.uid, status: commitmentTab },
+      orderBy: commitmentTab === "stale" ? { lastActionAt: "asc" } : { detectedAt: "desc" },
+      include: {
+        sourceEmail: {
+          select: { id: true, threadId: true, subject: true, receivedAt: true },
+        },
+      },
+      take: 100,
+    })
+  : [];
+
+// Counts per commitment subtab
+const [activeCommitsCount, staleCommitsCount, resolvedCommitsCount, rejectedCommitsCount] =
+  section === "commitments"
+    ? await Promise.all([
+        prisma.detectedCommitment.count({ where: { userId: session.uid, status: "active" } }),
+        prisma.detectedCommitment.count({ where: { userId: session.uid, status: "stale" } }),
+        prisma.detectedCommitment.count({ where: { userId: session.uid, status: "resolved" } }),
+        prisma.detectedCommitment.count({ where: { userId: session.uid, status: "rejected" } }),
+      ])
+    : [0, 0, 0, 0];
+
+const COMMITMENT_TAB_COUNTS: Record<CommitmentTab, number> = {
+  active: activeCommitsCount,
+  stale: staleCommitsCount,
+  resolved: resolvedCommitsCount,
+  rejected: rejectedCommitsCount,
+};
+
+// Pro top-level switch potřebujeme i total active commitments (do badge)
+const commitmentsTopCount = section === "mails"
+  ? await prisma.detectedCommitment.count({
+      where: { userId: session.uid, status: { in: ["active", "stale"] } },
+    })
+  : activeCommitsCount + staleCommitsCount;
+
 // --- List mode filter (jen mimo search) ---
 type ActionFilter = "action_required" | "waiting_external" | "informational" | "noise" | "resolved";
 const FILTER_OPTIONS: Array<{ value: ActionFilter; label: string }> = [
@@ -214,9 +265,282 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
 >
   <div class="max-w-3xl space-y-4" style="--c: var(--tint-cool-blue);">
     {/* ============================================================
-        DIGEST sekce (jen v list módu)
+        TOP-LEVEL SECTION SWITCH (faze 6): Maily | Závazky
         ============================================================ */}
-    {!isSearchMode && digest && digestContent ? (
+    {!isSearchMode && (
+      <nav class="flex items-center gap-1 border-b border-white/5" aria-label="Sekce">
+        <a
+          href="/posta"
+          class:list={[
+            "px-4 py-2 text-sm font-mono transition-colors -mb-px",
+            section === "mails"
+              ? "text-foreground border-b-2"
+              : "text-muted-foreground hover:text-foreground border-b-2 border-transparent",
+          ]}
+          style={section === "mails" ? "border-color: var(--c);" : ""}
+        >
+          Maily
+        </a>
+        <a
+          href="/posta?section=commitments"
+          class:list={[
+            "px-4 py-2 text-sm font-mono transition-colors -mb-px flex items-center gap-1.5",
+            section === "commitments"
+              ? "text-foreground border-b-2"
+              : "text-muted-foreground hover:text-foreground border-b-2 border-transparent",
+          ]}
+          style={section === "commitments" ? "border-color: var(--c);" : ""}
+        >
+          <span>Závazky</span>
+          {commitmentsTopCount > 0 && (
+            <span class="text-[10px] opacity-60">{commitmentsTopCount}</span>
+          )}
+        </a>
+      </nav>
+    )}
+
+    {/* ============================================================
+        ZÁVAZKY SEKCE (faze 6)
+        ============================================================ */}
+    {!isSearchMode && section === "commitments" && (
+      <>
+        <nav class="flex flex-wrap gap-1.5" aria-label="Commitment tab">
+          {(["active", "stale", "resolved", "rejected"] as const).map((tab) => {
+            const labels = { active: "Aktivní", stale: "Zastaralé", resolved: "Vyřízené", rejected: "Odmítnuté" };
+            const isActive = tab === commitmentTab;
+            const count = COMMITMENT_TAB_COUNTS[tab];
+            return (
+              <a
+                href={`/posta?section=commitments&ctab=${tab}`}
+                class:list={[
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono transition-colors",
+                  isActive
+                    ? "bg-[color-mix(in_oklch,var(--c)_22%,transparent)] text-foreground border border-[color-mix(in_oklch,var(--c)_40%,transparent)]"
+                    : "bg-white/3 text-muted-foreground hover:bg-white/8 hover:text-foreground border border-transparent",
+                ]}
+              >
+                <span>{labels[tab]}</span>
+                <span class="opacity-60">{count}</span>
+              </a>
+            );
+          })}
+        </nav>
+
+        {commitments.length === 0 ? (
+          <div class="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
+            {commitmentTab === "active" && "Žádné aktivní závazky. Jen co Petr pošle mail se slibem, AI to detekuje."}
+            {commitmentTab === "stale" && "Žádné zastaralé závazky. Pekně se hýbají."}
+            {commitmentTab === "resolved" && "Zatím nic vyřešeného."}
+            {commitmentTab === "rejected" && "Zatím nic odmítnutého."}
+          </div>
+        ) : (
+          <ul class="space-y-2">
+            {commitments.map((c) => {
+              const daysSinceDetect = Math.floor((Date.now() - c.detectedAt.getTime()) / (24 * 60 * 60 * 1000));
+              const daysSinceAction = Math.floor((Date.now() - c.lastActionAt.getTime()) / (24 * 60 * 60 * 1000));
+              const needsConfirm = c.status === "active" && !c.autoCreated && c.confidence < 0.85;
+              return (
+                <li>
+                  <details
+                    class:list={[
+                      "group glass rounded-xl border transition-colors",
+                      c.status === "rejected" || c.status === "resolved"
+                        ? "border-white/5 opacity-65"
+                        : "border-border hover:border-[color-mix(in_oklch,var(--c)_30%,transparent)]",
+                    ]}
+                  >
+                    <summary class="cursor-pointer list-none px-4 py-3 flex items-start gap-3">
+                      <span
+                        class:list={[
+                          "size-2 rounded-full mt-2 shrink-0",
+                          needsConfirm ? "bg-[var(--tint-butter)]" : "bg-foreground/15",
+                        ]}
+                        title={needsConfirm ? "Potřebuje potvrzení (confidence < 0.85)" : `confidence ${c.confidence.toFixed(2)}`}
+                      ></span>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-baseline gap-2 text-xs text-muted-foreground font-mono">
+                          <span class="truncate">
+                            {c.recipient ?? c.recipientEmail ?? "—"}
+                          </span>
+                          <span class="opacity-60 shrink-0">
+                            {commitmentTab === "stale" ? `${daysSinceAction} dní bez akce` : `před ${daysSinceDetect} dny`}
+                          </span>
+                        </div>
+                        <div class="font-medium text-sm mt-0.5">{c.proposedTitle}</div>
+                        <blockquote class="text-xs text-foreground/70 mt-1 italic border-l-2 pl-2 line-clamp-2" style="border-color: color-mix(in oklch, var(--c) 40%, transparent);">
+                          „{c.quotedText}"
+                        </blockquote>
+                        {c.deadlineHint && (
+                          <div class="text-[11px] text-foreground/70 mt-1 font-mono">
+                            ⏱ {c.deadlineHint}
+                            {c.parsedDeadline && ` (${c.parsedDeadline.toLocaleDateString("cs-CZ")})`}
+                          </div>
+                        )}
+                        <div class="flex flex-wrap items-center gap-1.5 mt-2 text-[10px] font-mono">
+                          {needsConfirm && (
+                            <span class="px-1.5 py-0.5 rounded text-[var(--tint-butter)]" style="background: color-mix(in oklch, var(--tint-butter) 14%, transparent);">
+                              potřebuje potvrzení
+                            </span>
+                          )}
+                          {c.autoCreated && c.status === "active" && (
+                            <span class="px-1.5 py-0.5 rounded text-muted-foreground bg-white/5">
+                              auto-detekovano
+                            </span>
+                          )}
+                          {c.todoistTaskId && (
+                            <span class="px-1.5 py-0.5 rounded text-emerald-400/80" style="background: color-mix(in oklch, rgb(52, 211, 153) 10%, transparent);">
+                              ↗ Todoist
+                            </span>
+                          )}
+                          {c.relatedTo.length > 0 && (
+                            <span class="px-1.5 py-0.5 rounded text-muted-foreground bg-white/5">
+                              souvisí s {c.relatedTo.length} dalšími
+                            </span>
+                          )}
+                          {c.relatedEmailIds.length > 0 && (
+                            <span class="px-1.5 py-0.5 rounded text-muted-foreground bg-white/5">
+                              {c.relatedEmailIds.length} navazujících mailů
+                            </span>
+                          )}
+                        </div>
+                        {commitmentTab === "stale" && (
+                          <div class="mt-2 text-2xl font-mono text-[var(--tint-rose)]/80">
+                            {daysSinceAction} dní bez akce
+                          </div>
+                        )}
+                      </div>
+                      <Icon name="lucide:chevron-down" class="size-4 mt-2 text-muted-foreground shrink-0 transition-transform group-open:rotate-180" />
+                    </summary>
+
+                    <div class="px-4 pb-4 pt-1 border-t border-white/5 space-y-3">
+                      <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono text-muted-foreground">
+                        <div>
+                          <dt class="inline text-foreground/60">Detekováno:</dt>
+                          <dd class="inline ml-1">{fmtAbsolute(c.detectedAt)}</dd>
+                        </div>
+                        <div>
+                          <dt class="inline text-foreground/60">Poslední akce:</dt>
+                          <dd class="inline ml-1">{fmtAbsolute(c.lastActionAt)}</dd>
+                        </div>
+                        <div>
+                          <dt class="inline text-foreground/60">Confidence:</dt>
+                          <dd class="inline ml-1">{c.confidence.toFixed(2)}</dd>
+                        </div>
+                        <div>
+                          <dt class="inline text-foreground/60">Prompt verze:</dt>
+                          <dd class="inline ml-1">{c.promptVersion}</dd>
+                        </div>
+                        {c.recipient && (
+                          <div>
+                            <dt class="inline text-foreground/60">Recipient:</dt>
+                            <dd class="inline ml-1">{c.recipient}</dd>
+                          </div>
+                        )}
+                        {c.recipientEmail && (
+                          <div>
+                            <dt class="inline text-foreground/60">Email:</dt>
+                            <dd class="inline ml-1">{c.recipientEmail}</dd>
+                          </div>
+                        )}
+                        {c.rejectionReason && (
+                          <div class="col-span-2">
+                            <dt class="inline text-foreground/60">Důvod odmítnutí:</dt>
+                            <dd class="inline ml-1 text-foreground/80">{c.rejectionReason}</dd>
+                          </div>
+                        )}
+                        {c.sourceEmail && (
+                          <div class="col-span-2 pt-1">
+                            <dt class="inline text-foreground/60">Zdroj:</dt>
+                            <dd class="inline ml-1">
+                              {c.sourceEmail.subject ?? "(bez předmětu)"}{" "}
+                              <a href={`https://mail.google.com/mail/u/0/#sent/${c.sourceEmail.threadId}`} target="_blank" rel="noopener noreferrer" class="underline text-foreground/80">
+                                ↗ Gmail
+                              </a>
+                            </dd>
+                          </div>
+                        )}
+                      </dl>
+
+                      <div class="flex flex-wrap items-center gap-2 pt-1">
+                        {c.status === "active" && (
+                          <>
+                            <form method="POST" action={`/api/posta/commitments/${c.id}/action`}>
+                              <input type="hidden" name="action" value="confirm" />
+                              <input type="hidden" name="from" value={`/posta?section=commitments&ctab=${commitmentTab}`} />
+                              <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors" style="background: color-mix(in oklch, var(--c) 14%, transparent); color: color-mix(in oklch, var(--c) 92%, white);">
+                                <Icon name="lucide:check" class="size-3.5" />
+                                Potvrdit
+                              </button>
+                            </form>
+                            <form method="POST" action={`/api/posta/commitments/${c.id}/action`}>
+                              <input type="hidden" name="action" value="reject" />
+                              <input type="hidden" name="from" value={`/posta?section=commitments&ctab=${commitmentTab}`} />
+                              <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                                <Icon name="lucide:x" class="size-3.5" />
+                                Tohle není závazek
+                              </button>
+                            </form>
+                            <form method="POST" action={`/api/posta/commitments/${c.id}/action`}>
+                              <input type="hidden" name="action" value="resolve" />
+                              <input type="hidden" name="from" value={`/posta?section=commitments&ctab=${commitmentTab}`} />
+                              <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                                <Icon name="lucide:check-circle-2" class="size-3.5" />
+                                Vyřízeno
+                              </button>
+                            </form>
+                            <form method="POST" action={`/api/posta/commitments/${c.id}/action`}>
+                              <input type="hidden" name="action" value="postpone" />
+                              <input type="hidden" name="from" value={`/posta?section=commitments&ctab=${commitmentTab}`} />
+                              <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                                <Icon name="lucide:clock" class="size-3.5" />
+                                Odložit (+7 dní)
+                              </button>
+                            </form>
+                          </>
+                        )}
+                        {c.status === "stale" && (
+                          <>
+                            <form method="POST" action={`/api/posta/commitments/${c.id}/action`}>
+                              <input type="hidden" name="action" value="unstale" />
+                              <input type="hidden" name="from" value={`/posta?section=commitments&ctab=${commitmentTab}`} />
+                              <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors" style="background: color-mix(in oklch, var(--c) 14%, transparent); color: color-mix(in oklch, var(--c) 92%, white);">
+                                <Icon name="lucide:rotate-ccw" class="size-3.5" />
+                                Vrátit aktivní
+                              </button>
+                            </form>
+                            <form method="POST" action={`/api/posta/commitments/${c.id}/action`}>
+                              <input type="hidden" name="action" value="resolve" />
+                              <input type="hidden" name="from" value={`/posta?section=commitments&ctab=${commitmentTab}`} />
+                              <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                                <Icon name="lucide:check-circle-2" class="size-3.5" />
+                                Vyřízeno
+                              </button>
+                            </form>
+                            <form method="POST" action={`/api/posta/commitments/${c.id}/action`}>
+                              <input type="hidden" name="action" value="reject" />
+                              <input type="hidden" name="from" value={`/posta?section=commitments&ctab=${commitmentTab}`} />
+                              <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+                                <Icon name="lucide:archive" class="size-3.5" />
+                                Archivovat (rejected)
+                              </button>
+                            </form>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </details>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </>
+    )}
+
+    {/* ============================================================
+        DIGEST sekce (jen v list módu Maily)
+        ============================================================ */}
+    {!isSearchMode && section === "mails" && digest && digestContent ? (
       <section class="glass rounded-2xl p-5 space-y-4">
         <header class="flex items-baseline justify-between gap-3">
           <div>
@@ -274,7 +598,7 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
           </div>
         )}
       </section>
-    ) : !isSearchMode && (
+    ) : !isSearchMode && section === "mails" && (
       <section class="glass rounded-2xl p-5 space-y-3">
         <header class="flex items-baseline justify-between gap-3">
           <div>
@@ -366,9 +690,9 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
     </form>
 
     {/* ============================================================
-        FILTER chips (jen v list módu)
+        FILTER chips (jen v list módu Maily)
         ============================================================ */}
-    {!isSearchMode && (
+    {!isSearchMode && section === "mails" && (
       <nav class="flex flex-wrap gap-1.5" aria-label="Filtr">
         {FILTER_OPTIONS.map((opt) => {
           const isActive = opt.value === filter;
@@ -550,9 +874,9 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
     )}
 
     {/* ============================================================
-        LIST mode (default — bez search)
+        LIST mode (default — bez search, section=mails)
         ============================================================ */}
-    {!isSearchMode && (
+    {!isSearchMode && section === "mails" && (
       emails.length === 0 ? (
         <div class="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
           Žádné maily v této kategorii.
@@ -722,13 +1046,13 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
       )
     )}
 
-    {!isSearchMode && emails.length === 100 && (
+    {!isSearchMode && section === "mails" && emails.length === 100 && (
       <p class="text-[11px] text-muted-foreground font-mono text-center pt-2">
         Zobrazeno prvních 100 mailů — zúžit přes vyhledávání nebo filter.
       </p>
     )}
 
-    {!isSearchMode && (
+    {!isSearchMode && section === "mails" && (
       <p class="text-[11px] text-muted-foreground font-mono text-center pt-2">
         Celkem v DB: {totalCount} mailů. Sync + klasifikace + embed běží automaticky každých 5-15 min.
       </p>
