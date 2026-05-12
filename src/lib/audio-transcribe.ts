@@ -152,6 +152,56 @@ async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
   throw lastErr;
 }
 
+/**
+ * Detekce hallucination loopu v Gemini transcript output.
+ *
+ * Gemini 2.5 Flash u tichého/nečitelného audia občas spadne do smyčky a
+ * opakuje krátkou frázi (např. „že se to stalo, že se to stalo, ...")
+ * dokud nevyčerpá token limit. Výsledný transcript je k ničemu.
+ *
+ * Heuristika:
+ *  1. Pokud text > 200 znaků a unikátnost slov < 8 % → loop
+ *  2. Pokud 4-gramová fráze tvoří > 30 % textu → loop
+ *
+ * Vrací důvod (pro errorMessage), nebo null pokud je text v pořádku.
+ */
+function detectHallucinationLoop(text: string): string | null {
+  if (text.length < 200) return null;
+  const words = text.toLowerCase().match(/\p{L}+/gu) ?? [];
+  if (words.length < 40) return null;
+
+  // (1) Unikátnost slov
+  const unique = new Set(words);
+  const ratio = unique.size / words.length;
+  if (ratio < 0.08) {
+    return `pouze ${unique.size}/${words.length} unikátních slov (${(ratio * 100).toFixed(1)} %)`;
+  }
+
+  // (2) 4-gramová repetice
+  if (words.length >= 20) {
+    const ngramCounts = new Map<string, number>();
+    for (let i = 0; i <= words.length - 4; i++) {
+      const ngram = `${words[i]} ${words[i + 1]} ${words[i + 2]} ${words[i + 3]}`;
+      ngramCounts.set(ngram, (ngramCounts.get(ngram) ?? 0) + 1);
+    }
+    let maxNgram = "";
+    let maxCount = 0;
+    for (const [ngram, count] of ngramCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        maxNgram = ngram;
+      }
+    }
+    const totalNgrams = words.length - 3;
+    const ngramRatio = maxCount / totalNgrams;
+    if (ngramRatio > 0.3) {
+      return `fráze „${maxNgram}" opakována ${maxCount}× (${(ngramRatio * 100).toFixed(0)} % textu)`;
+    }
+  }
+
+  return null;
+}
+
 function extractJson(text: string): string {
   // Gemini občas vrací JSON v markdown code-fence, i když říkáme „bez markdown".
   let trimmed = text.trim();
@@ -385,6 +435,17 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
     throw new Error(
       `Gemini Stage 1 (přepis) vrátil prázdný výstup. ` +
       `Audio: ${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB, mime ${params.mimeType}, mode ${usedMode}.`,
+    );
+  }
+
+  // Detekce hallucination loopu — Gemini 2.5 Flash při tichém/nečitelném audiu
+  // občas spadne do smyčky a opakuje krátkou frázi (např. „že se to stalo")
+  // stovkykrát až do token limitu. Místo uložení blábolu raději error.
+  const loopReason = detectHallucinationLoop(transcript);
+  if (loopReason) {
+    throw new Error(
+      `Gemini transcription vrátila opakující se loop (${loopReason}). ` +
+      `Pravděpodobně tiché/nečitelné audio. Audio: ${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB, mime ${params.mimeType}.`,
     );
   }
 
