@@ -6,12 +6,15 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/POSTA-PHASE-4.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence „Pošta" fáze 4 HOTOVÁ. RAG embeddings + hybrid search: chunkování (hybrid podle délky + thread-aware), embed cron `posta-embed` every 5 min (Gemini text-embedding-004 768 dim, pgvector HNSW), backfill skript `scripts/posta-backfill.ts` (resumable + lock + JSON log + --confirm), hybrid search ILIKE+vector (combined 0.4/0.6), `/posta` search mode s 6 facet filters + matched chunk highlight (cool-blue border-left, žádné yellow). DLQ `PostaEmbedFailure`. Tři otázky pro fázi 5 (retention, encryption, GCP push setup).
-1b. `INSTRUKCE/POSTA-PHASE-3.md` — UI modul `/posta` (SSR, zero JS), digest, sidebar badge
-1c. `INSTRUKCE/POSTA-PHASE-2.md` — klasifikace 7-polí, prompts/classify_v1.md
-1d. `INSTRUKCE/POSTA-PHASE-1.md` — OAuth + import skeleton
-1e. `INSTRUKCE/POSTA-DESIGN-DECISIONS.md` — **závazná specifikace pro fáze 2-6** (klasifikace ortogonálně, RAG hybrid, závazky confidence routing)
-1f. `prompts/classify_v1.md` — versionovaná spec klasifikátoru
+1. **`INSTRUKCE/POSTA-PHASE-5.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence „Pošta" fáze 5 HOTOVÁ. Gmail push (Cloud Pub/Sub) + AES-256-GCM encryption bodyText/Html at-rest + 96d selektivní retention + full delete API + audit log. Real-time inbox: nový mail → push → fetched + klasifikovaný do 5-30s. Polling 15→30min jako záchrana. Tři otázky pro fázi 6.
+1b. `INSTRUKCE/POSTA-PHASE-4.md` — RAG embeddings + hybrid search
+1c. `INSTRUKCE/POSTA-PHASE-3.md` — UI modul `/posta` (SSR, zero JS), digest, sidebar badge
+1d. `INSTRUKCE/POSTA-PHASE-2.md` — klasifikace 7-polí, prompts/classify_v1.md
+1e. `INSTRUKCE/POSTA-PHASE-1.md` — OAuth + import skeleton
+1f. `INSTRUKCE/POSTA-DESIGN-DECISIONS.md` — **závazná specifikace pro fáze 2-6** (klasifikace ortogonálně, RAG hybrid, závazky confidence routing)
+1g. `docs/email-intelligence/RETENTION.md` — co se maže, co zachová, proč 96 dnů
+1h. `docs/email-intelligence/INFRASTRUCTURE.md` — Cloud Pub/Sub setup + watch lifecycle + monitoring
+1i. `prompts/classify_v1.md` — versionovaná spec klasifikátoru
 2. `INSTRUKCE/HANDOFF-2026-05-10.md` — předchozí stav: Triage t-* dropdown, smart routing 6-úrovňový, Contact.isTeam + clientTag + aliases, RoutingAuditLog, GoSMS modul, Things-import (částečně dořešen — 217 nedoimportovaných mailů v `Downloads/things-finale.md`)
 3. `INSTRUKCE/SMART-ROUTING.md` — operativní návod jak routing nakonfigurovat a debugovat
 3. `INSTRUKCE/HANDOFF-2026-05-07.md` — předchozí stav (Spíž, UPLOAD, fire-and-forget napříč)
