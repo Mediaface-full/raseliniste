@@ -115,9 +115,35 @@ export async function embedQuery(text: string): Promise<number[]> {
 
 /**
  * Naformátuje number[] do pgvector literal stringu: '[0.1,0.2,...]'
+ * Exportováno pro reuse v posta-embed.ts (faze 4).
  */
-function vectorLiteral(arr: number[]): string {
+export function vectorLiteral(arr: number[]): string {
   return "[" + arr.join(",") + "]";
+}
+
+/**
+ * Batch embed — embed více textů paralelně s rozumnou concurrency.
+ * Per Petrovo zadání faze 4: max 5 concurrent proti Vertex rate limitu.
+ *
+ * Vrací embeddings ve stejném pořadí jako vstupní texty.
+ */
+export async function embedTextsBatch(texts: string[], concurrency = 5): Promise<number[][]> {
+  if (texts.length === 0) return [];
+  const out: number[][] = new Array(texts.length);
+
+  // Sliding window — drží `concurrency` Promises in-flight
+  let nextIdx = 0;
+  async function worker(): Promise<void> {
+    while (true) {
+      const i = nextIdx++;
+      if (i >= texts.length) return;
+      out[i] = await embedText(texts[i]);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, texts.length) }, () => worker()),
+  );
+  return out;
 }
 
 // ---------------------------------------------------------------------------

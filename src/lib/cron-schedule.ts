@@ -173,6 +173,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pošta — denní digest snapshot (fáze 3: top akce + eskalace + LLM summary)",
   },
   {
+    name: "posta-embed",
+    endpoint: "/api/cron/posta-embed",
+    schedule: { type: "every", minutes: 5 },
+    description: "Pošta — RAG embedding pipeline (fáze 4: chunking + Gemini embed, max 50/iteraci, DLQ při selhání)",
+  },
+  {
     name: "cleanup-sms",
     endpoint: "/api/cron/cleanup-sms",
     schedule: { type: "daily", hour: 3, minute: 30 },
