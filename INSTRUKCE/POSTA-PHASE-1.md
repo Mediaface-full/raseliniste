@@ -172,7 +172,12 @@ Vitest by se hodil i pro stávající kód (audio-transcribe, things-import,
    volume (1000+) by paralelizace pomohla, ale Gmail quota limit
    (250/s/user) by stejně omezil.
 
-## 3 nezodpovězené otázky blokující fázi 2
+## 3 otázky — ZODPOVĚZENY (viz `POSTA-DESIGN-DECISIONS.md`)
+
+**Pro implementaci fází 2+ se ŘÍDIT** `INSTRUKCE/POSTA-DESIGN-DECISIONS.md`,
+ne tímhle dokumentem. Zde jen historický záznam diskuze.
+
+## 3 původní otázky
 
 1. **AI klasifikace — kolik kategorií + jaké?**
    Návrh: `priority (low/med/high)` + `category (klient | osobni |
