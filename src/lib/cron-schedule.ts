@@ -155,6 +155,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "GoSMS — fallback polling stavu odeslaných SMS (kdyby webhook spadl)",
   },
   {
+    name: "posta-sync",
+    endpoint: "/api/cron/posta-sync",
+    schedule: { type: "every", minutes: 15 },
+    description: "Pošta — Gmail incremental sync (fáze 1: full pull newer_than:1d, max 100 mailů)",
+  },
+  {
     name: "cleanup-sms",
     endpoint: "/api/cron/cleanup-sms",
     schedule: { type: "daily", hour: 3, minute: 30 },
