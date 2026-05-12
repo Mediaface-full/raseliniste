@@ -27,6 +27,8 @@ function isPublic(pathname: string): boolean {
   if (pathname.startsWith("/api/cron/")) return true;
   // GoSMS webhooky (doručenky + odpovědi) — autorizace přes ?token=<webhookSecret>
   if (pathname.startsWith("/api/webhooks/gosms/")) return true;
+  // Pošta — Gmail Pub/Sub push webhook (autorizace přes OIDC JWT v Authorization header)
+  if (pathname === "/api/posta/gmail-webhook") return true;
   // Studna — pozvánkové linky pro hosty (autorizace přes guestToken v URL).
   if (pathname.startsWith("/me/")) return true;
   if (pathname.startsWith("/api/me/")) return true;

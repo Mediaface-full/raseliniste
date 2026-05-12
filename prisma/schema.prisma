@@ -79,6 +79,17 @@ model User {
   gmailHistoryId    String?
   gmailSyncedAt     DateTime?
   gmailSyncError    String?  @db.Text
+
+  // Faze 5 (2026-05-12) — Gmail push notifications pres Cloud Pub/Sub.
+  // gmailWatchExpiresAt — Gmail watch lifetime max 7 dnu (Google limit);
+  //   cron `posta-watch-renew` kazdych 5 dnu prodluzi watch (bezpecna rezerva).
+  // gmailWatchTopicName — kontrola ze watch ukazuje na nas Pub/Sub topic;
+  //   napr. "projects/raseliniste-prod/topics/gmail-watch-petr"
+  // gmailLastPushAt — timestamp posledniho prijateho push (sledovani
+  //   "30 min od posledniho push → spustit fallback polling")
+  gmailWatchExpiresAt DateTime?
+  gmailWatchTopicName String?
+  gmailLastPushAt     DateTime?
 }
 
 model WebauthnCredential {

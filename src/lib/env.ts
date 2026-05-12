@@ -25,6 +25,17 @@ const schema = z.object({
   // pro existující instance + dev). Pro produkci POVINNÝ.
   EMAIL_BODY_ENCRYPTION_KEY: emptyToUndef(z.string().regex(/^[a-fA-F0-9]{64}$/).optional()),
 
+  // Pošta — fáze 5 Gmail push (Cloud Pub/Sub):
+  //   GMAIL_PUBSUB_TOPIC — full topic name "projects/<gcp-project>/topics/<topic>"
+  //     (např. "projects/raseliniste-prod/topics/gmail-watch-petr")
+  //   GMAIL_PUBSUB_AUDIENCE — audience pro JWT verification webhook (typicky
+  //     "https://www.raseliniste.cz/api/posta/gmail-webhook")
+  //   GMAIL_PUBSUB_SA_EMAIL — service account email co Pub/Sub použije
+  //     pro push subscription auth (např. "gmail-push-sa@raseliniste-prod.iam.gserviceaccount.com")
+  GMAIL_PUBSUB_TOPIC: emptyToUndef(z.string().min(1).optional()),
+  GMAIL_PUBSUB_AUDIENCE: emptyToUndef(z.string().url().optional()),
+  GMAIL_PUBSUB_SA_EMAIL: emptyToUndef(z.string().email().optional()),
+
   // ==== Defaulty (vždy mají hodnotu) ====
   APP_URL: emptyToUndef(z.string().url().optional()).pipe(
     z.string().default("http://localhost:3000"),

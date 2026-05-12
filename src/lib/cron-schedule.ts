@@ -157,8 +157,8 @@ export const CRON_JOBS: CronJobDef[] = [
   {
     name: "posta-sync",
     endpoint: "/api/cron/posta-sync",
-    schedule: { type: "every", minutes: 15 },
-    description: "Pošta — Gmail incremental sync (fáze 1: full pull newer_than:1d, max 100 mailů)",
+    schedule: { type: "every", minutes: 30 },
+    description: "Pošta — Gmail polling sync (fáze 5: ZÁCHRANNÝ pattern při ztrátě push notifikace; interval 30 min od fáze 5, drive je Pub/Sub push)",
   },
   {
     name: "posta-classify",
@@ -183,6 +183,12 @@ export const CRON_JOBS: CronJobDef[] = [
     endpoint: "/api/cron/posta-cleanup",
     schedule: { type: "daily", hour: 3, minute: 0 },
     description: "Pošta — 96denní retention (fáze 5: nuluje bodyText/Html/attachments/rawHeaders, zachová metadata + chunks pro search)",
+  },
+  {
+    name: "posta-watch-renew",
+    endpoint: "/api/cron/posta-watch-renew",
+    schedule: { type: "daily", hour: 4, minute: 0 },
+    description: "Pošta — Gmail watch renewal (fáze 5: prodlouží watch expirující v < 48h; Gmail max lifetime 7d)",
   },
   {
     name: "cleanup-sms",
