@@ -6,7 +6,10 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/POSTA-PHASE-1.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence modul „Pošta" fáze 1 hotová (Gmail OAuth + import skeleton, max 100 mailů/sync, cron 15 min). Fáze 2 (klasifikace, RAG, vyšumělé závazky, UI) čeká. Tři otevřené otázky na konci dokumentu.
+1. **`INSTRUKCE/POSTA-PHASE-2.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence „Pošta" fáze 2 HOTOVÁ. Ortogonální klasifikace (action_type/content_type/urgency/escalation + suggestedAction/projectHint/reason) přes Gemini Flash + structured JSON output + post-processing escalation DB override + cron 15 min + manuální endpoint + UI dashboard v `/settings/integrations/google`. Tři nezodpovězené otázky na konci pro fázi 3 (UI `/posta` modul).
+1b. `INSTRUKCE/POSTA-PHASE-1.md` — předchozí fáze (OAuth + import skeleton)
+1c. `INSTRUKCE/POSTA-DESIGN-DECISIONS.md` — **závazná specifikace pro fáze 2-6** (klasifikace ortogonálně, RAG hybrid, závazky confidence routing)
+1d. `prompts/classify_v1.md` — versionovaná spec klasifikátoru
 2. `INSTRUKCE/HANDOFF-2026-05-10.md` — předchozí stav: Triage t-* dropdown, smart routing 6-úrovňový, Contact.isTeam + clientTag + aliases, RoutingAuditLog, GoSMS modul, Things-import (částečně dořešen — 217 nedoimportovaných mailů v `Downloads/things-finale.md`)
 3. `INSTRUKCE/SMART-ROUTING.md` — operativní návod jak routing nakonfigurovat a debugovat
 3. `INSTRUKCE/HANDOFF-2026-05-07.md` — předchozí stav (Spíž, UPLOAD, fire-and-forget napříč)
