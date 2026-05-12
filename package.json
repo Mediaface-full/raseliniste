@@ -12,7 +12,8 @@
     "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "health:import": "tsx scripts/import-health-export.ts"
+    "health:import": "tsx scripts/import-health-export.ts",
+    "posta:backfill": "tsx scripts/posta-backfill.ts"
   },
   "dependencies": {
     "@astrojs/node": "^10.0.5",
