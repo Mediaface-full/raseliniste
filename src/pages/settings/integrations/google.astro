@@ -26,6 +26,9 @@ const contactsCount = await prisma.contact.count({
 const emailsCount = await prisma.emailMessage.count({
   where: { userId: session.uid },
 });
+const classifiedCount = await prisma.emailClassification.count({
+  where: { message: { userId: session.uid } },
+});
 
 const justConnected = Astro.url.searchParams.get("just_connected") === "1";
 const oauthMisconfigured = !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET;
@@ -55,6 +58,7 @@ const oauthMisconfigured = !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET;
         client:load
         initial={{
           emailsCount,
+          classifiedCount,
           gmailSyncedAt: user.gmailSyncedAt?.toISOString() ?? null,
           gmailSyncError: user.gmailSyncError,
           hasHistoryId: Boolean(user.gmailHistoryId),

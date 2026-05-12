@@ -161,6 +161,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pošta — Gmail incremental sync (fáze 1: full pull newer_than:1d, max 100 mailů)",
   },
   {
+    name: "posta-classify",
+    endpoint: "/api/cron/posta-classify",
+    schedule: { type: "every", minutes: 15 },
+    description: "Pošta — klasifikace unclassified mailů (fáze 2: max 50/iteraci, Gemini Flash)",
+  },
+  {
     name: "cleanup-sms",
     endpoint: "/api/cron/cleanup-sms",
     schedule: { type: "daily", hour: 3, minute: 30 },

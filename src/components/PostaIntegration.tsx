@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Mail, Loader2, Check, TriangleAlert, RefreshCw } from "lucide-react";
+import { Mail, Loader2, Check, TriangleAlert, RefreshCw, Tags } from "lucide-react";
 import { Button } from "./ui/Button";
 
 interface InitialProps {
   emailsCount: number;
+  classifiedCount: number;
   gmailSyncedAt: string | null;
   gmailSyncError: string | null;
   hasHistoryId: boolean;
@@ -28,10 +29,23 @@ interface SyncResult {
  *
  * Tint: `--tint-cool-blue` (nový pro Poštu).
  */
+interface ClassifyResult {
+  mode: "pending" | "specific";
+  total: number;
+  classified: number;
+  skipped: number;
+  errors: number;
+  errorDetails: Array<{ emailId: string; error: string }>;
+  durationMs?: number;
+}
+
 export default function PostaIntegration({ initial }: { initial: InitialProps }) {
   const [emailsCount, setEmailsCount] = useState(initial.emailsCount);
+  const [classifiedCount, setClassifiedCount] = useState(initial.classifiedCount);
   const [syncing, setSyncing] = useState(false);
+  const [classifying, setClassifying] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
+  const [classifyResult, setClassifyResult] = useState<ClassifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(initial.gmailSyncedAt);
 
@@ -53,6 +67,30 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
       setError("Síťová chyba.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function runClassify() {
+    setClassifying(true);
+    setError(null);
+    setClassifyResult(null);
+    try {
+      const res = await fetch("/api/integrations/google/posta-classify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ limit: 50 }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Klasifikace selhala.");
+        return;
+      }
+      setClassifyResult(data);
+      setClassifiedCount((c) => c + (data.classified ?? 0));
+    } catch {
+      setError("Síťová chyba.");
+    } finally {
+      setClassifying(false);
     }
   }
 
@@ -100,12 +138,25 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 text-sm">
+      <div className="grid grid-cols-3 gap-2 text-sm">
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
-            Importované maily
+            Importované
           </div>
           <div className="font-mono text-2xl mt-0.5">{emailsCount}</div>
+        </div>
+        <div className="border border-border rounded-lg p-3">
+          <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+            Klasifikované
+          </div>
+          <div className="font-mono text-2xl mt-0.5">
+            {classifiedCount}
+            {emailsCount > 0 && (
+              <span className="text-[10px] text-muted-foreground ml-1">
+                / {emailsCount}
+              </span>
+            )}
+          </div>
         </div>
         <div className="border border-border rounded-lg p-3">
           <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
@@ -120,7 +171,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={runSync} disabled={syncing}>
+        <Button onClick={runSync} disabled={syncing || classifying}>
           {syncing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" /> Synchronizuji…
@@ -132,12 +183,61 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
             </>
           )}
         </Button>
-        <span className="text-xs text-muted-foreground">
-          {initial.hasHistoryId
-            ? "Pull mailů z posledních 24 h (max 100)"
-            : "Pull mailů z posledních 7 dnů (max 100)"}
-        </span>
+        <Button variant="outline" onClick={runClassify} disabled={syncing || classifying}>
+          {classifying ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Klasifikuji…
+            </>
+          ) : (
+            <>
+              <Tags className="w-4 h-4" /> Klasifikovat nové (max 50)
+            </>
+          )}
+        </Button>
       </div>
+      <p className="text-[11px] text-muted-foreground">
+        Sync běží automaticky každých 15 min, klasifikace také. Tlačítka jsou
+        on-demand spuštění.
+      </p>
+
+      {classifyResult && (
+        <div
+          className="rounded-lg border p-3 text-xs space-y-1"
+          style={{
+            background: "color-mix(in oklch, var(--c) 8%, transparent)",
+            borderColor: "color-mix(in oklch, var(--c) 30%, transparent)",
+          }}
+        >
+          <div className="flex items-center gap-2 text-sm font-medium" style={{ color: "var(--c)" }}>
+            <Check className="w-4 h-4" />
+            Klasifikace hotová
+          </div>
+          <div className="font-mono text-xs text-muted-foreground space-y-0.5">
+            <div>✓ Klasifikováno: {classifyResult.classified}</div>
+            <div>↺ Přeskočeno (už klasifikováno): {classifyResult.skipped}</div>
+            {classifyResult.errors > 0 && (
+              <div className="text-red-400">✗ Chyb: {classifyResult.errors}</div>
+            )}
+            {classifyResult.durationMs && (
+              <div>⏱ Doba: {(classifyResult.durationMs / 1000).toFixed(1)} s</div>
+            )}
+          </div>
+          {classifyResult.errorDetails.length > 0 && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                Detail chyb ({classifyResult.errorDetails.length})
+              </summary>
+              <ul className="mt-1 space-y-0.5 text-[11px] font-mono">
+                {classifyResult.errorDetails.map((e, i) => (
+                  <li key={i} className="text-red-400">
+                    {e.emailId}: {e.error}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
 
       {result && (
         <div
