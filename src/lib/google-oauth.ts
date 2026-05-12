@@ -19,6 +19,10 @@ import { encryptSecret, decryptSecret } from "./crypto";
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/contacts.readonly",
+  // Pošta — fáze 1 (2026-05-12): readonly + metadata stačí pro import + klasifikaci.
+  // Fáze 2+ rozšíří na gmail.modify (odpovídání, label changes).
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.metadata",
 ];
 
 function requireEnv(): { clientId: string; clientSecret: string; redirectUri: string } {

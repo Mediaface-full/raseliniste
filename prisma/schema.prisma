@@ -60,11 +60,20 @@ model User {
   customRituals    CustomRitual[]
   smsMessages      SmsMessage[]
   smsReplies       SmsReply[]
+  emailMessages    EmailMessage[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
   todoistSyncedAt   DateTime?
   todoistSyncError  String?  @db.Text
+
+  // Pošta — Gmail incremental sync (fáze 1: 2026-05-12)
+  // gmailHistoryId — kurzor pro Gmail history.list API, neslouží k full sync
+  //   (ten používá messages.list s after: query). Null = ještě neproběhl
+  //   první sync (full pull).
+  gmailHistoryId    String?
+  gmailSyncedAt     DateTime?
+  gmailSyncError    String?  @db.Text
 }
 
 model WebauthnCredential {
@@ -1638,6 +1647,64 @@ model SmsMessage {
   @@index([userId, createdAt])
   @@index([userId, status])
   @@index([gosmsMessageId])
+}
+
+// ============================================================================
+// POŠTA — Email Intelligence (fáze 1: 2026-05-12)
+// Gmail integrace přes Google OAuth. Tato fáze: čistý import + storage.
+// Klasifikace, embeddingy, UI, klasifikace -- fáze 2+.
+// ============================================================================
+
+model EmailMessage {
+  id                String     @id @default(cuid())
+  userId            String
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Gmail identifikátory — message ID v Gmailu je 16-znakový hex string,
+  // unique napříč všemi schránkami. Idempotence: druhý import stejné zprávy
+  // = no-op (upsert by gmailMessageId).
+  gmailMessageId    String     @unique
+  threadId          String     // gmail thread ID (sjednocení konverzace)
+
+  // Hlavičky — parsované z raw_headers pro rychlé filtrování bez JSON pathu.
+  fromAddress       String     // RFC5322 email (bez display name)
+  fromName          String?    // display name z From headeru
+  toAddresses       String[]   @default([])  // pole emailů
+  ccAddresses       String[]   @default([])
+  bccAddresses      String[]   @default([])
+  subject           String?    @db.Text
+  snippet           String?    @db.Text      // Gmail-generated preview (~150 znaků)
+
+  // Tělo — fáze 1 ukládáme oba formáty pokud Gmail vrátí. AI klasifikace
+  // bude později pracovat s bodyText (čistší). Šifrování at-rest přes
+  // crypto.ts při zápisu, decrypt jen on-demand v UI/AI handleru.
+  // Šifrované hodnoty mají tvar `enc:iv:tag` (base64 oddělené dvojtečkou)
+  // — single column místo 3 jako u UserIntegration, jednodušší při bulk insertu.
+  bodyText          String?    @db.Text
+  bodyHtml          String?    @db.Text
+
+  // Pro fázi 1 NEŠIFRUJEME — single-user instance, DB je v interní síti.
+  // Šifrování bude přidáno ve fázi 2 současně s vystavením /posta endpointu.
+  // bodyEncrypted     Boolean    @default(false)
+
+  // Gmail labely (např. ["INBOX", "IMPORTANT", "CATEGORY_PERSONAL"]).
+  labels            String[]   @default([])
+
+  hasAttachments    Boolean    @default(false)
+  // attachment metadata jen — payload v Gmailu na demand, neukládáme
+  attachments       Json?      // [{filename, mimeType, sizeBytes, attachmentId}]
+
+  // Raw headers jako JSONB — pro budoucí analýzu (DKIM, SPF, X-* headers).
+  rawHeaders        Json
+
+  receivedAt        DateTime   // z Gmail internalDate (epoch ms)
+  importedAt        DateTime   @default(now())
+  bodyDeletedAt     DateTime?  // 96denní retention cron nuluje bodyText/HTML, metadata zůstává
+
+  @@index([userId, receivedAt])
+  @@index([userId, threadId])
+  @@index([threadId])
+  @@index([userId, importedAt])
 }
 
 model SmsReply {
