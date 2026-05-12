@@ -197,6 +197,18 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pošta — detector vyšumělých závazků (fáze 6: LLM scan outbound mailů, dedup soft-link, confidence routing >=0.85 auto)",
   },
   {
+    name: "posta-commitment-todoist-sync",
+    endpoint: "/api/cron/posta-commitment-todoist-sync",
+    schedule: { type: "every", minutes: 5 },
+    description: "Pošta — commitment 1-way Todoist sync (fáze 6: create/close/delete/label, rate limit 30/min)",
+  },
+  {
+    name: "posta-commitment-stale",
+    endpoint: "/api/cron/posta-commitment-stale",
+    schedule: { type: "daily", hour: 3, minute: 0 },
+    description: "Pošta — stale marker pro commitmenty bez akce 30+ dnů (fáze 6: status active → stale)",
+  },
+  {
     name: "cleanup-sms",
     endpoint: "/api/cron/cleanup-sms",
     schedule: { type: "daily", hour: 3, minute: 30 },

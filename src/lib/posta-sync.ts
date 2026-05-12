@@ -147,12 +147,21 @@ export async function syncPostaForUser(userId: string): Promise<PostaSyncStats> 
     // Krok 4: fetch full content per ID (Gmail API neumí batch fetch zpráv,
     // takže serialně. Při 100 mailech ~10-30 sekund). Mezi voláními sleep 50ms
     // proti rate limitu.
+    const { trackRelatedEmail } = await import("./posta-commitment-sync");
     for (const meta of toFetch) {
       try {
         const raw = await getMessage(userId, meta.id);
         const parsed = parseGmailMessage(raw);
         await upsertEmailMessage(userId, parsed);
         stats.imported++;
+        // Faze 6: track related pro inbound maily (helper skipne outbound)
+        const dbRow = await prisma.emailMessage.findUnique({
+          where: { gmailMessageId: parsed.gmailMessageId },
+          select: { id: true },
+        });
+        if (dbRow) {
+          void trackRelatedEmail(dbRow.id).catch(() => null);
+        }
         await sleep(50);
       } catch (err) {
         stats.errors++;

@@ -157,9 +157,11 @@ export async function processHistoryFromPush(userId: string): Promise<{
     // celý syncPostaForUser (full pull + getProfile).
     const { getMessage, parseGmailMessage } = await import("./gmail");
     const { encryptBody, isEncryptionEnabled } = await import("./email-body-crypto");
+    const { trackRelatedEmail } = await import("./posta-commitment-sync");
 
     let imported = 0;
     const encEnabled = isEncryptionEnabled();
+    const importedIds: string[] = [];
     for (const msgId of newMessageIds) {
       try {
         const raw = await getMessage(userId, msgId);
@@ -168,7 +170,7 @@ export async function processHistoryFromPush(userId: string): Promise<{
         const textPacket = encEnabled ? encryptBody(parsed.bodyText) : null;
         const htmlPacket = encEnabled ? encryptBody(parsed.bodyHtml) : null;
 
-        await prisma.emailMessage.upsert({
+        const upserted = await prisma.emailMessage.upsert({
           where: { gmailMessageId: parsed.gmailMessageId },
           create: {
             userId,
@@ -195,9 +197,18 @@ export async function processHistoryFromPush(userId: string): Promise<{
           update: { labels: parsed.labels },
         });
         imported++;
+        importedIds.push(upserted.id);
       } catch (e) {
         errors.push(`${msgId}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200));
       }
+    }
+
+    // Faze 6: pro inbound maily zkontroluj zda souvisi s existujicim
+    // active commitmentem (thread match) — fire-and-forget
+    for (const id of importedIds) {
+      void trackRelatedEmail(id).catch((e) => {
+        console.warn(`[gmail-push] trackRelatedEmail ${id} failed: ${e instanceof Error ? e.message : e}`);
+      });
     }
 
     const newHistoryId = String(res.data.historyId ?? user.gmailHistoryId);
