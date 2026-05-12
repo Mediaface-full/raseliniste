@@ -61,6 +61,7 @@ model User {
   smsMessages      SmsMessage[]
   smsReplies       SmsReply[]
   emailMessages    EmailMessage[]
+  emailDigests     EmailDigest[]
 
   // Todoist incremental sync (Sync API)
   todoistSyncToken  String?  @db.Text
@@ -1708,6 +1709,12 @@ model EmailMessage {
   // pri rescanu prochazet vsechny maily, jen ty s candidates.
   hasOutboundCommitmentCandidates Boolean @default(false)
 
+  // Faze 3 (2026-05-12) — Petr "oznacit jako vyrizene" v /posta UI.
+  // null = aktivni (zobrazi se v listu). Non-null = archivovany.
+  // Sidebar badge counter pocita jen WHERE resolvedAt IS NULL.
+  resolvedAt        DateTime?
+  resolvedReason    String?    // "manual" | "auto-archive-newsletter" (faze 5+) | atd.
+
   classification    EmailClassification?
 
   @@index([userId, receivedAt])
@@ -1715,6 +1722,7 @@ model EmailMessage {
   @@index([threadId])
   @@index([userId, importedAt])
   @@index([userId, hasOutboundCommitmentCandidates])
+  @@index([userId, resolvedAt])
 }
 
 // ============================================================================
@@ -1775,6 +1783,48 @@ model EmailClassification {
   @@index([contentType])
   @@index([urgency])
   @@index([escalation])
+}
+
+// ============================================================================
+// EmailDigest — denni snapshot stavu Posty (faze 3, 2026-05-12)
+//
+// Cron `posta-digest` denne 7:00 generuje 1 zaznam per den per user.
+// Strukturovany JSON `content` obsahuje:
+//   - top action_required (priorita dle urgency + escalation + receivedAt)
+//   - eskalace (escalation=true OR urgency=high)
+//   - waiting_external prehled (kratky outbound stav)
+//   - counts dle actionType + contentType
+//   - LLM-generated reflective summary (vyhled do dne)
+//
+// Schema content JSONu je intentionalne loose — finalni mockup je v
+// INSTRUKCE/POSTA-PHASE-3.md (a SPEC.md az ho Petr posle), schema povoluje
+// rust bez migrace.
+// ============================================================================
+
+model EmailDigest {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  forDate         DateTime @db.Date  // den ke kteremu se digest vztahuje (Praha TZ)
+  generatedAt     DateTime @default(now())
+
+  // Strukturovany obsah pro UI render. Tvar zatim:
+  // {
+  //   topActions: [{ emailId, subject, fromName, urgency, suggestedAction, reason }],
+  //   escalations: [{ emailId, subject, fromName, urgency, reason }],
+  //   waitingExternal: [{ emailId, subject, toAddresses, since }],
+  //   counts: { actionType: { action_required: N, ... }, contentType: { klient: N, ... } },
+  //   summary: "1-2 vety LLM reflexe (Co me dnes ceka)",
+  //   model: "gemini-2.5-flash",
+  //   totalActiveEmails: N
+  // }
+  content         Json
+
+  viewedAt        DateTime?  // kdy Petr otevrel /posta (pro stats)
+
+  @@unique([userId, forDate])
+  @@index([userId, forDate])
 }
 
 model SmsReply {
