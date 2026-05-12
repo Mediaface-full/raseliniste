@@ -142,7 +142,7 @@ Stav 2026-05-10 (Smart routing 6-úrovňový + Triage t-* dropdown + RoutingAudi
 | iCloud integrace | `/settings/integrations/icloud` | ✅ |
 | Todoist integrace | `/settings/integrations` | ✅ |
 | **GoSMS integrace** | `/settings/integrations` (blok pod Todoist) | ✅ NOVÉ 05-10 — univerzální SMS brána. Setup viz `INSTRUKCE/GOSMS-SETUP.md`. Webhooky pro instant doručenky + replies, fallback polling cron à 30 min. |
-| **Pošta integrace (fáze 1-5)** | `/posta` modul + `/settings/integrations/google` karta | ✅ NOVÉ 05-12 — kompletní Email Intelligence: import (1) + klasifikace (2) + UI (3) + RAG search (4) + **Gmail push real-time + AES-256-GCM encryption + 96d retention (5)**. Cron: `posta-sync` 30m (záloha), `posta-classify` 15m, `posta-embed` 5m, `posta-digest` daily 7:00, `posta-cleanup` daily 3:00, `posta-watch-renew` daily 4:00. Scripts: `posta:backfill`, `posta:cleanup`, `posta:encrypt-migrate`. Detail: `INSTRUKCE/POSTA-PHASE-5.md`, `docs/email-intelligence/{RETENTION,INFRASTRUCTURE}.md`. Zbývá fáze 6 (DetectedCommitment). |
+| **Pošta KOMPLETNÍ (fáze 1-6)** | `/posta` modul + `/settings/integrations/google` karta | ✅ 2026-05-12 — Email Intelligence kompletní 6-fázový modul. Import + klasifikace + UI + RAG search + Gmail push real-time + AES-256-GCM encryption + 96d retention + **DetectedCommitment detector + confidence routing + Todoist 1-way sync + stale marker + related tracking**. 9 cron jobů, 3 prompts, 8 migrací, 4 docs. Cost steady-state ~1 Kč/měs. Detail: `INSTRUKCE/POSTA-PHASE-6.md`. |
 | E-mail (SMTP) | `/settings/reports` | ✅ |
 | iPhone Shortcuts | `/settings/shortcuts` | ✅ |
 | Health Auto Export | `/settings/ingest` | ✅ |

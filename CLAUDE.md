@@ -6,15 +6,17 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/POSTA-PHASE-5.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence „Pošta" fáze 5 HOTOVÁ. Gmail push (Cloud Pub/Sub) + AES-256-GCM encryption bodyText/Html at-rest + 96d selektivní retention + full delete API + audit log. Real-time inbox: nový mail → push → fetched + klasifikovaný do 5-30s. Polling 15→30min jako záchrana. Tři otázky pro fázi 6.
-1b. `INSTRUKCE/POSTA-PHASE-4.md` — RAG embeddings + hybrid search
-1c. `INSTRUKCE/POSTA-PHASE-3.md` — UI modul `/posta` (SSR, zero JS), digest, sidebar badge
-1d. `INSTRUKCE/POSTA-PHASE-2.md` — klasifikace 7-polí, prompts/classify_v1.md
-1e. `INSTRUKCE/POSTA-PHASE-1.md` — OAuth + import skeleton
-1f. `INSTRUKCE/POSTA-DESIGN-DECISIONS.md` — **závazná specifikace pro fáze 2-6** (klasifikace ortogonálně, RAG hybrid, závazky confidence routing)
-1g. `docs/email-intelligence/RETENTION.md` — co se maže, co zachová, proč 96 dnů
-1h. `docs/email-intelligence/INFRASTRUCTURE.md` — Cloud Pub/Sub setup + watch lifecycle + monitoring
-1i. `prompts/classify_v1.md` — versionovaná spec klasifikátoru
+1. **`INSTRUKCE/POSTA-PHASE-6.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence „Pošta" fáze 6 **FINÁLNÍ** HOTOVÁ. DetectedCommitment detector + confidence routing (auto >=0.85 / needs-confirm 0.55-0.84 / skip <0.55) + soft-link dedup + UI sekce Závazky s 4 subtaby + 1-way Todoist sync (DB primárka) + related email tracking (thread match drží alive) + stale marker 30d. **Modul Pošta kompletní** — fáze 1-6 hotové.
+1b. `INSTRUKCE/POSTA-PHASE-5.md` — Gmail push + encryption + retention
+1c. `INSTRUKCE/POSTA-PHASE-4.md` — RAG embeddings + hybrid search
+1d. `INSTRUKCE/POSTA-PHASE-3.md` — UI modul `/posta` (SSR, zero JS), digest, sidebar badge
+1e. `INSTRUKCE/POSTA-PHASE-2.md` — klasifikace 7-polí, prompts/classify_v1.md
+1f. `INSTRUKCE/POSTA-PHASE-1.md` — OAuth + import skeleton
+1g. `INSTRUKCE/POSTA-DESIGN-DECISIONS.md` — závazná specifikace pro fáze 2-6
+1h. `docs/email-intelligence/RETENTION.md` — 96d retention
+1i. `docs/email-intelligence/INFRASTRUCTURE.md` — Cloud Pub/Sub setup
+1j. `prompts/classify_v1.md` — klasifikace prompt
+1k. `prompts/classify_commitment_v1.md` — commitment detector prompt
 2. `INSTRUKCE/HANDOFF-2026-05-10.md` — předchozí stav: Triage t-* dropdown, smart routing 6-úrovňový, Contact.isTeam + clientTag + aliases, RoutingAuditLog, GoSMS modul, Things-import (částečně dořešen — 217 nedoimportovaných mailů v `Downloads/things-finale.md`)
 3. `INSTRUKCE/SMART-ROUTING.md` — operativní návod jak routing nakonfigurovat a debugovat
 3. `INSTRUKCE/HANDOFF-2026-05-07.md` — předchozí stav (Spíž, UPLOAD, fire-and-forget napříč)
