@@ -1,6 +1,7 @@
 ---
 import Shell from "../../../layouts/Shell.astro";
 import GoogleIntegration from "../../../components/GoogleIntegration";
+import PostaIntegration from "../../../components/PostaIntegration";
 import { prisma } from "../../../lib/db";
 import { readSession } from "../../../lib/session";
 import { isConnected } from "../../../lib/google-oauth";
@@ -11,7 +12,7 @@ if (!session) return Astro.redirect("/login");
 
 const user = await prisma.user.findUnique({
   where: { id: session.uid },
-  select: { username: true },
+  select: { username: true, gmailHistoryId: true, gmailSyncedAt: true, gmailSyncError: true },
 });
 if (!user) return Astro.redirect("/login");
 
@@ -21,6 +22,9 @@ const eventsCount = await prisma.calendarEvent.count({
 });
 const contactsCount = await prisma.contact.count({
   where: { userId: session.uid, googleResourceName: { not: null } },
+});
+const emailsCount = await prisma.emailMessage.count({
+  where: { userId: session.uid },
 });
 
 const justConnected = Astro.url.searchParams.get("just_connected") === "1";
@@ -32,7 +36,7 @@ const oauthMisconfigured = !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET;
   username={user.username}
   breadcrumb={[{ label: "Nastavení" }, { label: "Integrace" }, { label: "Google" }]}
 >
-  <div class="max-w-2xl">
+  <div class="max-w-2xl space-y-4">
     <GoogleIntegration
       client:load
       initial={{
@@ -45,5 +49,17 @@ const oauthMisconfigured = !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET;
         oauthMisconfigured,
       }}
     />
+
+    {status.connected && (
+      <PostaIntegration
+        client:load
+        initial={{
+          emailsCount,
+          gmailSyncedAt: user.gmailSyncedAt?.toISOString() ?? null,
+          gmailSyncError: user.gmailSyncError,
+          hasHistoryId: Boolean(user.gmailHistoryId),
+        }}
+      />
+    )}
   </div>
 </Shell>
