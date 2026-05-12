@@ -47,14 +47,15 @@ export const SCHEDULING_CONFIG: SchedulingConfig = {
   homeHours: { start: "09:00", end: "17:00" },
   // Online dny: brief má dilema "i út/st jako přídavek? Petre, řekni si."
   // Default: všechny pracovní dny — Petr může zúžit přes /calendar/settings.
-  onlineDays: [DAYS.MON, DAYS.TUE, DAYS.WED, DAYS.THU, DAYS.FRI],
-  onlineHours: { start: "08:00", end: "18:00" },
+  // Středa pryč — odpoledne syn (hokej, kroužky). Online dny Po/Út/Čt/Pá.
+  onlineDays: [DAYS.MON, DAYS.TUE, DAYS.THU, DAYS.FRI],
+  onlineHours: { start: "09:00", end: "17:00" },
   lunchBreak: { start: "12:00", end: "13:00" },
-  endOfDay: "18:00",
+  endOfDay: "17:00",
   bufferPragueMinutes: 60,
   bufferOnlineBetweenMinutes: 30,
-  minLeadTimeClientHours: 48,
-  minLeadTimeFriendHours: 12,
+  minLeadTimeClientHours: 72,
+  minLeadTimeFriendHours: 24,
   maxBookingHorizonDays: 30,
   maxPragueWarning: 1,        // 2+ → warning
   maxInPersonWarning: 1,      // 2+ → warning

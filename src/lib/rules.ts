@@ -85,6 +85,47 @@ export async function evaluateSlot(input: EvaluateInput): Promise<EvaluationResu
     }
   }
 
+  // HARD_BUSY_OVERLAP: generický overlap check — JAKÝKOLI event v kalendáři blokuje slot,
+  // kromě explicit whitelistu „neblokujících" typů. Bez tohoto pravidla booking
+  // ignoroval cokoli, co nebylo HOCKEY_SON/OOO_* (PERSONAL, ICLOUD_SON, WORK,
+  // klasifikace selhala u text-only eventů) — viz bug 2026-05-12 kdy /schuzka
+  // nabídla online středu odpoledne přestože Petr měl událost se synem.
+  //
+  // Whitelist (neblokuje):
+  //  - PARTNER_SHIFT     — info, partnerka pracuje, Petr je doma
+  //  - PARTNER_VACATION  — info, partnerka mimo
+  //  - OOO_TRAVEL_WORKING + slot je MEETING_ONLINE — pracuje z dovolené
+  //
+  // Vše ostatní (PERSONAL, WORK, FOCUS, ICLOUD_SON, MEETING_*, atd.) overlap → ERROR.
+  // HOCKEY_SON / OOO_FULL už mají svá specifická pravidla výše, ale tady taky padnou
+  // jako defense-in-depth (kdyby se HOCKEY_RE regex netrefil).
+  {
+    const NON_BLOCKING: ReadonlySet<string> = new Set([
+      "PARTNER_SHIFT",
+      "PARTNER_VACATION",
+    ]);
+    for (const e of sameWindow) {
+      if (NON_BLOCKING.has(e.type)) continue;
+      // OOO_TRAVEL_WORKING blokuje jen prezenční, online ne (řeší HARD_OOO_TRAVEL_INPERSON výše)
+      if (e.type === "OOO_TRAVEL_WORKING" && input.type === "MEETING_ONLINE") continue;
+      if (!overlap(e.startsAt, e.endsAt, input.startsAt, input.endsAt)) continue;
+      // Skip když už existuje specifický signál pro tenhle event (HOCKEY/OOO_FULL výše)
+      const alreadyFlagged =
+        signals.some((s) =>
+          s.rule === "HARD_HOCKEY_BLOCK" ||
+          s.rule === "HARD_OOO_FULL" ||
+          s.rule === "HARD_OOO_TRAVEL_INPERSON",
+        );
+      if (alreadyFlagged) break;
+      signals.push({
+        rule: "HARD_BUSY_OVERLAP",
+        severity: "ERROR",
+        message: `V kalendáři už máš „${e.title}" (${fmtTime(e.startsAt)}–${fmtTime(e.endsAt)}).`,
+      });
+      break;
+    }
+  }
+
   // HARD_OOO_FULL: během Petrovy dovolené
   for (const e of sameWindow) {
     if (e.type === "OOO_FULL" && overlap(e.startsAt, e.endsAt, input.startsAt, input.endsAt)) {

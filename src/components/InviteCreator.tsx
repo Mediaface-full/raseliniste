@@ -47,12 +47,24 @@ export default function InviteCreator() {
   const [invites, setInvites] = useState<InviteRow[]>([]);
 
   useEffect(() => {
-    void loadContacts();
     void loadInvites();
   }, []);
 
-  async function loadContacts() {
-    const res = await fetch("/api/contacts?vip=0");
+  // Server-side search přes ?q= (hledá v displayName + firstName + lastName + phones).
+  // Předchozí verze: fetch všech 500, client-side filter jen v displayName → propadlí
+  // kontakti s prázdným/odlišným displayName (např. importováno bez FN).
+  useEffect(() => {
+    const q = contactQuery.trim();
+    // Debounce 200ms, ať nepalí každý keystroke
+    const timer = setTimeout(() => {
+      void loadContacts(q);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [contactQuery]);
+
+  async function loadContacts(q: string) {
+    const url = q ? `/api/contacts?q=${encodeURIComponent(q)}` : "/api/contacts";
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
       setContacts(data.contacts ?? data);
@@ -108,9 +120,8 @@ export default function InviteCreator() {
     if (res.ok) void loadInvites();
   }
 
-  const filteredContacts = contacts.filter((c) =>
-    !contactQuery || c.displayName.toLowerCase().includes(contactQuery.toLowerCase()),
-  );
+  // Search už dělá server přes ?q= — tady jen vezmeme prvních 20 z response.
+  const filteredContacts = contacts.slice(0, 20);
 
   return (
     <div className="space-y-5">
