@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, Check, AlertTriangle, Calendar, MapPin, Video, Home } from "lucide-react";
 
 interface Slot {
@@ -32,6 +32,24 @@ export default function BookingPicker({ token }: { token: string }) {
   const [subject, setSubject] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  // Mobile UX: po vybrání slotu rolovat dolů na form, ať uživatel
+  // vidí, že je třeba doplnit jméno/e-mail/téma. Bez toho lidé kliknou
+  // hodinu a nevšimnou si, že form je úplně pod fold.
+  const formRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (chosenSlot && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Focus na první vyplnitelný input (jen u univerzálního invite)
+      if (invite?.requiresIdentification) {
+        setTimeout(() => {
+          const firstInput = formRef.current?.querySelector<HTMLInputElement>("input:not([disabled])");
+          firstInput?.focus({ preventScroll: true });
+        }, 300);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chosenSlot]);
 
   useEffect(() => {
     void load();
@@ -113,8 +131,8 @@ export default function BookingPicker({ token }: { token: string }) {
   }
 
   if (done) {
-    return centerCard("📧", "Skoro hotovo",
-      `Poslal jsem ti e-mail na ${email}. Klikni v něm na potvrzovací odkaz a termín bude finální.`);
+    return centerCard("✓", "Termín potvrzen",
+      `Pozvánka přijde mailem z Google Kalendáře${email ? ` na ${email}` : ""}.`);
   }
 
   // Group sloty po dnech
@@ -126,16 +144,14 @@ export default function BookingPicker({ token }: { token: string }) {
     slotsByDay.get(day)!.push(s);
   }
 
-  const greeting = invite.inviteeName ? `Ahoj ${invite.inviteeName},` : "Ahoj,";
   const showFilter = invite.meetingType === "CHOICE_ANY" && filteredSlots.length > 0;
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-serif text-2xl">{greeting}</h1>
+        <h1 className="font-serif text-2xl">Volba termínu</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          dík žes klikl. Vyber si chvíli, která ti sedne.{" "}
-          <span className="font-mono">{invite.slotDurationMin} min</span>.
+          Délka: <span className="font-mono">{invite.slotDurationMin} min</span>.
         </p>
       </div>
 
@@ -156,7 +172,7 @@ export default function BookingPicker({ token }: { token: string }) {
 
       {filteredSlots.length === 0 ? (
         <div className="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
-          Bohužel zrovna nemám volný slot. Zkus prosím za pár dní, nebo mi napiš.
+          Žádný volný termín. Pro domluvu napište mailem.
         </div>
       ) : (
         <div className="space-y-4">
@@ -194,7 +210,7 @@ export default function BookingPicker({ token }: { token: string }) {
       )}
 
       {chosenSlot && (
-        <div className="glass-strong rounded-xl p-5 space-y-3" style={{ ["--c" as string]: "var(--tint-sage)" }}>
+        <div ref={formRef} className="glass-strong rounded-xl p-5 space-y-3" style={{ ["--c" as string]: "var(--tint-sage)" }}>
           <div className="flex items-center gap-2">
             <Calendar className="size-4" />
             <strong>Vybráno:</strong> {new Date(chosenSlot.startsAt).toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" })} —{" "}
@@ -205,7 +221,7 @@ export default function BookingPicker({ token }: { token: string }) {
           {invite.requiresIdentification && (
             <div className="space-y-2 pt-2 border-t border-white/5">
               <div>
-                <label className="text-xs font-mono uppercase text-muted-foreground">Tvoje jméno *</label>
+                <label className="text-xs font-mono uppercase text-muted-foreground">Jméno *</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} required
                   className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
               </div>
@@ -220,9 +236,9 @@ export default function BookingPicker({ token }: { token: string }) {
                   className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
               </div>
               <div>
-                <label className="text-xs font-mono uppercase text-muted-foreground">O čem to bude *</label>
+                <label className="text-xs font-mono uppercase text-muted-foreground">Téma *</label>
                 <input value={subject} onChange={(e) => setSubject(e.target.value)} required
-                  placeholder="Krátká věta, co chceš probrat"
+                  placeholder="Krátká věta — o čem schůzka bude"
                   className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
               </div>
             </div>
@@ -233,9 +249,9 @@ export default function BookingPicker({ token }: { token: string }) {
             disabled={submitting || (invite.requiresIdentification && (!name || !email || !subject))}
             className="w-full mt-2 px-4 py-3 rounded-md bg-[var(--tint-sage)] text-black font-medium flex items-center justify-center gap-2 disabled:opacity-40"
           >
-            {submitting ? <><Loader2 className="size-4 animate-spin" /> Odesílám…</> : <><Check className="size-4" /> Potvrdit a poslat e-mail</>}
+            {submitting ? <><Loader2 className="size-4 animate-spin" /> Rezervuji…</> : <><Check className="size-4" /> Rezervovat termín</>}
           </button>
-          <p className="text-xs text-muted-foreground text-center">Pošlu ti e-mail s potvrzovacím odkazem. Termín je definitivní až po kliku v mailu.</p>
+          <p className="text-xs text-muted-foreground text-center">Po kliknutí se termín zapíše do kalendáře. Potvrzení přijde mailem.</p>
         </div>
       )}
 

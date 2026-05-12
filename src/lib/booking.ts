@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "./db";
 import { listAvailableSlots, evaluateSlot, type Slot } from "./rules";
 import { createGoogleEvent } from "./google-calendar";
-import { signMagicLink } from "./magic-link";
 import { sendMail } from "./mailer";
 import { env } from "./env";
 import type { EventTypeStr } from "./event-classifier";
@@ -143,7 +142,7 @@ export const EVERGREEN_NOTE = "schuzka-public-evergreen";
 
 export async function reserveSlot(input: ReserveInput): Promise<{
   inviteId: string;
-  magicLink: string;
+  meetLink: string | null;
 }> {
   const invite = await prisma.bookingInvite.findUnique({ where: { id: input.inviteId } });
   if (!invite) throw new Error("Invite nenalezen.");
@@ -178,11 +177,16 @@ export async function reserveSlot(input: ReserveInput): Promise<{
     type: input.slot.type,
   };
 
+  // 2026-05-12: Magic-link confirm krok zrušen globálně (Petrovo rozhodnutí —
+  // booking není veřejně dostupný, jen pro známé příjemce přes /calendar/invite
+  // a interní /schuzka link). Rovnou vytváříme Google event a posíláme finální
+  // potvrzovací mail s Meet linkem / místem. Status invite jde RESERVED → CONFIRMED
+  // v jedné transakci uvnitř confirmReservation().
+  //
   // Pro evergreen (/schuzka) vytvoř KLON — originál zůstává PENDING pro další leady.
-  // Pro běžný invite update na RESERVED.
-  let updated: typeof invite;
+  let created: typeof invite;
   if (isEvergreen) {
-    updated = await prisma.bookingInvite.create({
+    created = await prisma.bookingInvite.create({
       data: {
         token: randomBytes(16).toString("base64url"),
         mode: invite.mode,
@@ -200,7 +204,7 @@ export async function reserveSlot(input: ReserveInput): Promise<{
       },
     });
   } else {
-    updated = await prisma.bookingInvite.update({
+    created = await prisma.bookingInvite.update({
       where: { id: invite.id },
       data: {
         status: "RESERVED",
@@ -215,34 +219,12 @@ export async function reserveSlot(input: ReserveInput): Promise<{
     });
   }
 
-  // Magic-link pro confirm
-  const token = signMagicLink(updated.id);
-  const magicLink = `${APP_URL()}/api/booking/confirm?t=${encodeURIComponent(token)}`;
+  // Rovnou potvrdit (žádný magic-link mail).
+  const owner = await prisma.user.findFirst({ select: { id: true } });
+  if (!owner) throw new Error("Vlastník systému nebyl nalezen.");
+  const confirmation = await confirmReservation(created.id, owner.id);
 
-  // Pošli klientovi mail s confirm linkem
-  if (updated.inviteeEmail) {
-    const dateStr = input.slot.startsAt.toLocaleDateString("cs-CZ", {
-      weekday: "long", day: "numeric", month: "long",
-    });
-    const timeStr = `${fmtTime(input.slot.startsAt)}–${fmtTime(input.slot.endsAt)}`;
-    const greeting = updated.inviteeName ? `Ahoj ${updated.inviteeName},` : "Ahoj,";
-
-    await sendMail({
-      to: updated.inviteeEmail,
-      subject: `Potvrzení termínu — ${dateStr} ${timeStr}`,
-      html: `
-        <p>${greeting}</p>
-        <p>chceš potvrdit termín <strong>${dateStr} ${timeStr}</strong>?</p>
-        <p>Klikni pro potvrzení:</p>
-        <p><a href="${magicLink}" style="display:inline-block;padding:12px 24px;background:#3b82f6;color:white;text-decoration:none;border-radius:6px;">Potvrdit termín</a></p>
-        <p style="color:#666;font-size:12px;">Pokud klik nefunguje, otevři tento odkaz: ${magicLink}</p>
-        <p style="color:#666;font-size:12px;">Odkaz platí 24 hodin. Pokud termín už nechceš, ignoruj tento mail.</p>
-      `,
-      text: `${greeting}\n\nchceš potvrdit termín ${dateStr} ${timeStr}?\n\nPotvrdit: ${magicLink}\n\n(Odkaz platí 24 hodin.)`,
-    });
-  }
-
-  return { inviteId: updated.id, magicLink };
+  return { inviteId: created.id, meetLink: confirmation.meetLink };
 }
 
 // ---------------------------------------------------------------------------
@@ -297,29 +279,28 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
     data: { status: "CONFIRMED", confirmedAt: new Date() },
   });
 
-  // Mail klientovi: potvrzení + Meet link
+  // Potvrzovací mail příjemci. Neutrální tón, bez tykání/vykání a bez "děkuji" floskulí.
   if (invite.inviteeEmail) {
     const dateStr = startsAt.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
     const timeStr = `${fmtTime(startsAt)}–${fmtTime(endsAt)}`;
     const meetSection = result.meetLink
-      ? `<p><strong>Google Meet odkaz:</strong> <a href="${result.meetLink}">${result.meetLink}</a></p>`
+      ? `<p><strong>Google Meet:</strong> <a href="${result.meetLink}">${result.meetLink}</a></p>`
       : slot.type === "MEETING_PRAGUE"
-        ? `<p><strong>Místo:</strong> Praha — přesnou adresu pošlu samostatně.</p>`
+        ? `<p><strong>Místo:</strong> Praha — adresa pošta samostatně.</p>`
         : slot.type === "MEETING_HOME"
-          ? `<p><strong>Místo:</strong> u mě doma — adresu pošlu samostatně.</p>`
+          ? `<p><strong>Místo:</strong> u Petra doma — adresa pošta samostatně.</p>`
           : "";
 
     await sendMail({
       to: invite.inviteeEmail,
-      subject: `Potvrzeno: ${dateStr} ${timeStr}`,
+      subject: `Termín potvrzen — ${dateStr} ${timeStr}`,
       html: `
-        <p>Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},</p>
-        <p>termín <strong>${dateStr} ${timeStr}</strong> je potvrzený. ✓</p>
+        <p>Termín <strong>${dateStr} ${timeStr}</strong> je potvrzen.</p>
         ${meetSection}
-        <p>Pozvánka přijde i samostatně z Google Calendar.</p>
-        <p>Těším se,<br/>Gideon</p>
+        <p>Pozvánka přijde samostatně z Google Kalendáře.</p>
+        <p>Petr Peřina</p>
       `,
-      text: `Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},\n\ntermín ${dateStr} ${timeStr} je potvrzený.\n${result.meetLink ? `\nMeet: ${result.meetLink}\n` : ""}\nTěším se,\nGideon`,
+      text: `Termín ${dateStr} ${timeStr} je potvrzen.\n${result.meetLink ? `\nMeet: ${result.meetLink}\n` : ""}\nPetr Peřina`,
     });
   }
 
@@ -344,17 +325,17 @@ export async function cancelInvite(inviteId: string): Promise<void> {
     data: { status: "CANCELED" },
   });
 
-  // Pokud měla email, pošli cancellation
+  // Cancel mail neutrálně.
   if (invite.inviteeEmail && (invite.status === "RESERVED" || invite.status === "CONFIRMED")) {
     await sendMail({
       to: invite.inviteeEmail,
       subject: "Termín zrušen",
       html: `
-        <p>Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},</p>
-        <p>termín bohužel musím zrušit. Omlouvám se za komplikace — pošli mi novou pozvánku, najdeme jiný čas.</p>
-        <p>Gideon</p>
+        <p>Termín byl zrušen.</p>
+        <p>Pro nový termín odepište na tento e-mail.</p>
+        <p>Petr Peřina</p>
       `,
-      text: `Ahoj${invite.inviteeName ? ` ${invite.inviteeName}` : ""},\n\ntermín bohužel musím zrušit. Omlouvám se. Najdeme nový čas.\n\nGideon`,
+      text: `Termín byl zrušen.\nPro nový termín odepište na tento e-mail.\n\nPetr Peřina`,
     });
   }
 }
