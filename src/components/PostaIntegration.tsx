@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Loader2, Check, TriangleAlert, RefreshCw, Tags } from "lucide-react";
+import { Mail, Loader2, Check, TriangleAlert, RefreshCw, Tags, FileText } from "lucide-react";
 import { Button } from "./ui/Button";
 
 interface InitialProps {
@@ -94,6 +94,34 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
     }
   }
 
+  const [generatingDigest, setGeneratingDigest] = useState(false);
+  const [digestMessage, setDigestMessage] = useState<string | null>(null);
+  async function runDigest() {
+    setGeneratingDigest(true);
+    setError(null);
+    setDigestMessage(null);
+    try {
+      const res = await fetch("/api/integrations/google/posta-digest", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Generování digestu selhalo.");
+        return;
+      }
+      setDigestMessage(
+        `✓ Digest vygenerován (${data.stats.totalActiveEmails} aktivních mailů, ${(data.stats.durationMs / 1000).toFixed(1)} s). Otevři /posta.`,
+      );
+      setTimeout(() => setDigestMessage(null), 8000);
+    } catch {
+      setError("Síťová chyba.");
+    } finally {
+      setGeneratingDigest(false);
+    }
+  }
+
   return (
     <div
       className="glass rounded-2xl p-6 space-y-4"
@@ -183,7 +211,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
             </>
           )}
         </Button>
-        <Button variant="outline" onClick={runClassify} disabled={syncing || classifying}>
+        <Button variant="outline" onClick={runClassify} disabled={syncing || classifying || generatingDigest}>
           {classifying ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" /> Klasifikuji…
@@ -194,11 +222,25 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
             </>
           )}
         </Button>
+        <Button variant="ghost" onClick={runDigest} disabled={syncing || classifying || generatingDigest}>
+          {generatingDigest ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Generuji digest…
+            </>
+          ) : (
+            <>
+              <FileText className="w-4 h-4" /> Vygenerovat digest
+            </>
+          )}
+        </Button>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Sync běží automaticky každých 15 min, klasifikace také. Tlačítka jsou
-        on-demand spuštění.
+        Sync běží automaticky každých 15 min, klasifikace také. Digest se
+        generuje 7:00 ráno (cron). Tlačítka jsou on-demand spuštění.
       </p>
+      {digestMessage && (
+        <div className="text-xs text-emerald-400 font-mono">{digestMessage}</div>
+      )}
 
       {classifyResult && (
         <div

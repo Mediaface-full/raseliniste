@@ -167,6 +167,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pošta — klasifikace unclassified mailů (fáze 2: max 50/iteraci, Gemini Flash)",
   },
   {
+    name: "posta-digest",
+    endpoint: "/api/cron/posta-digest",
+    schedule: { type: "daily", hour: 7, minute: 0 },
+    description: "Pošta — denní digest snapshot (fáze 3: top akce + eskalace + LLM summary)",
+  },
+  {
     name: "cleanup-sms",
     endpoint: "/api/cron/cleanup-sms",
     schedule: { type: "daily", hour: 3, minute: 30 },
