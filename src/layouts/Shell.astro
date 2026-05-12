@@ -71,21 +71,29 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
 ---
 
 <Base title={title}>
-  <div class="min-h-screen relative z-10 lg:grid lg:grid-cols-[260px_1fr] lg:gap-3 lg:p-3 p-2">
+  <div
+    data-shell
+    class="min-h-screen relative z-10 lg:grid lg:grid-cols-[260px_1fr] lg:gap-3 lg:p-3 p-2
+           lg:[&[data-sidebar-collapsed=true]]:grid-cols-[0px_1fr] lg:[&[data-sidebar-collapsed=true]]:gap-0
+           lg:transition-[grid-template-columns,gap] lg:duration-200 lg:ease-out"
+  >
     {/* Backdrop (mobile only, když je sidebar otevřený) */}
     <div
       class="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 opacity-0 pointer-events-none transition-opacity lg:hidden data-[open]:opacity-100 data-[open]:pointer-events-auto"
       data-sidebar-backdrop
     ></div>
 
-    {/* Sidebar — glass panel; lg: v gridu, pod lg: off-canvas (otevírá se hamburgerem) */}
+    {/* Sidebar — glass panel; lg: v gridu, pod lg: off-canvas (otevírá se hamburgerem).
+        Desktop collapse: data-collapsed=true → opacity 0 + neviditelný, grid kolony se zmenší. */}
     <aside
       data-sidebar
       class="glass rounded-xl flex flex-col overflow-hidden
              lg:sticky lg:top-3 lg:h-[calc(100vh-1.5rem)]
              fixed inset-y-2 left-2 w-[260px] z-40 transform -translate-x-[calc(100%+1rem)] transition-transform
              data-[open]:translate-x-0
-             lg:static lg:translate-x-0 lg:inset-auto lg:w-auto"
+             lg:static lg:translate-x-0 lg:inset-auto lg:w-auto
+             lg:transition-[opacity,transform] lg:duration-200
+             lg:data-[collapsed=true]:opacity-0 lg:data-[collapsed=true]:-translate-x-4 lg:data-[collapsed=true]:pointer-events-none"
     >
       <div class="px-5 py-5 border-b border-white/5">
         <a href="/" class="flex items-baseline gap-2 group">
