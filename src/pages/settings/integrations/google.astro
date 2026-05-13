@@ -17,6 +17,11 @@ const user = await prisma.user.findUnique({
 if (!user) return Astro.redirect("/login");
 
 const status = await isConnected(session.uid);
+// Detekce zda OAuth ma novy gmail.readonly scope. Pokud Petr autorizoval
+// Google driv (pred Postou), config.scopes neobsahuje gmail.readonly a
+// integrace ma jen calendar/contacts. Pak je treba reauth.
+const grantedScopes = (status.config?.scopes as string[] | undefined) ?? [];
+const hasGmailScope = grantedScopes.includes("https://www.googleapis.com/auth/gmail.readonly");
 const eventsCount = await prisma.calendarEvent.count({
   where: { source: "GOOGLE_PRIMARY", deletedRemotely: false },
 });
@@ -50,6 +55,7 @@ const oauthMisconfigured = !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET;
         contactsCount,
         justConnected,
         oauthMisconfigured,
+        hasGmailScope,
       }}
     />
 

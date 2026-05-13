@@ -12,6 +12,7 @@ interface Initial {
   contactsCount: number;
   justConnected: boolean;
   oauthMisconfigured: boolean;
+  hasGmailScope: boolean;
 }
 
 export default function GoogleIntegration({ initial }: { initial: Initial }) {
@@ -167,6 +168,9 @@ export default function GoogleIntegration({ initial }: { initial: Initial }) {
               <Button variant="outline" onClick={() => sync("contacts")} disabled={Boolean(busy)}>
                 {busy === "sync-contacts" ? <Loader2 className="animate-spin" /> : <Users />} Sync kontakty
               </Button>
+              <Button variant="outline" onClick={connect} disabled={Boolean(busy)}>
+                {busy === "connect" ? <><Loader2 className="animate-spin" /> Spouštím…</> : <><Link2 /> Reautorizovat</>}
+              </Button>
               <Button variant="ghost" onClick={disconnect} disabled={Boolean(busy)} className="ml-auto">
                 <Trash2 /> Odpojit
               </Button>
@@ -178,6 +182,27 @@ export default function GoogleIntegration({ initial }: { initial: Initial }) {
           </Button>
         )}
       </div>
+
+      {/* Banner pro chybejici Gmail scope — Petrova integrace z dob pred Postou.
+          Reauth je nutny aby Google vratil refresh_token s gmail.readonly. */}
+      {connected && !initial.hasGmailScope && (
+        <div className="glass-strong rounded-xl p-4 space-y-3 border-l-4 border-[var(--tint-rose)]">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="size-5 mt-0.5 text-[var(--tint-rose)]" />
+            <div className="flex-1">
+              <h4 className="font-medium">Pošta zatím není aktivní</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                Google je připojený jen pro kalendář a kontakty. Pro import e-mailů
+                je potřeba povolit Gmail scope. Klikni dole "Reautorizovat" — Google
+                ukáže consent screen s novými oprávněními (Gmail readonly + metadata).
+              </p>
+            </div>
+          </div>
+          <Button onClick={connect} disabled={Boolean(busy)}>
+            {busy === "connect" ? <><Loader2 className="animate-spin" /> Spouštím…</> : <><Link2 /> Rozšířit oprávnění o Gmail</>}
+          </Button>
+        </div>
+      )}
 
       {message && (
         <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 text-sm px-3 py-2 flex items-center gap-2">
