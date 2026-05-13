@@ -86,7 +86,12 @@ Spusť **`./scripts/setup-gmail-pubsub.sh`** (vyžaduje `gcloud` CLI auth
 k Petrově GCP projektu).
 
 Pokud Petr `gcloud` nemá, manuálně v GCP Console:
-1. **APIs & Services → Enable APIs** → Cloud Pub/Sub API
+0. **APIs & Services → Enable APIs** → **Gmail API** (nutné pro Posta sync —
+   bez toho dostaneš "Gmail API has not been used in project ... before or it
+   is disabled"). Tohle se musí zapnout VŽDY, i kdyby push notifications
+   nebyly potřeba.
+1. **APIs & Services → Enable APIs** → Cloud Pub/Sub API (jen pro fázi 5
+   push notifikace; pokud používáš jen polling, není potřeba)
 2. **Pub/Sub → Topics → Create** `gmail-watch-petr`
 3. **Pub/Sub → Topics → gmail-watch-petr → Permissions → Add**:
    - Member: `gmail-api-push@system.gserviceaccount.com`
