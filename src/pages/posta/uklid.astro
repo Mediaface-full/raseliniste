@@ -1,0 +1,66 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import PostaUklid from "../../components/PostaUklid";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// Top 100 odesilatelu seskupenych podle fromAddress
+// + nejcastejsi contentType per sender (pres EmailClassification join)
+const senders = await prisma.$queryRaw<Array<{
+  fromAddress: string;
+  fromName: string | null;
+  count: bigint;
+  dominantContentType: string | null;
+  latestSubject: string | null;
+  latestReceivedAt: Date | null;
+}>>`
+  SELECT
+    em."fromAddress",
+    MAX(em."fromName") AS "fromName",
+    COUNT(*)::bigint AS count,
+    MODE() WITHIN GROUP (ORDER BY ec."contentType") AS "dominantContentType",
+    (
+      SELECT subject FROM "EmailMessage" e2
+      WHERE e2."userId" = ${session.uid} AND e2."fromAddress" = em."fromAddress"
+      ORDER BY e2."receivedAt" DESC LIMIT 1
+    ) AS "latestSubject",
+    MAX(em."receivedAt") AS "latestReceivedAt"
+  FROM "EmailMessage" em
+  LEFT JOIN "EmailClassification" ec ON ec."messageId" = em.id
+  WHERE em."userId" = ${session.uid}
+  GROUP BY em."fromAddress"
+  ORDER BY count DESC
+  LIMIT 100
+`;
+
+// Serialize bigint
+const sendersClean = senders.map((s) => ({
+  fromAddress: s.fromAddress,
+  fromName: s.fromName,
+  count: Number(s.count),
+  dominantContentType: s.dominantContentType,
+  latestSubject: s.latestSubject,
+  latestReceivedAt: s.latestReceivedAt?.toISOString() ?? null,
+}));
+
+const totalMails = sendersClean.reduce((sum, s) => sum + s.count, 0);
+---
+
+<Shell
+  title="Pošta — úklid · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Pošta" }, { label: "Úklid" }]}
+>
+  <div class="max-w-4xl">
+    <PostaUklid client:load senders={sendersClean} totalMails={totalMails} />
+  </div>
+</Shell>

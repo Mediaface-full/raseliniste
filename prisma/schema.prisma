@@ -97,6 +97,19 @@ model User {
   // Single-user typicky 1 hodnota, ale schema toleruje update (alias addresses).
   gmailEmailAddress    String?
 
+  // 2026-05-13 — Backfill state pro multi-tick zpetny import historie (6 let).
+  // Beh: Petr klikne "Stahnout historii X let" → set gmailBackfillStartedAt +
+  // gmailBackfillYears. Cron `posta-backfill` 15min volá backfillMetadata():
+  // pull jednu page (500 IDs), per-mail messages.get?format=metadata (zadny
+  // bodyText), save next pageToken. Po dokonceni set gmailBackfillCompletedAt.
+  // Kdyz null, cron neni active.
+  gmailBackfillStartedAt   DateTime?
+  gmailBackfillCompletedAt DateTime?
+  gmailBackfillYears       Int?     // 1, 2, 4, 6, nebo null=all
+  gmailBackfillPageToken   String?  // Gmail messages.list pageToken cursor
+  gmailBackfillTotalFetched Int     @default(0)
+  gmailBackfillError       String?  @db.Text
+
   detectedCommitments DetectedCommitment[]
   schedulingConfig    SchedulingConfig?
 }

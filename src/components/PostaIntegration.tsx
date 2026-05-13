@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Mail, Loader2, Check, TriangleAlert, RefreshCw, Tags, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Mail, Loader2, Check, TriangleAlert, RefreshCw, Tags, FileText, History, Trash2 } from "lucide-react";
 import { Button } from "./ui/Button";
 
 interface InitialProps {
@@ -8,6 +8,14 @@ interface InitialProps {
   gmailSyncedAt: string | null;
   gmailSyncError: string | null;
   hasHistoryId: boolean;
+  backfill?: {
+    started: boolean;
+    completed: boolean;
+    inProgress: boolean;
+    years: number | null;
+    totalFetched: number;
+    error: string | null;
+  } | null;
 }
 
 interface SyncResult {
@@ -99,6 +107,52 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
 
   const [generatingDigest, setGeneratingDigest] = useState(false);
   const [digestMessage, setDigestMessage] = useState<string | null>(null);
+
+  // Backfill state — polling kazdych 10s pokud aktivni
+  const [backfillStatus, setBackfillStatus] = useState(initial.backfill ?? null);
+  const [backfillStarting, setBackfillStarting] = useState(false);
+  const [backfillYears, setBackfillYears] = useState<number | "all">(6);
+
+  useEffect(() => {
+    if (!backfillStatus?.inProgress) return;
+    const id = setInterval(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/integrations/google/posta-backfill");
+          const data = await res.json();
+          if (data.ok) setBackfillStatus(data.status);
+        } catch { /* ignore */ }
+      })();
+    }, 10_000);
+    return () => clearInterval(id);
+  }, [backfillStatus?.inProgress]);
+
+  async function startBackfill() {
+    setBackfillStarting(true);
+    setError(null);
+    try {
+      const years = backfillYears === "all" ? null : backfillYears;
+      const res = await fetch("/api/integrations/google/posta-backfill", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ years }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Start backfillu selhal.");
+        return;
+      }
+      // Refresh status
+      const statusRes = await fetch("/api/integrations/google/posta-backfill");
+      const statusData = await statusRes.json();
+      if (statusData.ok) setBackfillStatus(statusData.status);
+    } catch {
+      setError("Síťová chyba.");
+    } finally {
+      setBackfillStarting(false);
+    }
+  }
+
   async function runDigest() {
     setGeneratingDigest(true);
     setError(null);
@@ -200,6 +254,94 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
           </div>
         </div>
       </div>
+
+      {/* Backfill historie — sekce zobrazena jen kdyz neni completed.
+          Po Completed se schová (uz znas historii, dalsi backfill nepotrebujes). */}
+      {!backfillStatus?.completed && (
+        <div
+          className="rounded-xl border p-4 space-y-3"
+          style={{
+            borderColor: "color-mix(in oklch, var(--c) 30%, transparent)",
+            background: "color-mix(in oklch, var(--c) 5%, transparent)",
+          }}
+        >
+          <div className="flex items-start gap-2">
+            <History className="size-4 mt-0.5" style={{ color: "var(--c)" }} />
+            <div className="flex-1">
+              <div className="font-medium text-sm">Zpětný import historie</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Stažení metadat (subject + odesílatel + datum, bez body) pro celé období.
+                Po importu projdeš <code>/posta/uklid</code> kde smažeš spam / reklamy z Gmailu,
+                pak se stáhnou plná těla už jen pro zbylé maily.
+              </p>
+            </div>
+          </div>
+
+          {backfillStatus?.inProgress ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Loader2 className="size-4 animate-spin" style={{ color: "var(--c)" }} />
+                <span className="font-mono">
+                  Probíhá: {backfillStatus.totalFetched.toLocaleString("cs-CZ")} mailů staženo
+                  {backfillStatus.years && ` (${backfillStatus.years} let)`}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Běží cron `posta-backfill` 15min ticky. Můžeš zavřít okno, importuje se na pozadí.
+              </p>
+              {backfillStatus.error && (
+                <div className="text-xs text-destructive">Poslední chyba: {backfillStatus.error}</div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-xs font-mono uppercase text-muted-foreground">Období:</label>
+              <select
+                value={backfillYears === "all" ? "all" : String(backfillYears)}
+                onChange={(e) => setBackfillYears(e.target.value === "all" ? "all" : (parseInt(e.target.value, 10) as 1 | 2 | 4 | 6))}
+                className="px-2 py-1 rounded-md bg-black/30 border border-white/10 text-sm font-mono"
+              >
+                <option value="1">1 rok</option>
+                <option value="2">2 roky</option>
+                <option value="4">4 roky</option>
+                <option value="6">6 let</option>
+                <option value="all">Vše dostupné</option>
+              </select>
+              <Button
+                onClick={startBackfill}
+                disabled={backfillStarting}
+                className="ml-2"
+              >
+                {backfillStarting ? (
+                  <><Loader2 className="size-4 animate-spin" /> Spouštím…</>
+                ) : (
+                  <><History className="size-4" /> Spustit zpětný import</>
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Po Completed: info card s totalFetched + odkaz na /posta/uklid */}
+      {backfillStatus?.completed && (
+        <div
+          className="rounded-xl border p-4 flex items-center gap-3"
+          style={{
+            borderColor: "color-mix(in oklch, var(--tint-sage) 30%, transparent)",
+            background: "color-mix(in oklch, var(--tint-sage) 5%, transparent)",
+          }}
+        >
+          <Check className="size-5 text-[var(--tint-sage)]" />
+          <div className="flex-1">
+            <div className="font-medium text-sm">Zpětný import hotov</div>
+            <div className="text-xs text-muted-foreground">
+              {backfillStatus.totalFetched.toLocaleString("cs-CZ")} mailů v DB.
+              Otevři <a href="/posta/uklid" className="underline">/posta/uklid</a> a smaž junk.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={() => runSync()} disabled={syncing || classifying}>

@@ -191,6 +191,18 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pošta — Gmail watch renewal (fáze 5: prodlouží watch expirující v < 48h; Gmail max lifetime 7d)",
   },
   {
+    name: "posta-backfill",
+    endpoint: "/api/cron/posta-backfill",
+    schedule: { type: "every", minutes: 15 },
+    description: "Pošta — multi-tick zpětný import historie (2026-05-13: pro usery s gmailBackfillStartedAt && !Completed, jedna page 500 mailů per tick, metadata-only)",
+  },
+  {
+    name: "posta-fill-bodies",
+    endpoint: "/api/cron/posta-fill-bodies",
+    schedule: { type: "every", minutes: 10 },
+    description: "Pošta — doplnění plných body pro metadata-only maily po backfill cleanup (2026-05-13: max 100/tick, Gmail messages.get?format=full)",
+  },
+  {
     name: "posta-commitment-detect",
     endpoint: "/api/cron/posta-commitment-detect",
     schedule: { type: "every", minutes: 15 },

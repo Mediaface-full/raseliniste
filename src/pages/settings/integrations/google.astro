@@ -12,7 +12,12 @@ if (!session) return Astro.redirect("/login");
 
 const user = await prisma.user.findUnique({
   where: { id: session.uid },
-  select: { username: true, gmailHistoryId: true, gmailSyncedAt: true, gmailSyncError: true },
+  select: {
+    username: true,
+    gmailHistoryId: true, gmailSyncedAt: true, gmailSyncError: true,
+    gmailBackfillStartedAt: true, gmailBackfillCompletedAt: true,
+    gmailBackfillYears: true, gmailBackfillTotalFetched: true, gmailBackfillError: true,
+  },
 });
 if (!user) return Astro.redirect("/login");
 
@@ -68,6 +73,14 @@ const oauthMisconfigured = !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET;
           gmailSyncedAt: user.gmailSyncedAt?.toISOString() ?? null,
           gmailSyncError: user.gmailSyncError,
           hasHistoryId: Boolean(user.gmailHistoryId),
+          backfill: {
+            started: !!user.gmailBackfillStartedAt,
+            completed: !!user.gmailBackfillCompletedAt,
+            inProgress: !!user.gmailBackfillStartedAt && !user.gmailBackfillCompletedAt,
+            years: user.gmailBackfillYears,
+            totalFetched: user.gmailBackfillTotalFetched,
+            error: user.gmailBackfillError,
+          },
         }}
       />
     )}

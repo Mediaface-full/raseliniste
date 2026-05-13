@@ -174,6 +174,62 @@ export async function getMessage(
   }
 }
 
+/**
+ * Lightweight fetch — jen headers + snippet (žádný bodyText/Html).
+ * Použito pro backfill historie (6 let), kde nejdřív chceme přehled
+ * od koho/kdy/co a teprve po cleanup spam doplníme bodies.
+ *
+ * Quota cost stejný jako getMessage full (5 units), ale response payload
+ * je mnohem menší — Gmail nevrací base64 body.
+ */
+export async function getMessageMetadata(
+  userId: string,
+  messageId: string,
+): Promise<gmail_v1.Schema$Message> {
+  try {
+    const gmail = await getGmail(userId);
+    const res = await withRetry(`getMessageMeta:${messageId}`, () =>
+      gmail.users.messages.get({
+        userId: GMAIL_USER_ID,
+        id: messageId,
+        format: "metadata",
+        metadataHeaders: ["From", "To", "Cc", "Bcc", "Subject", "Date", "Message-ID", "In-Reply-To", "References"],
+      }),
+    );
+    await recordUsage(userId);
+    return res.data;
+  } catch (err) {
+    await recordError(userId, err);
+    throw err;
+  }
+}
+
+/**
+ * Bulk move messages to Trash. Gmail batchModify max 1000 ID per call.
+ * Pouziva se v `/posta/uklid` cleanup UI.
+ */
+export async function trashMessages(userId: string, messageIds: string[]): Promise<void> {
+  if (messageIds.length === 0) return;
+  if (messageIds.length > 1000) throw new Error("trashMessages: max 1000 IDs per call");
+  try {
+    const gmail = await getGmail(userId);
+    await withRetry(`trashMessages:${messageIds.length}`, () =>
+      gmail.users.messages.batchModify({
+        userId: GMAIL_USER_ID,
+        requestBody: {
+          ids: messageIds,
+          addLabelIds: ["TRASH"],
+          removeLabelIds: ["INBOX", "UNREAD"],
+        },
+      }),
+    );
+    await recordUsage(userId);
+  } catch (err) {
+    await recordError(userId, err);
+    throw err;
+  }
+}
+
 // =============================================================================
 // Parsing helpers — Gmail → naše EmailMessage tvar
 // =============================================================================
