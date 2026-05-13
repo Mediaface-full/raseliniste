@@ -77,7 +77,7 @@ export default function SchedulingSettings({ initial }: { initial: Config }) {
       <div>
         <h1 className="font-serif text-2xl">Nastavení bookingu</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Dostupnost pro pozvánky (<code className="text-xs">/calendar/invite</code>) a veřejnou stránku <code className="text-xs">/schuzka</code>.
+          Dostupnost pro pozvánky generované přes <code className="text-xs">/calendar/invite</code>.
           Změny se projeví okamžitě.
         </p>
       </div>

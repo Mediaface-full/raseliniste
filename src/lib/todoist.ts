@@ -66,7 +66,29 @@ export interface TodoistSection {
   project_id: string;
 }
 
-async function call<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+/**
+ * Sdílený throttle — všechny Todoist requesty napříč procesy procházejí tudy.
+ * Drží minimální 100ms mezi requesty (10/s = 600/min, bezpečně pod Todoist
+ * REST limit 450/15min = 30/min průměrně, ale Todoist toleruje burst).
+ *
+ * Posta-commitment-sync má svůj vlastní 2000ms sleep (30/min) — kombinací se
+ * dvěma vrstvami dosahujeme: vlastní pomalé crony + retry-on-429 jako safety
+ * net pokud paralelní cesty (task-todoist-push, todoist-sync) sečetly přes
+ * limit.
+ */
+let nextAllowedAt = 0;
+const MIN_GAP_MS = 100;
+
+async function waitForThrottle(): Promise<void> {
+  const now = Date.now();
+  if (now < nextAllowedAt) {
+    await new Promise((r) => setTimeout(r, nextAllowedAt - now));
+  }
+  nextAllowedAt = Math.max(now, nextAllowedAt) + MIN_GAP_MS;
+}
+
+async function call<T>(token: string, path: string, init?: RequestInit, attempt = 0): Promise<T> {
+  await waitForThrottle();
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
@@ -75,6 +97,27 @@ async function call<T>(token: string, path: string, init?: RequestInit): Promise
       ...(init?.headers ?? {}),
     },
   });
+
+  // 429 → retry s respektem k retry_after (max 3 pokusy)
+  if (res.status === 429 && attempt < 3) {
+    const body = await res.text().catch(() => "");
+    let retryAfterSec = 60; // konzervativní default
+    try {
+      const parsed = JSON.parse(body) as { error_extra?: { retry_after?: number } };
+      if (parsed.error_extra?.retry_after && parsed.error_extra.retry_after > 0) {
+        retryAfterSec = Math.min(parsed.error_extra.retry_after, 1800); // cap 30 min
+      }
+    } catch {
+      // bez retry_after → exponential backoff
+      retryAfterSec = Math.min(60 * Math.pow(2, attempt), 600);
+    }
+    console.warn(`[todoist] 429 rate limit, retry za ${retryAfterSec}s (attempt ${attempt + 1}/3)`);
+    // Posunout globální throttle aby další volání čekala
+    nextAllowedAt = Date.now() + retryAfterSec * 1000;
+    await new Promise((r) => setTimeout(r, retryAfterSec * 1000));
+    return call<T>(token, path, init, attempt + 1);
+  }
+
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Todoist ${res.status}: ${body.slice(0, 300)}`);

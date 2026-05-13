@@ -33,8 +33,9 @@ function isPublic(pathname: string): boolean {
   if (pathname.startsWith("/me/")) return true;
   if (pathname.startsWith("/api/me/")) return true;
   // Booking — public klient stránky a public booking endpointy.
+  // /schuzka byla 2026-05-13 smazána (Petr: "nedávám pozvánky veřejně"),
+  // public booking jen přes personalizovaný link /i/<token>.
   if (pathname.startsWith("/i/")) return true;
-  if (pathname === "/schuzka") return true;
   if (pathname.startsWith("/api/booking/by-token/")) return true;
   if (pathname === "/api/booking/reserve") return true;
   if (pathname === "/api/booking/confirm") return true;

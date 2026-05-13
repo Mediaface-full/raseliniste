@@ -27,8 +27,12 @@ import { prisma } from "./db";
 import { decryptSecret } from "./crypto";
 import { createTask, updateTask, closeTask, deleteTask } from "./todoist";
 
-const TODOIST_RATE_LIMIT_PER_MIN = 30;
-const MIN_DELAY_BETWEEN_CALLS_MS = (60 * 1000) / TODOIST_RATE_LIMIT_PER_MIN; // 2000 ms
+// Petr 2026-05-13 dostal Todoist 429 (1280s retry-after). Zpomaleno z 30/min
+// na 10/min — paralelní crony (task-todoist-push, todoist-sync, Things import)
+// se potkávají, sčítají requesty. Plus retry-on-429 ve src/lib/todoist.ts
+// jako safety net pokud i tak ucinime burst.
+const TODOIST_RATE_LIMIT_PER_MIN = 10;
+const MIN_DELAY_BETWEEN_CALLS_MS = (60 * 1000) / TODOIST_RATE_LIMIT_PER_MIN; // 6000 ms
 
 export interface SyncStats {
   userId: string;
