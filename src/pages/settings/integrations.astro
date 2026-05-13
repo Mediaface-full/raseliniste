@@ -7,6 +7,7 @@ import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 import { env } from "../../lib/env";
 import { normalizeTagRules } from "../../lib/task-todoist-push";
+import { isConnected } from "../../lib/google-oauth";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -52,6 +53,10 @@ const gosmsConfig = (gosmsIntegration?.config ?? {}) as {
   organizationFetchedAt?: string;
 };
 const publicBaseUrl = env.APP_URL || "https://www.raseliniste.cz";
+
+// Google status pro card link (detail na /settings/integrations/google)
+const googleStatus = await isConnected(session.uid);
+const emailsCount = await prisma.emailMessage.count({ where: { userId: session.uid } });
 ---
 
 <Shell
@@ -60,6 +65,33 @@ const publicBaseUrl = env.APP_URL || "https://www.raseliniste.cz";
   breadcrumb={[{ label: "Nastavení" }, { label: "Integrace" }]}
 >
   <div class="max-w-2xl space-y-6">
+    {/* Google / Pošta — odkaz na detail. Bez Google OAuth Pošta nic neimportuje. */}
+    <a
+      href="/settings/integrations/google"
+      class="block glass rounded-xl p-4 hover:bg-white/5 transition"
+      style={{ "--c": "var(--tint-sky)" } as any}
+    >
+      <div class="flex items-center gap-3">
+        <div class="size-10 rounded-lg flex items-center justify-center" style={{ background: "color-mix(in oklch, var(--tint-sky) 25%, transparent)" } as any}>
+          <span style={{ color: "var(--tint-sky)" } as any} class="font-mono text-lg">G</span>
+        </div>
+        <div class="flex-1">
+          <div class="font-medium flex items-center gap-2">
+            Google Workspace + Pošta
+            {googleStatus.connected ? (
+              <span class="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)]">připojeno</span>
+            ) : (
+              <span class="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-rose)]/15 text-[var(--tint-rose)]">nepřipojeno</span>
+            )}
+          </div>
+          <div class="text-xs text-muted-foreground mt-0.5">
+            Kalendář, kontakty, Gmail. {emailsCount > 0 ? `${emailsCount} importovaných mailů.` : "Žádné maily zatím nesynchronizované."}
+          </div>
+        </div>
+        <span class="text-muted-foreground">→</span>
+      </div>
+    </a>
+
     <IntegrationsSettings
       client:load
       initial={{
