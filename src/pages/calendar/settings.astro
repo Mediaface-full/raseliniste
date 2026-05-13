@@ -1,0 +1,28 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import SchedulingSettings from "../../components/SchedulingSettings";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+import { getSchedulingConfig } from "../../lib/rules-config";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const initialConfig = await getSchedulingConfig();
+---
+
+<Shell
+  title="Booking nastavení · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Kalendář" }, { label: "Nastavení bookingu" }]}
+>
+  <div class="max-w-3xl">
+    <SchedulingSettings client:load initial={initialConfig} />
+  </div>
+</Shell>

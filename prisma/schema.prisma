@@ -98,6 +98,55 @@ model User {
   gmailEmailAddress    String?
 
   detectedCommitments DetectedCommitment[]
+  schedulingConfig    SchedulingConfig?
+}
+
+/// Booking scheduling config — 1 řádek per user, editovatelné z /calendar/settings.
+/// Single-user typicky 1 řádek. Default hodnoty pocházejí z bývalého hardcoded
+/// configu v src/lib/rules-config.ts (před 2026-05-13).
+///
+/// Den-of-week: 0=Sunday, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat.
+/// "HH:MM" 24h time strings.
+model SchedulingConfig {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Dostupnost per typ schůzky
+  pragueDays       Int[]
+  pragueHoursStart String   // "09:00"
+  pragueHoursEnd   String   // "17:00"
+  homeDays         Int[]
+  homeHoursStart   String
+  homeHoursEnd     String
+  onlineDays       Int[]
+  onlineHoursStart String
+  onlineHoursEnd   String
+
+  // Denní okolnosti
+  lunchBreakStart  String   // "12:00"
+  lunchBreakEnd    String   // "13:00"
+  endOfDay         String   // "17:00"
+
+  // Buffery
+  bufferPragueMinutes        Int   // minimum před cestou do Prahy
+  bufferOnlineBetweenMinutes Int   // mezi online schůzkami
+
+  // Booking-only
+  minLeadTimeClientHours Int
+  minLeadTimeFriendHours Int
+  maxBookingHorizonDays  Int
+
+  // Day-load limity
+  maxPragueWarning     Int     // > X → warning v Praze
+  maxInPersonWarning   Int     // > X → warning prezenčních
+  maxInPersonError     Int     // > X → error
+  maxOnlineWarning     Int     // > X → warning online
+  weightedLoadWarning  Float   // prezenční=1.0, online=0.6
+  weightedLoadError    Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model WebauthnCredential {

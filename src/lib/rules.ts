@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import {
-  SCHEDULING_CONFIG,
+  getSchedulingConfig,
   type SchedulingConfig,
   dowOf,
   timeOnDate,
@@ -46,7 +46,7 @@ export interface EvaluationResult {
 // ---------------------------------------------------------------------------
 
 export async function evaluateSlot(input: EvaluateInput): Promise<EvaluationResult> {
-  const cfg = SCHEDULING_CONFIG;
+  const cfg = await getSchedulingConfig();
   const signals: RuleSignal[] = [];
 
   // Načti všechny eventy v okolí dne (±1 den buffer pro buffer pravidla)
@@ -380,7 +380,7 @@ export interface Slot {
 }
 
 export async function listAvailableSlots(opts: AvailabilityOpts): Promise<Slot[]> {
-  const cfg = SCHEDULING_CONFIG;
+  const cfg = await getSchedulingConfig();
   const horizon = opts.horizonDays ?? cfg.maxBookingHorizonDays;
   const dur = (opts.slotDurationMinutes ?? 60) * 60 * 1000;
 
