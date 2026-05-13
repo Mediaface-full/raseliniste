@@ -42,9 +42,27 @@ export interface PostaSyncStats {
 
 /**
  * Maximum mailů co stáhneme za jednu synchronizaci.
- * Faze 1 hranice — viz Petrovo zadání („zaimportovaných posledních 100 mailů").
+ *
+ * Před 2026-05-13: hardcoded 100 (Faze 1 dev test). Petr 2026-05-13 nahlásil
+ * "naclo se jen 100 mailů" — limit byl smyslem MVP test, ne production.
+ *
+ * Retention pro Pošta je 96 dnů (RETENTION.md), takže init musí pulnout
+ * 96 dnů zpět; ne týden.
+ *
+ * INIT (první sync — user.gmailHistoryId == null):
+ *   - 5000 mailů cap (typický inbox za 96d cca 1-5k mailů)
+ *   - query newer_than:96d
+ *   - serial fetch ~50ms/mail = 5000 * 50ms = 250s = ~4 min, v limitu cron
+ *     scheduler 15min ticku
+ *
+ * INCREMENTAL (následující sync):
+ *   - 200 mailů cap (1d traffic + safety)
+ *   - query newer_than:1d
  */
-const MAX_MESSAGES_PER_SYNC = 100;
+const MAX_MESSAGES_PER_INIT_SYNC = 5000;
+const MAX_MESSAGES_PER_INCREMENTAL_SYNC = 200;
+const INIT_QUERY = "newer_than:96d";
+const INCREMENTAL_QUERY = "newer_than:1d";
 
 /**
  * Sync Gmail pro daného uživatele. Vola se z cronu nebo manualne přes
@@ -102,22 +120,28 @@ export async function syncPostaForUser(userId: string): Promise<PostaSyncStats> 
     }
 
     // Krok 2: získat seznam ID
-    // Faze 1: pro INIT i INCREMENTAL používáme messages.list s q filtrem.
-    // INIT pulluje newer_than:7d (max 100), INCREMENTAL newer_than:1d
-    // (nezavislé na gmailHistoryId — to bude pro fázi 2 přes history.list).
-    const q = stats.mode === "init" ? "newer_than:7d" : "newer_than:1d";
+    // INIT (gmailHistoryId == null): pull 96d historie do MAX_MESSAGES_PER_INIT_SYNC (5000)
+    // INCREMENTAL: pull 1d do MAX_MESSAGES_PER_INCREMENTAL_SYNC (200)
+    const q = stats.mode === "init" ? INIT_QUERY : INCREMENTAL_QUERY;
+    const maxMessages =
+      stats.mode === "init" ? MAX_MESSAGES_PER_INIT_SYNC : MAX_MESSAGES_PER_INCREMENTAL_SYNC;
     const idsToFetch: Array<{ id: string; threadId: string }> = [];
     let pageToken: string | undefined = undefined;
-    while (idsToFetch.length < MAX_MESSAGES_PER_SYNC) {
-      const remaining = MAX_MESSAGES_PER_SYNC - idsToFetch.length;
+    while (idsToFetch.length < maxMessages) {
+      const remaining = maxMessages - idsToFetch.length;
       const page = await listMessages(userId, {
         q,
-        maxResults: Math.min(100, remaining),
+        maxResults: Math.min(500, remaining), // Gmail API max per page = 500
         pageToken,
       });
       idsToFetch.push(...page.messages);
       if (!page.nextPageToken || page.messages.length === 0) break;
       pageToken = page.nextPageToken;
+    }
+    if (idsToFetch.length === maxMessages) {
+      console.warn(
+        `[posta-sync] userId=${userId} mode=${stats.mode} hit max ${maxMessages} (možná víc historie čeká, další cron tick pokračovat nebude — historyId se ukládá)`,
+      );
     }
 
     if (idsToFetch.length === 0) {

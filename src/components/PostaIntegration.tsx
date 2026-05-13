@@ -49,12 +49,15 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
   const [error, setError] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(initial.gmailSyncedAt);
 
-  async function runSync() {
+  async function runSync(opts?: { reinit?: boolean }) {
     setSyncing(true);
     setError(null);
     setResult(null);
     try {
-      const res = await fetch("/api/integrations/google/posta-init", { method: "POST" });
+      const url = opts?.reinit
+        ? "/api/integrations/google/posta-init?reinit=1"
+        : "/api/integrations/google/posta-init";
+      const res = await fetch(url, { method: "POST" });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Sync selhal.");
@@ -199,7 +202,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={runSync} disabled={syncing || classifying}>
+        <Button onClick={() => runSync()} disabled={syncing || classifying}>
           {syncing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" /> Synchronizuji…
@@ -211,6 +214,20 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
             </>
           )}
         </Button>
+        {initial.hasHistoryId && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (confirm("Stáhnout historii 96 dnů? Může trvat několik minut, max 5000 mailů. Existující se nepřepisuje.")) {
+                void runSync({ reinit: true });
+              }
+            }}
+            disabled={syncing || classifying}
+            title="Re-init: 96d historie, max 5000 mailů, idempotent (existující se neimportují znovu)"
+          >
+            <RefreshCw className="w-4 h-4" /> Stáhnout historii 96 dnů
+          </Button>
+        )}
         <Button variant="outline" onClick={runClassify} disabled={syncing || classifying || generatingDigest}>
           {classifying ? (
             <>
