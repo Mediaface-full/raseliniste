@@ -6,7 +6,15 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-1. **`INSTRUKCE/POSTA-PHASE-6.md`** ← **AKTUÁLNÍ STAV 2026-05-12** — Email Intelligence „Pošta" fáze 6 **FINÁLNÍ** HOTOVÁ. DetectedCommitment detector + confidence routing (auto >=0.85 / needs-confirm 0.55-0.84 / skip <0.55) + soft-link dedup + UI sekce Závazky s 4 subtaby + 1-way Todoist sync (DB primárka) + related email tracking (thread match drží alive) + stale marker 30d. **Modul Pošta kompletní** — fáze 1-6 hotové.
+0. **`INSTRUKCE/HANDOFF-2026-05-13.md`** ← **AKTUÁLNÍ STAV** — Booking modul kompletní + Pošta scope fix + Todoist 429 retry. Před tímto handoffem byl modul Pošta nasazený ale neimportoval nic (chyběl scope + reauth banner + GCP Gmail API enable). Po pushi 8 commitů (`10f18f2` … `d8ec9d0`) a reauth v `/settings/integrations/google` by mělo začít fungovat.
+
+1. **`INSTRUKCE/POSTA-PHASE-6.md`** — Email Intelligence „Pošta" fáze 6 **FINÁLNÍ** HOTOVÁ. DetectedCommitment detector + confidence routing (auto >=0.85 / needs-confirm 0.55-0.84 / skip <0.55) + soft-link dedup + UI sekce Závazky s 4 subtaby + 1-way Todoist sync (DB primárka) + related email tracking (thread match drží alive) + stale marker 30d. **Modul Pošta kompletní** — fáze 1-6 hotové.
+
+   **Pošta scope opraven 2026-05-13** (commit `28fd888`): `gmail.modify + gmail.send` (čtení + drafty + odesílání reply). Memory `project_posta_module.md` to mělo zapsané, ale fáze 1 implementovala jen readonly+metadata — dohnáno.
+
+   **CRONY:** všechny v `src/lib/cron-schedule.ts`, DSM Task Scheduler volá jen `/api/cron/scheduler` (dispatcher pattern). ŽÁDNÉ DSM změny.
+
+   **DEPLOY GOTCHA:** v GCP Console enable Gmail API jednorázově (viz krok 0 v `docs/email-intelligence/INFRASTRUCTURE.md`). OAuth scope ≠ enabled API.
 1b. `INSTRUKCE/POSTA-PHASE-5.md` — Gmail push + encryption + retention
 1c. `INSTRUKCE/POSTA-PHASE-4.md` — RAG embeddings + hybrid search
 1d. `INSTRUKCE/POSTA-PHASE-3.md` — UI modul `/posta` (SSR, zero JS), digest, sidebar badge

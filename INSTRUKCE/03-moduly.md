@@ -85,17 +85,19 @@ Stav 2026-05-10 (Smart routing 6-úrovňový + Triage t-* dropdown + RoutingAudi
 | **Měsíc** | `/calendar/mesic` / `/calendar/mesic/<YYYY-MM>` | ✅ NOVÉ 05-04 | Desktop. Heatmap hustoty 5 stupňů, velké eventy jako TEXT v buňce (max 2, source-color), rituály ✨ v rohu, hover tooltip (200ms fade) s plným seznamem, aktuální týden inset, fullscreen, tisk. „Květen 2026" v nominativu. |
 | **Naplno mód** | `?naplno=1` na week/month/day | ✅ NOVÉ 05-04 | Base layout místo Shell. Bez sidebaru, bez Při cestě. Šipky listování zachovávají query string. „Rituální prostor" pro nedělní pohled.|
 | **/calendar (sidebar záložka)** | redirect na `/calendar/tyden` | ✅ AKT 05-04 — defaultní desktop pohled je týden. Stará CalendarView se nepoužívá. |
-| Pozvánka | `/calendar/invite` | ✅ |
-| Klient pozvánka | `/i/<token>` | ✅ public |
-| Cold lead | `/schuzka` | ✅ public |
+| Pozvánka | `/calendar/invite` | ✅ AKT 05-13 — server-side contact search (`?q=`), neutralní texty |
+| Klient pozvánka | `/i/<token>` | ✅ public — magic-link confirm pryč 05-12, rovnou Google event |
+| ~~Cold lead~~ | ~~`/schuzka`~~ | ❌ SMAZÁNO 05-13 (Petr: „nedávám pozvánky veřejně") |
+| **Booking nastavení** | `/calendar/settings` | ✅ NOVÉ 05-13 — DB-driven SchedulingConfig, sticky save, sekce Online/Praha/Doma/Pauzy/Lead time/Buffery/Limity |
 | Dovolená/nomád | `/calendar/away` | ✅ |
 | Lokace | `/calendar/locations` | ✅ |
-| Settings Google | `/settings/integrations/google` | ✅ |
+| Settings Google | `/settings/integrations/google` | ✅ AKT 05-13 — reauth banner + Rozšířit oprávnění o Gmail tlačítko |
 | Settings iCloud | `/settings/integrations/icloud` | ✅ |
 
-- 18 pravidel (HARD/WARNING/INFO) v `lib/rules-config.ts`
+- 19 pravidel (HARD/WARNING/INFO) v `src/lib/rules.ts` — **NOVÉ 05-13: HARD_BUSY_OVERLAP** generický overlap s whitelistem (PARTNER_SHIFT/VACATION + OOO_TRAVEL_WORKING u online)
+- Config DB-driven přes `SchedulingConfig` (migration `20260513090000`), editovatelný v `/calendar/settings`, default 09-17 bez středy online, lead 72/24
 - Sync Google + iCloud syn (RODINA) + iCloud partnerka (S & P) à 5 min
-- Bookingy s magic-link confirm + smart slot listing
+- Bookingy: magic-link confirm krok ZRUŠEN 05-12, `reserveSlot()` rovnou vytvoří Google event a pošle finální mail. `confirm.ts` zachován pro legacy linky.
 - Noční briefing 22:00 → Todoist (cron)
 - OOO management vytvoří v Google all-day event s `eventType: outOfOffice`
 
