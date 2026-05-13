@@ -192,9 +192,9 @@ export default function GoogleIntegration({ initial }: { initial: Initial }) {
             <div className="flex-1">
               <h4 className="font-medium">Pošta zatím není aktivní</h4>
               <p className="text-sm text-muted-foreground mt-1">
-                Google je připojený jen pro kalendář a kontakty. Pro import e-mailů
-                je potřeba povolit Gmail scope. Klikni dole "Reautorizovat" — Google
-                ukáže consent screen s novými oprávněními (Gmail readonly + metadata).
+                Google je připojený jen pro kalendář a kontakty. Pro import a odpovídání
+                na e-maily je potřeba povolit Gmail oprávnění. Klik dole spustí Google
+                consent screen s novými scopy (čtení mailů, drafty, odesílání).
               </p>
             </div>
           </div>

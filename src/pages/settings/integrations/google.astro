@@ -4,7 +4,7 @@ import GoogleIntegration from "../../../components/GoogleIntegration";
 import PostaIntegration from "../../../components/PostaIntegration";
 import { prisma } from "../../../lib/db";
 import { readSession } from "../../../lib/session";
-import { isConnected } from "../../../lib/google-oauth";
+import { isConnected, POSTA_REQUIRED_SCOPE } from "../../../lib/google-oauth";
 import { env } from "../../../lib/env";
 
 const session = await readSession(Astro.cookies);
@@ -17,11 +17,11 @@ const user = await prisma.user.findUnique({
 if (!user) return Astro.redirect("/login");
 
 const status = await isConnected(session.uid);
-// Detekce zda OAuth ma novy gmail.readonly scope. Pokud Petr autorizoval
-// Google driv (pred Postou), config.scopes neobsahuje gmail.readonly a
-// integrace ma jen calendar/contacts. Pak je treba reauth.
+// Detekce zda OAuth ma vsechny Posta scopy. Pokud Petr autorizoval Google driv
+// (kalendar + kontakty), config.scopes neobsahuje gmail.modify/send a Posta
+// nemuze fungovat. Treba reauth.
 const grantedScopes = (status.config?.scopes as string[] | undefined) ?? [];
-const hasGmailScope = grantedScopes.includes("https://www.googleapis.com/auth/gmail.readonly");
+const hasGmailScope = grantedScopes.includes(POSTA_REQUIRED_SCOPE);
 const eventsCount = await prisma.calendarEvent.count({
   where: { source: "GOOGLE_PRIMARY", deletedRemotely: false },
 });

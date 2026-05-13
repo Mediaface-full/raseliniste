@@ -19,11 +19,15 @@ import { encryptSecret, decryptSecret } from "./crypto";
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/contacts.readonly",
-  // Pošta — fáze 1 (2026-05-12): readonly + metadata stačí pro import + klasifikaci.
-  // Fáze 2+ rozšíří na gmail.modify (odpovídání, label changes).
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.metadata",
+  // Pošta — Petr potvrdil 2026-05-12: gmail.modify (čtení + drafty + labely)
+  // + gmail.send (odeslání reply). modify zahrnuje readonly + metadata, takže
+  // ty starší scopy už nejsou potřeba samostatně.
+  "https://www.googleapis.com/auth/gmail.modify",
+  "https://www.googleapis.com/auth/gmail.send",
 ];
+
+/** Klíčový scope který signalizuje že Pošta může fungovat. Bez něj jen kalendář/kontakty. */
+export const POSTA_REQUIRED_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
 
 function requireEnv(): { clientId: string; clientSecret: string; redirectUri: string } {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {

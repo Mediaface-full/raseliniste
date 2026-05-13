@@ -9,7 +9,7 @@ Tato fáze: čistý OAuth + import + storage. Bez klasifikace, bez UI.
 
 | Co je hotové | Co ještě není |
 |---|---|
-| Gmail OAuth scope (`gmail.readonly` + `gmail.metadata`) | `gmail.modify` scope (odpovídání, label changes) |
+| Gmail OAuth scope (`gmail.modify` + `gmail.send`) — čtení + drafty + odeslání reply | UI komponent pro reply (composer) |
 | `EmailMessage` schema + migrace | `EmailClassification`, `EmailDigest`, `EmailCommitment` |
 | `src/lib/gmail.ts` API klient | Gmail push notifications (Cloud Pub/Sub) |
 | Sync logika `posta-sync.ts` + cron 15 min | Pravá incremental přes `users.history.list` |
