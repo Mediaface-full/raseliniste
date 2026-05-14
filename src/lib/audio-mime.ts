@@ -89,7 +89,11 @@ const GEMINI_SUPPORTED: ReadonlySet<string> = new Set([
  *   resolveAudioMime("", "dokument.pdf") → null
  */
 export function resolveAudioMime(clientMime: string | null | undefined, filename: string | null | undefined): string | null {
-  const mime = (clientMime || "").toLowerCase().trim();
+  // STRIP codec sufix — MediaRecorder z prohlížeče posílá `audio/webm;codecs=opus`
+  // nebo `audio/mp4;codecs=mp4a`. Gemini chce čistý MIME bez codec parameter.
+  // Petr 2026-05-14: host záznamy (Jan ve studánce) padaly na tomto.
+  const rawMime = (clientMime || "").toLowerCase().trim();
+  const mime = rawMime.split(";")[0].trim(); // "audio/webm;codecs=opus" → "audio/webm"
 
   // 1. Klient pošle audio/* — normalizuj na Gemini-supported variantu
   if (mime.startsWith("audio/")) {

@@ -408,21 +408,39 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
     : `${baseTranscribePrompt}${accuracyRules}`;
 
   const stage1Start = Date.now();
-  const transcribeResp = await withRetry("Stage 1 (transcribe)", () =>
-    genai.models.generateContent({
-      model: DEFAULT_MODEL, // Flash je na přepis dostatečný i pro briefy (analýza je pak Pro)
-      contents: [
-        {
-          role: "user",
-          parts: [audioPart as never, { text: transcribePrompt }],
+  const transcribeResp = await withRetry("Stage 1 (transcribe)", async () => {
+    try {
+      return await genai.models.generateContent({
+        model: DEFAULT_MODEL, // Flash je na přepis dostatečný i pro briefy (analýza je pak Pro)
+        contents: [
+          {
+            role: "user",
+            parts: [audioPart as never, { text: transcribePrompt }],
+          },
+        ],
+        config: {
+          temperature: 0.1,
+          maxOutputTokens: 65000, // pro 90 min audio reálně potřeba
         },
-      ],
-      config: {
-        temperature: 0.1,
-        maxOutputTokens: 65000, // pro 90 min audio reálně potřeba
-      },
-    }),
-  );
+      });
+    } catch (e) {
+      // Petr 2026-05-14: hosti zaznamy (Jan ze studanky) padaji s Gemini 400
+      // INVALID_ARGUMENT i po MIME fixu. Wrap pro citelnou hlasku co konkretne
+      // bylo spatne. Stejne jako transcribeAudioOnly (UPLOAD path) commit 5340584.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/INVALID_ARGUMENT|400/i.test(msg)) {
+        const sizeMb = (params.audio.byteLength / 1024 / 1024).toFixed(1);
+        const firstBytes = params.audio.subarray(0, 8).toString("hex"); // header pro debug
+        throw new Error(
+          `Gemini nepřijal audio (${sizeMb} MB, mime "${params.mimeType}", mode "${usedMode}", ` +
+          `header 0x${firstBytes}). Možné příčiny: neuznaný kodek (např. webm/opus z mobilního ` +
+          `Chromu Vertex EU neumí), poškozený soubor, nebo prázdný/krátký buffer. ` +
+          `Detail: ${msg.slice(0, 200)}`,
+        );
+      }
+      throw e;
+    }
+  });
   void trackGeminiCall({
     module: "audio-stage1-transcribe",
     response: transcribeResp,
