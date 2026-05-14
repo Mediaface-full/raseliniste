@@ -89,6 +89,18 @@ export async function saveUpload(
   const ext = extFromMime(mime);
   if (!ext) throw new Error(`Nepodporovaný typ souboru: ${mime}`);
 
+  // Petr 2026-05-14: detekované 0-byte audio recordy v DB (Janova
+  // 46s nahrávka). Prevence — odmítnout uložit prázdný buffer rovnou
+  // zdola. Pokud klient pošle 0-byte blob (MediaRecorder selhal, uživatel
+  // zavřel okno před save), DB row se nevytvoří se selháním later.
+  if (data.byteLength === 0) {
+    throw new Error("Soubor je prázdný (0 bytes). Nahrávku se nepodařilo zachytit, zkus znovu.");
+  }
+  // < 256 B taky podezřele krátké (audio header sám má pár stovek B)
+  if (mime.startsWith("audio/") && data.byteLength < 256) {
+    throw new Error(`Audio je podezřele krátké (${data.byteLength} B). Nahrávka se přerušila hned na začátku, zkus znovu.`);
+  }
+
   await ensureUploadDir(subdir);
 
   const filename = `${randomBytes(12).toString("hex")}.${ext}`;
