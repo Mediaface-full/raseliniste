@@ -146,3 +146,233 @@ export function parseVCardFile(text: string): ParsedContact[] {
   }
   return contacts;
 }
+
+// ============================================================================
+// iCloud CardDAV sync API (2026-05-14 — kontakty_brief.md fáze 1)
+// ============================================================================
+//
+// Bohatší model než legacy ParsedContact — bere v úvahu ORG, ADR, BDAY,
+// CATEGORIES (Apple skupiny), KIND (group vs individual).
+//
+// Vlastní implementace bez npm závislosti (Petr 2026-05-14).
+
+export interface VCardContact {
+  uid: string;
+  fn: string;
+  firstName: string;
+  lastName: string;
+  org: string | null;
+  phones: { number: string; label: string | null }[];
+  emails: { email: string; label: string | null }[];
+  addressLines: string[];
+  birthYear: number | null;
+  birthMonth: number | null;
+  birthDay: number | null;
+  categories: string[];
+  note: string | null;
+  rev: string | null;
+  kind: "individual" | "group" | "org" | null;
+  groupMemberUids: string[];
+}
+
+/**
+ * Bohatší parser než legacy parseVCard. Vrací VCardContact (nebo null).
+ * Vstup je raw vCard string (bez BEGIN/END marker je OK, parser je tolerantní).
+ */
+export function parseVCardFull(raw: string): VCardContact | null {
+  const lines = unfoldLines(raw);
+  // Najdi BEGIN:VCARD..END:VCARD blok (pokud je jen jeden) nebo vezmi vše
+  const beginIdx = lines.findIndex((l) => l.toUpperCase().trim() === "BEGIN:VCARD");
+  const endIdx = lines.findIndex((l) => l.toUpperCase().trim() === "END:VCARD");
+  const block = beginIdx >= 0 && endIdx > beginIdx
+    ? lines.slice(beginIdx + 1, endIdx)
+    : lines;
+
+  const contact: VCardContact = {
+    uid: "",
+    fn: "",
+    firstName: "",
+    lastName: "",
+    org: null,
+    phones: [],
+    emails: [],
+    addressLines: [],
+    birthYear: null,
+    birthMonth: null,
+    birthDay: null,
+    categories: [],
+    note: null,
+    rev: null,
+    kind: null,
+    groupMemberUids: [],
+  };
+
+  for (const line of block) {
+    if (/^VERSION:/i.test(line)) continue;
+    const colonIdx = line.indexOf(":");
+    if (colonIdx < 0) continue;
+    const head = line.slice(0, colonIdx);
+    const value = line.slice(colonIdx + 1);
+    const parts = head.split(";");
+    const keyRaw = parts[0].toUpperCase();
+    const params = parts.slice(1);
+    const key = keyRaw.replace(/^ITEM\d+\./, "");
+    const decoded = decodeValue(value, params);
+
+    switch (key) {
+      case "UID":
+        contact.uid = decoded.trim();
+        break;
+      case "FN":
+        contact.fn = decoded.trim();
+        break;
+      case "N": {
+        const np = decoded.split(";");
+        contact.lastName = (np[0] ?? "").trim();
+        contact.firstName = (np[1] ?? "").trim();
+        break;
+      }
+      case "TEL": {
+        const label = extractLabel(params) ?? null;
+        const num = decoded.trim();
+        if (num) contact.phones.push({ number: num, label });
+        break;
+      }
+      case "EMAIL": {
+        const label = extractLabel(params) ?? null;
+        const em = decoded.trim().toLowerCase();
+        if (em) contact.emails.push({ email: em, label });
+        break;
+      }
+      case "ORG": {
+        const orgParts = decoded.split(";");
+        const company = (orgParts[0] ?? "").trim();
+        contact.org = company || null;
+        break;
+      }
+      case "ADR": {
+        // POBox;Extended;Street;Locality;Region;PostalCode;Country
+        const ap = decoded.split(";").map((s) => s.trim());
+        const street = ap[2] ?? "";
+        const cityZip = [ap[3], ap[5]].filter(Boolean).join(" ");
+        const country = ap[6] ?? "";
+        const addr = [street, cityZip, country].filter(Boolean).join("\n");
+        if (addr) contact.addressLines.push(addr);
+        break;
+      }
+      case "BDAY": {
+        const m = decoded.match(/^(\d{4})-?(\d{2})-?(\d{2})/);
+        if (m) {
+          const y = parseInt(m[1]!, 10);
+          contact.birthYear = (y > 1700 && y < 2200) ? y : null;
+          contact.birthMonth = parseInt(m[2]!, 10) || null;
+          contact.birthDay = parseInt(m[3]!, 10) || null;
+        }
+        break;
+      }
+      case "CATEGORIES":
+        contact.categories = decoded.split(",").map((s) => s.trim()).filter(Boolean);
+        break;
+      case "NOTE":
+        contact.note = decoded.trim() || null;
+        break;
+      case "REV":
+        contact.rev = decoded.trim() || null;
+        break;
+      case "KIND":
+      case "X-ADDRESSBOOKSERVER-KIND": {
+        const k = decoded.toLowerCase().trim();
+        if (k === "group" || k === "individual" || k === "org") contact.kind = k;
+        break;
+      }
+      case "X-ADDRESSBOOKSERVER-MEMBER":
+      case "MEMBER": {
+        const m = decoded.match(/urn:uuid:(.+)$/i) ?? decoded.match(/^(.+)$/);
+        if (m) contact.groupMemberUids.push(m[1]!.trim());
+        break;
+      }
+    }
+  }
+
+  if (!contact.fn) {
+    contact.fn = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim();
+  }
+  if (!contact.fn && !contact.uid) return null;
+
+  return contact;
+}
+
+/**
+ * Serializace VCardContact → vCard 3.0 string.
+ * Pro PUT na iCloud CardDAV server. CRLF line endings (RFC 6350 spec).
+ */
+export function buildVCard(contact: VCardContact): string {
+  const lines: string[] = ["BEGIN:VCARD", "VERSION:3.0"];
+  if (contact.uid) lines.push(`UID:${contact.uid}`);
+  lines.push(`FN:${escapeValue(contact.fn)}`);
+  lines.push(`N:${escapeValue(contact.lastName)};${escapeValue(contact.firstName)};;;`);
+
+  if (contact.org) lines.push(`ORG:${escapeValue(contact.org)}`);
+
+  for (const p of contact.phones) {
+    const param = p.label ? `;TYPE=${vcardTypeFromLabel(p.label)}` : "";
+    lines.push(`TEL${param}:${escapeValue(p.number)}`);
+  }
+  for (const e of contact.emails) {
+    const param = e.label ? `;TYPE=${vcardTypeFromLabel(e.label)}` : "";
+    lines.push(`EMAIL${param}:${escapeValue(e.email)}`);
+  }
+
+  for (const addr of contact.addressLines) {
+    const ap = addr.split(/\n/).map((s) => s.trim());
+    const street = ap[0] ?? "";
+    const cityZipMatch = (ap[1] ?? "").match(/^(.+?)\s+(\d{3}\s?\d{2}|\d{4,6})\s*$/);
+    const city = cityZipMatch?.[1] ?? ap[1] ?? "";
+    const zip = cityZipMatch?.[2] ?? "";
+    const country = ap[2] ?? "";
+    lines.push(`ADR;TYPE=HOME:;;${escapeValue(street)};${escapeValue(city)};;${escapeValue(zip)};${escapeValue(country)}`);
+  }
+
+  if (contact.birthYear || contact.birthMonth || contact.birthDay) {
+    const y = contact.birthYear ?? 1604;
+    const m = String(contact.birthMonth ?? 1).padStart(2, "0");
+    const d = String(contact.birthDay ?? 1).padStart(2, "0");
+    lines.push(`BDAY:${y}-${m}-${d}`);
+  }
+
+  if (contact.categories.length > 0) {
+    lines.push(`CATEGORIES:${contact.categories.map(escapeValue).join(",")}`);
+  }
+
+  if (contact.note) lines.push(`NOTE:${escapeValue(contact.note)}`);
+
+  if (contact.kind === "group") {
+    lines.push("X-ADDRESSBOOKSERVER-KIND:group");
+    for (const uid of contact.groupMemberUids) {
+      lines.push(`X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:${uid}`);
+    }
+  }
+
+  lines.push(`REV:${new Date().toISOString().replace(/\.\d{3}/, "")}`);
+  lines.push("END:VCARD");
+  return lines.join("\r\n") + "\r\n";
+}
+
+function escapeValue(s: string | null | undefined): string {
+  if (!s) return "";
+  return String(s)
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function vcardTypeFromLabel(label: string): string {
+  const l = label.toLowerCase();
+  if (l === "mobile" || l === "cell" || l === "iphone") return "CELL";
+  if (l === "work") return "WORK";
+  if (l === "home") return "HOME";
+  if (l === "fax") return "FAX";
+  if (l === "other") return "OTHER";
+  return label.toUpperCase();
+}
