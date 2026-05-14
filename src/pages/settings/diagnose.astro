@@ -28,6 +28,32 @@ if (!user) return Astro.redirect("/login");
       </p>
     </div>
 
+    {/* Recovery akce — pro situace kdy nahrávky uvízly v error stavu z důvodu
+        starého MIME (před commitem 5340584). Petr 2026-05-14 hlásil. */}
+    <div class="glass rounded-xl p-5 space-y-3" style="--c: var(--tint-rose);">
+      <h2 class="font-serif text-lg flex items-center gap-2">
+        <span style="color: var(--c);">⚙</span> Záchranná akce
+      </h2>
+      <p class="text-sm text-muted-foreground leading-relaxed">
+        Pokud nahrávky ve Studánce uvízly v <code>status=error</code> s hláškou
+        <code>INVALID_ARGUMENT</code>, jde nejspíš o nestandardní MIME z iPhone
+        Voice Memos (<code>audio/x-m4a</code>). Tlačítko projde všechny failed
+        nahrávky, opraví MIME na <code>audio/mp4</code> a znovu je pošle ke
+        zpracování.
+      </p>
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          id="fix-mimes-btn"
+          class="px-4 py-2 rounded-md text-sm font-medium transition active:scale-[0.98]"
+          style="background: color-mix(in oklch, var(--tint-rose) 20%, transparent); color: var(--tint-rose); border: 1px solid color-mix(in oklch, var(--tint-rose) 35%, transparent);"
+        >
+          Opravit MIME a retry failed nahrávky
+        </button>
+        <span id="fix-mimes-status" class="text-xs font-mono text-muted-foreground"></span>
+      </div>
+      <div id="fix-mimes-result" class="hidden text-sm rounded-md border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs whitespace-pre-wrap"></div>
+    </div>
+
     <div id="diag-root" class="space-y-4">
       <div class="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
         Načítám…
@@ -174,5 +200,37 @@ if (!user) return Astro.redirect("/login");
 
     load();
     setInterval(load, 10000);
+
+    // Recovery handler — POST /api/studna/recordings/fix-mimes-and-retry
+    const fixBtn = document.getElementById("fix-mimes-btn");
+    const fixStatus = document.getElementById("fix-mimes-status");
+    const fixResult = document.getElementById("fix-mimes-result");
+    fixBtn?.addEventListener("click", async () => {
+      if (!confirm("Projít všechny error nahrávky, opravit MIME a spustit retry. Pokračovat?")) return;
+      fixBtn.setAttribute("disabled", "true");
+      fixBtn.style.opacity = "0.5";
+      fixStatus.textContent = "Běží…";
+      fixResult.classList.add("hidden");
+      try {
+        const res = await fetch("/api/studna/recordings/fix-mimes-and-retry", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          fixStatus.textContent = "Chyba";
+          fixResult.classList.remove("hidden");
+          fixResult.textContent = `Chyba: ${data.error ?? res.statusText}`;
+          return;
+        }
+        fixStatus.textContent = `Hotovo: ${data.retried}/${data.total} retry, ${data.mimeFixed} MIME opravený, ${data.skipped} přeskočených.`;
+        fixResult.classList.remove("hidden");
+        fixResult.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        fixStatus.textContent = "Síťová chyba";
+        fixResult.classList.remove("hidden");
+        fixResult.textContent = String(e);
+      } finally {
+        fixBtn.removeAttribute("disabled");
+        fixBtn.style.opacity = "1";
+      }
+    });
   </script>
 </Shell>
