@@ -621,13 +621,28 @@ PRAVIDLA:
 ${params.projectContext ? `Kontext projektu (pro lepší rozpoznání jmen/termínů): ${params.projectContext}\n` : ""}`;
 
   const start = Date.now();
-  const resp = await withRetry("UPLOAD transcribe", () =>
-    genai.models.generateContent({
-      model: DEFAULT_MODEL,
-      contents: [{ role: "user", parts: [audioPart as never, { text: prompt }] }],
-      config: { temperature: 0.1, maxOutputTokens: 65000 },
-    }),
-  );
+  const resp = await withRetry("UPLOAD transcribe", async () => {
+    try {
+      return await genai.models.generateContent({
+        model: DEFAULT_MODEL,
+        contents: [{ role: "user", parts: [audioPart as never, { text: prompt }] }],
+        config: { temperature: 0.1, maxOutputTokens: 65000 },
+      });
+    } catch (e) {
+      // Petr 2026-05-14: Gemini 400 INVALID_ARGUMENT pro Studanka UPLOAD
+      // (Apple m4a -> audio/x-m4a klient MIME). Wrap error s diagnostikou.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/INVALID_ARGUMENT|400/i.test(msg)) {
+        const sizeMb = (params.audio.byteLength / 1024 / 1024).toFixed(1);
+        throw new Error(
+          `Gemini nepřijal audio (${sizeMb} MB, mime "${params.mimeType}"). ` +
+          `Pravděpodobně neuznaný formát nebo poškozený soubor. Zkus exportovat ` +
+          `jako MP3 / WAV / standardní M4A. Detail: ${msg.slice(0, 200)}`,
+        );
+      }
+      throw e;
+    }
+  });
   void trackGeminiCall({
     module: "audio-upload-transcribe",
     response: resp,
