@@ -254,11 +254,14 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
         onSuccess={onRefresh}
       />
 
+      {/* Admin-only: nahrát hotový audio soubor (UPLOAD type).
+          Petr 2026-05-14 hlásil "na mobilu nevidim tlacitko nahrát audio" —
+          byl dole pod TextInputCard jako thin dashed button, ztrácel se.
+          Přesunuto NAD TextInput + solid card styling pro viditelnost. */}
+      <UploadAudioCard projectId={project.id} onSuccess={onRefresh} />
+
       {/* Admin-only: vložit hotový text (zápis schůzky) bez nahrávky */}
       <TextInputCard projectId={project.id} onSuccess={onRefresh} />
-
-      {/* Admin-only: nahrát hotový audio soubor (UPLOAD type) */}
-      <UploadAudioCard projectId={project.id} onSuccess={onRefresh} />
 
       {/* Zeptat se projektu — AI dotaz nad všemi záznamy */}
       <ProjectAskCard projectId={project.id} recordingsCount={project.recordings.filter((r) => r.status === "processed").length} />
@@ -1887,15 +1890,29 @@ function UploadAudioCard({ projectId, onSuccess }: { projectId: string; onSucces
   }
 
   if (!open) {
+    // 2026-05-14: Solid card místo thin dashed button — Petr na mobilu nevidi.
+    // Lavender tint, větší ikona, jasný popis. Card je hned pod rekordérem
+    // (přesunuto v StudnaDetail.tsx).
     return (
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full glass rounded-xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors"
-        style={{ ["--c" as string]: "var(--tint-lavender)", borderStyle: "dashed" }}
+        className="w-full glass rounded-xl p-4 flex items-center gap-3 text-left hover:bg-white/[0.04] transition-colors active:scale-[0.99]"
+        style={{ ["--c" as string]: "var(--tint-lavender)", borderColor: "color-mix(in oklch, var(--tint-lavender) 30%, transparent)" }}
       >
-        <Upload className="size-4 text-[var(--tint-lavender)]" />
-        Nahrát audio soubor (MP3/M4A/... — jen přepis, bez AI analýzy)
+        <div
+          className="size-10 rounded-lg grid place-items-center shrink-0"
+          style={{ background: "color-mix(in oklch, var(--tint-lavender) 20%, transparent)" }}
+        >
+          <Upload className="size-5 text-[var(--tint-lavender)]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm">Nahrát audio soubor</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            MP3 / M4A / WAV / podcast — jen přepis, bez AI analýzy
+          </div>
+        </div>
+        <span className="text-muted-foreground text-lg shrink-0">→</span>
       </button>
     );
   }
