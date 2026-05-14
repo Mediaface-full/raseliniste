@@ -8,7 +8,7 @@
  * vybírá v dropdownu.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, Loader2, AlertTriangle, Check } from "lucide-react";
 
 interface Project {
@@ -28,6 +28,15 @@ export default function OwnerUploadAudio({ projects }: Props) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  // Petr 2026-05-14: ?upload=1 v URL → auto-otevři kartu (vstupní bod ze /start).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("upload") === "1") {
+      setOpen(true);
+    }
+  }, []);
 
   async function uploadFile(file: File) {
     if (!selectedId) {

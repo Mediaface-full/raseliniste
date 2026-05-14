@@ -42,14 +42,18 @@ type Tile = {
 };
 
 const tiles: Tile[] = [
-  { href: "/dnes",                title: "Mise",      icon: "custom:mise-raketa",            tint: "sky" },
-  { href: "/ozvena?mode=journal", title: "Deník",     icon: "lucide:book-open",              tint: "butter" },
-  { href: "/ozvena?mode=task",    title: "Úkoly",     icon: "lucide:check-square",           tint: "peach" },
-  { href: "/studna/nahravka",     title: "Studánka",  icon: "lucide:waves",                  tint: "mint" },
-  { href: "/prskavka/nahravka",   title: "Prskavka",  icon: "lucide:sparkles",               tint: "rose" },
-  { href: "/zeptat-se",           title: "Zeptat se", icon: "lucide:message-circle-question", tint: "lavender" },
-  { href: "/zijes/novy",          title: "ŽIJEŠ?",    icon: "lucide:heart-pulse",            tint: "pink" },
-  { href: "/bwmys",               title: "Myši",      icon: "custom:bw-mys",                 tint: "sage" },
+  { href: "/dnes",                          title: "Mise",          icon: "custom:mise-raketa",            tint: "sky" },
+  { href: "/ozvena?mode=journal",           title: "Deník",         icon: "lucide:book-open",              tint: "butter" },
+  { href: "/ozvena?mode=task",              title: "Úkoly",         icon: "lucide:check-square",           tint: "peach" },
+  { href: "/studna/nahravka",               title: "Studánka",      icon: "lucide:waves",                  tint: "mint" },
+  // Petr 2026-05-14: na /start chybělo přímé tlačítko upload audio do studánky.
+  // ?upload=1 auto-otevře upload card hned po načtení (stejný pattern jako
+  // /ozvena?upload=1 pro úkoly+deník).
+  { href: "/studna/nahravka?upload=1",      title: "Nahrát audio",  icon: "lucide:upload",                 tint: "lavender" },
+  { href: "/prskavka/nahravka",             title: "Prskavka",      icon: "lucide:sparkles",               tint: "rose" },
+  { href: "/zeptat-se",                     title: "Zeptat se",     icon: "lucide:message-circle-question", tint: "sage" },
+  { href: "/zijes/novy",                    title: "ŽIJEŠ?",        icon: "lucide:heart-pulse",            tint: "pink" },
+  { href: "/bwmys",                         title: "Myši",          icon: "custom:bw-mys",                 tint: "sage" },
 ];
 
 const today = new Date();
