@@ -142,9 +142,24 @@ const prefillPhoneValue = normalizedPhone ?? rawPhone;
 
 // Min datum pro VIP date picker = dnes + 2 dny (Gideon potřebuje aspoň
 // 2 pracovní dny na vyřízení; "dnes" / "zítra" by často nestihl).
-const minDate = new Date();
-minDate.setDate(minDate.getDate() + 2);
-const minDateIso = minDate.toISOString().slice(0, 10);
+//
+// POZOR na timezone: server běží v UTC, klient v Europe/Prague.
+// `toISOString().slice(0,10)` vrátí UTC datum, ne Praha — v ranních hodinách
+// (00:00–02:00 Praha) by minDateIso byl o den menší než user vidí. Petr 2026-05-14
+// hlásil "VIP nemůže odeslat i když datum je za 2 dny" — možná tady.
+// Fix: počítáme Praha datum explicitně přes Intl.
+const pragueDateParts = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Europe/Prague",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).formatToParts(new Date());
+const py = Number(pragueDateParts.find((p) => p.type === "year")?.value);
+const pm = Number(pragueDateParts.find((p) => p.type === "month")?.value);
+const pd = Number(pragueDateParts.find((p) => p.type === "day")?.value);
+// new Date(y, m-1, d+2) — JS auto-přetočí pokud d+2 přesáhne počet dní v měsíci
+const minDateObj = new Date(py, pm - 1, pd + 2);
+const minDateIso = `${minDateObj.getFullYear()}-${String(minDateObj.getMonth() + 1).padStart(2, "0")}-${String(minDateObj.getDate()).padStart(2, "0")}`;
 
 // Vyber správnou sadu textů
 const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;

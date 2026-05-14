@@ -40,7 +40,14 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   let body: z.infer<typeof Body>;
   try {
     body = Body.parse(await request.json());
-  } catch {
+  } catch (e) {
+    // Petr 2026-05-14: VIP nemohli odeslat formulář, generic error neřekl proč.
+    // Vrátit konkrétní field detail (path + message) pro lepší UI feedback.
+    if (e instanceof z.ZodError) {
+      const detail = e.issues.map((i) => `${i.path.join(".") || "form"}: ${i.message}`).join("; ");
+      console.warn(`[call-log/submit] Zod fail: ${detail}`);
+      return Response.json({ error: `Formulář není kompletní: ${detail}` }, { status: 400 });
+    }
     return Response.json({ error: "Neplatná data ve formuláři." }, { status: 400 });
   }
 
@@ -85,17 +92,40 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   // Datum splnění je VIP-only privilegium. Pokud volající není VIP, ignoruj
   // (mohl by ho podsunout v requestu i když na ne-VIP variantě stránky pole není).
   // Min = dnes + 2 dny (Gideon potřebuje rezervu).
+  //
+  // 2026-05-14: Petr hlásil "VIP nemůže odeslat i když datum je za 2 dny".
+  // Příčina: silent skip pokud datum nevyhoví — submit pokračoval bez termínu.
+  // Fix: vrátit konkrétní 400 error. Plus Praha-aware comparison (server běží
+  // v UTC, "dnes+2" musí být v Petrově lokále).
   let requestedDueAt: Date | null = null;
   if (wasVip && body.dueDate) {
-    const parsed = new Date(`${body.dueDate}T00:00:00`);
-    if (!isNaN(parsed.getTime())) {
-      const now = new Date();
-      const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
-      const maxFuture = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate());
-      if (parsed >= minDate && parsed <= maxFuture) {
-        requestedDueAt = parsed;
-      }
+    // String compare YYYY-MM-DD oba v Praha lokál
+    const pragueParts = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Europe/Prague",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const py = Number(pragueParts.find((p) => p.type === "year")?.value);
+    const pm = Number(pragueParts.find((p) => p.type === "month")?.value);
+    const pd = Number(pragueParts.find((p) => p.type === "day")?.value);
+    const minObj = new Date(py, pm - 1, pd + 2);
+    const minIso = `${minObj.getFullYear()}-${String(minObj.getMonth() + 1).padStart(2, "0")}-${String(minObj.getDate()).padStart(2, "0")}`;
+    const maxObj = new Date(py + 2, pm - 1, pd);
+    const maxIso = `${maxObj.getFullYear()}-${String(maxObj.getMonth() + 1).padStart(2, "0")}-${String(maxObj.getDate()).padStart(2, "0")}`;
+
+    if (body.dueDate < minIso) {
+      return Response.json(
+        { error: `Termín musí být nejdřív ${minIso} (dnes + 2 dny). Vybrali jste ${body.dueDate}.` },
+        { status: 400 },
+      );
     }
+    if (body.dueDate > maxIso) {
+      return Response.json(
+        { error: `Termín nesmí být dál než 2 roky (max ${maxIso}).` },
+        { status: 400 },
+      );
+    }
+    // Parse jako Praha lokál — uložíme jako Date object s Praha půlnoci
+    requestedDueAt = new Date(`${body.dueDate}T00:00:00+02:00`); // CEST default, JS si přepočítá DST sám
   }
 
   // Vytvoř CallLog (snapshot)
