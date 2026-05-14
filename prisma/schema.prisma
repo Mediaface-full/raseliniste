@@ -112,6 +112,7 @@ model User {
 
   detectedCommitments DetectedCommitment[]
   schedulingConfig    SchedulingConfig?
+  contactGroups       ContactGroup[]
 }
 
 /// Booking scheduling config — 1 řádek per user, editovatelné z /calendar/settings.
@@ -420,6 +421,27 @@ model Contact {
   googlePhotoUrl      String?
   lastGoogleSyncAt    DateTime?
 
+  // iCloud CardDAV sync (2026-05-14, kontakty_brief.md fáze 1).
+  // iCloud je primární zdroj pravdy pro core fields (jméno, telefony, emaily,
+  // adresa, narozeniny, skupiny, firma). Rašeliniště drží jako overlay
+  // navíc isVip/aliases/clientTag/callLogToken/isTeam/... — ty iCloud nevidí.
+  icloudUid          String?        @unique  // UID z vCard (stabilní napříč syncy)
+  icloudEtag         String?                  // ETag pro optimistic concurrency PUT
+  icloudHref         String?                  // CardDAV path pro PUT/DELETE
+  lastIcloudSyncAt   DateTime?
+
+  // Core fields rozšířené pro plný kontakt model (vCard 3.0 kompatibilita)
+  company            String?                  // ORG vCard field
+  addressLines       String[]       @default([]) // ADR vCard (víceřádková adresa)
+  birthYear          Int?                      // úplné datum (kromě birthMonth/birthDay)
+  // Apple skupiny — denormalizace na kontaktu (názvy skupin čárkou oddělené
+  // ve vCard přes X-ABLabel nebo CATEGORIES). Pro UI tabulky stačí pole jmen.
+  // Authoritative source ale je ContactGroup s seznamem členů — kontaktní
+  // pole se generuje při syncu.
+  groups             String[]       @default([])
+  // Provenience záznamu: "icloud" | "google" | "manual"
+  syncSource         String?
+
   phones       Phone[]
   emails       ContactEmail[]
   callLogs     CallLog[]
@@ -434,6 +456,35 @@ model Contact {
   @@index([userId, birthMonth, birthDay])
   @@index([userId, isClient])
   @@index([userId, isFriend])
+  @@index([userId, icloudUid])
+}
+
+/// Apple iCloud skupiny — v CardDAV jsou skupiny samostatné vCardy s typem
+/// `group` a seznamem členských UID. Aplikace to abstrahuje (uživatel vidí
+/// čárkou oddělený seznam v Contact.groups), ale autoritativní zdroj je
+/// tahle tabulka. Při uložení změny aplikace spočte diff a updatuje
+/// příslušné skupinové vCardy na iCloud serveru.
+///
+/// Petr 2026-05-14 (kontakty_brief.md sekce 4, 7).
+model ContactGroup {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String                            // canonical jméno (case-insensitive unique)
+  memberUids  String[]      @default([])        // UIDs z Contact.icloudUid
+
+  // iCloud CardDAV sync
+  icloudUid   String?       @unique
+  icloudEtag  String?
+  icloudHref  String?
+  lastIcloudSyncAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 enum BookingMode {
