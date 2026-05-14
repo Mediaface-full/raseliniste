@@ -1,6 +1,7 @@
 ---
 import Shell from "../../layouts/Shell.astro";
 import OwnerRecorder from "../../components/OwnerRecorder";
+import OwnerUploadAudio from "../../components/OwnerUploadAudio";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 
@@ -26,10 +27,16 @@ const projects = await prisma.projectBox.findMany({
   heading="Nahrávka"
   breadcrumb={[{ label: "Studánka", href: "/studna" }, { label: "Nahrávka" }]}
 >
-  <div class="max-w-md mx-auto">
+  <div class="max-w-md mx-auto space-y-3">
     <OwnerRecorder
       client:load
       ownerName={user.username}
+      projects={projects}
+    />
+    {/* Petr 2026-05-14: na /studna/nahravka (link ze /start "Studánka") chyběl
+        upload audio souboru — měl jen rekordér. Přidáno pod rekordér. */}
+    <OwnerUploadAudio
+      client:load
       projects={projects}
     />
   </div>
