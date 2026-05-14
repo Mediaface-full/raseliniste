@@ -274,6 +274,33 @@ function tryRepairJson(raw: string): string | null {
 // Base64 inflation +33 %, takže 14 MB raw = ~19 MB v requestu — bezpečný strop.
 const INLINE_AUDIO_LIMIT_BYTES = 14 * 1024 * 1024;
 
+/**
+ * Detekce nezachranitelného audio (0 bytes nebo příliš krátký buffer).
+ * Vola se na začátku transcribe funkcí — pokud detekce projde, hodíme
+ * specifický error místo aby Gemini vrátil opaque INVALID_ARGUMENT.
+ *
+ * Petr 2026-05-14: host záznamy s prázdným audio (cleanup-audio cron smazal
+ * soubor, klient nahrál 0-byte blob, atd.) padaly na Gemini 400.
+ */
+function assertAudioNotEmpty(audio: Buffer, mimeType: string): void {
+  if (audio.byteLength === 0) {
+    throw new Error(
+      `Audio je prázdné (0 bytes, mime "${mimeType}"). Soubor pravděpodobně ` +
+      `zmizel z disku (cleanup-audio cron po 14 dnech), nebo se klient ` +
+      `nepodařil nahrát žádná data. Nahrávku nelze obnovit — smaž ji a ` +
+      `pokud možno požádej hosta o novou.`,
+    );
+  }
+  // Příliš krátký buffer (méně než 1 KB) je téměř jistě chyba (audio header
+  // sám má ~200-500 B, ale reálná nahrávka i 1s je aspoň pár KB).
+  if (audio.byteLength < 1024) {
+    throw new Error(
+      `Audio je podezřele krátké (${audio.byteLength} B, mime "${mimeType}"). ` +
+      `Pravděpodobně se nahrávka přerušila hned na začátku. Nelze ji přepsat.`,
+    );
+  }
+}
+
 export async function transcribeAudio(params: {
   audio: Buffer;
   mimeType: string;
@@ -291,6 +318,7 @@ export async function transcribeAudio(params: {
   // použije se default: BRIEF=Pro, STANDARD=Flash.
   analysisModelOverride?: string | null;
 }): Promise<TranscribeResult> {
+  assertAudioNotEmpty(params.audio, params.mimeType);
   const isBrief = params.recordingType === "BRIEF";
   const model = (params.analysisModelOverride && params.analysisModelOverride.trim().length > 0)
     ? params.analysisModelOverride.trim()
@@ -581,6 +609,7 @@ export async function transcribeAudioOnly(params: {
   /** Volitelný kontext projektu — Gemini ho použije pro lepší rozpoznání jmen/termínů. */
   projectContext?: string | null;
 }): Promise<{ transcript: string; model: string }> {
+  assertAudioNotEmpty(params.audio, params.mimeType);
   const fitsInline = params.audio.byteLength <= INLINE_AUDIO_LIMIT_BYTES;
   const mode = getGeminiMode();
   let genai = getGemini();

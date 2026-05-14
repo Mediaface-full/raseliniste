@@ -49,6 +49,14 @@ if (!user) return Astro.redirect("/login");
         >
           Opravit MIME a retry failed nahrávky
         </button>
+        <button
+          id="delete-empty-btn"
+          class="px-4 py-2 rounded-md text-sm font-medium transition active:scale-[0.98]"
+          style="background: color-mix(in oklch, var(--tint-rose) 12%, transparent); color: var(--muted-foreground); border: 1px solid color-mix(in oklch, var(--tint-rose) 25%, transparent);"
+          title="Smaže nahrávky kde audio chybí na disku nebo má 0 bytes — nelze je obnovit"
+        >
+          Smazat nezachranitelné (prázdné audio)
+        </button>
         <span id="fix-mimes-status" class="text-xs font-mono text-muted-foreground"></span>
       </div>
       <div id="fix-mimes-result" class="hidden text-sm rounded-md border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs whitespace-pre-wrap"></div>
@@ -230,6 +238,36 @@ if (!user) return Astro.redirect("/login");
       } finally {
         fixBtn.removeAttribute("disabled");
         fixBtn.style.opacity = "1";
+      }
+    });
+
+    // Delete nezachranitelne handler
+    const delBtn = document.getElementById("delete-empty-btn");
+    delBtn?.addEventListener("click", async () => {
+      if (!confirm("Smazat všechny nahrávky kde audio chybí nebo má 0 bytes. Tyto nelze obnovit. Pokračovat?")) return;
+      delBtn.setAttribute("disabled", "true");
+      delBtn.style.opacity = "0.5";
+      fixStatus.textContent = "Mažu prázdné…";
+      fixResult.classList.add("hidden");
+      try {
+        const res = await fetch("/api/studna/recordings/delete-empty-audio", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          fixStatus.textContent = "Chyba";
+          fixResult.classList.remove("hidden");
+          fixResult.textContent = `Chyba: ${data.error ?? res.statusText}`;
+          return;
+        }
+        fixStatus.textContent = `Smazáno ${data.deleted} ze ${data.scanned} error nahrávek (nezachranitelné).`;
+        fixResult.classList.remove("hidden");
+        fixResult.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        fixStatus.textContent = "Síťová chyba";
+        fixResult.classList.remove("hidden");
+        fixResult.textContent = String(e);
+      } finally {
+        delBtn.removeAttribute("disabled");
+        delBtn.style.opacity = "1";
       }
     });
   </script>
