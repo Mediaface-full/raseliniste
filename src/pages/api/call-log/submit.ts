@@ -124,8 +124,15 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         { status: 400 },
       );
     }
-    // Parse jako Praha lokál — uložíme jako Date object s Praha půlnoci
-    requestedDueAt = new Date(`${body.dueDate}T00:00:00+02:00`); // CEST default, JS si přepočítá DST sám
+    // Parse jako Praha 12:00 (poledne) — ukládáme do DB jako Date object.
+    // POZOR: NESMÍME použít půlnoc s pevným +02:00 offset, protože:
+    //   1. JS Date.toISOString() pak vrátí 22:00 UTC předchozího dne →
+    //      Todoist by dostal `due_date` o den dřív (bug před 2026-05-14).
+    //   2. +02:00 platí jen v CEST, v zimním CET je +01:00. Pevný offset
+    //      by způsobil DST off-by-one 2× ročně.
+    // Poledne (12:00) Praha = 10:00 UTC v létě, 11:00 UTC v zimě — vždy
+    // stejný kalendářní den v UTC i Praze.
+    requestedDueAt = new Date(`${body.dueDate}T12:00:00`);
   }
 
   // Vytvoř CallLog (snapshot)
@@ -179,7 +186,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         "",
         `Číslo: ${prettyPhone}`,
         contact ? `Kontakt: ${contact.displayName}${wasVip ? " (VIP)" : ""}` : "Neznámé číslo",
-        requestedDueAt ? `📅 **Termín požadovaný od VIP:** ${requestedDueAt.toLocaleDateString("cs-CZ")}` : "",
+        requestedDueAt ? `📅 **Termín požadovaný od VIP:** ${requestedDueAt.toLocaleDateString("cs-CZ", { timeZone: "Europe/Prague" })}` : "",
         body.isUrgent ? "⚠️ Označeno jako **urgentní**" : "",
         `Přijato: ${new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague" })}`,
         `Firewall: https://www.raseliniste.cz/firewall`,
@@ -188,13 +195,18 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         .join("\n");
 
       // Termín:
-      //   1. VIP zadal konkrétní datum  → due_date YYYY-MM-DD
+      //   1. VIP zadal konkrétní datum  → due_date YYYY-MM-DD (z body.dueDate
+      //      přímo — NESMÍME jít přes requestedDueAt.toISOString().slice(0,10),
+      //      to by posunulo o den kvůli UTC vs Praha)
       //   2. URGENT bez data            → due_string "today" (urgent = chce dnes)
       //   3. VIP bez termínu / ostatní  → bez termínu (Petr ho zařadí sám,
       //      jinak by se mu Today zaplnilo všemi VIP úkoly)
+      //
+      //   Pokud VIP zadal datum I urgent: priorita má datum (pravidlo 1).
+      //   Server preferuje konkrétní termín nad obecným "today".
       const dueArgs: { due_date?: string; due_string?: string } = {};
-      if (requestedDueAt) {
-        dueArgs.due_date = requestedDueAt.toISOString().slice(0, 10);
+      if (requestedDueAt && body.dueDate) {
+        dueArgs.due_date = body.dueDate; // YYYY-MM-DD z Zod validation, již ověřeno
       } else if (body.isUrgent) {
         dueArgs.due_string = "today";
       }
