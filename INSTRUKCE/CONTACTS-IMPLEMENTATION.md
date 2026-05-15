@@ -1,221 +1,257 @@
-# Kontakty — implementace iCloud sync + tabulkový editor
+# Kontakty modul — kompletní implementace (kontakty_brief.md)
 
-> Stav 2026-05-15: **Fáze 1 HOTOVÁ.** Tabulková editace + iCloud CardDAV sync
-> (pull + push + match) + skupiny + validační filtry.
->
-> Budoucí fáze (Petrovo briefu `kontakty_brief.md`): duplicity detect/merge,
-> Find & Replace, normalizace +420, import VCF/CSV, Google Workspace sync.
+Stav: **2026-05-15 — VŠECH 8 FÁZÍ HOTOVÝCH** ✅
 
-## TL;DR
-
-Petr má v `kontakty_brief.md` 14 sekcí — postavili jsme **fundamentální vrstvu**:
-
-1. iCloud kontakty se stahují do Rašeliniště DB (CardDAV)
-2. Tabulkový editor s single-click edit, pagination, search, validační filtry
-3. Změny se ukládají do DB + jednotlivě pushují zpět na iCloud
-4. Apple skupiny se synchronizují jako `ContactGroup` + denormalizace na `Contact.groups[]`
-5. **Overlay model** — Rašeliniště drží `isVip` / `aliases` / `clientTag` / `callLogToken` / `isTeam` / `clientTagAliases`; tyto pole iCloud nevidí, sync je nepřepisuje
+Brief: `kontakty_brief.md` v rootu repo.
 
 ## Architektura
 
 ```
-                ┌──────────────┐
-                │   iCloud     │  CardDAV (https://contacts.icloud.com)
-                │   Contacts   │
-                └──────┬───────┘
-                       │ Basic Auth (Apple ID + app password
-                       │   sdílený s icloud-calendar.ts)
-                       │
-                ┌──────▼───────────────────┐
-                │  src/lib/carddav.ts      │  discovery + LIST + REPORT + PUT + DELETE
-                └──────┬───────────────────┘
-                       │
-                ┌──────▼───────────────────┐
-                │  src/lib/vcard.ts        │  parseVCardFull + buildVCard (3.0 subset)
-                └──────┬───────────────────┘
-                       │
-                ┌──────▼───────────────────┐
-                │  src/lib/icloud-contacts.ts │  pull/push/match logic
-                └──────┬───────────────────┘
-                       │
-        ┌──────────────┼──────────────┐
-        │              │              │
-   ┌────▼────┐   ┌─────▼─────┐   ┌────▼─────────┐
-   │ Contact │   │ContactGroup│  │UserIntegration│
-   │  (DB)   │   │   (DB)    │   │ provider=icloud│
-   └────┬────┘   └─────┬─────┘   └────────────────┘
-        │              │
-        │              └── memberUids[] → denormalizace na Contact.groups[]
-        │
-        └── overlay pole (isVip, aliases, clientTag, …) — Rašeliniště only
+[iCloud Contacts]              [Google Workspace]
+        ↑↓                              ↑↓
+   CardDAV (Apple)               People API (REST)
+        ↑↓                              ↑↓
+[carddav.ts] [vcard.ts]   [google-contacts-sync.ts]
+        ↑↓                              ↑↓
+[icloud-contacts.ts]                  ↑↓
+        ↑↓                              ↑↓
+   [Prisma DB — Contact, ContactGroup, ContactBackup, ContactEmail, Phone]
+        ↑↓
+   [API /api/contacts/* — REST endpointy]
+        ↑↓
+   [/contacts/tabulka — ContactsTable + ContactsTools + ContactsNewsBanner]
 ```
 
-## Datový model (Prisma)
+**Overlay model:** iCloud drží core fields (jméno, telefony, emaily, adresa,
+narozeniny, firma, skupiny). Rašeliniště drží **overlay** (isVip, aliases,
+clientTag, callLogToken, isTeam, ...) — sync se ho **netýká**.
 
-### Contact (rozšířeno migrací `20260514210000_icloud_contacts`)
+## Schema (Prisma)
 
-Nová iCloud pole:
-- `icloudUid` (unique) — vCard UID, stabilní napříč syncy
-- `icloudEtag` — `If-Match` header při PUT (RFC 6352 optimistic concurrency)
-- `icloudHref` — CardDAV path pro PUT/DELETE
-- `lastIcloudSyncAt` — diagnostika
-- `company` — ORG vCard field
-- `addressLines: String[]` — multi-line adresa (sloučená z ADR komponent)
-- `birthYear` — úplné datum (kromě birthMonth/Day které už byly)
-- `groups: String[]` — denormalizace pro UI tabulky
-- `syncSource` — `"icloud"` | `"google"` | `"manual"`
+### Rozšíření modelu Contact
 
-Indexy:
-- `@@index([userId, icloudUid])` — rychlý re-sync lookup
+```prisma
+// iCloud CardDAV sync
+icloudUid          String?   @unique
+icloudEtag         String?
+icloudHref         String?
+lastIcloudSyncAt   DateTime?
 
-### ContactGroup (nová tabulka)
-
-Apple skupiny v CardDAV jsou samostatné vCardy s `KIND:group` + `X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:<UID>`.
-
-- `name` + `userId` unique
-- `memberUids: String[]` — UIDs členů (= Contact.icloudUid)
-- `icloudUid/Etag/Href` — sync state
-
-### UserIntegration provider="icloud" (sdílený s kalendářem)
-
-Existující row z `icloud-calendar.ts` poskytuje credentials. Kontakty si nedotazují nové připojení — config field získá nová pole:
-- `contactsAddressbookUrl` — cache po discovery
-- `appleId` (existující) — Apple email
-- (tokenEnc/Iv/Tag = app password, šifrované)
-
-## Sync logika
-
-### Pull (`pullIcloudContacts(userId)`)
-
-```
-1. getIcloudCredentials(userId) — credentials z provider=icloud
-2. Cache addressbook URL (po prvním discovery)
-3. listAddressbookItems() — PROPFIND Depth:1 → seznam {href, etag}
-4. fetchAddressbookItems() — REPORT addressbook-multiget, chunk 100
-5. parseVCardFull() — pro každou vCard
-6. Pro každý parsed contact:
-   a. Match podle icloudUid → re-sync (replace phones/emails)
-   b. Match podle telefonu/emailu → first match (UNION, zachovat lokální)
-   c. Žádný match → CREATE nový Contact
-7. Pro každou parsed skupinu → upsert ContactGroup
-8. refreshContactGroupsField — denormalizuj memberUids → Contact.groups
-9. Update UserIntegration.lastUsedAt
+// Core fields rozšířené pro plný kontakt model (vCard 3.0)
+company            String?
+addressLines       String[]  @default([])
+birthYear          Int?
+groups             String[]  @default([])
+syncSource         String?   // "icloud" | "google" | "manual" | "restore"
 ```
 
-**Kritické pro návaznosti**: `replacePhonesAndEmails` (re-sync) maže lokální
-telefony/emaily. `mergePhonesAndEmails` (first match) zachovává lokální. Bez
-tohohle by VIPka lookup, callLog, smart routing, Things imported telefony
-zmizely při prvním sync.
+### Nové modely
 
-### Push (`pushContactToIcloud(userId, contactId)`)
+- **`ContactGroup`** — Apple skupiny jako samostatné vCardy (`KIND:group`
+  + `X-ADDRESSBOOKSERVER-MEMBER`)
+- **`ContactBackup`** — automatické zálohy vCard 3.0 snapshot před PUT/DELETE/merge
 
+### Migrace
+
+| Migrace | Co dělá |
+|---|---|
+| `20260514210000_icloud_contacts` | Contact iCloud sloupce + ContactGroup |
+| `20260515110000_contact_backups` | ContactBackup tabulka |
+| `20260515120000_contacts_baseline` | User.contactsSeenBaselineAt |
+
+## Fáze 1 — iCloud CardDAV sync (commits `175e2fd` … `74b3c27`)
+
+**Soubory:**
+- `src/lib/vcard.ts` — parser/serializer vCard 3.0 (`parseVCardFull`, `buildVCard`)
+- `src/lib/carddav.ts` — CardDAV klient (discoverAddressbook, list, multiget, putVCard, deleteVCard, testConnection)
+- `src/lib/icloud-contacts.ts` — high-level sync (pullIcloudContacts, pushContactToIcloud)
+
+**Match strategie (A):**
+1. `icloudUid` match (re-sync)
+2. Telefon/email exact match (první sync — Petr má Contact z Things/Google/manual)
+3. Jinak vytvoř nový
+
+**Overlay pole se nepřepisují.**
+
+**Apple kvirky řešené:**
+- Default XML namespace `xmlns="DAV:"` bez prefixu (regex tolerantní `(?:\w+:)?`)
+- Redirect na `p<DC>-contacts.icloud.com` po Basic Auth — update baseHost
+- Credentials sdílené s kalendářem (`provider="icloud"` row)
+
+## Fáze 2 — Duplicity detect + merge (commit `b840750`)
+
+**Soubor:** `src/lib/contacts-duplicates.ts`
+
+- **Union-find clustering** podle jména (case-insens), telefonu (posledních 9 číslic), emailu (lowercase)
+- **Merge logika:**
+  - Primary zachová ID, icloudUid, overlay pole
+  - Skalární doplnění z prvního non-empty secondary
+  - Telefony/emaily/skupiny: union (dedup)
+  - Overlay (isVip/isTeam/isClient/...): true sekundárního propaguje
+  - Aliases + clientTagAliases: union
+  - Re-link vazeb (CallLog, BookingInvite, Task assignee)
+  - Auto-backup secondary před delete
+- **API:** `GET /api/contacts/duplicates` (clusters) + `POST` (merge)
+- **UI:** `ContactsDuplicates.tsx` (radio buttons primárka + expand/collapse)
+
+## Fáze 3 — Find & Replace + Normalizace +420 (commit `b840750`)
+
+**Soubor:** `src/lib/contacts-tools.ts`
+
+**Find & Replace:**
+- Sloupce: displayName / firstName / lastName / company / note / phones / emails
+- Regex + case-sensitive volby
+- Preview (top 20) + apply flow
+
+**Normalizace +420:**
+- Skip `+` nebo `00` (mezinárodní)
+- 9-místné CZ rozsahy: mobile `60[1-8]`, `70[2-9]`, `72-77x`, `79x`; pevné `2x`, `3[1-9]`, `38x`, `4x`, `5x`
+- 🟢 high confidence (CZ-likely, default checked) / 🟡 ambiguous (default unchecked)
+- Format: `+420 XXX XXX XXX`
+
+**API:** `POST /api/contacts/find-replace`, `GET/POST /api/contacts/normalize-phones`
+
+## Fáze 4 — Import/Export VCF/CSV (commit `8cf63f2`)
+
+**Import** (`src/lib/contacts-import.ts`):
+- **VCF**: parse BEGIN:VCARD/END:VCARD bloky přes `parseVCardFull`
+- **CSV**: sniffer separator (`;` / `,`), mapování českých+anglických hlaviček
+- **Collision detect**: phone (posledních 9) / email exact match
+- Preview vs apply flow, overwrite checkbox
+- **API:** `POST /api/contacts/import-vcf-csv` (multipart, max 10 MB)
+
+**Export** (`src/lib/contacts-export.ts`):
+- Formáty: **VCF** (vCard 3.0 přes `buildVCard`) nebo **CSV** (UTF-8 BOM, středník, Excel-friendly)
+- Scope: vše / `company:X` / `group:Y`
+- **Firemní mode**: jen 7 polí (Jméno, Příjmení, Firma, Telefon mobile prefer, Druhý telefon, Narozeniny, E-mail primary)
+- Filename: `kontakty_<scope>[_firemni]_<datum>.<ext>`
+- **API:** `GET /api/contacts/export?format=&scope=&firemni=`
+
+## Fáze 5 — Backup + Restore (commit `8cf63f2`)
+
+**Soubor:** `src/lib/contacts-backup.ts`
+
+**Auto-zálohy** před každým:
+- `before_put` — PUT do iCloudu (push)
+- `before_delete` — DELETE z DB (single + bulk)
+- `before_merge` — sekundární kontakt v duplicit merge
+
+**Cleanup:** drží 500 záloh per user, UI listuje 80.
+
+**Restore:** parse vCard ze zálohy → update existující (po contactId match) nebo create nový. Phones/emails reset.
+
+**API:** `GET /api/contacts/backups` (list) + `POST` (restore)
+
+## Fáze 6 — Google Workspace (commit `6eb985c`)
+
+**Soubor:** `src/lib/google-contacts-sync.ts`
+
+**OAuth scope rozšířen:** `contacts.readonly` → `contacts` (read+write). Reauth banner v `/settings/integrations/google` při prvním použití.
+
+**Funkce:**
+1. **Push iCloud → Google** (`syncIcloudToGoogle`):
+   - 3-úrovňové párování: `googleResourceName` → FN+(tel|email) → tel
+   - Pro každý Rašeliniště kontakt: match (update) nebo create
+   - Etag-based concurrency (If-Match)
+   - Throttle 120ms (~8 req/s)
+
+2. **Cleanup duplicit** v Googlu (`cleanupGoogleDuplicates`):
+   - Union-find přes phone/email/name
+   - Keep preference: match s `Contact.googleResourceName`, jinak nejmenší
+   - Bulk delete non-keep
+
+3. **Pull-back** (`pullBackFromGoogle`):
+   - Kontakty co existují jen v Googlu (žádný overlap se naším DB)
+   - syncSource=`google`, importedFrom=`google`
+
+**API:**
+- `POST /api/contacts/google/sync` (scope volitelný)
+- `GET/POST /api/contacts/google/cleanup`
+- `GET/POST /api/contacts/google/pullback`
+
+## Fáze 7 — Banner novinek + bulk + skupiny + delete (commit `6eb985c`)
+
+**Banner „Nově přidané z mobilu":**
+- `User.contactsSeenBaselineAt` — timestamp posledního „mark prohlédnuto"
+- Filter: `createdAt > baseline AND syncSource=icloud`
+- API: `GET /api/contacts/news`, `POST` (mark seen)
+- UI: `ContactsNewsBanner.tsx`
+
+**Bulk akce** (`POST /api/contacts/bulk`):
+- `delete` — auto-backup pak deleteMany
+- `add-group` / `remove-group` — pro každého: groups union/diff
+- Max 500 IDs per call
+
+**Skupiny CRUD** (`/api/contacts/groups`):
+- GET — list s počty členů
+- POST — vytvoří (case-ins dedup)
+- DELETE — smaže + odstraní z Contact.groups u všech členů
+
+**DELETE /api/contacts/:id** rozšířen o auto-backup.
+
+## Fáze 8 — UI integrace (commit `02edce9`)
+
+**`ContactsTools.tsx`** — accordion s 8 sekcemi:
+- A) Validace (počty kategorií)
+- B) Duplicity v iCloudu (mountuje ContactsDuplicates)
+- C) Find & Replace
+- D) Normalizace +420
+- E) Import VCF/CSV
+- F) Obnova ze zálohy (80 záznamů)
+- G) Google Workspace (push + cleanup + pull-back)
+- H) Export VCF/CSV (scope + format + firemní)
+
+**`/contacts/tabulka.astro`:**
 ```
-1. Načti Contact + phones + emails
-2. Pokud nemá icloudUid → vygeneruj crypto.randomUUID()
-3. buildVCard() → vCard 3.0 text
-4. PUT na addressbook URL/<UID>.vcf s If-Match: <etag>
-5. Pokud 412 → cizí změna, klient musí refetch
-6. Po úspěchu update icloudEtag, icloudHref, lastIcloudSyncAt
+[Banner novinek] (ContactsNewsBanner)
+[Hero header + tabulka] (ContactsTable)
+[Nástroje] (ContactsTools)
 ```
 
-## API endpointy
+**Sidebar:** „Kontakty — tabulka" (`lucide:table-2`, lavender)
 
-| Endpoint | Metoda | Účel |
-|---|---|---|
-| `/api/contacts/icloud/sync` | POST | Plný pull z iCloudu |
-| `/api/contacts/icloud/push` | POST `{contactId}` | Push single contact |
-| `/api/contacts/icloud/test` | POST | Test connection + count |
-| `/api/contacts/tabulka` | GET `?page&pageSize&q&validation` | List s pagination + filtry |
-| `/api/contacts/tabulka` | PATCH `{changes: [...]}` | Bulk save dirty rows |
+**Settings:** `/settings/integrations/icloud` má sekci „Kontakty" (IcloudContactsSection) s Test connection + Stáhnout z iCloudu
 
-## UI
+## Klíčová rozhodnutí (zachovat při dalších iteracích)
 
-### `/contacts/tabulka` (Astro page + ContactsTable.tsx React island)
+1. **Overlay model** — iCloud core / Rašeliniště overlay. Sync se overlay nedotýká.
+2. **PIN gate vyhozený** — JWT cookie auth stačí (single-user).
+3. **Match (A)** — phone/email exact match při prvním sync, zbytek založí jako nový. Duplicity řeší F2 UI.
+4. **Žádné npm závislosti** pro vCard/CardDAV — vlastní implementace.
+5. **iCloud = source of truth** pro core fields. Při sync phones/emails se v DB **přepisují** na iCloud verzi.
+6. **Google = mirror** — push iCloud→Google s 3-úrovňovým párováním proti duplicitám.
 
-**Hero hlavička:**
-- Počet kontaktů + dirty counter
-- iCloud status pill (🟢 / ⚠ s linkem na settings)
-- Tlačítko **„Synchronizovat s iCloudem"**
-- Tlačítko **„Uložit (N)"** — bulk save dirty
+## Commity (chronologicky)
 
-**Chip seznam skupin** (sekce 5.7 briefu):
-- Pastel chips s počtem členů
-- Klik = filter
+| commit | obsah |
+|---|---|
+| `175e2fd` | Schema F1.1 |
+| `a9f12de` | vCard + CardDAV + iCloud sync F1.2 |
+| `0e6db19` | Settings UI + API endpoints F1.3-4 |
+| `bd6acc7` | ContactsTable F1.5-8 |
+| `a898cc5` | F2 duplicity lib+API (WIP) |
+| `c38647c` | CardDAV discovery fix (Apple) |
+| `fcd18c9` | IcloudContactsSection v /settings/integrations/icloud |
+| `74b3c27` | CardDAV XML namespace fix (Apple default DAV:) |
+| `b840750` | F2 UI + F3 lib+API |
+| `8cf63f2` | F4 + F5 |
+| `6eb985c` | F6 + F7 |
+| `02edce9` | F8 UI integrace |
 
-**Toolbar:**
-- Fulltext search (debounced 300ms)
-- Validační filtr dropdown
-- Page size 10/25/50/100/200
+## Známé omezení
 
-**Tabulka:**
-- Sloupce: Jméno, Příjmení, Firma, Telefon, Telefon 2, Email, Skupiny, Narozeniny, Flag (VIP/TÝM/K), Push
-- Single-click vstup do edit modu
-- Enter potvrdí, Escape zruší
-- Dirty řádky tinted rose
-- Per-row push tlačítko (cloud upload icon)
+- **Drafts JSON soubor** (brief 5.6) — neimplementováno, dirty stav je v paměti komponenty.
+- **80 záloh v UI** vs `TOTAL_KEEP = 500` v DB — UI list je limit, DB drží víc.
+- **Google scope reauth** — Petr musí ručně reauth Google integration při prvním F6 push.
 
-**Sidebar entry:** „Kontakty — tabulka" pod existujícím „Kontakty".
+## Test postup po deploy
 
-## Návaznosti (důležité, nesmí se rozsypat)
-
-| Modul | Závislost | Riziko po sync | Mitigace |
-|---|---|---|---|
-| VIPka `/call-log` | Phone.number exact match | Telefon zmizí | Union při first match |
-| CallLog history | Contact.id | Žádné — Contact stays | OK |
-| Smart routing (Todoist) | Contact.clientTag + aliases | clientTag/aliases overlay | Sync je nepřepisuje |
-| BookingInvite | Contact.id | OK | — |
-| Letter recipients | Contact.id | OK | — |
-| Tasks (assignedTo) | Contact.id | OK | — |
-
-**Co se v existujícím kódu nezměnilo:**
-- `Contact.isVip`, `isClient`, `isFriend`, `isFamily`, `isTeam`, `clientTag`, `aliases`, `clientTagAliases`, `callLogToken`, `customGreeting`, `birthdayReminderDaysBefore`, `birthdayReminderChannels`, `note`, `defaultBookingMode`, `googleResourceName`, `lastGoogleSyncAt`, `importedFrom`, `externalId` — všechno overlay, sync je nečte ani nepíše.
-
-## Bezpečnost
-
-- **Auth**: HTTP Basic (Apple ID + app password). App password šifrovaný v `UserIntegration.tokenEnc` (AES-256-GCM).
-- **Concurrency**: PUT s `If-Match: <etag>` → 412 pokud někdo upravil z jiného zařízení. Klient musí refetch.
-- **Single user**: jediný admin v systému (JWT cookie session). PIN gate z briefu **vynechaný** (zbytečná dvojí autentikace).
-
-## Co zbývá (budoucí fáze)
-
-| Fáze briefu | Stav | Plán |
-|---|---|---|
-| 5.8 B — Duplicity v iCloudu | TBD | Detect podle jména/telefonu/emailu, merge UI s volbou primárky |
-| 5.8 C — Find & Replace | TBD | Hromadná textová náhrada s regex/case-sensitive volbami |
-| 5.8 D — Telefony +420 | TBD | Auto-detect 9místných CZ čísel + interactive normalize |
-| 5.8 E — Import VCF/CSV | Částečně (legacy `parseVCardFile`) | Drag-and-drop + collision detect |
-| 5.8 F — Obnova ze zálohy | TBD | Backup table před PUT/DELETE |
-| 5.8 G — Google Workspace | Částečně (existující People API pull) | CardDAV push + 3-úrovňové párování + cleanup duplicit |
-| 5.9 — Export VCF/CSV | TBD | Scope (vše/firma/skupina) + firemní export (7 polí) |
-| 5.4 — Banner nově přidaných | TBD | Track seen UIDs + diff |
-
-## Commits
-
-- `175e2fd` — F1.1 Schema + migrace
-- `a9f12de` — F1.2 CardDAV klient + vCard parser + sync logic
-- `0e6db19` — F1.3-F1.7 API endpointy + tabulka + UI + sidebar
-
-## Testovací postup
-
-1. **Preconditions**: iCloud kalendář musí být připojený (Apple ID + app password v `/settings/integrations/icloud`). Pokud ne, doplň.
-2. Otevři **`/contacts/tabulka`** v sidebaru.
-3. Klikni **„Synchronizovat s iCloudem"** → pulluje vCardy + skupiny → reload.
-4. V tabulce: klikni na buňku → změň hodnotu → Enter → další řádek → dirty se počítá.
-5. Klikni **„Uložit (N)"** → bulk PATCH → DB se updatuje.
-6. Pro push změny do iCloudu klikni **⤴** v posledním sloupci řádku → PUT vCard.
-7. Po sync zkontroluj na **`/contacts`** (původní form) že VIP/TEAM/clientTag/aliases jsou zachované.
-
-## Známé limity / TODO
-
-- **Apple skupina rename** — pokud se v iCloudu skupina přejmenuje, vznikne v DB **nová** ContactGroup (icloudUid match) ale stará zůstane. Detekce orphans + auto-clean TBD.
-- **Smazání kontaktu** v iCloudu (Apple Contacts app) — Rašeliniště DB ho po sync neuvidí jako smazaný. Potřeba diff baseline. Zatím manuální cleanup.
-- **Throttling** — sync 1000 kontaktů = 1000 multi-get requestů (po chunks 100 = 10 calls). Pro velké addressbooky (5k+) může být sleep mezi chunks. Zatím no-throttle, Apple drží.
-- **Conflict UI** — pokud PUT vrátí 412 (cizí změna), backend hodí error. Klient nedostane návod „klikni Synchronizovat a zkus znovu". TBD UX.
-
-## Filozofie (z Petrova briefu)
-
-1. **Žádné automatické pozadí** — sync je explicitní akce, ne cron
-2. **Single-click editace** — žádné modální okno na úpravu jednoho pole
-3. **Always show consequences** — counter dirty změn, confirm před destruktivními akcemi (TBD)
-4. **iCloud zůstává zdrojem pravdy** — Rašeliniště zrcadlí + overlay
-5. **Recoverable by default** — TBD backup tabulka, zatím PUT s If-Match
+1. Push všech commitů z GH Desktopu → ghcr build → DSM pull → restart
+2. Migrace 3× se spustí auto v `docker-entrypoint.sh`
+3. `/settings/integrations/icloud` → sekce „Kontakty" → **„Test připojení"** → uvidíš počet vCardů
+4. **„Stáhnout z iCloudu"** → pull (1-2 min pro tisíc kontaktů)
+5. `/contacts/tabulka`:
+   - Banner novinek (pokud jsou nové od baseline)
+   - Tabulka kontaktů (single-click edit)
+   - Nástroje sekce → vyzkoušej Duplicity, F&R, +420
+6. Pro Google sync: nejdřív reauth v `/settings/integrations/google` (banner upozorní), pak Nástroje → Google Workspace → Push vše
