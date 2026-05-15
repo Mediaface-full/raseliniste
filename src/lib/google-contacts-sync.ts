@@ -23,13 +23,17 @@ import { google, type people_v1 } from "googleapis";
 import { prisma } from "./db";
 import { getAuthorizedClient } from "./google-oauth";
 
-const READ_MASK = "names,emailAddresses,phoneNumbers,organizations,addresses,birthdays,biographies,memberships,metadata";
+const READ_MASK = "names,emailAddresses,phoneNumbers,organizations,addresses,birthdays,biographies,memberships,metadata,nicknames,relations";
 const SLEEP_BETWEEN_REQUESTS_MS = 120; // ~8 req/s, safe pod People API quota
 
 export interface GoogleSyncResult {
   ok: boolean;
-  created: number;
-  updated: number;
+  // Push směr (Rašeliniště → Google)
+  created: number;     // nové v Googlu
+  updated: number;     // update v Googlu
+  // Pull směr (Google → Rašeliniště)
+  pulledCreated: number;  // nové v naší DB z Googlu
+  pulledUpdated: number;  // update v naší DB z Googlu
   skipped: number;
   errors: number;
   durationMs: number;
@@ -53,6 +57,8 @@ interface GoogleConnection {
   fn: string;
   phones: string[];        // posledních 9 číslic per phone
   emails: string[];        // lowercase
+  /** Google updateTime (RFC 3339) z primary source v metadata.sources[] — pro last-write-wins */
+  updateTime: Date | null;
   raw: people_v1.Schema$Person;
 }
 
@@ -74,12 +80,16 @@ async function fetchAllGoogleConnections(userId: string): Promise<GoogleConnecti
     for (const c of res.data.connections ?? []) {
       if (!c.resourceName) continue;
       const fn = c.names?.[0]?.displayName ?? "";
+      // updateTime z primary source (CONTACT type) — pro last-write-wins
+      const primarySource = (c.metadata?.sources ?? []).find((s) => s.type === "CONTACT");
+      const updateTime = primarySource?.updateTime ? new Date(primarySource.updateTime) : null;
       out.push({
         resourceName: c.resourceName,
         etag: c.etag ?? "",
         fn,
         phones: (c.phoneNumbers ?? []).map((p) => phoneKey(p.value ?? "")).filter(Boolean),
         emails: (c.emailAddresses ?? []).map((e) => (e.value ?? "").toLowerCase().trim()).filter(Boolean),
+        updateTime,
         raw: c,
       });
     }
@@ -187,7 +197,7 @@ export async function syncIcloudToGoogle(
   options: { scope?: "all" | { company: string } | { group: string } } = {},
 ): Promise<GoogleSyncResult> {
   const start = Date.now();
-  const stats: GoogleSyncResult = { ok: false, created: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0 };
+  const stats: GoogleSyncResult = { ok: false, created: 0, updated: 0, pulledCreated: 0, pulledUpdated: 0, skipped: 0, errors: 0, durationMs: 0 };
 
   try {
     // 1) Načti všechny Rašeliniště kontakty (s filtrem scope)
@@ -258,6 +268,256 @@ export async function syncIcloudToGoogle(
 
   stats.durationMs = Date.now() - start;
   console.log(`[google-sync] userId=${userId} created=${stats.created} updated=${stats.updated} errors=${stats.errors} duration=${stats.durationMs}ms`);
+  return stats;
+}
+
+// ============================================================================
+// OBOUSMĚRNÝ SYNC (Petr 2026-05-15)
+// ============================================================================
+//
+// Last-write-wins podle Google updateTime vs Contact.lastGoogleSyncAt /
+// Contact.updatedAt.
+//
+// Algoritmus:
+//   1. Stáhni všechny Google connections (s metadata.sources[].updateTime)
+//   2. Stáhni všechny naše Contacts
+//   3. Pro každý Google kontakt:
+//        a) Najdi match v naší DB (3-úrovňové parování)
+//        b) Pokud match a Google.updateTime > Contact.lastGoogleSyncAt:
+//             → pull do DB (jen core fields, overlay zachován)
+//        c) Pokud žádný match (kontakt jen v Google):
+//             → create v naší DB s syncSource="google"
+//   4. Pro každý náš Contact:
+//        a) Pokud googleResourceName == null:
+//             → create v Google + uložit resourceName
+//        b) Pokud Contact.updatedAt > lastGoogleSyncAt (změna od posledního sync):
+//             → update v Google
+//        c) Jinak skip
+//
+// Overlay model: pull z Google NEPŘEPISUJE isVip/aliases/clientTag/...
+
+import { backupContact } from "./contacts-backup";
+
+/**
+ * Parse Google Person → core fields pro Contact upsert (overlay-safe).
+ */
+function googlePersonToCore(p: people_v1.Schema$Person): {
+  displayName: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
+  addressLines: string[];
+  birthYear: number | null;
+  birthMonth: number | null;
+  birthDay: number | null;
+  note: string | null;
+  phones: { number: string; label: string | null }[];
+  emails: { email: string; label: string | null }[];
+} {
+  const name = p.names?.[0];
+  return {
+    displayName: name?.displayName ?? name?.unstructuredName ?? "(bez jména)",
+    firstName: name?.givenName ?? null,
+    lastName: name?.familyName ?? null,
+    company: p.organizations?.[0]?.name ?? null,
+    addressLines: (p.addresses ?? []).map((a) => a.formattedValue ?? "").filter(Boolean),
+    birthYear: p.birthdays?.[0]?.date?.year ?? null,
+    birthMonth: p.birthdays?.[0]?.date?.month ?? null,
+    birthDay: p.birthdays?.[0]?.date?.day ?? null,
+    note: p.biographies?.[0]?.value ?? null,
+    phones: (p.phoneNumbers ?? []).map((ph) => ({ number: ph.value ?? "", label: ph.type ?? null })).filter((x) => x.number),
+    emails: (p.emailAddresses ?? []).map((e) => ({ email: (e.value ?? "").toLowerCase(), label: e.type ?? null })).filter((x) => x.email),
+  };
+}
+
+export async function syncWithGoogle(
+  userId: string,
+  options: { scope?: "all" | { company: string } | { group: string } } = {},
+): Promise<GoogleSyncResult> {
+  const start = Date.now();
+  const stats: GoogleSyncResult = { ok: false, created: 0, updated: 0, pulledCreated: 0, pulledUpdated: 0, skipped: 0, errors: 0, durationMs: 0 };
+
+  try {
+    // 1) Načti naše kontakty (scope filter)
+    let where: Parameters<typeof prisma.contact.findMany>[0]["where"] = { userId };
+    if (typeof options.scope === "object" && "company" in options.scope) {
+      where = { ...where, company: options.scope.company };
+    } else if (typeof options.scope === "object" && "group" in options.scope) {
+      where = { ...where, groups: { has: options.scope.group } };
+    }
+    const ourContacts = await prisma.contact.findMany({
+      where,
+      include: { phones: true, emails: true },
+    });
+
+    // 2) Stáhni Google connections
+    const googleConnections = await fetchAllGoogleConnections(userId);
+    const people = await getPeopleClient(userId);
+
+    // 3) Build match indexy pro pull (Google → DB)
+    const matchedResourceNames = new Set<string>();
+
+    // PULL: pro každý Google kontakt — pokud match s naším → update (pokud novější),
+    // jinak create v DB
+    for (const g of googleConnections) {
+      try {
+        // Pseudo-Contact pro findGoogleMatch
+        const matched = ourContacts.find((c) => {
+          if (c.googleResourceName === g.resourceName) return true;
+          const cFn = c.displayName.toLowerCase().trim();
+          if (cFn === g.fn.toLowerCase().trim()) {
+            const cPhones = c.phones.map((p) => phoneKey(p.number));
+            const cEmails = c.emails.map((e) => e.email.toLowerCase().trim());
+            if (cPhones.some((p) => g.phones.includes(p)) || cEmails.some((e) => g.emails.includes(e))) {
+              return true;
+            }
+          }
+          // L3 fallback: jen telefon match
+          const cPhones2 = c.phones.map((p) => phoneKey(p.number));
+          if (cPhones2.some((p) => g.phones.includes(p))) return true;
+          return false;
+        });
+
+        if (matched) {
+          matchedResourceNames.add(g.resourceName);
+          // Last-write-wins: Google novější než lastGoogleSyncAt → pull
+          const dbLastSync = matched.lastGoogleSyncAt;
+          const googleUpdated = g.updateTime;
+          if (googleUpdated && (!dbLastSync || googleUpdated > dbLastSync)) {
+            // Zálohuj naši verzi před přepsáním (overlay je zachován v DB, ale core jdou pryč)
+            await backupContact(userId, matched.id, "before_put").catch(() => null);
+            const core = googlePersonToCore(g.raw);
+            await prisma.contact.update({
+              where: { id: matched.id },
+              data: {
+                displayName: core.displayName,
+                firstName: core.firstName,
+                lastName: core.lastName,
+                company: core.company,
+                addressLines: core.addressLines,
+                birthYear: core.birthYear,
+                birthMonth: core.birthMonth,
+                birthDay: core.birthDay,
+                note: core.note ?? matched.note, // note keep pokud Google nemá
+                googleResourceName: g.resourceName,
+                lastGoogleSyncAt: new Date(),
+              },
+            });
+            // Reset phones/emails na Google verzi
+            await prisma.phone.deleteMany({ where: { contactId: matched.id } });
+            await prisma.contactEmail.deleteMany({ where: { contactId: matched.id } });
+            for (const p of core.phones) {
+              await prisma.phone.create({ data: { contactId: matched.id, number: p.number, label: p.label } }).catch(() => null);
+            }
+            for (const e of core.emails) {
+              await prisma.contactEmail.create({ data: { contactId: matched.id, email: e.email, label: e.label } }).catch(() => null);
+            }
+            stats.pulledUpdated++;
+          }
+        } else {
+          // Kontakt jen v Google — vytvořit v DB
+          const core = googlePersonToCore(g.raw);
+          const created = await prisma.contact.create({
+            data: {
+              userId,
+              displayName: core.displayName,
+              firstName: core.firstName,
+              lastName: core.lastName,
+              company: core.company,
+              addressLines: core.addressLines,
+              birthYear: core.birthYear,
+              birthMonth: core.birthMonth,
+              birthDay: core.birthDay,
+              note: core.note,
+              googleResourceName: g.resourceName,
+              lastGoogleSyncAt: new Date(),
+              syncSource: "google",
+              importedFrom: "google",
+            },
+          });
+          for (const p of core.phones) {
+            await prisma.phone.create({ data: { contactId: created.id, number: p.number, label: p.label } }).catch(() => null);
+          }
+          for (const e of core.emails) {
+            await prisma.contactEmail.create({ data: { contactId: created.id, email: e.email, label: e.label } }).catch(() => null);
+          }
+          stats.pulledCreated++;
+        }
+      } catch (e) {
+        console.warn(`[google-sync-pull] resourceName=${g.resourceName} err:`, e instanceof Error ? e.message : e);
+        stats.errors++;
+      }
+      await sleep(SLEEP_BETWEEN_REQUESTS_MS);
+    }
+
+    // PUSH: pro každý náš Contact — pokud změna od posledního sync nebo nový, push do Google
+    // Refresh ourContacts po pull (mohli jsme přidat nové)
+    const ourContactsFresh = await prisma.contact.findMany({
+      where,
+      include: { phones: true, emails: true },
+    });
+
+    for (const c of ourContactsFresh) {
+      try {
+        const isNewToGoogle = !c.googleResourceName;
+        const hasLocalChanges = c.lastGoogleSyncAt ? c.updatedAt > c.lastGoogleSyncAt : true;
+        // Skip pokud nic nového od posledního push a má resourceName
+        if (!isNewToGoogle && !hasLocalChanges) {
+          stats.skipped++;
+          continue;
+        }
+
+        const person = buildPersonFromContact(c);
+
+        if (isNewToGoogle) {
+          const res = await people.people.createContact({ requestBody: person });
+          if (res.data.resourceName) {
+            await prisma.contact.update({
+              where: { id: c.id },
+              data: { googleResourceName: res.data.resourceName, lastGoogleSyncAt: new Date() },
+            });
+          }
+          stats.created++;
+        } else {
+          // Update — vyžaduje etag, najdi v google connections cache
+          const g = googleConnections.find((gc) => gc.resourceName === c.googleResourceName);
+          if (!g) {
+            // Google ho mezitím smazal? Vytvořit znovu.
+            const res = await people.people.createContact({ requestBody: person });
+            if (res.data.resourceName) {
+              await prisma.contact.update({
+                where: { id: c.id },
+                data: { googleResourceName: res.data.resourceName, lastGoogleSyncAt: new Date() },
+              });
+            }
+            stats.created++;
+          } else {
+            await people.people.updateContact({
+              resourceName: g.resourceName,
+              updatePersonFields: PERSON_UPDATE_FIELDS,
+              requestBody: { ...person, etag: g.etag },
+            });
+            await prisma.contact.update({
+              where: { id: c.id },
+              data: { lastGoogleSyncAt: new Date() },
+            });
+            stats.updated++;
+          }
+        }
+        await sleep(SLEEP_BETWEEN_REQUESTS_MS);
+      } catch (e) {
+        console.warn(`[google-sync-push] contact ${c.id} (${c.displayName}) err:`, e instanceof Error ? e.message : e);
+        stats.errors++;
+      }
+    }
+
+    stats.ok = true;
+  } catch (e) {
+    stats.error = e instanceof Error ? e.message : String(e);
+  }
+
+  stats.durationMs = Date.now() - start;
+  console.log(`[google-sync-bidirectional] userId=${userId} push(created=${stats.created} updated=${stats.updated}) pull(created=${stats.pulledCreated} updated=${stats.pulledUpdated}) skipped=${stats.skipped} errors=${stats.errors} duration=${stats.durationMs}ms`);
   return stats;
 }
 

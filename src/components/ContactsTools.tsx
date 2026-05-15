@@ -525,7 +525,14 @@ function GoogleSection() {
   const [pullBackCandidates, setPullBackCandidates] = useState<Array<{ resourceName: string; fn: string; phones: string[]; emails: string[] }> | null>(null);
 
   async function pushAll() {
-    if (!confirm("Push všech kontaktů z Rašeliniště do Google Workspace? Pro duplicity 3-úrovňové párování (UID → FN+tel+email → tel), nikdy nezakládá nové duplicity. Pokud chybí Google scope 'contacts', proběhne reauth.")) return;
+    if (!confirm(
+      "OBOUSMĚRNÝ sync Rašeliniště ↔ Google Workspace.\n\n" +
+      "• Stáhne změny z Google (nové kontakty, úpravy)\n" +
+      "• Pošle naše změny do Google (last-write-wins podle timestamp)\n" +
+      "• 3-úrovňové párování proti duplicitám\n" +
+      "• Overlay pole (VIP, aliasy, klient slug) se NEPŘEPISUJÍ z Googlu\n\n" +
+      "Pokud chybí Google scope 'contacts', proběhne reauth.",
+    )) return;
     setSyncing(true);
     setError(null);
     setResult(null);
@@ -533,14 +540,19 @@ function GoogleSection() {
       const res = await fetch("/api/contacts/google/sync", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ scope: "all" }),
+        body: JSON.stringify({ scope: "all", direction: "bidirectional" }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Sync selhal. Pravděpodobně chybí Google contacts scope — reauth v /settings/integrations/google.");
         return;
       }
-      setResult(`✓ Vytvořeno ${data.created}, update ${data.updated}, chyby ${data.errors} (${(data.durationMs / 1000).toFixed(1)} s).`);
+      setResult(
+        `✓ Sync hotov (${(data.durationMs / 1000).toFixed(1)} s).\n` +
+        `Z Google → DB: vytvořeno ${data.pulledCreated}, update ${data.pulledUpdated}.\n` +
+        `DB → Google: vytvořeno ${data.created}, update ${data.updated}, skipped ${data.skipped}.\n` +
+        `Chyby: ${data.errors}.`,
+      );
     } finally {
       setSyncing(false);
     }
@@ -605,18 +617,20 @@ function GoogleSection() {
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Sync iCloud → Google Workspace přes People API. Vyžaduje <code>contacts</code> OAuth scope —
-        pokud chybí, proběhne reauth v <a href="/settings/integrations/google" className="underline">Google integration</a>.
+        <strong>Obousměrný sync</strong> Rašeliniště ↔ Google Workspace (People API). Stáhne nové z Google,
+        pošle naše změny tam (last-write-wins podle timestamp). 3-úrovňové párování proti duplicitám.
+        Vyžaduje <code>contacts</code> OAuth scope — pokud chybí, proběhne reauth v{" "}
+        <a href="/settings/integrations/google" className="underline">Google integration</a>.
       </p>
       <div className="flex flex-wrap gap-2">
         <Button onClick={pushAll} disabled={syncing}>
-          {syncing ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />} Push vše do Google
+          {syncing ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />} Synchronizovat s Google
         </Button>
         <Button variant="outline" onClick={cleanupDuplicates} disabled={cleaning}>
           {cleaning ? <Loader2 className="size-4 animate-spin" /> : null} Vyčistit duplicity v Google
         </Button>
         <Button variant="outline" onClick={loadPullBack} disabled={pullingBack}>
-          {pullingBack ? <Loader2 className="size-4 animate-spin" /> : null} Najít kontakty jen v Google
+          {pullingBack ? <Loader2 className="size-4 animate-spin" /> : null} Najít kontakty jen v Google (preview)
         </Button>
       </div>
       {pullBackCandidates && (
