@@ -38,41 +38,91 @@ const XML_NS = `xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:carddav"`;
 /**
  * Najde URL hlavního addressbooku pro daný user.
  *
- * Postup (RFC 6764 + RFC 6352):
- *   1. PROPFIND `/.well-known/carddav` → current-user-principal
- *   2. PROPFIND principal → addressbook-home-set
- *   3. PROPFIND home-set → najít resourcetype=addressbook s největším počtem
- *      kontaktů (typicky první)
+ * Apple iCloud specifika:
+ *   - .well-known/carddav existuje ale chová se nestabilně (někdy 401, někdy
+ *     redirect bez Authorization header)
+ *   - PROPFIND přímo na https://contacts.icloud.com/ vrací 207 s
+ *     current-user-principal nebo 301 redirect na p<DC>-contacts.icloud.com
+ *   - userId v URL je číselný (např. "/12345678/principal/")
  *
- * Vrátí absolutní URL addressbooku.
+ * Strategie:
+ *   1. PROPFIND na server root → najít current-user-principal (Apple typicky
+ *      redirectne na p<DC> server, fetch follow=true to vyřeší)
+ *   2. PROPFIND principal → addressbook-home-set
+ *   3. PROPFIND home-set Depth:1 → najít resourcetype=addressbook
+ *
+ * Petr 2026-05-15: Apple kalendář funguje, kontakty selhávaly — fix přechodem
+ * z .well-known na přímý PROPFIND root.
  */
 export async function discoverAddressbook(creds: CardDavCredentials): Promise<string> {
-  // Krok 1: principal discovery
-  const baseHost = new URL(creds.serverUrl).origin;
-  const wellKnown = `${baseHost}/.well-known/carddav`;
-  const principalRes = await davRequest(wellKnown, creds, "PROPFIND", `<?xml version="1.0"?>
+  let baseHost = new URL(creds.serverUrl).origin;
+
+  // Krok 1: PROPFIND root → current-user-principal
+  // Apple iCloud někdy redirectne 301 na p<DC>-contacts.icloud.com. Pokud
+  // fetch redirect zachytí, body parsing pokračuje normálně. Jinak retry s
+  // novou URL.
+  const principalRes = await davRequest(`${baseHost}/`, creds, "PROPFIND", `<?xml version="1.0"?>
 <d:propfind ${XML_NS}>
   <d:prop>
     <d:current-user-principal/>
   </d:prop>
 </d:propfind>`, { Depth: "0" });
-  const principalPath = extractTagContent(principalRes.body, "current-user-principal")
-    .replace(/<d:href[^>]*>([^<]+)<\/d:href>/i, "$1");
-  if (!principalPath) throw new Error("CardDAV: principal discovery selhala (žádný current-user-principal)");
 
-  // Krok 2: addressbook-home-set
-  const principalUrl = principalPath.startsWith("http") ? principalPath : `${baseHost}${principalPath}`;
+  if (principalRes.status >= 400) {
+    throw new Error(`CardDAV: PROPFIND root selhal (HTTP ${principalRes.status}). Body: ${principalRes.body.slice(0, 300)}`);
+  }
+
+  // Apple může přesměrovat redirect — fetch ho followuje. Detekuj nový host
+  // ze samotného principal href (může být absolutní URL na p<DC>).
+  let principalPath = "";
+  const principalMatch = principalRes.body.match(/<d:current-user-principal[^>]*>[\s\S]*?<d:href[^>]*>([^<]+)<\/d:href>/i)
+    ?? principalRes.body.match(/<current-user-principal[^>]*>[\s\S]*?<href[^>]*>([^<]+)<\/href>/i);
+  if (principalMatch) {
+    principalPath = principalMatch[1].trim();
+  }
+
+  if (!principalPath) {
+    throw new Error(`CardDAV: principal discovery selhala (žádný current-user-principal v response). Body preview: ${principalRes.body.slice(0, 400)}`);
+  }
+
+  // Sestav principal URL (může být absolutní nebo relativní)
+  let principalUrl: string;
+  if (principalPath.startsWith("http")) {
+    principalUrl = principalPath;
+    // Update baseHost pro další requesty (Apple může přesměrovat na p<DC>-)
+    baseHost = new URL(principalUrl).origin;
+  } else {
+    principalUrl = `${baseHost}${principalPath}`;
+  }
+
+  // Krok 2: PROPFIND principal → addressbook-home-set
   const homeRes = await davRequest(principalUrl, creds, "PROPFIND", `<?xml version="1.0"?>
 <d:propfind ${XML_NS}>
   <d:prop>
     <c:addressbook-home-set/>
   </d:prop>
 </d:propfind>`, { Depth: "0" });
-  const homeHrefMatch = homeRes.body.match(/<c:addressbook-home-set[^>]*>[\s\S]*?<d:href[^>]*>([^<]+)<\/d:href>/i);
-  if (!homeHrefMatch) throw new Error("CardDAV: addressbook-home-set nenalezen");
-  const homeUrl = homeHrefMatch[1].startsWith("http") ? homeHrefMatch[1] : `${baseHost}${homeHrefMatch[1]}`;
 
-  // Krok 3: list addressbooků v home-set, vyber první addressbook
+  if (homeRes.status >= 400) {
+    throw new Error(`CardDAV: PROPFIND principal selhal (HTTP ${homeRes.status}). URL: ${principalUrl}. Body: ${homeRes.body.slice(0, 300)}`);
+  }
+
+  const homeHrefMatch = homeRes.body.match(/<c:addressbook-home-set[^>]*>[\s\S]*?<d:href[^>]*>([^<]+)<\/d:href>/i)
+    ?? homeRes.body.match(/<addressbook-home-set[^>]*>[\s\S]*?<href[^>]*>([^<]+)<\/href>/i);
+  if (!homeHrefMatch) {
+    throw new Error(`CardDAV: addressbook-home-set nenalezen v response. Body preview: ${homeRes.body.slice(0, 400)}`);
+  }
+
+  const homeHref = homeHrefMatch[1].trim();
+  let homeUrl: string;
+  if (homeHref.startsWith("http")) {
+    homeUrl = homeHref;
+    baseHost = new URL(homeUrl).origin;
+  } else {
+    homeUrl = `${baseHost}${homeHref}`;
+  }
+
+  // Krok 3: PROPFIND home-set Depth:1 → list addressbooků
   const addressbooksRes = await davRequest(homeUrl, creds, "PROPFIND", `<?xml version="1.0"?>
 <d:propfind ${XML_NS}>
   <d:prop>
@@ -80,20 +130,30 @@ export async function discoverAddressbook(creds: CardDavCredentials): Promise<st
     <d:displayname/>
   </d:prop>
 </d:propfind>`, { Depth: "1" });
+
+  if (addressbooksRes.status >= 400) {
+    throw new Error(`CardDAV: PROPFIND home-set selhal (HTTP ${addressbooksRes.status}). URL: ${homeUrl}. Body: ${addressbooksRes.body.slice(0, 300)}`);
+  }
+
   // Najdi response s resourcetype/addressbook
   const responses = splitResponses(addressbooksRes.body);
   for (const resp of responses) {
-    if (/<c:addressbook\s*\/>/i.test(resp) || /<carddav:addressbook/i.test(resp)) {
-      const href = extractHref(resp);
-      if (href && !href.endsWith(homeUrl.replace(baseHost, "")) && !href.endsWith("/")) {
-        continue; // ne home samotný
-      }
-      if (href) {
-        return href.startsWith("http") ? href : `${baseHost}${href}`;
-      }
-    }
+    const isAddressbook = /<c:addressbook\s*\/>/i.test(resp)
+      || /<carddav:addressbook/i.test(resp)
+      || /<addressbook\s*\/>/i.test(resp);
+    if (!isAddressbook) continue;
+
+    const href = extractHref(resp);
+    if (!href) continue;
+    // Skip pokud je to home-set samotný (nemá addressbook resourcetype, ale
+    // některé servery to tak vrátí — defenzivně skipni endpoint na "/" alone)
+    const normalizedHomeHref = new URL(homeUrl).pathname.replace(/\/$/, "");
+    const normalizedHref = href.startsWith("http") ? new URL(href).pathname : href;
+    if (normalizedHref.replace(/\/$/, "") === normalizedHomeHref) continue;
+
+    return href.startsWith("http") ? href : `${baseHost}${href}`;
   }
-  throw new Error("CardDAV: žádný addressbook nenalezen v home-set");
+  throw new Error(`CardDAV: žádný addressbook nenalezen v home-set ${homeUrl}. Response: ${addressbooksRes.body.slice(0, 400)}`);
 }
 
 // ============================================================================
