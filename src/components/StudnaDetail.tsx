@@ -1087,18 +1087,12 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
           />
         </div>
-        <div>
-          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-            Vlastní AI prompt (volitelné — pokud prázdný, použije se default)
-          </label>
-          <textarea
-            value={extractionPrompt}
-            onChange={(e) => setExtractionPrompt(e.target.value)}
-            rows={5}
-            placeholder="Pro tento projekt zaměř pozornost zejména na…"
-            className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 text-sm resize-none"
-          />
-        </div>
+        {/* Petr 2026-05-15: extractionPrompt field je legacy/dead — neaplikuje
+            se v žádném AI volání (jen ukládá do DB). Skryté. Pravé custom
+            prompty jsou níž v sekci „⚙ Vlastní AI prompty pro tento projekt"
+            (studnaStandardPrompt / studnaBriefPrompt) které opravdu řídí
+            Stage 2 analýzu. Field v DB zachováno pro případnou budoucí
+            funkčnost — neztratí se data. */}
 
         {/* Vlastní prompt pro Souhrn projektu (volá tlačítko "Souhrn projektu"
             v detailu — agregát napříč všemi nahrávkami, vrací markdown).
@@ -1157,14 +1151,14 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
 
         {/* Per-projekt Stage 2 prompty — pokročilé, pro projekty kde standardní
             globální analýza nestačí (jiný typ výstupu, vlastní formát). */}
-        <div className="rounded-md border border-white/5 bg-white/[0.02] p-3">
+        <div className="rounded-md border-2 border-[var(--tint-mint)]/30 bg-[var(--tint-mint)]/[0.04] p-3">
           <button
             type="button"
             onClick={() => setShowCustomPrompts((v) => !v)}
             className="flex items-center justify-between w-full text-left"
           >
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-              ⚙ Vlastní AI prompty pro tento projekt {(project.studnaStandardPrompt || project.studnaBriefPrompt) && "· aktivní"}
+            <span className="text-[11px] uppercase tracking-wider text-[var(--tint-mint)] font-mono font-semibold">
+              🎯 Vlastní AI prompt pro analýzu nahrávek {(project.studnaStandardPrompt || project.studnaBriefPrompt) && "· AKTIVNÍ ✓"}
             </span>
             <span className="text-[10px] font-mono text-muted-foreground">
               {showCustomPrompts ? "skrýt" : "zobrazit"}
@@ -1173,9 +1167,14 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           {showCustomPrompts && (
             <div className="mt-3 space-y-3">
               <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
-                Přepíše globální Studna prompt POUZE pro tento projekt. Když prázdné, použije se globální
-                z <code className="font-mono">/settings/ai-prompts</code> (nebo default v kódu). Zachovej
-                JSON schéma a explicitní instrukci češtiny v textech, jinak Gemini může vrátit anglicky.
+                <strong className="text-foreground">Toto je TO správné místo</strong> pro custom prompt analýzy. Aplikuje se na Stage 2 (analýza přepisu).
+                Custom prompt řídí <strong>OBSAH polí</strong> v JSON odpovědi (jaké má být summary, hloubka thoughts).
+                <strong className="text-foreground"> Struktura JSON je hardcoded</strong> (transcript, summary, key_themes, thoughts, …)
+                — Gemini ji vrátí vždy, nemusíš ji vypisovat.
+                <br /><br />
+                Příklad: <code className="text-xs">„Summary stručná max 200 slov, zaměřená na finance. Thoughts jen klíčové (max 5)."</code>
+                <br />
+                Prázdné = default ze <code className="font-mono">/settings/ai-prompts</code>.
               </p>
               <div>
                 <div className="flex items-center justify-between mb-1">
