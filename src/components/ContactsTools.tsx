@@ -42,6 +42,8 @@ export default function ContactsTools({ groupNames, companyNames = [] }: { group
 
       <CleanupEntitiesBanner />
 
+      <DiagnoseSection />
+
       <Section title="Validace" icon={<Search className="size-4" />} isOpen={open.has("validation")} onToggle={() => toggle("validation")}>
         <ValidationSection />
       </Section>
@@ -206,6 +208,116 @@ function CleanupEntitiesBanner() {
         Pak klikneš „Synchronizovat s iCloudem" v hero → naimportuje čistý dataset z iCloudu. Použij pokud cleanup+merge nestíhá.
       </p>
       {error && <div className="text-xs text-destructive">{error}</div>}
+    </div>
+  );
+}
+
+// ===========================================================================
+// Diagnostika — kdo, odkud, kdy. Pro Petra 2026-05-15 — chce vidět kde se
+// duplicity berou.
+// ===========================================================================
+function DiagnoseSection() {
+  const [data, setData] = useState<{
+    total: number;
+    bySyncSource: { syncSource: string; count: number }[];
+    byImportedFrom: { importedFrom: string; count: number }[];
+    overlay: Record<string, number>;
+    duplicates: { clusters: number; wouldRemoveByMerge: number; top5Examples: Array<{ contactCount: number; reasons: string[]; contacts: Array<{ displayName: string; phones: string[]; emails: string[]; syncSource: string | null }> }> };
+    recent20: Array<{ name: string; syncSource: string; importedFrom: string; hasIcloudUid: boolean; hasGoogleResourceName: boolean; createdAt: string }>;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/contacts/diagnose");
+      const json = await res.json();
+      if (res.ok) setData(json);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="glass rounded-xl p-4 space-y-3" style={{ ["--c" as string]: "var(--tint-butter)" }}>
+      <div className="flex items-center gap-2">
+        <Search className="size-4" style={{ color: "var(--c)" }} />
+        <h3 className="font-medium text-sm">Diagnostika — kde se kontakty berou</h3>
+        <Button onClick={load} disabled={loading} className="ml-auto" variant="outline">
+          {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+          {data ? "Refresh" : "Spočítat"}
+        </Button>
+      </div>
+
+      {data && (
+        <div className="space-y-3 text-sm">
+          <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2">
+            <div className="font-mono text-lg font-medium">{data.total} kontaktů celkem</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Duplicit (clusters): {data.duplicates.clusters} · po auto-merge by zbylo {data.total - data.duplicates.wouldRemoveByMerge}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2">
+              <div className="text-xs font-mono uppercase text-muted-foreground mb-1">Podle syncSource</div>
+              {data.bySyncSource.map((b, i) => (
+                <div key={i} className="flex justify-between text-xs"><span>{b.syncSource}</span><span className="font-mono">{b.count}</span></div>
+              ))}
+            </div>
+            <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2">
+              <div className="text-xs font-mono uppercase text-muted-foreground mb-1">Podle importedFrom</div>
+              {data.byImportedFrom.map((b, i) => (
+                <div key={i} className="flex justify-between text-xs"><span>{b.importedFrom}</span><span className="font-mono">{b.count}</span></div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2">
+            <div className="text-xs font-mono uppercase text-muted-foreground mb-1">Overlay + identifikátory</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+              {Object.entries(data.overlay).map(([k, v]) => (
+                <div key={k} className="flex justify-between"><span>{k}</span><span className="font-mono">{v}</span></div>
+              ))}
+            </div>
+          </div>
+
+          {data.duplicates.top5Examples.length > 0 && (
+            <details className="rounded-md border border-white/10 bg-black/20 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-mono uppercase text-muted-foreground">Top 5 příkladů duplicit</summary>
+              <div className="mt-2 space-y-2 text-xs">
+                {data.duplicates.top5Examples.map((ex, i) => (
+                  <div key={i} className="border-t border-white/5 pt-2">
+                    <div className="font-medium">{ex.contactCount}× duplicate — {ex.reasons.slice(0, 2).join(" · ")}</div>
+                    {ex.contacts.map((c, j) => (
+                      <div key={j} className="ml-2 text-muted-foreground">
+                        • {c.displayName} <span className="font-mono opacity-60">[{c.syncSource ?? "?"}]</span>
+                        {c.phones.length > 0 && <span className="ml-2">📞 {c.phones.join(", ")}</span>}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          <details className="rounded-md border border-white/10 bg-black/20 px-3 py-2">
+            <summary className="cursor-pointer text-xs font-mono uppercase text-muted-foreground">20 nejnovějších kontaktů</summary>
+            <div className="mt-2 space-y-1 text-xs max-h-60 overflow-y-auto">
+              {data.recent20.map((c, i) => (
+                <div key={i} className="flex justify-between border-b border-white/5 pb-0.5">
+                  <span>{c.name || "(bez jména)"}</span>
+                  <span className="font-mono text-muted-foreground">
+                    {c.hasIcloudUid ? "iCloud" : ""}{c.hasGoogleResourceName ? " G" : ""}
+                    {" · "}{c.syncSource}
+                    {" · "}{new Date(c.createdAt).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
     </div>
   );
 }
