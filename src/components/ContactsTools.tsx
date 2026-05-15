@@ -25,7 +25,7 @@ import ContactsDuplicates from "./ContactsDuplicates";
 
 type SectionKey = "validation" | "duplicates" | "find-replace" | "phones-420" | "import" | "backups" | "google" | "export";
 
-export default function ContactsTools({ groupNames }: { groupNames: string[] }) {
+export default function ContactsTools({ groupNames, companyNames = [] }: { groupNames: string[]; companyNames?: string[] }) {
   const [open, setOpen] = useState<Set<SectionKey>>(new Set());
   function toggle(key: SectionKey) {
     setOpen((prev) => {
@@ -39,6 +39,8 @@ export default function ContactsTools({ groupNames }: { groupNames: string[] }) 
   return (
     <div className="space-y-3">
       <h2 className="font-serif text-xl tracking-tight">Nástroje</h2>
+
+      <CleanupEntitiesBanner />
 
       <Section title="Validace" icon={<Search className="size-4" />} isOpen={open.has("validation")} onToggle={() => toggle("validation")}>
         <ValidationSection />
@@ -69,8 +71,69 @@ export default function ContactsTools({ groupNames }: { groupNames: string[] }) 
       </Section>
 
       <Section title="Export VCF/CSV" icon={<Download className="size-4" />} isOpen={open.has("export")} onToggle={() => toggle("export")}>
-        <ExportSection groupNames={groupNames} />
+        <ExportSection groupNames={groupNames} companyNames={companyNames} />
       </Section>
+    </div>
+  );
+}
+
+// ===========================================================================
+// Cleanup HTML entities banner — Petr 2026-05-15: po prvním iCloud sync
+// jsou v DB `&#13;` v emailech/telefonech/jménech. Banner vidí jen pokud
+// detekuje entity → 1 klik vyčistí.
+// ===========================================================================
+function CleanupEntitiesBanner() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ contactsUpdated: number; phonesUpdated: number; emailsUpdated: number; groupsUpdated: number; duplicatesDeleted: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function run() {
+    if (!confirm("Vyčistit HTML entities (`&#13;` a podobné) z kontaktů + telefonů + emailů + skupin? Plus odstranit duplicitní telefony/emaily uvnitř kontaktu. Idempotentní.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/contacts/cleanup-entities", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Cleanup selhal.");
+        return;
+      }
+      setResult(data.stats);
+      setDone(true);
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done && result) {
+    return (
+      <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 text-sm px-4 py-3 flex items-center gap-2">
+        <Check className="size-4 text-[var(--tint-sage)]" />
+        Vyčištěno {result.contactsUpdated} kontaktů, {result.phonesUpdated} tel, {result.emailsUpdated} emailů, {result.groupsUpdated} skupin, {result.duplicatesDeleted} duplikátů. Refresh za 2 s…
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-strong rounded-xl p-4 space-y-2" style={{ borderLeft: "4px solid var(--tint-rose)" }}>
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="size-5 text-[var(--tint-rose)] mt-0.5 shrink-0" />
+        <div className="flex-1">
+          <div className="font-medium text-sm">Vyčistit HTML entity z dat</div>
+          <p className="text-xs text-muted-foreground mt-1">
+            První iCloud sync propustil <code>&amp;#13;</code> (HTML entity pro \r) do emailů, telefonů, jmen a firem.
+            Příčina v XML decoderu byla opravena, ale historická data potřebují vyčistit. Plus odstraní duplicitní telefony/emaily uvnitř kontaktu.
+          </p>
+        </div>
+      </div>
+      <Button onClick={run} disabled={busy} className="bg-[var(--tint-rose)]/20 text-[var(--tint-rose)] border-[var(--tint-rose)]/40">
+        {busy ? <><Loader2 className="size-4 animate-spin" /> Čistím…</> : "Vyčistit teď"}
+      </Button>
+      {error && <div className="text-xs text-destructive">{error}</div>}
     </div>
   );
 }
@@ -663,7 +726,7 @@ function GoogleSection() {
 // ===========================================================================
 // H) EXPORT
 // ===========================================================================
-function ExportSection({ groupNames }: { groupNames: string[] }) {
+function ExportSection({ groupNames, companyNames }: { groupNames: string[]; companyNames: string[] }) {
   const [scope, setScope] = useState("all");
   const [format, setFormat] = useState<"vcf" | "csv">("vcf");
   const [firemni, setFiremni] = useState(false);
@@ -681,12 +744,23 @@ function ExportSection({ groupNames }: { groupNames: string[] }) {
       <div className="grid grid-cols-2 gap-2">
         <select value={scope} onChange={(e) => setScope(e.target.value)} className="px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm">
           <option value="all">Všichni</option>
-          {groupNames.map((g) => (
-            <option key={g} value={`group:${g}`}>Skupina: {g}</option>
-          ))}
+          {companyNames.length > 0 && (
+            <optgroup label="Podle firmy">
+              {companyNames.map((c) => (
+                <option key={`company:${c}`} value={`company:${c}`}>🏢 {c}</option>
+              ))}
+            </optgroup>
+          )}
+          {groupNames.length > 0 && (
+            <optgroup label="Podle skupiny">
+              {groupNames.map((g) => (
+                <option key={`group:${g}`} value={`group:${g}`}>📁 {g}</option>
+              ))}
+            </optgroup>
+          )}
         </select>
         <select value={format} onChange={(e) => setFormat(e.target.value as "vcf" | "csv")} className="px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm">
-          <option value="vcf">VCF (vCard 3.0)</option>
+          <option value="vcf">VCF (vCard 3.0 — 1 soubor pro všechny)</option>
           <option value="csv">CSV (středník, UTF-8 BOM, Excel)</option>
         </select>
       </div>
@@ -697,6 +771,9 @@ function ExportSection({ groupNames }: { groupNames: string[] }) {
       <a href={buildUrl()} download className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[var(--tint-sage)]/20 text-[var(--tint-sage)] border border-[var(--tint-sage)]/40 text-sm font-medium hover:bg-[var(--tint-sage)]/30">
         <Download className="size-4" /> Stáhnout {format.toUpperCase()}
       </a>
+      <p className="text-xs text-muted-foreground">
+        VCF = jeden soubor obsahující všechny kontakty z výběru (i 50+ v jednom file). Ideální pro import jinam.
+      </p>
     </div>
   );
 }

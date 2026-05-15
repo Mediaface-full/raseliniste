@@ -372,6 +372,10 @@ function escapeXml(s: string): string {
 
 function decodeXmlEntities(s: string): string {
   return s
+    // Numeric entities (Petr 2026-05-15: Apple posílá `&#13;` jako CR ve
+    // vCard data — bez decode propadne literal do EMAIL/TEL hodnot)
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

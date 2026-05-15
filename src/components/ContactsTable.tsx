@@ -385,6 +385,7 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
               <th className="px-2 py-2 text-left w-[140px]">Telefon</th>
               <th className="px-2 py-2 text-left w-[120px]">Telefon 2</th>
               <th className="px-2 py-2 text-left w-[160px]">E-mail</th>
+              <th className="px-2 py-2 text-left w-[180px]">Adresa</th>
               <th className="px-2 py-2 text-left w-[140px]">Skupiny</th>
               <th className="px-2 py-2 text-left w-[100px]">Narozeniny</th>
               <th className="px-2 py-2 text-center w-[60px]" title="VIP/Team flagy z Rašeliniště (overlay)">Flag</th>
@@ -393,11 +394,11 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className="px-3 py-12 text-center text-sm text-muted-foreground">
+              <tr><td colSpan={11} className="px-3 py-12 text-center text-sm text-muted-foreground">
                 <Loader2 className="size-5 animate-spin mx-auto mb-2" /> Načítám…
               </td></tr>
             ) : contacts.length === 0 ? (
-              <tr><td colSpan={10} className="px-3 py-12 text-center text-sm text-muted-foreground italic">
+              <tr><td colSpan={11} className="px-3 py-12 text-center text-sm text-muted-foreground italic">
                 Žádné kontakty v aktuálním filtru.
               </td></tr>
             ) : contacts.map((c) => {
@@ -421,6 +422,11 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
                     value={eff.emails[0]?.email ?? ""}
                     onSave={(v) => editCell(c.id, "email1", v)}
                     icon={<Mail className="size-3 inline mr-1 opacity-40" />}
+                  />
+                  <EditableCell
+                    value={eff.addressLines.join(" / ")}
+                    onSave={(v) => editCell(c.id, "addressLines", v)}
+                    placeholder="—"
                   />
                   <EditableCell
                     value={eff.groups.join(", ")}

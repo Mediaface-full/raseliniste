@@ -39,6 +39,15 @@ const groupRows = await prisma.contactGroup.findMany({
   orderBy: { name: "asc" },
 });
 const groupNames = groupRows.map((g) => g.name);
+
+// Firmy pro export scope dropdown (Petr 2026-05-15: export podle firmy)
+const companyRows = await prisma.contact.findMany({
+  where: { userId: session.uid, company: { not: null } },
+  select: { company: true },
+  distinct: ["company"],
+  orderBy: { company: "asc" },
+});
+const companyNames = companyRows.map((c) => c.company!).filter(Boolean);
 ---
 
 <Shell
@@ -55,6 +64,6 @@ const groupNames = groupRows.map((g) => g.name);
     {/* Rozbalovací nástroje pod tabulkou — kontakty_brief.md 5.8 + 5.9.
         Duplicity, F&R, +420 normalize, Import VCF/CSV, Backups/Restore,
         Google sync (3-úrovňové párování + cleanup + pull-back), Export. */}
-    <ContactsTools client:load groupNames={groupNames} />
+    <ContactsTools client:load groupNames={groupNames} companyNames={companyNames} />
   </div>
 </Shell>
