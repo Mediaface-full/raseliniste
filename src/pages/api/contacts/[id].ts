@@ -133,6 +133,10 @@ export const DELETE: APIRoute = async ({ cookies, params }) => {
   const owned = await ownContact(session.uid, id);
   if (!owned) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
 
+  // Petr 2026-05-15 (kontakty_brief.md 5.8 F): auto-backup před delete.
+  const { backupContact } = await import("@/lib/contacts-backup");
+  await backupContact(session.uid, id, "before_delete").catch(() => null);
+
   await prisma.contact.delete({ where: { id } });
   return Response.json({ ok: true });
 };

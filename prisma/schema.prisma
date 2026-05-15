@@ -97,6 +97,11 @@ model User {
   // Single-user typicky 1 hodnota, ale schema toleruje update (alias addresses).
   gmailEmailAddress    String?
 
+  // 2026-05-15 (kontakty_brief.md 5.4) — Sleduje které kontakty UID už user
+  // viděl. Banner "Nově přidané z mobilu" porovná aktuální Contact.icloudUid
+  // proti baseline a ukáže diff. "Označit prohlédnuté" = update baseline.
+  contactsSeenBaselineAt DateTime?
+
   // 2026-05-13 — Backfill state pro multi-tick zpetny import historie (6 let).
   // Beh: Petr klikne "Stahnout historii X let" → set gmailBackfillStartedAt +
   // gmailBackfillYears. Cron `posta-backfill` 15min volá backfillMetadata():

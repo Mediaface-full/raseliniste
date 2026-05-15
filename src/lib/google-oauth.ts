@@ -18,7 +18,11 @@ import { encryptSecret, decryptSecret } from "./crypto";
 
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar",
-  "https://www.googleapis.com/auth/contacts.readonly",
+  // Kontakty — Petr 2026-05-15 (kontakty_brief.md F6): push iCloud → Google,
+  // cleanup duplicit, pull-back. Vyžaduje plný `contacts` scope (write).
+  // Starý `contacts.readonly` byl nedostatečný — Rašeliniště nemohlo
+  // vytvářet/upravovat/mazat kontakty v Googlu.
+  "https://www.googleapis.com/auth/contacts",
   // Pošta — Petr potvrdil 2026-05-12: gmail.modify (čtení + drafty + labely)
   // + gmail.send (odeslání reply). modify zahrnuje readonly + metadata, takže
   // ty starší scopy už nejsou potřeba samostatně.
@@ -28,6 +32,9 @@ export const GOOGLE_SCOPES = [
 
 /** Klíčový scope který signalizuje že Pošta může fungovat. Bez něj jen kalendář/kontakty. */
 export const POSTA_REQUIRED_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
+
+/** Plný contacts scope pro Kontakty modul (push do Google Workspace). */
+export const CONTACTS_REQUIRED_SCOPE = "https://www.googleapis.com/auth/contacts";
 
 function requireEnv(): { clientId: string; clientSecret: string; redirectUri: string } {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
