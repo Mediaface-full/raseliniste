@@ -83,14 +83,14 @@ export default function ContactsTools({ groupNames, companyNames = [] }: { group
 // detekuje entity → 1 klik vyčistí.
 // ===========================================================================
 function CleanupEntitiesBanner() {
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ contactsUpdated: number; phonesUpdated: number; emailsUpdated: number; groupsUpdated: number; duplicatesDeleted: number } | null>(null);
+  const [busy, setBusy] = useState<"cleanup" | "merge" | null>(null);
+  const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  async function run() {
-    if (!confirm("Vyčistit HTML entities (`&#13;` a podobné) z kontaktů + telefonů + emailů + skupin? Plus odstranit duplicitní telefony/emaily uvnitř kontaktu. Idempotentní.")) return;
-    setBusy(true);
+  async function runCleanup() {
+    if (!confirm("Vyčistit HTML entities (`&#13;` apod.) z kontaktů + telefonů + emailů + skupin? Plus smazat prázdné kontakty. Idempotentní.")) return;
+    setBusy("cleanup");
     setError(null);
     try {
       const res = await fetch("/api/contacts/cleanup-entities", { method: "POST" });
@@ -99,13 +99,43 @@ function CleanupEntitiesBanner() {
         setError(data.error ?? "Cleanup selhal.");
         return;
       }
-      setResult(data.stats);
+      const s = data.stats;
+      setResult(`✓ Vyčištěno ${s.contactsUpdated} kontaktů, ${s.phonesUpdated} tel, ${s.emailsUpdated} emailů, ${s.duplicatesDeleted} duplikátů uvnitř kontaktů, ${s.emptyContactsDeleted ?? 0} prázdných kontaktů smazáno.`);
       setDone(true);
-      setTimeout(() => window.location.reload(), 2000);
+      setTimeout(() => window.location.reload(), 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function runAutoMerge() {
+    if (!confirm(
+      "Auto-merge VŠECHNY duplicity najednou (union-find podle jména/telefonu/emailu).\n\n" +
+      "Primárka se vybere podle priority:\n" +
+      "  1. VIP / callLogToken / clientTag / aliases (overlay)\n" +
+      "  2. icloudUid set\n" +
+      "  3. Nejstarší createdAt\n\n" +
+      "Sekundární kontakty se sloučí (telefony/emaily/skupiny union, overlay zachován) a smažou.\n" +
+      "Před každým mergem auto-záloha.",
+    )) return;
+    setBusy("merge");
+    setError(null);
+    try {
+      const res = await fetch("/api/contacts/auto-merge", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Auto-merge selhal.");
+        return;
+      }
+      setResult(`✓ Sloučeno ${data.mergedClusters} clusterů, smazáno ${data.contactsRemoved} duplicitních kontaktů. Chyby: ${data.errors}.`);
+      setDone(true);
+      setTimeout(() => window.location.reload(), 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -113,26 +143,31 @@ function CleanupEntitiesBanner() {
     return (
       <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 text-sm px-4 py-3 flex items-center gap-2">
         <Check className="size-4 text-[var(--tint-sage)]" />
-        Vyčištěno {result.contactsUpdated} kontaktů, {result.phonesUpdated} tel, {result.emailsUpdated} emailů, {result.groupsUpdated} skupin, {result.duplicatesDeleted} duplikátů. Refresh za 2 s…
+        {result} Refresh za 3 s…
       </div>
     );
   }
 
   return (
-    <div className="glass-strong rounded-xl p-4 space-y-2" style={{ borderLeft: "4px solid var(--tint-rose)" }}>
+    <div className="glass-strong rounded-xl p-4 space-y-3" style={{ borderLeft: "4px solid var(--tint-rose)" }}>
       <div className="flex items-start gap-2">
         <AlertTriangle className="size-5 text-[var(--tint-rose)] mt-0.5 shrink-0" />
         <div className="flex-1">
-          <div className="font-medium text-sm">Vyčistit HTML entity z dat</div>
+          <div className="font-medium text-sm">Sanitace po prvním iCloud sync</div>
           <p className="text-xs text-muted-foreground mt-1">
-            První iCloud sync propustil <code>&amp;#13;</code> (HTML entity pro \r) do emailů, telefonů, jmen a firem.
-            Příčina v XML decoderu byla opravena, ale historická data potřebují vyčistit. Plus odstraní duplicitní telefony/emaily uvnitř kontaktu.
+            Po prvním sync se v DB objevily <code>&amp;#13;</code> v emailech/telefonech, prázdné kontakty a duplicity.
+            Doporučený postup: <strong>1) Vyčistit entity</strong> → <strong>2) Auto-merge duplicity</strong>.
           </p>
         </div>
       </div>
-      <Button onClick={run} disabled={busy} className="bg-[var(--tint-rose)]/20 text-[var(--tint-rose)] border-[var(--tint-rose)]/40">
-        {busy ? <><Loader2 className="size-4 animate-spin" /> Čistím…</> : "Vyčistit teď"}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={runCleanup} disabled={busy !== null} className="bg-[var(--tint-rose)]/20 text-[var(--tint-rose)] border-[var(--tint-rose)]/40">
+          {busy === "cleanup" ? <><Loader2 className="size-4 animate-spin" /> Čistím…</> : "1) Vyčistit entity + prázdné"}
+        </Button>
+        <Button onClick={runAutoMerge} disabled={busy !== null} className="bg-[var(--tint-sage)]/20 text-[var(--tint-sage)] border-[var(--tint-sage)]/40">
+          {busy === "merge" ? <><Loader2 className="size-4 animate-spin" /> Slučuji…</> : "2) Auto-merge duplicity"}
+        </Button>
+      </div>
       {error && <div className="text-xs text-destructive">{error}</div>}
     </div>
   );

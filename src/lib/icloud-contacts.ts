@@ -223,10 +223,15 @@ async function upsertContact(
     : null;
 
   // 2) Match podle telefonu (phoneKey = posledních 9 číslic, robustní napříč
-  //    formáty — `+420 777 888 999` v iCloudu vs `420777888999` v Rašeliniště
-  //    z Things importu nemůže selhat na string exact). Email lowercase.
-  //    Petr 2026-05-15: predchozí normalizePhone match propousteli duplicity
-  //    kdyz formaty se lisily.
+  //    formáty) nebo emailu (lowercase).
+  //
+  //    PETR 2026-05-15 (po 3x duplicity): match je teď přes VŠECHNY kontakty
+  //    (i ty s icloudUid), nejen unpaired. Apple totiž může změnit UID mezi
+  //    syncy (edit v Apple Contacts app vygeneruje nový UID), L1 by selhal
+  //    a L2 by ignoroval starý kontakt s předchozím UID → vznikla duplicita.
+  //
+  //    Match preferenčně na kontakt BEZ icloudUid (pravý duplikát z manualu/
+  //    Things), pak na kontakt s icloudUid (UID rotation case).
   if (!existing) {
     const parsedPhoneKeys = parsed.phones
       .map((p) => p.number.replace(/\D/g, "").slice(-9))
@@ -234,29 +239,27 @@ async function upsertContact(
     const emails = parsed.emails.map((e) => e.email.toLowerCase());
 
     if (parsedPhoneKeys.length > 0 || emails.length > 0) {
-      // Phone match: nemůžeme to spustit přes Prisma `in` (DB má telefony
-      // v raw formátu, my potřebujeme last-9-digits). Fetch kandidáty +
-      // JS porovnání.
+      // Fetch ALL kandidáty (icloudUid null i not-null) — JS match
       const candidates = await prisma.contact.findMany({
-        where: {
-          userId,
-          icloudUid: null,
-          OR: [
-            ...(parsedPhoneKeys.length > 0 ? [{ phones: { some: {} } }] : []),
-            ...(emails.length > 0 ? [{ emails: { some: { email: { in: emails } } } }] : []),
-          ],
-        },
+        where: { userId },
         include: { phones: true, emails: true },
       });
 
-      // Najdi prvního s overlapem (phoneKey nebo email lowercase)
-      existing = candidates.find((c) => {
+      // Najdi všechny s overlapem (phoneKey nebo email)
+      const matches = candidates.filter((c) => {
+        // Skip ten s parsed.uid (L1 selhal nebo UID rotation — ale stále stejný kontakt)
+        if (parsed.uid && c.icloudUid === parsed.uid) return false;
         const cPhoneKeys = c.phones.map((p) => p.number.replace(/\D/g, "").slice(-9));
-        if (parsedPhoneKeys.some((k) => cPhoneKeys.includes(k))) return true;
+        if (parsedPhoneKeys.some((k) => k && cPhoneKeys.includes(k))) return true;
         const cEmails = c.emails.map((e) => e.email.toLowerCase());
-        if (emails.some((e) => cEmails.includes(e))) return true;
+        if (emails.some((e) => e && cEmails.includes(e))) return true;
         return false;
-      }) ?? null;
+      });
+
+      // Preferenční pořadí: unpaired (icloudUid null) → s icloudUid (UID rotation)
+      existing = matches.find((c) => !c.icloudUid)
+        ?? matches.find((c) => c.icloudUid)
+        ?? null;
       if (existing) stats.matched++;
     }
   }
