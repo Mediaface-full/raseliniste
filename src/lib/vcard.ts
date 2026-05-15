@@ -310,7 +310,18 @@ export function parseVCardFull(raw: string): VCardContact | null {
   contact.lastName = sanitize(contact.lastName);
   if (contact.org) contact.org = sanitize(contact.org) || null;
   if (contact.note) contact.note = sanitize(contact.note) || null;
-  contact.addressLines = contact.addressLines.map(sanitize).filter(Boolean);
+  // Adresy: NESMÍME zničit `\n` mezi ulice/město/země. Strip jen `\r`/`\t`
+  // a `&#13;` zbytky uvnitř, trim okolní whitespace per řádek, odstranit
+  // prázdné řádky.
+  contact.addressLines = contact.addressLines
+    .map((addr) => addr
+      .replace(/&#1[03];/g, "")
+      .split(/\n/)
+      .map((line) => line.replace(/[\r\t]/g, "").trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim())
+    .filter(Boolean);
   contact.categories = contact.categories.map(sanitize).filter(Boolean);
   contact.phones = contact.phones.map((p) => ({ number: sanitize(p.number), label: p.label ? sanitize(p.label) : null })).filter((p) => p.number);
   contact.emails = contact.emails.map((e) => ({ email: sanitize(e.email).toLowerCase(), label: e.label ? sanitize(e.label) : null })).filter((e) => e.email);

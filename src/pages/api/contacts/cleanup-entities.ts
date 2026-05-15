@@ -42,6 +42,30 @@ function decodeEntities(s: string | null | undefined): string | null {
     .trim();
 }
 
+/**
+ * Speciální handler pro adresy — adresa může mít `\n` uvnitř (oddělovač mezi
+ * ulice/město/země). Trim aplikujeme jen na začátek/konec celé hodnoty, ne
+ * mezi řádky. Plus odstraníme `\r` na konci jednotlivých řádků a prázdné řádky.
+ */
+function decodeAddress(s: string | null | undefined): string | null {
+  if (!s) return s ?? null;
+  const decoded = s
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+  // Strip `\r` per řádek + odstranit prázdné řádky + finální trim
+  return decoded
+    .split(/\n/)
+    .map((line) => line.replace(/\r/g, "").trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
 export const POST: APIRoute = async ({ cookies }) => {
   const session = await readSession(cookies);
   if (!session) return Response.json({ error: "UNAUTHENTICATED" }, { status: 401 });
@@ -78,8 +102,9 @@ export const POST: APIRoute = async ({ cookies }) => {
     const greet = decodeEntities(c.greetingOverride);
     if (greet !== c.greetingOverride) updates.greetingOverride = greet;
 
-    // Pole stringů
-    const cleanedAddr = c.addressLines.map((line) => decodeEntities(line) ?? "").filter(Boolean);
+    // Pole adres — speciální handler decodeAddress (zachová `\n` uvnitř, jen
+    // strip `\r` a entity)
+    const cleanedAddr = c.addressLines.map((line) => decodeAddress(line) ?? "").filter(Boolean);
     if (JSON.stringify(cleanedAddr) !== JSON.stringify(c.addressLines)) {
       updates.addressLines = cleanedAddr;
     }
