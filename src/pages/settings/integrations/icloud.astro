@@ -1,6 +1,7 @@
 ---
 import Shell from "../../../layouts/Shell.astro";
 import IcloudIntegration from "../../../components/IcloudIntegration";
+import IcloudContactsSection from "../../../components/IcloudContactsSection";
 import { prisma } from "../../../lib/db";
 import { readSession } from "../../../lib/session";
 import { getStatus } from "../../../lib/icloud-calendar";
@@ -22,7 +23,7 @@ const status = await getStatus(session.uid);
   username={user.username}
   breadcrumb={[{ label: "Nastavení" }, { label: "Integrace" }, { label: "iCloud" }]}
 >
-  <div class="max-w-2xl">
+  <div class="max-w-2xl space-y-4">
     <IcloudIntegration
       client:load
       initial={{
@@ -35,5 +36,9 @@ const status = await getStatus(session.uid);
         stats: status.stats,
       }}
     />
+    {/* Petr 2026-05-15: sync kontaktů + Kontakty status patří k iCloud
+        integraci (credentials sdílené). Sekce zobrazí status + sync tlačítko
+        + test connection link. */}
+    <IcloudContactsSection client:load icloudConnected={status.connected} />
   </div>
 </Shell>
