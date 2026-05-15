@@ -298,21 +298,29 @@ export function parseVCardFull(raw: string): VCardContact | null {
     contact.fn = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim();
   }
 
-  // Petr 2026-05-15: Apple iCloud má stub kontakty (Apple Contacts vlastní
-  // bug — nedokončené editace, importy zanechávají vCardy jen s CR `\r` nebo
-  // prázdné `FN:` polem). Plus některé XML responses obsahují raw `&#13;`
-  // (HTML entity pro CR) jako displayName. Po decode entit + trim CR/whitespace
-  // zjistime jestli kontakt má alespon něco užitečného. Pokud ne, odmítneme ho
-  // (vrátíme null) — neukládáme prázdné kontakty.
-  const cleanName = (contact.fn ?? "").replace(/&#1[03];/g, "").replace(/[\r\n\s]+/g, "").trim();
-  const cleanFirst = (contact.firstName ?? "").replace(/&#1[03];/g, "").replace(/[\r\n\s]+/g, "").trim();
-  const cleanLast = (contact.lastName ?? "").replace(/&#1[03];/g, "").replace(/[\r\n\s]+/g, "").trim();
-  const hasName = cleanName.length > 0 || cleanFirst.length > 0 || cleanLast.length > 0;
-  const hasContact = contact.phones.length > 0 || contact.emails.length > 0;
-  const hasOrg = (contact.org ?? "").replace(/&#1[03];/g, "").trim().length > 0;
+  // Petr 2026-05-15: AGRESIVNĚ trim všech stringů — Apple posílá `\r` na konci
+  // hodnot (přes `&#13;` HTML entity). Pokud `\r` zůstane v UID, L1 match selže
+  // mezi DB (čistý UID) a iCloud response (UID s `\r`) → duplicita. Stejně
+  // pro phones (`+420 777 888 999\r` vs `+420 777 888 999`).
+  const sanitize = (s: string): string => s.replace(/[\r\n\t -]/g, "").trim();
 
-  // Kontakt musí mít buď (alespoň jméno) NEBO (alespoň 1 telefon/email/firma).
-  // Pokud nic — je to stub, odmítáme.
+  contact.uid = sanitize(contact.uid);
+  contact.fn = sanitize(contact.fn);
+  contact.firstName = sanitize(contact.firstName);
+  contact.lastName = sanitize(contact.lastName);
+  if (contact.org) contact.org = sanitize(contact.org) || null;
+  if (contact.note) contact.note = sanitize(contact.note) || null;
+  contact.addressLines = contact.addressLines.map(sanitize).filter(Boolean);
+  contact.categories = contact.categories.map(sanitize).filter(Boolean);
+  contact.phones = contact.phones.map((p) => ({ number: sanitize(p.number), label: p.label ? sanitize(p.label) : null })).filter((p) => p.number);
+  contact.emails = contact.emails.map((e) => ({ email: sanitize(e.email).toLowerCase(), label: e.label ? sanitize(e.label) : null })).filter((e) => e.email);
+  contact.groupMemberUids = contact.groupMemberUids.map(sanitize).filter(Boolean);
+
+  // Pokud kontakt nemá žádné jméno + žádný kontakt + žádnou firmu — stub, odmítnout.
+  const hasName = contact.fn.length > 0 || contact.firstName.length > 0 || contact.lastName.length > 0;
+  const hasContact = contact.phones.length > 0 || contact.emails.length > 0;
+  const hasOrg = (contact.org ?? "").length > 0;
+
   if (!hasName && !hasContact && !hasOrg) return null;
 
   return contact;

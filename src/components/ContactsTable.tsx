@@ -234,8 +234,20 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
         return;
       }
       const s = data.stats;
-      setMessage(`✓ iCloud sync hotový. Staženo ${s.pulled}, vytvořeno ${s.created}, spárováno ${s.matched}, updatováno ${s.updated}, skupin ${s.groups}, chyb ${s.errors}.`);
-      setTimeout(() => setMessage(null), 8000);
+      const am = s.autoMerge;
+      const fc = s.finalContactCount;
+      const parts = [
+        `✓ iCloud sync OK`,
+        `staženo ${s.pulled}`,
+        s.created > 0 ? `vytvořeno ${s.created}` : null,
+        s.matched > 0 ? `spárováno ${s.matched}` : null,
+        s.updated > 0 ? `update ${s.updated}` : null,
+        s.errors > 0 ? `chyby ${s.errors}` : null,
+        am && am.merged > 0 ? `auto-sloučeno ${am.merged} dup` : null,
+        fc ? `→ celkem ${fc} kontaktů` : null,
+      ].filter(Boolean).join(" · ");
+      setMessage(parts);
+      setTimeout(() => setMessage(null), 12000);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
