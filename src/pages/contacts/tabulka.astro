@@ -1,6 +1,8 @@
 ---
 import Shell from "../../layouts/Shell.astro";
 import ContactsTable from "../../components/ContactsTable";
+import ContactsNewsBanner from "../../components/ContactsNewsBanner";
+import ContactsTools from "../../components/ContactsTools";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 
@@ -29,6 +31,14 @@ const icloudStatus = {
 
 // Celkový počet pro hero
 const totalCount = await prisma.contact.count({ where: { userId: session.uid } });
+
+// Skupiny pro export scope dropdown (Petr 2026-05-15 F8)
+const groupRows = await prisma.contactGroup.findMany({
+  where: { userId: session.uid },
+  select: { name: true },
+  orderBy: { name: "asc" },
+});
+const groupNames = groupRows.map((g) => g.name);
 ---
 
 <Shell
@@ -36,7 +46,15 @@ const totalCount = await prisma.contact.count({ where: { userId: session.uid } }
   username={user.username}
   breadcrumb={[{ label: "Kontakty", href: "/contacts" }, { label: "Tabulka" }]}
 >
-  <div class="max-w-[1400px]">
+  <div class="max-w-[1400px] space-y-5">
+    {/* Banner novinek z mobilu — kontakty_brief.md 5.4 */}
+    <ContactsNewsBanner client:load />
+
     <ContactsTable client:load initialTotal={totalCount} icloudStatus={icloudStatus} />
+
+    {/* Rozbalovací nástroje pod tabulkou — kontakty_brief.md 5.8 + 5.9.
+        Duplicity, F&R, +420 normalize, Import VCF/CSV, Backups/Restore,
+        Google sync (3-úrovňové párování + cleanup + pull-back), Export. */}
+    <ContactsTools client:load groupNames={groupNames} />
   </div>
 </Shell>
