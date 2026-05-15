@@ -498,6 +498,31 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
   // -------------------------------------------------------------------------
   // STAGE 2: Analýza nad přepisem. Žádné audio, jen text → spolehlivý JSON.
   // -------------------------------------------------------------------------
+  // Petr 2026-05-15: Pokud má projekt custom prompt, je to **specifikace OBSAHU**
+  // polí (např. "summary stručná, zaměřená na finance"), ne náhrada struktury.
+  // Hardcoded JSON contract garantuje, že Gemini vrátí očekávaný shape — UI
+  // čte `summary`, `key_themes`, `thoughts`, atd.
+  const jsonContract = isBrief
+    ? `Struktura JSON odpovědi (povinná):
+- transcript (string, ponech prázdné — už máme)
+- summary (string, česky, markdown s nadpisy)
+- key_themes (string[], 5-10 položek, česky)
+- thoughts (array of {text, rationale}, česky, 30+ položek možné)
+- open_questions (string[], česky)
+- sentiment ("constructive"|"concerned"|"excited"|"analytical"|"uncertain"|"frustrated")
+- intensity_signals (string, česky)
+- glossary (array of {term, definition}, česky)
+- actors (array of {name, role}, česky)
+- decision_history (string, chronologicky, česky)`
+    : `Struktura JSON odpovědi (povinná):
+- transcript (string, ponech prázdné — už máme)
+- summary (string, česky, 200-500 slov, 2-4 odstavce)
+- key_themes (string[], 2-5 výstižných pojmů, česky)
+- thoughts (array of {text, rationale}, česky, všechny myšlenky)
+- open_questions (string[], česky)
+- sentiment ("constructive"|"concerned"|"excited"|"analytical"|"uncertain"|"frustrated")
+- intensity_signals (string, česky)`;
+
   const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Gideona. Audio už je přepsané — pracuj jen s textem.
 
 ${params.projectContext ? `Kontext projektu: ${params.projectContext}\n\n` : ""}Přepis:
@@ -505,9 +530,12 @@ ${params.projectContext ? `Kontext projektu: ${params.projectContext}\n\n` : ""}
 ${transcript}
 """
 
+${jsonContract}
+
+Instrukce pro obsah polí (priorita custom > default):
 ${prompt}
 
-Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň všechna ostatní pole. Vrať POUZE JSON.`;
+Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň všechna ostatní pole DLE STRUKTURY VÝŠE. Vrať POUZE JSON.`;
 
   const stage2Start = Date.now();
   const analyzeResp = await withRetry("Stage 2 (analyze)", () =>
@@ -734,6 +762,31 @@ export async function analyzeTranscript(params: {
     throw new Error("Přepis je prázdný — není co analyzovat.");
   }
 
+  // Petr 2026-05-15: Pokud má projekt custom prompt, je to **specifikace OBSAHU**
+  // polí (např. "summary stručná, zaměřená na finance"), ne náhrada struktury.
+  // Hardcoded JSON contract garantuje, že Gemini vrátí očekávaný shape — UI
+  // čte `summary`, `key_themes`, `thoughts`, atd.
+  const jsonContract = isBrief
+    ? `Struktura JSON odpovědi (povinná):
+- transcript (string, ponech prázdné — už máme)
+- summary (string, česky, markdown s nadpisy)
+- key_themes (string[], 5-10 položek, česky)
+- thoughts (array of {text, rationale}, česky, 30+ položek možné)
+- open_questions (string[], česky)
+- sentiment ("constructive"|"concerned"|"excited"|"analytical"|"uncertain"|"frustrated")
+- intensity_signals (string, česky)
+- glossary (array of {term, definition}, česky)
+- actors (array of {name, role}, česky)
+- decision_history (string, chronologicky, česky)`
+    : `Struktura JSON odpovědi (povinná):
+- transcript (string, ponech prázdné — už máme)
+- summary (string, česky, 200-500 slov, 2-4 odstavce)
+- key_themes (string[], 2-5 výstižných pojmů, česky)
+- thoughts (array of {text, rationale}, česky, všechny myšlenky)
+- open_questions (string[], česky)
+- sentiment ("constructive"|"concerned"|"excited"|"analytical"|"uncertain"|"frustrated")
+- intensity_signals (string, česky)`;
+
   const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Gideona. Audio už je přepsané — pracuj jen s textem.
 
 ${params.projectContext ? `Kontext projektu: ${params.projectContext}\n\n` : ""}Přepis:
@@ -741,9 +794,12 @@ ${params.projectContext ? `Kontext projektu: ${params.projectContext}\n\n` : ""}
 ${transcript}
 """
 
+${jsonContract}
+
+Instrukce pro obsah polí (priorita custom > default):
 ${prompt}
 
-Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň všechna ostatní pole. Vrať POUZE JSON.`;
+Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň všechna ostatní pole DLE STRUKTURY VÝŠE. Vrať POUZE JSON.`;
 
   const genai = getGemini();
   const stage2Start = Date.now();
