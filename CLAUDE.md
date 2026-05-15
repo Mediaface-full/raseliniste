@@ -6,7 +6,9 @@ Tento soubor se automaticky načte každou novou Claude Code session.
 
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
-0. **`INSTRUKCE/HANDOFF-2026-05-13.md`** ← **AKTUÁLNÍ STAV** — Booking modul kompletní + Pošta scope fix + Todoist 429 retry. Před tímto handoffem byl modul Pošta nasazený ale neimportoval nic (chyběl scope + reauth banner + GCP Gmail API enable). Po pushi 8 commitů (`10f18f2` … `d8ec9d0`) a reauth v `/settings/integrations/google` by mělo začít fungovat.
+0. **`INSTRUKCE/CONTACTS-IMPLEMENTATION.md`** ← **AKTUÁLNÍ STAV 2026-05-15** — Kontakty Fáze 1 HOTOVÁ. iCloud CardDAV sync (pull/push/match) + `/contacts/tabulka` editor + ContactGroup + validační filtry. Overlay model: iCloud core fields + Rašeliniště overlay (isVip/aliases/clientTag/callLogToken/isTeam = NETKAME při sync). Credentials sdílené s `provider="icloud"` z kalendáře. Match strategie A (phone/email first match union → re-sync replace). Vlastní vCard 3.0 + CardDAV bez npm deps. Commity `175e2fd`, `a9f12de`, `0e6db19`. Zadání: `kontakty_brief.md`.
+
+0b. **`INSTRUKCE/HANDOFF-2026-05-13.md`** — Booking modul kompletní + Pošta scope fix + Todoist 429 retry. Před tímto handoffem byl modul Pošta nasazený ale neimportoval nic (chyběl scope + reauth banner + GCP Gmail API enable). Po pushi 8 commitů (`10f18f2` … `d8ec9d0`) a reauth v `/settings/integrations/google` by mělo začít fungovat.
 
 1. **`INSTRUKCE/POSTA-PHASE-6.md`** — Email Intelligence „Pošta" fáze 6 **FINÁLNÍ** HOTOVÁ. DetectedCommitment detector + confidence routing (auto >=0.85 / needs-confirm 0.55-0.84 / skip <0.55) + soft-link dedup + UI sekce Závazky s 4 subtaby + 1-way Todoist sync (DB primárka) + related email tracking (thread match drží alive) + stale marker 30d. **Modul Pošta kompletní** — fáze 1-6 hotové.
 
