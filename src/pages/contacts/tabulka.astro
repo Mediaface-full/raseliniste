@@ -1,0 +1,42 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import ContactsTable from "../../components/ContactsTable";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// iCloud connection status pro banner
+const integration = await prisma.userIntegration.findUnique({
+  where: { userId_provider: { userId: session.uid, provider: "icloud" } },
+  select: { lastUsedAt: true, lastError: true, config: true },
+});
+const config = (integration?.config ?? {}) as { appleId?: string; contactsAddressbookUrl?: string };
+const icloudStatus = {
+  connected: Boolean(integration),
+  username: config.appleId ?? null,
+  hasAddressbook: Boolean(config.contactsAddressbookUrl),
+  lastUsedAt: integration?.lastUsedAt?.toISOString() ?? null,
+  lastError: integration?.lastError ?? null,
+};
+
+// Celkový počet pro hero
+const totalCount = await prisma.contact.count({ where: { userId: session.uid } });
+---
+
+<Shell
+  title="Kontakty — tabulka · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Kontakty", href: "/contacts" }, { label: "Tabulka" }]}
+>
+  <div class="max-w-[1400px]">
+    <ContactsTable client:load initialTotal={totalCount} icloudStatus={icloudStatus} />
+  </div>
+</Shell>

@@ -42,6 +42,11 @@ export interface SyncStats {
 // CREDENTIALS
 // ============================================================================
 
+/**
+ * iCloud credentials sdílí provider="icloud" s kalendářem (icloud-calendar.ts).
+ * Config field má `appleId` (z calendar setupu) — pro kontakty stačí použít
+ * stejný row. Petr nemusí zadávat credentials znovu.
+ */
 export async function getIcloudCredentials(userId: string): Promise<CardDavCredentials | null> {
   const integration = await prisma.userIntegration.findUnique({
     where: { userId_provider: { userId, provider: "icloud" } },
@@ -54,14 +59,44 @@ export async function getIcloudCredentials(userId: string): Promise<CardDavCrede
     tag: integration.tokenTag,
   });
 
-  const config = (integration.config ?? {}) as { username?: string; serverUrl?: string; addressbookUrl?: string };
-  if (!config.username) return null;
+  // Config field může mít buď `appleId` (z calendar setupu icloud-calendar.ts)
+  // nebo `username` (legacy / náš nový setup) — tolerantní lookup.
+  const config = (integration.config ?? {}) as {
+    appleId?: string;
+    username?: string;
+    contactsServerUrl?: string;
+  };
+  const username = config.appleId ?? config.username;
+  if (!username) return null;
 
   return {
-    username: config.username,
+    username,
     password,
-    serverUrl: config.serverUrl ?? "https://contacts.icloud.com",
+    serverUrl: config.contactsServerUrl ?? "https://contacts.icloud.com",
   };
+}
+
+/**
+ * Cache addressbook URL po prvním discovery (pro rychlejší další sync).
+ */
+export async function getCachedAddressbookUrl(userId: string): Promise<string | null> {
+  const integration = await prisma.userIntegration.findUnique({
+    where: { userId_provider: { userId, provider: "icloud" } },
+  });
+  const config = (integration?.config ?? {}) as { contactsAddressbookUrl?: string };
+  return config.contactsAddressbookUrl ?? null;
+}
+
+export async function setCachedAddressbookUrl(userId: string, url: string): Promise<void> {
+  const integration = await prisma.userIntegration.findUnique({
+    where: { userId_provider: { userId, provider: "icloud" } },
+  });
+  if (!integration) return;
+  const oldConfig = (integration.config ?? {}) as Record<string, unknown>;
+  await prisma.userIntegration.update({
+    where: { userId_provider: { userId, provider: "icloud" } },
+    data: { config: { ...oldConfig, contactsAddressbookUrl: url } },
+  });
 }
 
 // ============================================================================
@@ -98,22 +133,11 @@ export async function pullIcloudContacts(userId: string): Promise<SyncStats> {
   }
 
   try {
-    // Discovery (jednou per sync — Apple addressbook URL se nemění)
-    let addressbookUrl: string;
-    const integration = await prisma.userIntegration.findUnique({
-      where: { userId_provider: { userId, provider: "icloud" } },
-    });
-    const cachedUrl = (integration?.config as { addressbookUrl?: string })?.addressbookUrl;
-    if (cachedUrl) {
-      addressbookUrl = cachedUrl;
-    } else {
+    // Discovery (jednou — Apple addressbook URL se nemění)
+    let addressbookUrl = await getCachedAddressbookUrl(userId);
+    if (!addressbookUrl) {
       addressbookUrl = await discoverAddressbook(creds);
-      // Cache addressbookUrl do config aby další sync nemusel dělat discovery
-      const oldConfig = (integration?.config ?? {}) as Record<string, unknown>;
-      await prisma.userIntegration.update({
-        where: { userId_provider: { userId, provider: "icloud" } },
-        data: { config: { ...oldConfig, addressbookUrl } },
-      });
+      await setCachedAddressbookUrl(userId, addressbookUrl);
     }
 
     // List všech itemů (jen href + etag — žádný obsah)
@@ -234,6 +258,12 @@ async function upsertContact(
   };
 
   if (existing) {
+    // Bezpečnost: pokud má kontakt už icloudUid (re-sync), iCloud je
+    // primárka — replace phones/emails. Jinak (prvni match z manual/Things)
+    // **union** — zachovat lokální + přidat iCloud (nezmizí VIPka lookup
+    // ani Things-imported telefony které iCloud ještě nemá).
+    const isReSync = Boolean(existing.icloudUid);
+
     // UPDATE — core fields přebíráme z iCloudu, overlay (isVip/aliases/...) NETKAME
     await prisma.contact.update({
       where: { id: existing.id },
@@ -245,8 +275,12 @@ async function upsertContact(
         ...(parsed.lastName ? { lastName: parsed.lastName } : {}),
       },
     });
-    // Reset telefony a emaily na iCloud verzi (idempotent — pokud jsou stejné, no-op)
-    await syncPhonesAndEmails(existing.id, parsed);
+
+    if (isReSync) {
+      await replacePhonesAndEmails(existing.id, parsed);
+    } else {
+      await mergePhonesAndEmails(existing.id, parsed);
+    }
     stats.updated++;
   } else {
     // CREATE
@@ -261,15 +295,16 @@ async function upsertContact(
         ...coreData,
       },
     });
-    await syncPhonesAndEmails(created.id, parsed);
+    await replacePhonesAndEmails(created.id, parsed);
     stats.created++;
   }
 }
 
-async function syncPhonesAndEmails(contactId: string, parsed: VCardContact): Promise<void> {
-  // Smaž stávající phones/emails od iCloudu, znovu vlož (idempotent)
-  // Pokud měl Petr ručně přidaný telefon mimo iCloud, ten po sync zmizí — to je
-  // OK, iCloud je source of truth pro tato pole.
+/**
+ * RE-SYNC — iCloud je primárka. Smaž lokální, nahraď iCloud verzí.
+ * Použít jen když existing.icloudUid je nastavený (= už byl spárovaný).
+ */
+async function replacePhonesAndEmails(contactId: string, parsed: VCardContact): Promise<void> {
   await prisma.phone.deleteMany({ where: { contactId } });
   await prisma.contactEmail.deleteMany({ where: { contactId } });
 
@@ -287,6 +322,45 @@ async function syncPhonesAndEmails(contactId: string, parsed: VCardContact): Pro
   if (emails.length > 0) {
     await prisma.contactEmail.createMany({
       data: emails.map((e) => ({ contactId, email: e.email, label: e.label })),
+      skipDuplicates: true,
+    });
+  }
+}
+
+/**
+ * FIRST MATCH — union: zachovat lokální + doplnit iCloud položky které
+ * lokálně chybí. Bezpečné při prvním párování existujícího Contact
+ * (z Things import / Google / manual) na iCloud vCard.
+ *
+ * Po prvním sync má kontakt icloudUid → další re-sync používá replace.
+ */
+async function mergePhonesAndEmails(contactId: string, parsed: VCardContact): Promise<void> {
+  const existing = await prisma.contact.findUnique({
+    where: { id: contactId },
+    include: { phones: true, emails: true },
+  });
+  if (!existing) return;
+
+  const existingPhoneSet = new Set(existing.phones.map((p) => p.number));
+  const existingEmailSet = new Set(existing.emails.map((e) => e.email.toLowerCase()));
+
+  const newPhones = parsed.phones
+    .map((p) => ({ number: normalizePhone(p.number) ?? p.number, label: p.label }))
+    .filter((p) => p.number && !existingPhoneSet.has(p.number));
+
+  const newEmails = parsed.emails
+    .map((e) => ({ email: e.email.toLowerCase(), label: e.label }))
+    .filter((e) => e.email && !existingEmailSet.has(e.email));
+
+  if (newPhones.length > 0) {
+    await prisma.phone.createMany({
+      data: newPhones.map((p) => ({ contactId, number: p.number, label: p.label })),
+      skipDuplicates: true,
+    });
+  }
+  if (newEmails.length > 0) {
+    await prisma.contactEmail.createMany({
+      data: newEmails.map((e) => ({ contactId, email: e.email, label: e.label })),
       skipDuplicates: true,
     });
   }
@@ -369,10 +443,7 @@ export async function pushContactToIcloud(userId: string, contactId: string): Pr
 
   // Pro nový kontakt vygeneruj UID
   const uid = contact.icloudUid ?? crypto.randomUUID();
-  const integration = await prisma.userIntegration.findUnique({
-    where: { userId_provider: { userId, provider: "icloud" } },
-  });
-  const addressbookUrl = (integration?.config as { addressbookUrl?: string })?.addressbookUrl;
+  const addressbookUrl = await getCachedAddressbookUrl(userId);
   if (!addressbookUrl) return { ok: false, error: "Addressbook URL chybí — spusť nejdřív sync." };
 
   const vcard = buildVCard({
