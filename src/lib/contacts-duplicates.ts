@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "./db";
+import { backupContact } from "./contacts-backup";
 
 export interface DuplicateCluster {
   id: string; // dočasné ID pro UI tracking
@@ -216,6 +217,11 @@ export async function mergeContacts(
     where: { id: { in: secondaryIds }, userId },
     include: { phones: true, emails: true },
   });
+
+  // Záloha každého sekundárního před sloučením (kontakty_brief.md 5.8 F)
+  for (const s of secondaries) {
+    await backupContact(userId, s.id, "before_merge").catch(() => null);
+  }
 
   // 1) Skalární doplnění
   const updates: Record<string, unknown> = {};

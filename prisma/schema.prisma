@@ -113,6 +113,32 @@ model User {
   detectedCommitments DetectedCommitment[]
   schedulingConfig    SchedulingConfig?
   contactGroups       ContactGroup[]
+  contactBackups      ContactBackup[]
+}
+
+/// Záloha kontaktu před úpravou / smazáním (kontakty_brief.md 5.8 F).
+/// Vytváří se automaticky před každým PUT do iCloudu / před DELETE.
+/// UI „Obnova ze zálohy" listuje posledních 80 záznamů a může každou
+/// obnovit jako nový kontakt nebo přepsat stávající (přes UID match).
+model ContactBackup {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Snapshot kontaktu jako vCard 3.0 string (kompatibilní napříč zdroji)
+  vcardSnapshot   String   @db.Text
+  contactId       String?  // FK na původní Contact (nullable — Contact mohl být smazán)
+  displayName     String   // pro UI listování bez parsing vCardy
+  // Důvod zálohy:
+  //   "before_put"    — před PUT do iCloudu (změna)
+  //   "before_delete" — před DELETE z iCloudu (smazání)
+  //   "before_merge"  — sekundární kontakt před sloučením v duplicit merge
+  action          String
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([contactId])
 }
 
 /// Booking scheduling config — 1 řádek per user, editovatelné z /calendar/settings.

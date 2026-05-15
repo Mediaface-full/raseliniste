@@ -25,6 +25,7 @@ import {
 } from "./carddav";
 import { parseVCardFull, buildVCard, type VCardContact } from "./vcard";
 import { normalizePhone } from "./phone";
+import { backupContact } from "./contacts-backup";
 
 export interface SyncStats {
   ok: boolean;
@@ -434,6 +435,13 @@ export async function pushContactToIcloud(userId: string, contactId: string): Pr
 }> {
   const creds = await getIcloudCredentials(userId);
   if (!creds) return { ok: false, error: "iCloud credentials nejsou nakonfigurované." };
+
+  // Petr 2026-05-15 (kontakty_brief.md 5.8 F): záloha před každým PUT.
+  // Pokud Contact existuje, snapshotneme jeho aktuální stav do ContactBackup
+  // → po nepovedeném PUT (412 Conflict, server error) lze obnovit.
+  await backupContact(userId, contactId, "before_put").catch((e) => {
+    console.warn(`[icloud-push] backup failed for ${contactId}: ${e instanceof Error ? e.message : e}`);
+  });
 
   const contact = await prisma.contact.findFirst({
     where: { id: contactId, userId },
