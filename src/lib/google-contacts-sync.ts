@@ -599,11 +599,13 @@ export async function cleanupGoogleDuplicates(userId: string): Promise<{
   deleted: number;
   clustersProcessed: number;
   errors: number;
+  errorMessages: string[];
 }> {
   const clusters = await findGoogleDuplicates(userId);
   const people = await getPeopleClient(userId);
   let deleted = 0;
   let errors = 0;
+  const errorMessages: string[] = [];
   for (const cluster of clusters) {
     for (const m of cluster.members) {
       if (m.resourceName === cluster.keep.resourceName) continue;
@@ -612,12 +614,18 @@ export async function cleanupGoogleDuplicates(userId: string): Promise<{
         deleted++;
         await sleep(SLEEP_BETWEEN_REQUESTS_MS);
       } catch (e) {
-        console.warn(`[google-cleanup] delete ${m.resourceName} err:`, e instanceof Error ? e.message : e);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`[google-cleanup] delete ${m.resourceName} err:`, msg);
         errors++;
+        // Sběr unikátních chyb (typicky 1 příčina pro všechny — scope/auth)
+        const shortMsg = msg.slice(0, 200);
+        if (!errorMessages.includes(shortMsg) && errorMessages.length < 3) {
+          errorMessages.push(shortMsg);
+        }
       }
     }
   }
-  return { ok: true, deleted, clustersProcessed: clusters.length, errors };
+  return { ok: true, deleted, clustersProcessed: clusters.length, errors, errorMessages };
 }
 
 // ============================================================================

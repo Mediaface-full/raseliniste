@@ -705,7 +705,19 @@ function GoogleSection() {
         setError(data.error ?? "Selhalo.");
         return;
       }
-      setResult(`✓ Zpracováno ${data.clustersProcessed} clusterů, smazáno ${data.deleted}, chyby ${data.errors}.`);
+      if (data.errors > 0 && data.errorMessages?.length > 0) {
+        // Detailní chyba pro Petra — typicky scope insufficient po prvním sync
+        const hasAuthError = data.errorMessages.some((m: string) => /403|401|insufficient|scope|permission/i.test(m));
+        if (hasAuthError) {
+          setError(
+            `Google delete vrací chybu autorizace — pravděpodobně chybí scope \`contacts\` (write). ` +
+            `Otevři /settings/integrations/google a klikni Reautorizovat. Detail: ${data.errorMessages[0]}`,
+          );
+        } else {
+          setError(`Detail chyby: ${data.errorMessages.join(" | ")}`);
+        }
+      }
+      setResult(`Zpracováno ${data.clustersProcessed} clusterů, smazáno ${data.deleted}, chyby ${data.errors}.`);
     } finally {
       setCleaning(false);
     }
