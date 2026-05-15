@@ -92,7 +92,11 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
   // Dirty tracking — pole změn neuložených na server. Klíč = contactId-field.
   const [dirty, setDirty] = useState<Map<string, { id: string; field: string; value: string | number | null | string[] }>>(new Map());
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  // Petr 2026-05-15: rozdělené stavy per provider — sdílený `syncing` rozsvěcoval
+  // spinnery u OBOU tlačítek najednou, i když uživatel klikl jen jedno.
+  const [syncingIcloud, setSyncingIcloud] = useState(false);
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
+  const syncing = syncingIcloud || syncingGoogle; // jen pro celkovou pojistku (např. disable Save tlačítka)
   const [pushingId, setPushingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -223,7 +227,7 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
   }
 
   async function runIcloudSync() {
-    setSyncing(true);
+    setSyncingIcloud(true);
     setError(null);
     setMessage(null);
     try {
@@ -252,14 +256,14 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setSyncing(false);
+      setSyncingIcloud(false);
     }
   }
 
   /** Obousměrný sync s Google Workspace (Petr 2026-05-15 — vedle iCloud sync). */
   async function runGoogleSync() {
     if (!confirm("Obousměrný sync s Google Workspace (last-write-wins). Overlay pole (VIP/aliasy/klient slug) se nepřepisují. Pokud chybí Google scope `contacts`, proběhne reauth v /settings/integrations/google.")) return;
-    setSyncing(true);
+    setSyncingGoogle(true);
     setError(null);
     setMessage(null);
     try {
@@ -279,7 +283,7 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setSyncing(false);
+      setSyncingGoogle(false);
     }
   }
 
@@ -336,19 +340,19 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
           )}
           <button
             onClick={runIcloudSync}
-            disabled={syncing || !icloudStatus.connected}
+            disabled={syncingIcloud || syncingGoogle || !icloudStatus.connected}
             className="px-3 py-1.5 rounded-md bg-[var(--tint-sky)]/15 text-[var(--tint-sky)] border border-[var(--tint-sky)]/30 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
           >
-            {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Cloud className="size-3.5" />}
+            {syncingIcloud ? <Loader2 className="size-3.5 animate-spin" /> : <Cloud className="size-3.5" />}
             Synchronizovat s iCloudem
           </button>
           <button
             onClick={runGoogleSync}
-            disabled={syncing}
+            disabled={syncingIcloud || syncingGoogle}
             className="px-3 py-1.5 rounded-md bg-[var(--tint-lavender)]/15 text-[var(--tint-lavender)] border border-[var(--tint-lavender)]/30 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
             title="Obousměrný sync s Google Workspace (last-write-wins). Vyžaduje rozšířený OAuth scope contacts."
           >
-            {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Cloud className="size-3.5" />}
+            {syncingGoogle ? <Loader2 className="size-3.5 animate-spin" /> : <Cloud className="size-3.5" />}
             Synchronizovat s Google
           </button>
           <button
