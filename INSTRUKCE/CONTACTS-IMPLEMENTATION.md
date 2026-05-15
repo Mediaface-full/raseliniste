@@ -237,6 +237,81 @@ syncSource         String?   // "icloud" | "google" | "manual" | "restore"
 | `8cf63f2` | F4 + F5 |
 | `6eb985c` | F6 + F7 |
 | `02edce9` | F8 UI integrace |
+| `c3f78bd` | Google sync **OBOUSMĚRNÝ** (původně jen push) |
+| `5d01c20` | `&#13;` decoder + cleanup endpoint + sloupec adresa + export podle firmy |
+| `e507079` | parser odmítá prázdné kontakty + match phoneKey + Google sync tlačítko v hero |
+| `2998b20` | match L2 na všechny kontakty (i s icloudUid) + auto-merge UI |
+| `716f880` | parser sanitize všech stringů + auto-merge po každém sync + rate-limit |
+| `ab7ce26` | `&#13;` v adresách — speciální handler zachová `\n` mezi řádky |
+| `5d809a3` | rozdělené sync stavy iCloud/Google (spinner crosstalk) |
+| `2b4c75f` | Nuclear reset endpoint — smaže non-overlay, sync iCloud znovu |
+| `08ff2d8` | cleanup Google vrací detail chyby (typicky scope `contacts` write) |
+| `7d37951` | diagnostic endpoint `/api/contacts/diagnose` + UI sekce |
+
+## Provozní gotchas (důležité)
+
+### Google scope reauth (vyžaduje uživatelskou akci)
+
+Po deployi `e507079` (rozšíření `contacts.readonly` → `contacts` read+write):
+1. Petr musí jít na `/settings/integrations/google`
+2. Klik **Reautorizovat**
+3. Google consent screen → odsouhlas nové scopy
+4. Bez tohoto kroku **Google delete vrací 403** „insufficient authentication scopes" — commit `08ff2d8` vrátí konkrétní hlášku do UI.
+
+### `&#13;` v datech (Apple CardDAV gotcha)
+
+Apple iCloud posílá `&#13;` (HTML entity pro CR) v XML response. Pokud něco
+proletí přes parser nedotčeně:
+- **Cleanup endpoint** `/api/contacts/cleanup-entities` — projede všech 5 string fields + addressLines + groups
+- **Tlačítko v UI** „Vyčistit entity + prázdné" v Nástrojích banneru
+- **Detail handler** pro adresy (`decodeAddress`) — zachová `\n` mezi ulice/město/země
+
+### Duplicity po sync
+
+I po fix v `716f880` (parser sanitize) mohou vzniknout duplicity. Tři vrstvy obrany:
+1. **Parser sanitize** — strip CR/LF/TAB ze všech stringů
+2. **Match L2** v `upsertContact` přes phoneKey na VŠECHNY kontakty (i s icloudUid — Apple UID rotation)
+3. **Auto-merge po sync** — automaticky volá `findDuplicateClusters` + `mergeContacts`
+
+Pokud po sync přesto vzniknou duplicity, **Nuclear reset** (`2b4c75f`) smaže všechny non-overlay kontakty a sync iCloudu znovu = čistý dataset.
+
+### Diagnostika
+
+`/api/contacts/diagnose` GET vrátí breakdown:
+- per syncSource, per importedFrom
+- overlay flags counts
+- duplicate clusters s top 5 příklady
+- 20 nejnovějších kontaktů s timestamp + source
+
+UI sekce „Diagnostika" v Nástrojích (žlutá butter), tlačítko „Spočítat".
+
+## Workflow pro Petra (cheat sheet)
+
+**Čerstvý start (jednou):**
+1. `/settings/integrations/icloud` → Test připojení → Stáhnout z iCloudu
+2. `/contacts/tabulka` → Nástroje → cleanup banner → „Vyčistit entity + prázdné"
+
+**Pokud duplicity:**
+1. Nástroje → „Diagnostika" → Spočítat → screenshot
+2. Pokud cluster < 50: Nástroje → Duplicity → Najít → manuálně merge
+3. Pokud cluster > 50: Nástroje → cleanup banner → „Auto-merge duplicity"
+
+**Pokud naprostý bordel:**
+1. Nástroje → cleanup banner → **„💣 Nuclear reset"** → napiš `SMAZAT`
+2. Hero → „Synchronizovat s iCloudem"
+3. Po sync uvidíš čistý dataset
+
+**Google sync (po reauth):**
+1. Hero → „Synchronizovat s Google" (obousměrný, last-write-wins)
+2. Nebo Nástroje → Google Workspace → 3 akce zvlášť
+
+**Export:**
+- Nástroje → Export VCF/CSV → scope (vše / firma / skupina) + format → Stáhnout
+
+**Editace tabulky:**
+- Single-click do buňky → změna → Enter → další řádek
+- Bulk Uložit v hero (tlačítko se countem dirty)
+- Per-row tlačítko push do iCloudu (cloud-upload ikona vpravo)
 
 ## Známé omezení
 
