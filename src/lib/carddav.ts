@@ -75,8 +75,9 @@ export async function discoverAddressbook(creds: CardDavCredentials): Promise<st
   // Apple může přesměrovat redirect — fetch ho followuje. Detekuj nový host
   // ze samotného principal href (může být absolutní URL na p<DC>).
   let principalPath = "";
-  const principalMatch = principalRes.body.match(/<d:current-user-principal[^>]*>[\s\S]*?<d:href[^>]*>([^<]+)<\/d:href>/i)
-    ?? principalRes.body.match(/<current-user-principal[^>]*>[\s\S]*?<href[^>]*>([^<]+)<\/href>/i);
+  // Apple iCloud používá default DAV: namespace (bez prefixu). Sabre/Radicale
+  // používají `d:` prefix. Regex tolerantní na obě.
+  const principalMatch = principalRes.body.match(/<(?:\w+:)?current-user-principal[^>]*>[\s\S]*?<(?:\w+:)?href[^>]*>([^<]+)<\/(?:\w+:)?href>/i);
   if (principalMatch) {
     principalPath = principalMatch[1].trim();
   }
@@ -107,8 +108,7 @@ export async function discoverAddressbook(creds: CardDavCredentials): Promise<st
     throw new Error(`CardDAV: PROPFIND principal selhal (HTTP ${homeRes.status}). URL: ${principalUrl}. Body: ${homeRes.body.slice(0, 300)}`);
   }
 
-  const homeHrefMatch = homeRes.body.match(/<c:addressbook-home-set[^>]*>[\s\S]*?<d:href[^>]*>([^<]+)<\/d:href>/i)
-    ?? homeRes.body.match(/<addressbook-home-set[^>]*>[\s\S]*?<href[^>]*>([^<]+)<\/href>/i);
+  const homeHrefMatch = homeRes.body.match(/<(?:\w+:)?addressbook-home-set[^>]*>[\s\S]*?<(?:\w+:)?href[^>]*>([^<]+)<\/(?:\w+:)?href>/i);
   if (!homeHrefMatch) {
     throw new Error(`CardDAV: addressbook-home-set nenalezen v response. Body preview: ${homeRes.body.slice(0, 400)}`);
   }
@@ -136,11 +136,11 @@ export async function discoverAddressbook(creds: CardDavCredentials): Promise<st
   }
 
   // Najdi response s resourcetype/addressbook
+  // Apple iCloud: `<addressbook xmlns="urn:ietf:params:xml:ns:carddav"/>` —
+  // empty self-closing element s namespace declaration nebo bez prefixu.
   const responses = splitResponses(addressbooksRes.body);
   for (const resp of responses) {
-    const isAddressbook = /<c:addressbook\s*\/>/i.test(resp)
-      || /<carddav:addressbook/i.test(resp)
-      || /<addressbook\s*\/>/i.test(resp);
+    const isAddressbook = /<(?:\w+:)?addressbook[\s/>]/i.test(resp);
     if (!isAddressbook) continue;
 
     const href = extractHref(resp);
@@ -179,7 +179,7 @@ export async function listAddressbookItems(
   const responses = splitResponses(res.body);
   for (const resp of responses) {
     const href = extractHref(resp);
-    const etag = (resp.match(/<d:getetag[^>]*>([^<]+)<\/d:getetag>/i)?.[1] ?? "").replace(/^"|"$/g, "");
+    const etag = (resp.match(/<(?:\w+:)?getetag[^>]*>([^<]+)<\/(?:\w+:)?getetag>/i)?.[1] ?? "").replace(/^"|"$/g, "");
     if (!href || !etag) continue;
     // Skip self (addressbook samotný — má prázdný etag nebo končí /)
     if (href.endsWith("/") || !etag) continue;
@@ -215,8 +215,8 @@ export async function fetchAddressbookItems(
     const responses = splitResponses(res.body);
     for (const resp of responses) {
       const href = extractHref(resp);
-      const etag = (resp.match(/<d:getetag[^>]*>([^<]+)<\/d:getetag>/i)?.[1] ?? "").replace(/^"|"$/g, "");
-      const vcardMatch = resp.match(/<c:address-data[^>]*>([\s\S]*?)<\/c:address-data>/i);
+      const etag = (resp.match(/<(?:\w+:)?getetag[^>]*>([^<]+)<\/(?:\w+:)?getetag>/i)?.[1] ?? "").replace(/^"|"$/g, "");
+      const vcardMatch = resp.match(/<(?:\w+:)?address-data[^>]*>([\s\S]*?)<\/(?:\w+:)?address-data>/i);
       const vcard = vcardMatch ? decodeXmlEntities(vcardMatch[1]) : null;
       if (href && etag && vcard) {
         out.push({ href, etag, vcard });
@@ -333,31 +333,31 @@ async function rawRequest(
 // XML PARSING HELPERS (jednoduché regex pro CardDAV-specific XML)
 // ============================================================================
 
-/** Rozdělí PROPFIND/REPORT multistatus na jednotlivé <d:response> bloky. */
+/**
+ * Rozdělí PROPFIND/REPORT multistatus na jednotlivé <response> bloky.
+ *
+ * Apple iCloud používá DEFAULT XML namespace (`<multistatus xmlns="DAV:">`)
+ * bez prefixu — `<response>`. Sabre/Radicale a další servery používají
+ * prefix `<d:response>`. Regex tolerantní na obě varianty.
+ */
 function splitResponses(xml: string): string[] {
   const out: string[] = [];
-  const re = /<d:response[\s>][\s\S]*?<\/d:response>/gi;
+  // (?:\w+:)? = volitelný prefix s `:` (např. `d:` nebo žádný)
+  const re = /<(?:\w+:)?response[\s>][\s\S]*?<\/(?:\w+:)?response>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml)) !== null) {
     out.push(m[0]);
-  }
-  if (out.length === 0) {
-    // Některé servery (Google) můžou používat jiný prefix než `d:` — fallback
-    const re2 = /<[^:>\s]+:response[\s>][\s\S]*?<\/[^:>\s]+:response>/gi;
-    let m2: RegExpExecArray | null;
-    while ((m2 = re2.exec(xml)) !== null) out.push(m2[0]);
   }
   return out;
 }
 
 function extractHref(responseXml: string): string | null {
-  const m = responseXml.match(/<d:href[^>]*>([^<]+)<\/d:href>/i)
-    ?? responseXml.match(/<href[^>]*>([^<]+)<\/href>/i);
-  return m?.[1] ?? null;
+  const m = responseXml.match(/<(?:\w+:)?href[^>]*>([^<]+)<\/(?:\w+:)?href>/i);
+  return m?.[1]?.trim() ?? null;
 }
 
 function extractTagContent(xml: string, tagName: string): string {
-  const re = new RegExp(`<[^:>]*:?${tagName}[^>]*>([\\s\\S]*?)<\\/[^:>]*:?${tagName}>`, "i");
+  const re = new RegExp(`<(?:\\w+:)?${tagName}[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?${tagName}>`, "i");
   return xml.match(re)?.[1] ?? "";
 }
 
