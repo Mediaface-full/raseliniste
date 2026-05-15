@@ -83,10 +83,40 @@ export default function ContactsTools({ groupNames, companyNames = [] }: { group
 // detekuje entity → 1 klik vyčistí.
 // ===========================================================================
 function CleanupEntitiesBanner() {
-  const [busy, setBusy] = useState<"cleanup" | "merge" | null>(null);
+  const [busy, setBusy] = useState<"cleanup" | "merge" | "nuclear" | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  async function runNuclear() {
+    const userInput = prompt(
+      "NUCLEAR RESET — smaže všechny kontakty BEZ overlay flagů (VIP/tým/clientTag/aliases/callLogToken jsou ZACHOVÁNY).\n\n" +
+      "Pak klikneš 'Synchronizovat s iCloudem' a importuje se čistý dataset z iCloudu.\n\n" +
+      "Pro potvrzení napiš: SMAZAT",
+    );
+    if (userInput !== "SMAZAT") return;
+    setBusy("nuclear");
+    setError(null);
+    try {
+      const res = await fetch("/api/contacts/nuclear-reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirm: "NUCLEAR_RESET" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Reset selhal.");
+        return;
+      }
+      setResult(`✓ Smazáno ${data.deleted} kontaktů. Zachováno ${data.keptOverlay} (VIP/tým/clientTag/aliases). V DB zbývá ${data.finalCount}. Teď klikni 'Synchronizovat s iCloudem'.`);
+      setDone(true);
+      setTimeout(() => window.location.reload(), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function runCleanup() {
     if (!confirm("Vyčistit HTML entities (`&#13;` apod.) z kontaktů + telefonů + emailů + skupin? Plus smazat prázdné kontakty. Idempotentní.")) return;
@@ -167,7 +197,14 @@ function CleanupEntitiesBanner() {
         <Button onClick={runAutoMerge} disabled={busy !== null} className="bg-[var(--tint-sage)]/20 text-[var(--tint-sage)] border-[var(--tint-sage)]/40">
           {busy === "merge" ? <><Loader2 className="size-4 animate-spin" /> Slučuji…</> : "2) Auto-merge duplicity"}
         </Button>
+        <Button onClick={runNuclear} disabled={busy !== null} className="bg-destructive/20 text-destructive border-destructive/40 ml-auto" title="Smaže všechny non-overlay kontakty. Zachová jen VIP/tým/clientTag/aliases.">
+          {busy === "nuclear" ? <><Loader2 className="size-4 animate-spin" /> Mažu…</> : "💣 Nuclear reset"}
+        </Button>
       </div>
+      <p className="text-xs text-muted-foreground border-t border-white/5 pt-2 mt-2">
+        💣 <strong>Nuclear reset</strong> = smaže VŠECHNY kontakty bez overlay flagů (VIP/tým/clientTag/aliases zachovány).
+        Pak klikneš „Synchronizovat s iCloudem" v hero → naimportuje čistý dataset z iCloudu. Použij pokud cleanup+merge nestíhá.
+      </p>
       {error && <div className="text-xs text-destructive">{error}</div>}
     </div>
   );
