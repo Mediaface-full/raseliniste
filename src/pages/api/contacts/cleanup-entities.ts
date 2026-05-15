@@ -52,6 +52,7 @@ export const POST: APIRoute = async ({ cookies }) => {
     emailsUpdated: 0,
     groupsUpdated: 0,
     duplicatesDeleted: 0,
+    emptyContactsDeleted: 0,
   };
 
   // 1) Contact rows — projet všechny fields
@@ -189,6 +190,36 @@ export const POST: APIRoute = async ({ cookies }) => {
     await prisma.contactEmail.deleteMany({ where: { id: { in: toDeleteEmail } } });
   }
   stats.duplicatesDeleted = toDeletePhone.length + toDeleteEmail.length;
+
+  // 6) Smazat PRÁZDNÉ kontakty (stub z iCloudu — žádné jméno, žádný tel,
+  //    žádný email, žádná firma — Apple bug s nedokončenými importy).
+  //    Detekce po cleanup entit, kdy zbude "" / "\r" / whitespace.
+  const allContacts = await prisma.contact.findMany({
+    where: { userId: session.uid },
+    include: { phones: true, emails: true },
+  });
+  const emptyIds: string[] = [];
+  for (const c of allContacts) {
+    const nameClean = (c.displayName ?? "").replace(/[\r\n\s&#0-9;]+/g, "").trim();
+    const firstClean = (c.firstName ?? "").replace(/[\r\n\s&#0-9;]+/g, "").trim();
+    const lastClean = (c.lastName ?? "").replace(/[\r\n\s&#0-9;]+/g, "").trim();
+    const orgClean = (c.company ?? "").replace(/[\r\n\s&#0-9;]+/g, "").trim();
+    const hasReadableName =
+      // alespoň jedno písmeno (ne jen čísla a entity)
+      /[a-zA-ZÀ-ž]/.test(nameClean) || /[a-zA-ZÀ-ž]/.test(firstClean) || /[a-zA-ZÀ-ž]/.test(lastClean);
+    const hasContact = c.phones.length > 0 || c.emails.length > 0;
+    const hasOrg = /[a-zA-ZÀ-ž]/.test(orgClean);
+    // POZOR: nesmazat overlay kontakty (isVip/clientTag/aliases) — i kdyby
+    // byly "prázdné" po decode, Petr je vědomě udržuje (VIP token, alias).
+    const hasOverlay = c.isVip || c.isTeam || c.clientTag !== null || c.aliases.length > 0 || c.callLogToken !== null;
+    if (!hasReadableName && !hasContact && !hasOrg && !hasOverlay) {
+      emptyIds.push(c.id);
+    }
+  }
+  if (emptyIds.length > 0) {
+    await prisma.contact.deleteMany({ where: { id: { in: emptyIds } } });
+    stats.emptyContactsDeleted = emptyIds.length;
+  }
 
   return Response.json({ ok: true, stats });
 };

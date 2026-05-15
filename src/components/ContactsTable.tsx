@@ -234,7 +234,34 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
         return;
       }
       const s = data.stats;
-      setMessage(`✓ Sync hotový. Staženo ${s.pulled}, vytvořeno ${s.created}, spárováno ${s.matched}, updatováno ${s.updated}, skupin ${s.groups}, chyb ${s.errors}.`);
+      setMessage(`✓ iCloud sync hotový. Staženo ${s.pulled}, vytvořeno ${s.created}, spárováno ${s.matched}, updatováno ${s.updated}, skupin ${s.groups}, chyb ${s.errors}.`);
+      setTimeout(() => setMessage(null), 8000);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  /** Obousměrný sync s Google Workspace (Petr 2026-05-15 — vedle iCloud sync). */
+  async function runGoogleSync() {
+    if (!confirm("Obousměrný sync s Google Workspace (last-write-wins). Overlay pole (VIP/aliasy/klient slug) se nepřepisují. Pokud chybí Google scope `contacts`, proběhne reauth v /settings/integrations/google.")) return;
+    setSyncing(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/contacts/google/sync", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scope: "all", direction: "bidirectional" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Google sync selhal. Pravděpodobně chybí Google scope `contacts` — reauth v /settings/integrations/google.");
+        return;
+      }
+      setMessage(`✓ Google sync hotový. Z Google: vytvořeno ${data.pulledCreated}, update ${data.pulledUpdated}. Do Google: vytvořeno ${data.created}, update ${data.updated}. Chyb ${data.errors}.`);
       setTimeout(() => setMessage(null), 8000);
       await load();
     } catch (e) {
@@ -302,6 +329,15 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
           >
             {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Cloud className="size-3.5" />}
             Synchronizovat s iCloudem
+          </button>
+          <button
+            onClick={runGoogleSync}
+            disabled={syncing}
+            className="px-3 py-1.5 rounded-md bg-[var(--tint-lavender)]/15 text-[var(--tint-lavender)] border border-[var(--tint-lavender)]/30 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
+            title="Obousměrný sync s Google Workspace (last-write-wins). Vyžaduje rozšířený OAuth scope contacts."
+          >
+            {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Cloud className="size-3.5" />}
+            Synchronizovat s Google
           </button>
           <button
             onClick={saveAll}

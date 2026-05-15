@@ -1496,6 +1496,43 @@ Garantujeme: i když Stage 2 selže, transcript je vždy uložený. Pokrývá re
 
 Vertex AI nepodporuje `genai.files.upload()` (Files API existuje jen v Google AI Studio). Pro audio > 14 MB v Vertex módu fallback na AI Studio Files API přes `GEMINI_API_KEY`.
 
+### CardDAV XML gotcha — Apple `&#13;` v datech (2026-05-15)
+
+**Symptom:** Po prvním iCloud sync se v Rašeliniště DB objevily kontakty
+s `&#13;` v emailu/telefonu/jméně/firmě. Plus celé „prázdné" kontakty
+kde displayName = pouze `&#13;`.
+
+**Root cause:** Apple iCloud CardDAV server posílá XML response s **numeric
+HTML entities** pro CR/LF (`&#13;` = `\r`, `&#10;` = `\n`). Naše původní
+`decodeXmlEntities()` v `src/lib/carddav.ts` znala jen `&amp;`, `&lt;`, atd.
+— numeric entities propustila literal do vCard data, kde se uložily do DB.
+
+Plus Apple Contacts má **stub kontakty** (bug v iOS app — nedokončené
+editace, importy zanechávají vCardy s prázdným `FN:` nebo jen CR `\r`).
+
+**Fix (commit `5d01c20` + následný):**
+
+1. `decodeXmlEntities` rozšířen o numeric entities (`&#NNN;`, `&#xHH;`).
+2. `parseVCardFull` odmítá vCard kde po decode/trim není ani jméno ani
+   telefon/email/firma (vrací `null` → upsertContact skip).
+3. Endpoint `POST /api/contacts/cleanup-entities`:
+   - Projde všechny Contact + Phone + ContactEmail + ContactGroup
+   - `decodeEntities()` + trim CR/whitespace
+   - Dedup duplicitních telefonů/emailů uvnitř kontaktu
+   - Smaže prázdné kontakty (bez čitelného jména + bez contact info
+     + bez overlay polí — overlay (isVip/aliases/clientTag/callLogToken)
+     chráněno!)
+4. UI tlačítko „Vyčistit teď" v `/contacts/tabulka` → Nástroje (banner
+   na vrchu sekce).
+5. Match strategie v `upsertContact` (icloud-contacts.ts) změněna z
+   `normalizePhone` na **`phoneKey` (posledních 9 číslic)** — robustní
+   napříč formáty (`+420 777 888 999` vs `420777888999` = match).
+
+**Lekce do budoucna:** při psaní vlastních HTTP klientů pro XML/SOAP
+servery vždy podporovat **plnou sadu HTML entities včetně numeric**.
+RFC 5198 (unicode in XML) numeric entities zmiňuje, ale není povinné je
+implementovat. Apple/Google různě posílají, být tolerantní.
+
 ### AI prompts override system (commit 00086dd)
 
 Default prompty hardcoded v `lib/ai-prompts.ts` (single source of truth). Override v DB tabulce `AiPrompt`. UI v `/settings/ai-prompts`. 60 s in-memory cache. Reset = smaže DB, vrátí default.

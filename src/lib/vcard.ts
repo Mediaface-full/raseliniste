@@ -297,7 +297,23 @@ export function parseVCardFull(raw: string): VCardContact | null {
   if (!contact.fn) {
     contact.fn = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim();
   }
-  if (!contact.fn && !contact.uid) return null;
+
+  // Petr 2026-05-15: Apple iCloud má stub kontakty (Apple Contacts vlastní
+  // bug — nedokončené editace, importy zanechávají vCardy jen s CR `\r` nebo
+  // prázdné `FN:` polem). Plus některé XML responses obsahují raw `&#13;`
+  // (HTML entity pro CR) jako displayName. Po decode entit + trim CR/whitespace
+  // zjistime jestli kontakt má alespon něco užitečného. Pokud ne, odmítneme ho
+  // (vrátíme null) — neukládáme prázdné kontakty.
+  const cleanName = (contact.fn ?? "").replace(/&#1[03];/g, "").replace(/[\r\n\s]+/g, "").trim();
+  const cleanFirst = (contact.firstName ?? "").replace(/&#1[03];/g, "").replace(/[\r\n\s]+/g, "").trim();
+  const cleanLast = (contact.lastName ?? "").replace(/&#1[03];/g, "").replace(/[\r\n\s]+/g, "").trim();
+  const hasName = cleanName.length > 0 || cleanFirst.length > 0 || cleanLast.length > 0;
+  const hasContact = contact.phones.length > 0 || contact.emails.length > 0;
+  const hasOrg = (contact.org ?? "").replace(/&#1[03];/g, "").trim().length > 0;
+
+  // Kontakt musí mít buď (alespoň jméno) NEBO (alespoň 1 telefon/email/firma).
+  // Pokud nic — je to stub, odmítáme.
+  if (!hasName && !hasContact && !hasOrg) return null;
 
   return contact;
 }

@@ -222,23 +222,41 @@ async function upsertContact(
       })
     : null;
 
-  // 2) Match podle telefonu nebo emailu (první sync — Petr měl Contact z manual/Google)
+  // 2) Match podle telefonu (phoneKey = posledních 9 číslic, robustní napříč
+  //    formáty — `+420 777 888 999` v iCloudu vs `420777888999` v Rašeliniště
+  //    z Things importu nemůže selhat na string exact). Email lowercase.
+  //    Petr 2026-05-15: predchozí normalizePhone match propousteli duplicity
+  //    kdyz formaty se lisily.
   if (!existing) {
-    const normalizedPhones = parsed.phones.map((p) => normalizePhone(p.number)).filter((p): p is string => Boolean(p));
+    const parsedPhoneKeys = parsed.phones
+      .map((p) => p.number.replace(/\D/g, "").slice(-9))
+      .filter((k) => k.length >= 6);
     const emails = parsed.emails.map((e) => e.email.toLowerCase());
 
-    if (normalizedPhones.length > 0 || emails.length > 0) {
-      existing = await prisma.contact.findFirst({
+    if (parsedPhoneKeys.length > 0 || emails.length > 0) {
+      // Phone match: nemůžeme to spustit přes Prisma `in` (DB má telefony
+      // v raw formátu, my potřebujeme last-9-digits). Fetch kandidáty +
+      // JS porovnání.
+      const candidates = await prisma.contact.findMany({
         where: {
           userId,
-          icloudUid: null, // jen ne-paired contacts
+          icloudUid: null,
           OR: [
-            ...(normalizedPhones.length > 0 ? [{ phones: { some: { number: { in: normalizedPhones } } } }] : []),
+            ...(parsedPhoneKeys.length > 0 ? [{ phones: { some: {} } }] : []),
             ...(emails.length > 0 ? [{ emails: { some: { email: { in: emails } } } }] : []),
           ],
         },
         include: { phones: true, emails: true },
       });
+
+      // Najdi prvního s overlapem (phoneKey nebo email lowercase)
+      existing = candidates.find((c) => {
+        const cPhoneKeys = c.phones.map((p) => p.number.replace(/\D/g, "").slice(-9));
+        if (parsedPhoneKeys.some((k) => cPhoneKeys.includes(k))) return true;
+        const cEmails = c.emails.map((e) => e.email.toLowerCase());
+        if (emails.some((e) => cEmails.includes(e))) return true;
+        return false;
+      }) ?? null;
       if (existing) stats.matched++;
     }
   }
