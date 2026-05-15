@@ -498,12 +498,23 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
   // -------------------------------------------------------------------------
   // STAGE 2: Analýza nad přepisem. Žádné audio, jen text → spolehlivý JSON.
   // -------------------------------------------------------------------------
-  // Petr 2026-05-15: Pokud má projekt custom prompt, je to **specifikace OBSAHU**
-  // polí (např. "summary stručná, zaměřená na finance"), ne náhrada struktury.
-  // Hardcoded JSON contract garantuje, že Gemini vrátí očekávaný shape — UI
-  // čte `summary`, `key_themes`, `thoughts`, atd.
-  const jsonContract = isBrief
-    ? `Struktura JSON odpovědi (povinná):
+  // Petr 2026-05-15: Pokud má projekt custom prompt, Petr chce ŘÍDIT CO se
+  // z přepisu vytáhne — ne strukturovaný JSON s pevnými poli (summary/thoughts/…),
+  // ale VOLNÝ MARKDOWN podle jeho promptu. Frontend pak ten markdown zobrazí
+  // jako hlavní obsah analýzy.
+  //
+  // Default chování (žádný custom prompt) zachovává strukturu pro UI defaults.
+  const hasCustomPrompt = Boolean(customForType && customForType.trim().length > 0);
+
+  const jsonContract = hasCustomPrompt
+    ? `Struktura JSON odpovědi (povinná, jen 2 pole):
+- transcript (string, ponech PRÁZDNÉ — už máme)
+- customExtract (string, markdown — VOLNÝ TEXT podle instrukcí níže; SEM PATŘÍ VŠE CO MÁŠ VYTÁHNOUT)
+
+POZOR: NEVRACEJ summary, key_themes, thoughts, sentiment, ani jiná pole.
+Petr explicitně řídí co chce v customExtract.`
+    : isBrief
+      ? `Struktura JSON odpovědi (povinná):
 - transcript (string, ponech prázdné — už máme)
 - summary (string, česky, markdown s nadpisy)
 - key_themes (string[], 5-10 položek, česky)
@@ -514,7 +525,7 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
 - glossary (array of {term, definition}, česky)
 - actors (array of {name, role}, česky)
 - decision_history (string, chronologicky, česky)`
-    : `Struktura JSON odpovědi (povinná):
+      : `Struktura JSON odpovědi (povinná):
 - transcript (string, ponech prázdné — už máme)
 - summary (string, česky, 200-500 slov, 2-4 odstavce)
 - key_themes (string[], 2-5 výstižných pojmů, česky)
@@ -522,6 +533,10 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
 - open_questions (string[], česky)
 - sentiment ("constructive"|"concerned"|"excited"|"analytical"|"uncertain"|"frustrated")
 - intensity_signals (string, česky)`;
+
+  const instructionLabel = hasCustomPrompt
+    ? `INSTRUKCE — co konkrétně vytáhnout do "customExtract" (Petrův pokyn pro tento projekt):`
+    : `Instrukce pro obsah polí:`;
 
   const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Gideona. Audio už je přepsané — pracuj jen s textem.
 
@@ -532,10 +547,10 @@ ${transcript}
 
 ${jsonContract}
 
-Instrukce pro obsah polí (priorita custom > default):
+${instructionLabel}
 ${prompt}
 
-Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň všechna ostatní pole DLE STRUKTURY VÝŠE. Vrať POUZE JSON.`;
+Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POUZE JSON dle struktury výše.`;
 
   const stage2Start = Date.now();
   const analyzeResp = await withRetry("Stage 2 (analyze)", () =>
@@ -762,12 +777,23 @@ export async function analyzeTranscript(params: {
     throw new Error("Přepis je prázdný — není co analyzovat.");
   }
 
-  // Petr 2026-05-15: Pokud má projekt custom prompt, je to **specifikace OBSAHU**
-  // polí (např. "summary stručná, zaměřená na finance"), ne náhrada struktury.
-  // Hardcoded JSON contract garantuje, že Gemini vrátí očekávaný shape — UI
-  // čte `summary`, `key_themes`, `thoughts`, atd.
-  const jsonContract = isBrief
-    ? `Struktura JSON odpovědi (povinná):
+  // Petr 2026-05-15: Pokud má projekt custom prompt, Petr chce ŘÍDIT CO se
+  // z přepisu vytáhne — ne strukturovaný JSON s pevnými poli (summary/thoughts/…),
+  // ale VOLNÝ MARKDOWN podle jeho promptu. Frontend pak ten markdown zobrazí
+  // jako hlavní obsah analýzy.
+  //
+  // Default chování (žádný custom prompt) zachovává strukturu pro UI defaults.
+  const hasCustomPrompt = Boolean(customForType && customForType.trim().length > 0);
+
+  const jsonContract = hasCustomPrompt
+    ? `Struktura JSON odpovědi (povinná, jen 2 pole):
+- transcript (string, ponech PRÁZDNÉ — už máme)
+- customExtract (string, markdown — VOLNÝ TEXT podle instrukcí níže; SEM PATŘÍ VŠE CO MÁŠ VYTÁHNOUT)
+
+POZOR: NEVRACEJ summary, key_themes, thoughts, sentiment, ani jiná pole.
+Petr explicitně řídí co chce v customExtract.`
+    : isBrief
+      ? `Struktura JSON odpovědi (povinná):
 - transcript (string, ponech prázdné — už máme)
 - summary (string, česky, markdown s nadpisy)
 - key_themes (string[], 5-10 položek, česky)
@@ -778,7 +804,7 @@ export async function analyzeTranscript(params: {
 - glossary (array of {term, definition}, česky)
 - actors (array of {name, role}, česky)
 - decision_history (string, chronologicky, česky)`
-    : `Struktura JSON odpovědi (povinná):
+      : `Struktura JSON odpovědi (povinná):
 - transcript (string, ponech prázdné — už máme)
 - summary (string, česky, 200-500 slov, 2-4 odstavce)
 - key_themes (string[], 2-5 výstižných pojmů, česky)
@@ -786,6 +812,10 @@ export async function analyzeTranscript(params: {
 - open_questions (string[], česky)
 - sentiment ("constructive"|"concerned"|"excited"|"analytical"|"uncertain"|"frustrated")
 - intensity_signals (string, česky)`;
+
+  const instructionLabel = hasCustomPrompt
+    ? `INSTRUKCE — co konkrétně vytáhnout do "customExtract" (Petrův pokyn pro tento projekt):`
+    : `Instrukce pro obsah polí:`;
 
   const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Gideona. Audio už je přepsané — pracuj jen s textem.
 
@@ -796,10 +826,10 @@ ${transcript}
 
 ${jsonContract}
 
-Instrukce pro obsah polí (priorita custom > default):
+${instructionLabel}
 ${prompt}
 
-Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Naplň všechna ostatní pole DLE STRUKTURY VÝŠE. Vrať POUZE JSON.`;
+Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POUZE JSON dle struktury výše.`;
 
   const genai = getGemini();
   const stage2Start = Date.now();

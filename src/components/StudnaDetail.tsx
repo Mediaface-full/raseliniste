@@ -311,9 +311,14 @@ function RecordingCard({
   const isUpload = recording.type === "UPLOAD";
   const tint = recording.type === "BRIEF" ? "mint" : isUpload ? "lavender" : "butter";
   const a = recording.analysis ?? {};
+  // Petr 2026-05-15: pokud projekt měl custom prompt, Stage 2 vrátí
+  // customExtract (volný markdown řízený Petrovým pokynem) místo strukturovaného
+  // summary. Frontend ho zobrazí jako hlavní obsah.
+  const hasCustomExtract = typeof a?.customExtract === "string" && a.customExtract.trim().length > 0;
+  const mainText: string = hasCustomExtract ? a.customExtract.trim() : (typeof a?.summary === "string" ? a.summary : "");
   const summarySnippet =
-    typeof a?.summary === "string" && a.summary.trim()
-      ? a.summary.trim().slice(0, 140) + (a.summary.length > 140 ? "…" : "")
+    mainText
+      ? mainText.slice(0, 140) + (mainText.length > 140 ? "…" : "")
       : (recording.transcript ?? "").trim().slice(0, 140);
 
   return (
@@ -420,8 +425,20 @@ function RecordingCard({
                 </div>
               )}
 
-              {/* Souhrn */}
-              {a.summary && (
+              {/* Custom extract (volný markdown řízený Petrovým prompt projektu).
+                  Petr 2026-05-15: pokud projekt má custom prompt, Stage 2 vrátí
+                  customExtract místo strukturovaného summary. */}
+              {hasCustomExtract && (
+                <div className="rounded-md border border-[var(--tint-mint)]/25 bg-[var(--tint-mint)]/[0.05] p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--tint-mint)] font-mono mb-2">
+                    🎯 Vlastní extrakt
+                  </div>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap">{a.customExtract}</div>
+                </div>
+              )}
+
+              {/* Souhrn (default — pokud není custom extract) */}
+              {!hasCustomExtract && a.summary && (
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">{a.summary}</div>
               )}
 
@@ -1167,14 +1184,16 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           {showCustomPrompts && (
             <div className="mt-3 space-y-3">
               <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
-                <strong className="text-foreground">Toto je TO správné místo</strong> pro custom prompt analýzy. Aplikuje se na Stage 2 (analýza přepisu).
-                Custom prompt řídí <strong>OBSAH polí</strong> v JSON odpovědi (jaké má být summary, hloubka thoughts).
-                <strong className="text-foreground"> Struktura JSON je hardcoded</strong> (transcript, summary, key_themes, thoughts, …)
-                — Gemini ji vrátí vždy, nemusíš ji vypisovat.
+                <strong className="text-foreground">Volný extrakt z přepisu.</strong> Sem napiš co konkrétně chceš
+                z každé nahrávky vytáhnout — Stage 2 (analýza) vrátí <strong>volný markdown</strong> přesně dle tvých instrukcí,
+                NE strukturované summary/themes. Výstup se zobrazí jako „🎯 Vlastní extrakt" v detailu záznamu.
                 <br /><br />
-                Příklad: <code className="text-xs">„Summary stručná max 200 slov, zaměřená na finance. Thoughts jen klíčové (max 5)."</code>
-                <br />
-                Prázdné = default ze <code className="font-mono">/settings/ai-prompts</code>.
+                Příklady:
+                <br />• <code className="text-xs">„Vytáhni seznam úkolů co z toho vyplynou: kdo, co, dokdy. Bullet list."</code>
+                <br />• <code className="text-xs">„Klíčové rozhodnutí a důvody pro a proti. Markdown, 3-5 odstavců."</code>
+                <br />• <code className="text-xs">„Jen jména osob a co ke každé z nich řekl. Tabulka markdown."</code>
+                <br /><br />
+                Prázdné = default strukturovaná analýza (summary + themes + thoughts + …).
               </p>
               <div>
                 <div className="flex items-center justify-between mb-1">
