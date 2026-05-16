@@ -315,11 +315,15 @@ function RecordingCard({
   // customExtract (volný markdown řízený Petrovým pokynem) místo strukturovaného
   // summary. Frontend ho zobrazí jako hlavní obsah.
   const hasCustomExtract = typeof a?.customExtract === "string" && a.customExtract.trim().length > 0;
+  const customTitle: string | null = typeof a?.customTitle === "string" && a.customTitle.trim().length > 0 ? a.customTitle.trim() : null;
   const mainText: string = hasCustomExtract ? a.customExtract.trim() : (typeof a?.summary === "string" ? a.summary : "");
-  const summarySnippet =
-    mainText
-      ? mainText.slice(0, 140) + (mainText.length > 140 ? "…" : "")
-      : (recording.transcript ?? "").trim().slice(0, 140);
+  // Pokud má custom prompt vlastní title, prefer ho jako snippet — jasnější
+  // než prvních 140 znaků markdownu (typicky "## Title\n\n...").
+  const summarySnippet = customTitle
+    ? customTitle
+    : (mainText
+        ? mainText.slice(0, 140) + (mainText.length > 140 ? "…" : "")
+        : (recording.transcript ?? "").trim().slice(0, 140));
 
   return (
     <div

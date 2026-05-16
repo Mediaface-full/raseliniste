@@ -506,13 +506,13 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
   // Default chování (žádný custom prompt) zachovává strukturu pro UI defaults.
   const hasCustomPrompt = Boolean(customForType && customForType.trim().length > 0);
 
+  // Petr 2026-05-16: Když má projekt custom prompt, NEVNUCUJEME mu vlastní
+  // JSON schéma — Petr si v promptu definuje vlastní pole (title, description,
+  // primary_theme, key_insights, ...). AI dostane plnou volnost. Parsovaný JSON
+  // pak konvertujeme na markdown a uložíme do customExtract pro UI.
   const jsonContract = hasCustomPrompt
-    ? `Struktura JSON odpovědi (povinná, jen 2 pole):
-- transcript (string, ponech PRÁZDNÉ — už máme)
-- customExtract (string, markdown — VOLNÝ TEXT podle instrukcí níže; SEM PATŘÍ VŠE CO MÁŠ VYTÁHNOUT)
-
-POZOR: NEVRACEJ summary, key_themes, thoughts, sentiment, ani jiná pole.
-Petr explicitně řídí co chce v customExtract.`
+    ? `Vrať POUZE validní JSON podle instrukcí níže. Petrův prompt řídí strukturu
+i obsah — respektuj ho přesně. Pole "transcript" v JSONu NEVRACEJ, máme ho.`
     : isBrief
       ? `Struktura JSON odpovědi (povinná):
 - transcript (string, ponech prázdné — už máme)
@@ -535,7 +535,7 @@ Petr explicitně řídí co chce v customExtract.`
 - intensity_signals (string, česky)`;
 
   const instructionLabel = hasCustomPrompt
-    ? `INSTRUKCE — co konkrétně vytáhnout do "customExtract" (Petrův pokyn pro tento projekt):`
+    ? `INSTRUKCE PRO ANALÝZU (Petrův prompt pro tento projekt — řídí strukturu i obsah JSONu):`
     : `Instrukce pro obsah polí:`;
 
   const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Gideona. Audio už je přepsané — pracuj jen s textem.
@@ -550,7 +550,7 @@ ${jsonContract}
 ${instructionLabel}
 ${prompt}
 
-Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POUZE JSON dle struktury výše.`;
+Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POUZE validní JSON.`;
 
   const stage2Start = Date.now();
   const analyzeResp = await withRetry("Stage 2 (analyze)", () =>
@@ -606,21 +606,52 @@ Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POU
     }
   }
 
-  const analysis: AudioAnalysis = {
-    summary: parsed.summary ?? "",
-    key_themes: Array.isArray(parsed.key_themes) ? parsed.key_themes : [],
-    thoughts: Array.isArray(parsed.thoughts) ? parsed.thoughts : [],
-    open_questions: Array.isArray(parsed.open_questions) ? parsed.open_questions : [],
-    sentiment: parsed.sentiment ?? "neutral",
-    intensity_signals: parsed.intensity_signals ?? "",
-    ...(isBrief
-      ? {
-          glossary: Array.isArray(parsed.glossary) ? parsed.glossary : [],
-          actors: Array.isArray(parsed.actors) ? parsed.actors : [],
-          decision_history: Array.isArray(parsed.decision_history) ? parsed.decision_history : [],
-        }
-      : {}),
-  };
+  // Petr 2026-05-16: S custom promptem si Petr definuje vlastní pole. Celý
+  // parsed JSON konvertujeme na markdown → customExtract, plus zachováváme
+  // case-insensitive lookup pro běžná pole (summary/title) pokud je tam má.
+  let analysis: AudioAnalysis;
+  if (hasCustomPrompt) {
+    const customMarkdown = (typeof parsed.customExtract === "string" && parsed.customExtract.trim().length > 0)
+      ? parsed.customExtract
+      : formatParsedAsMarkdown(parsed);
+    analysis = {
+      summary: typeof parsed.summary === "string" ? parsed.summary : "",
+      key_themes: Array.isArray(parsed.key_themes) ? parsed.key_themes
+        : Array.isArray(parsed.tags) ? parsed.tags : [],
+      thoughts: Array.isArray(parsed.thoughts) ? parsed.thoughts : [],
+      open_questions: Array.isArray(parsed.open_questions) ? parsed.open_questions
+        : (typeof parsed.open_questions === "string" && parsed.open_questions.trim()) ? [parsed.open_questions] : [],
+      sentiment: typeof parsed.sentiment === "string" ? parsed.sentiment : "neutral",
+      intensity_signals: typeof parsed.intensity_signals === "string" ? parsed.intensity_signals : "",
+      ...(isBrief
+        ? {
+            glossary: Array.isArray(parsed.glossary) ? parsed.glossary : [],
+            actors: Array.isArray(parsed.actors) ? parsed.actors : [],
+            decision_history: Array.isArray(parsed.decision_history) ? parsed.decision_history : [],
+          }
+        : {}),
+    };
+    (analysis as any).customExtract = customMarkdown;
+    if (typeof parsed.title === "string" && parsed.title.trim()) {
+      (analysis as any).customTitle = parsed.title.trim();
+    }
+  } else {
+    analysis = {
+      summary: parsed.summary ?? "",
+      key_themes: Array.isArray(parsed.key_themes) ? parsed.key_themes : [],
+      thoughts: Array.isArray(parsed.thoughts) ? parsed.thoughts : [],
+      open_questions: Array.isArray(parsed.open_questions) ? parsed.open_questions : [],
+      sentiment: parsed.sentiment ?? "neutral",
+      intensity_signals: parsed.intensity_signals ?? "",
+      ...(isBrief
+        ? {
+            glossary: Array.isArray(parsed.glossary) ? parsed.glossary : [],
+            actors: Array.isArray(parsed.actors) ? parsed.actors : [],
+            decision_history: Array.isArray(parsed.decision_history) ? parsed.decision_history : [],
+          }
+        : {}),
+    };
+  }
 
   return {
     transcript,
@@ -785,13 +816,12 @@ export async function analyzeTranscript(params: {
   // Default chování (žádný custom prompt) zachovává strukturu pro UI defaults.
   const hasCustomPrompt = Boolean(customForType && customForType.trim().length > 0);
 
+  // Petr 2026-05-16: Když má projekt custom prompt, NEVNUCUJEME mu vlastní
+  // JSON schéma — Petr si v promptu definuje vlastní pole. AI dostane volnost,
+  // parsed JSON konvertujeme na markdown → customExtract.
   const jsonContract = hasCustomPrompt
-    ? `Struktura JSON odpovědi (povinná, jen 2 pole):
-- transcript (string, ponech PRÁZDNÉ — už máme)
-- customExtract (string, markdown — VOLNÝ TEXT podle instrukcí níže; SEM PATŘÍ VŠE CO MÁŠ VYTÁHNOUT)
-
-POZOR: NEVRACEJ summary, key_themes, thoughts, sentiment, ani jiná pole.
-Petr explicitně řídí co chce v customExtract.`
+    ? `Vrať POUZE validní JSON podle instrukcí níže. Petrův prompt řídí strukturu
+i obsah — respektuj ho přesně. Pole "transcript" v JSONu NEVRACEJ, máme ho.`
     : isBrief
       ? `Struktura JSON odpovědi (povinná):
 - transcript (string, ponech prázdné — už máme)
@@ -814,7 +844,7 @@ Petr explicitně řídí co chce v customExtract.`
 - intensity_signals (string, česky)`;
 
   const instructionLabel = hasCustomPrompt
-    ? `INSTRUKCE — co konkrétně vytáhnout do "customExtract" (Petrův pokyn pro tento projekt):`
+    ? `INSTRUKCE PRO ANALÝZU (Petrův prompt pro tento projekt — řídí strukturu i obsah JSONu):`
     : `Instrukce pro obsah polí:`;
 
   const analyzePrompt = `Jsi senior asistent, který analyzuje přepis hlasového záznamu pro Gideona. Audio už je přepsané — pracuj jen s textem.
@@ -829,7 +859,7 @@ ${jsonContract}
 ${instructionLabel}
 ${prompt}
 
-Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POUZE JSON dle struktury výše.`;
+Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POUZE validní JSON.`;
 
   const genai = getGemini();
   const stage2Start = Date.now();
@@ -883,21 +913,49 @@ Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POU
     }
   }
 
-  const analysis: AudioAnalysis = {
-    summary: parsed.summary ?? "",
-    key_themes: Array.isArray(parsed.key_themes) ? parsed.key_themes : [],
-    thoughts: Array.isArray(parsed.thoughts) ? parsed.thoughts : [],
-    open_questions: Array.isArray(parsed.open_questions) ? parsed.open_questions : [],
-    sentiment: parsed.sentiment ?? "neutral",
-    intensity_signals: parsed.intensity_signals ?? "",
-    ...(isBrief
-      ? {
-          glossary: Array.isArray(parsed.glossary) ? parsed.glossary : [],
-          actors: Array.isArray(parsed.actors) ? parsed.actors : [],
-          decision_history: Array.isArray(parsed.decision_history) ? parsed.decision_history : [],
-        }
-      : {}),
-  };
+  let analysis: AudioAnalysis;
+  if (hasCustomPrompt) {
+    const customMarkdown = (typeof parsed.customExtract === "string" && parsed.customExtract.trim().length > 0)
+      ? parsed.customExtract
+      : formatParsedAsMarkdown(parsed);
+    analysis = {
+      summary: typeof parsed.summary === "string" ? parsed.summary : "",
+      key_themes: Array.isArray(parsed.key_themes) ? parsed.key_themes
+        : Array.isArray(parsed.tags) ? parsed.tags : [],
+      thoughts: Array.isArray(parsed.thoughts) ? parsed.thoughts : [],
+      open_questions: Array.isArray(parsed.open_questions) ? parsed.open_questions
+        : (typeof parsed.open_questions === "string" && parsed.open_questions.trim()) ? [parsed.open_questions] : [],
+      sentiment: typeof parsed.sentiment === "string" ? parsed.sentiment : "neutral",
+      intensity_signals: typeof parsed.intensity_signals === "string" ? parsed.intensity_signals : "",
+      ...(isBrief
+        ? {
+            glossary: Array.isArray(parsed.glossary) ? parsed.glossary : [],
+            actors: Array.isArray(parsed.actors) ? parsed.actors : [],
+            decision_history: Array.isArray(parsed.decision_history) ? parsed.decision_history : [],
+          }
+        : {}),
+    };
+    (analysis as any).customExtract = customMarkdown;
+    if (typeof parsed.title === "string" && parsed.title.trim()) {
+      (analysis as any).customTitle = parsed.title.trim();
+    }
+  } else {
+    analysis = {
+      summary: parsed.summary ?? "",
+      key_themes: Array.isArray(parsed.key_themes) ? parsed.key_themes : [],
+      thoughts: Array.isArray(parsed.thoughts) ? parsed.thoughts : [],
+      open_questions: Array.isArray(parsed.open_questions) ? parsed.open_questions : [],
+      sentiment: parsed.sentiment ?? "neutral",
+      intensity_signals: parsed.intensity_signals ?? "",
+      ...(isBrief
+        ? {
+            glossary: Array.isArray(parsed.glossary) ? parsed.glossary : [],
+            actors: Array.isArray(parsed.actors) ? parsed.actors : [],
+            decision_history: Array.isArray(parsed.decision_history) ? parsed.decision_history : [],
+          }
+        : {}),
+    };
+  }
 
   return {
     transcript,
@@ -905,6 +963,54 @@ Důležité: pole "transcript" v odpovědi neobsazuj — ten už mám. Vrať POU
     model,
     promptChars: analyzePrompt.length,
   };
+}
+
+/**
+ * Petr 2026-05-16: Když má projekt custom prompt, Petr v něm často píše vlastní
+ * JSON schéma (title, primary_theme, description, key_insights, ...). Nesmíme
+ * mu vnucovat náš kontrakt (transcript+customExtract) — to by zahodilo jeho pole.
+ *
+ * Místo toho dáme AI volnost vrátit cokoliv, pak parsovaný JSON konvertujeme
+ * na markdown a uložíme do customExtract. UI ho zobrazí v "Vlastní extrakt" boxu.
+ */
+function formatParsedAsMarkdown(parsed: any): string {
+  if (parsed === null || parsed === undefined) return "";
+  if (typeof parsed === "string") return parsed;
+  if (typeof parsed === "number" || typeof parsed === "boolean") return String(parsed);
+  if (Array.isArray(parsed)) {
+    return parsed.map((v) => {
+      if (typeof v === "string") return `- ${v}`;
+      if (typeof v === "object" && v !== null) return `- ${JSON.stringify(v)}`;
+      return `- ${String(v)}`;
+    }).join("\n");
+  }
+  if (typeof parsed !== "object") return String(parsed);
+
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key === "transcript") continue; // máme zvlášť
+    const label = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    if (value === null || value === undefined || value === "") continue;
+    if (typeof value === "string") {
+      lines.push(`## ${label}\n\n${value}\n`);
+    } else if (Array.isArray(value)) {
+      if (value.length === 0) continue;
+      const items = value.map((v) => {
+        if (typeof v === "string") return `- ${v}`;
+        if (typeof v === "object" && v !== null) {
+          const inner = Object.entries(v).map(([k, vv]) => `**${k}:** ${typeof vv === "string" ? vv : JSON.stringify(vv)}`).join(" · ");
+          return `- ${inner}`;
+        }
+        return `- ${String(v)}`;
+      });
+      lines.push(`## ${label}\n\n${items.join("\n")}\n`);
+    } else if (typeof value === "object") {
+      lines.push(`## ${label}\n\n${JSON.stringify(value, null, 2)}\n`);
+    } else {
+      lines.push(`## ${label}\n\n${String(value)}\n`);
+    }
+  }
+  return lines.join("\n");
 }
 
 function minimalAnalysis(isBrief: boolean, note: string): AudioAnalysis {
