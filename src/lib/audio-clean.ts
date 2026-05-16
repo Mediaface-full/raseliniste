@@ -10,13 +10,21 @@ import os from "node:os";
  * Tenhle filtr odřízne basy + výšky (hudba) a normalizuje hlas, takže Gemini
  * dostane čistší řeč.
  *
- * Filter chain:
- *   highpass=f=200       — uřízne pod 200 Hz (basy, kopáky)
- *   lowpass=f=3000       — uřízne nad 3 kHz (cinky, perkuse). Řeč je 300-3400 Hz.
- *   dynaudnorm=p=0.95    — dynamická normalizace: zesílí tichá místa (hlas),
- *                          stlačí hlasitá (refrény, údery)
+ * Filter chain (verze 2, 2026-05-16 po feedbacku „hlas je tišší než předtím"):
+ *   pan=mono                — slij stereo → mono (často izoluje vokál v centru)
+ *   afftdn=nr=12            — FFT denoiser, redukce šumu 12 dB
+ *   highpass=f=100          — odřízne basy pod 100 Hz (mužský hlas začíná ~85 Hz)
+ *   loudnorm=I=-14:TP=-1.5  — EBU R128 loudness norm (Spotify standard −14 LUFS)
+ *   volume=2.0              — extra +6 dB boost ať hlas vyleze
  *
- * Output: MP3 96 kbps (kompromis mezi velikostí a kvalitou pro Gemini).
+ * Předchozí verze měla `lowpass=3000` (uřízla řečové formanty 3-5 kHz, zvuk
+ * zněl dušený) a `dynaudnorm=p=0.95` (nezesílilo pokud nebyl headroom).
+ *
+ * Limitace: ffmpeg filtry nezázrakují u silné hudby v pozadí. Pokud i tohle
+ * nestačí, řešením je AI source separation (Demucs/Spleeter), což chce Python
+ * sidecar container nebo cloud API.
+ *
+ * Output: MP3 96 kbps, 16 kHz mono.
  *
  * Requires `ffmpeg` v PATH (instalováno v Dockerfile runner stage).
  */
@@ -43,15 +51,25 @@ export async function cleanAudioForTranscription(
   try {
     await fs.writeFile(inputPath, inputBuffer);
 
+    // pan=mono před afftdn protože afftdn pracuje per-channel; mono zjednoduší
+    // a stereo „center extraction" často izoluje vokál (hudba bývá v stranách).
+    const filterChain = [
+      "pan=mono|c0=0.5*c0+0.5*c1",
+      "afftdn=nr=12",
+      "highpass=f=100",
+      "loudnorm=I=-14:TP=-1.5:LRA=11",
+      "volume=2.0",
+    ].join(",");
+
     const stderr = await runFfmpeg([
       "-y",                                           // overwrite output
       "-i", inputPath,
-      "-af", "highpass=f=200,lowpass=f=3000,dynaudnorm=p=0.95",
+      "-af", filterChain,
       "-vn",                                          // bez videa (mp4 wrapper)
       "-c:a", "libmp3lame",
-      "-b:a", "96k",
+      "-b:a", "128k",                                 // bitrate up — řeč už ne tak ořezaná
       "-ar", "16000",                                 // 16 kHz dostatečné pro řeč
-      "-ac", "1",                                     // mono (Gemini si poradí)
+      "-ac", "1",
       outputPath,
     ]);
 
