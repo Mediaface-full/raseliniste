@@ -387,14 +387,109 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
     }
   }
 
+  /**
+   * Discard — zahodit lokální dirty edits, znovu z DB.
+   */
+  function discardAll() {
+    if (dirty.size === 0) return;
+    if (!confirm(`Zahodit ${dirty.size} neuložených změn?`)) return;
+    setLocalEdits(new Map());
+    setDirty(new Map());
+    setMessage("✓ Změny zahozeny.");
+    setTimeout(() => setMessage(null), 2000);
+  }
+
+  /**
+   * Save dirty + push do iCloudu per-row (Uložit + Google volá zvlášť Google).
+   * Po save automaticky push do iCloudu všech dirty rows.
+   */
+  async function saveAllAndPushIcloud() {
+    if (dirtyCount === 0) {
+      setMessage("Nic neuloženo — žádné změny.");
+      setTimeout(() => setMessage(null), 2000);
+      return;
+    }
+    const dirtyIds = Array.from(dirty.values()).map((d) => d.id);
+    await saveAll();
+    // Po save push každý dirty kontakt do iCloudu
+    let pushed = 0;
+    let pushFailed = 0;
+    for (const id of dirtyIds) {
+      try {
+        const res = await fetch("/api/contacts/icloud/push", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ contactId: id }),
+        });
+        if (res.ok) pushed++; else pushFailed++;
+      } catch { pushFailed++; }
+    }
+    setMessage(`✓ Uloženo do DB a iCloudu (${pushed} push, ${pushFailed} selhalo).`);
+    setTimeout(() => setMessage(null), 5000);
+    await load();
+  }
+
+  /** Save + push do iCloud + obousměrný sync s Google */
+  async function saveAllAndSyncGoogle() {
+    await saveAllAndPushIcloud();
+    await runGoogleSync();
+  }
+
+  /**
+   * Vytvoří nový prázdný kontakt — POST /api/contacts, pak refresh.
+   */
+  async function createNewContact() {
+    const name = prompt("Jméno nového kontaktu:")?.trim();
+    if (!name) return;
+    try {
+      const res = await fetch("/api/contacts", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ displayName: name, syncSource: "manual", importedFrom: "manual" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Vytvoření selhalo.");
+        return;
+      }
+      setMessage(`✓ Vytvořeno: ${name}. Doplň údaje v tabulce a Ulož.`);
+      setTimeout(() => setMessage(null), 4000);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Nová skupina — POST /api/contacts/groups.
+   */
+  async function createNewGroup() {
+    const name = prompt("Název nové skupiny:")?.trim();
+    if (!name) return;
+    try {
+      const res = await fetch("/api/contacts/groups", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Vytvoření skupiny selhalo.");
+        return;
+      }
+      setMessage(data.existed ? `Skupina "${name}" už existuje.` : `✓ Skupina "${name}" vytvořena.`);
+      setTimeout(() => setMessage(null), 3000);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   const dirtyCount = dirty.size;
 
   return (
     <div className="space-y-4">
-      {/* Hero hlavička */}
-      <div className="glass rounded-2xl p-4 flex flex-wrap items-center gap-3">
-        <Users className="size-5 text-[var(--tint-lavender)]" />
-        <h1 className="font-serif text-xl">Kontakty</h1>
+      {/* Hero — kompaktní status pily + title + sync tlačítka */}
+      <div className="glass rounded-2xl p-3 flex flex-wrap items-center gap-2">
+        <Users className="size-4 text-[var(--tint-lavender)]" />
+        <h1 className="font-serif text-lg">Kontakty</h1>
         <span className="text-xs font-mono text-muted-foreground">
           {total.toLocaleString("cs-CZ")} kontaktů
           {dirtyCount > 0 && <span className="text-[var(--tint-rose)]"> · {dirtyCount} neuložených</span>}
@@ -402,64 +497,121 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {icloudStatus.connected ? (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">
-              🟢 iCloud {icloudStatus.username}
-            </span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">🟢 iCloud {icloudStatus.username}</span>
           ) : (
-            <a
-              href="/settings/integrations/icloud"
-              className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-rose)]/15 text-[var(--tint-rose)] font-mono hover:underline"
-            >
-              ⚠ iCloud nepřipojen
-            </a>
+            <a href="/settings/integrations/icloud" className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-rose)]/15 text-[var(--tint-rose)] font-mono hover:underline">⚠ iCloud nepřipojen</a>
           )}
-          {/* Google status — Petr 2026-05-16: chce stejně jako iCloud */}
           {googleStatus.connected && googleStatus.hasContactsScope ? (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">
-              🟢 Google {googleStatus.username ?? ""}
-            </span>
-          ) : googleStatus.connected && !googleStatus.hasContactsScope ? (
-            <a
-              href="/settings/integrations/google"
-              className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-butter)]/15 text-[var(--tint-butter)] font-mono hover:underline"
-              title="Chybí scope contacts (write) — reauth potřebný"
-            >
-              ⚠ Google — reauth potřebný
-            </a>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">🟢 Google {googleStatus.username ?? ""}</span>
+          ) : googleStatus.connected ? (
+            <a href="/settings/integrations/google" className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-butter)]/15 text-[var(--tint-butter)] font-mono hover:underline">⚠ Google reauth</a>
           ) : (
-            <a
-              href="/settings/integrations/google"
-              className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-rose)]/15 text-[var(--tint-rose)] font-mono hover:underline"
-            >
-              ⚠ Google nepřipojen
-            </a>
+            <a href="/settings/integrations/google" className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-rose)]/15 text-[var(--tint-rose)] font-mono hover:underline">⚠ Google nepřipojen</a>
           )}
           <button
             onClick={runIcloudSync}
             disabled={syncingIcloud || syncingGoogle || !icloudStatus.connected}
-            className="px-3 py-1.5 rounded-md bg-[var(--tint-sky)]/15 text-[var(--tint-sky)] border border-[var(--tint-sky)]/30 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
+            title="Stáhnout kontakty z iCloudu + auto-merge duplicit"
+            className="px-2.5 py-1 rounded-md bg-[var(--tint-sky)]/15 text-[var(--tint-sky)] border border-[var(--tint-sky)]/30 text-xs font-medium flex items-center gap-1 disabled:opacity-40"
           >
-            {syncingIcloud ? <Loader2 className="size-3.5 animate-spin" /> : <Cloud className="size-3.5" />}
-            Synchronizovat s iCloudem
+            {syncingIcloud ? <Loader2 className="size-3 animate-spin" /> : <Cloud className="size-3" />}
+            Sync iCloud
           </button>
           <button
             onClick={runGoogleSync}
             disabled={syncingIcloud || syncingGoogle}
-            className="px-3 py-1.5 rounded-md bg-[var(--tint-lavender)]/15 text-[var(--tint-lavender)] border border-[var(--tint-lavender)]/30 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
-            title="Obousměrný sync s Google Workspace (last-write-wins). Vyžaduje rozšířený OAuth scope contacts."
+            title="Obousměrný sync s Google Workspace"
+            className="px-2.5 py-1 rounded-md bg-[var(--tint-lavender)]/15 text-[var(--tint-lavender)] border border-[var(--tint-lavender)]/30 text-xs font-medium flex items-center gap-1 disabled:opacity-40"
           >
-            {syncingGoogle ? <Loader2 className="size-3.5 animate-spin" /> : <Cloud className="size-3.5" />}
-            Synchronizovat s Google
-          </button>
-          <button
-            onClick={saveAll}
-            disabled={dirtyCount === 0 || saving}
-            className="px-3 py-1.5 rounded-md bg-[var(--tint-sage)]/20 text-[var(--tint-sage)] border border-[var(--tint-sage)]/40 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
-          >
-            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-            Uložit ({dirtyCount})
+            {syncingGoogle ? <Loader2 className="size-3 animate-spin" /> : <Cloud className="size-3" />}
+            Sync Google
           </button>
         </div>
+      </div>
+
+      {/* Velký TOOLBAR (Petr 2026-05-16 — podle původního systému):
+          Obnovit / Zahodit | Search + Page size | Uložit (iCloud) / Uložit + Google / Nový kontakt / Nová skupina */}
+      <div className="glass rounded-xl p-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => load()}
+          disabled={loading}
+          className="px-3 py-1.5 rounded-md bg-[var(--tint-lavender)]/20 text-[var(--tint-lavender)] border border-[var(--tint-lavender)]/40 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
+          title="Znovu načíst kontakty z DB"
+        >
+          {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+          Obnovit
+        </button>
+        <button
+          onClick={discardAll}
+          disabled={dirtyCount === 0}
+          className="px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40 hover:bg-white/10"
+          title="Zahodit neuložené změny"
+        >
+          <X className="size-3.5" /> Zahodit
+        </button>
+
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
+            placeholder="jméno, e-mail, telefon, firma…"
+            className="w-full pl-8 pr-3 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm"
+          />
+        </div>
+        <select
+          value={pageSize}
+          onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
+          className="px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm font-mono"
+          title="Velikost stránky"
+        >
+          {[10, 25, 50, 100, 200].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select
+          value={validation}
+          onChange={(e) => { setValidation(e.target.value as ValidationFilter); setPage(1); }}
+          className="px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm"
+          title="Validační filtr"
+        >
+          {Object.entries(VALIDATION_LABELS).map(([v, label]) => (
+            <option key={v} value={v}>{label}</option>
+          ))}
+        </select>
+
+        <button
+          onClick={saveAllAndPushIcloud}
+          disabled={dirtyCount === 0 || saving}
+          title="Uložit do DB + push všech dirty kontaktů do iCloudu"
+          className="px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40 hover:bg-white/10"
+        >
+          {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+          Uložit (iCloud){dirtyCount > 0 && ` · ${dirtyCount}`}
+        </button>
+        <button
+          onClick={saveAllAndSyncGoogle}
+          disabled={dirtyCount === 0 || saving || syncingGoogle}
+          title="Uložit do DB + push iCloud + obousměrný sync Google"
+          className="px-3 py-1.5 rounded-md bg-[var(--tint-sage)]/20 text-[var(--tint-sage)] border border-[var(--tint-sage)]/40 text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
+        >
+          {saving || syncingGoogle ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+          Uložit + Google{dirtyCount > 0 && ` · ${dirtyCount}`}
+        </button>
+
+        <button
+          onClick={createNewContact}
+          className="px-3 py-1.5 rounded-md bg-[var(--tint-mint)]/20 text-[var(--tint-mint)] border border-[var(--tint-mint)]/40 text-sm font-medium flex items-center gap-1.5"
+          title="Vytvořit nový kontakt"
+        >
+          + Nový kontakt
+        </button>
+        <button
+          onClick={createNewGroup}
+          className="px-3 py-1.5 rounded-md bg-[var(--tint-mint)]/20 text-[var(--tint-mint)] border border-[var(--tint-mint)]/40 text-sm font-medium flex items-center gap-1.5"
+          title="Vytvořit novou skupinu"
+        >
+          + Nová skupina
+        </button>
       </div>
 
       {/* Sync progress banner — během sync + 5s po. Real-time čísla z DB
@@ -544,35 +696,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="glass rounded-xl p-3 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
-            placeholder="Hledat (jméno, telefon, email, firma…)"
-            className="w-full pl-8 pr-3 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm"
-          />
-        </div>
-        <select
-          value={validation}
-          onChange={(e) => { setValidation(e.target.value as ValidationFilter); setPage(1); }}
-          className="px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm"
-        >
-          {Object.entries(VALIDATION_LABELS).map(([v, label]) => (
-            <option key={v} value={v}>{label}</option>
-          ))}
-        </select>
-        <select
-          value={pageSize}
-          onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }}
-          className="px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm font-mono"
-        >
-          {[10, 25, 50, 100, 200].map((n) => <option key={n} value={n}>{n}/strana</option>)}
-        </select>
-      </div>
+      {/* Původní toolbar přesunut do hero výše (Petr 2026-05-16). */}
 
       {/* Tabulka */}
       <div className="glass rounded-xl overflow-x-auto">
