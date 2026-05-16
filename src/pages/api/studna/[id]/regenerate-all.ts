@@ -25,8 +25,8 @@ export const POST: APIRoute = async ({ cookies, params }) => {
   const projectId = params.id;
   if (!projectId) return Response.json({ error: "INVALID_ID" }, { status: 400 });
 
-  const project = await prisma.studnaProject.findFirst({
-    where: { id: projectId, userId: session.uid },
+  const project = await prisma.projectBox.findFirst({
+    where: { id: projectId, userId: session.uid, archivedAt: null },
     select: { id: true, description: true, studnaStandardPrompt: true, studnaBriefPrompt: true, analysisModel: true },
   });
   if (!project) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
