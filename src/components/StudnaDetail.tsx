@@ -658,13 +658,22 @@ function RecordingCard({
               {/* Audio přehrávač (pokud existuje) */}
               {recording.audioPath && (
                 <div className="pt-1">
-                  <button
-                    onClick={() => setShowAudio(!showAudio)}
-                    className="text-[11px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1"
-                  >
-                    {showAudio ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-                    Přehrát audio
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowAudio(!showAudio)}
+                      className="text-[11px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      {showAudio ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                      Přehrát audio
+                    </button>
+                    <a
+                      href={`/api/studna/recordings/${recording.id}/audio?download=1`}
+                      download
+                      className="text-[11px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      <Download className="size-3" /> Stáhnout
+                    </a>
+                  </div>
                   {showAudio && (
                     <audio
                       controls
@@ -687,13 +696,22 @@ function RecordingCard({
                   přehrávač jen ve `processed` bloku, error stav ho neměl. */}
               {recording.audioPath && (
                 <div>
-                  <button
-                    onClick={() => setShowAudio(!showAudio)}
-                    className="text-[11px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1"
-                  >
-                    {showAudio ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-                    Přehrát audio (zkontroluj jestli není tiché/poškozené)
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowAudio(!showAudio)}
+                      className="text-[11px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      {showAudio ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                      Přehrát audio (zkontroluj jestli není tiché/poškozené)
+                    </button>
+                    <a
+                      href={`/api/studna/recordings/${recording.id}/audio?download=1`}
+                      download
+                      className="text-[11px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1"
+                    >
+                      <Download className="size-3" /> Stáhnout
+                    </a>
+                  </div>
                   {showAudio && (
                     <audio
                       controls
