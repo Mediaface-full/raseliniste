@@ -29,6 +29,18 @@ const icloudStatus = {
   lastError: integration?.lastError ?? null,
 };
 
+// Google connection status pro hero (Petr 2026-05-16)
+const googleIntegration = await prisma.userIntegration.findUnique({
+  where: { userId_provider: { userId: session.uid, provider: "google" } },
+  select: { config: true },
+});
+const googleConfig = (googleIntegration?.config ?? {}) as { scopes?: string[]; email?: string };
+const googleStatus = {
+  connected: Boolean(googleIntegration),
+  hasContactsScope: Array.isArray(googleConfig.scopes) && googleConfig.scopes.includes("https://www.googleapis.com/auth/contacts"),
+  username: googleConfig.email ?? null,
+};
+
 // Celkový počet pro hero
 const totalCount = await prisma.contact.count({ where: { userId: session.uid } });
 
@@ -59,7 +71,7 @@ const companyNames = companyRows.map((c) => c.company!).filter(Boolean);
     {/* Banner novinek z mobilu — kontakty_brief.md 5.4 */}
     <ContactsNewsBanner client:load />
 
-    <ContactsTable client:load initialTotal={totalCount} icloudStatus={icloudStatus} />
+    <ContactsTable client:load initialTotal={totalCount} icloudStatus={icloudStatus} googleStatus={googleStatus} />
 
     {/* Rozbalovací nástroje pod tabulkou — kontakty_brief.md 5.8 + 5.9.
         Duplicity, F&R, +420 normalize, Import VCF/CSV, Backups/Restore,

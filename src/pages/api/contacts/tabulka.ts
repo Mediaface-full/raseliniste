@@ -36,6 +36,10 @@ export const GET: APIRoute = async ({ cookies, url }) => {
         { phones: { some: { number: { contains: q } } } },
         { emails: { some: { email: { contains: q, mode: "insensitive" } } } },
         { note: { contains: q, mode: "insensitive" } },
+        // Petr 2026-05-16: search v groups[] — klik na chip "Klienti" filtroval
+        // jen v displayName/firstName/lastName, takže nezobrazilo žádné kontakty
+        // ze skupiny. Teď match i name skupiny.
+        { groups: { has: q } },
       ],
     });
   }

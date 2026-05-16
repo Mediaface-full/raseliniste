@@ -31,14 +31,18 @@ function hasEntities(s: string | null | undefined): boolean {
 function decodeEntities(s: string | null | undefined): string | null {
   if (!s) return s ?? null;
   return s
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    // Petr 2026-05-16: ošetřit i RAW `&#13;` bez `;` (Apple někdy posílá zkomolené)
+    // Plus uppercase hex.
+    .replace(/&#(\d+);?/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-fA-F]+);?/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/\r/g, "") // odstranit CR (\r) z koncovek hodnot — Apple je posílá zbytečně
+    // Druhý průchod — pokud po decoder zůstal `&#13;` v důsledku double-encoding
+    .replace(/&#1[03];?/g, "")
+    .replace(/[\r\n\t]/g, "")
     .trim();
 }
 

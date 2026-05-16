@@ -17,7 +17,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search, Save, RefreshCw, Loader2, AlertTriangle, Check, Cloud, CloudUpload,
-  Users, Phone, Mail, Filter, X, ChevronLeft, ChevronRight,
+  Users, Phone, Mail, Filter, X, ChevronLeft, ChevronRight, Trash2,
 } from "lucide-react";
 
 interface Contact {
@@ -55,9 +55,16 @@ interface IcloudStatus {
   lastError: string | null;
 }
 
+interface GoogleStatus {
+  connected: boolean;
+  hasContactsScope: boolean;
+  username: string | null;
+}
+
 interface Props {
   initialTotal: number;
   icloudStatus: IcloudStatus;
+  googleStatus: GoogleStatus;
 }
 
 type ValidationFilter = "" | "no-phone" | "no-email" | "no-group" | "no-company" | "no-contact" | "incomplete-name";
@@ -76,7 +83,7 @@ const VALIDATION_LABELS: Record<ValidationFilter, string> = {
 // Component
 // ============================================================================
 
-export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
+export default function ContactsTable({ initialTotal, icloudStatus, googleStatus }: Props) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [groups, setGroups] = useState<GroupChip[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +105,7 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
   const [syncingGoogle, setSyncingGoogle] = useState(false);
   const syncing = syncingIcloud || syncingGoogle; // jen pro celkovou pojistku (např. disable Save tlačítka)
   const [pushingId, setPushingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -312,6 +320,38 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
     }
   }
 
+  /**
+   * Smazat kontakt — z DB + best-effort taky z iCloud (pokud má icloudHref) +
+   * Google (pokud má googleResourceName). Petr 2026-05-16: chce smazat z všeho.
+   */
+  async function deleteContact(contactId: string, displayName: string) {
+    if (!confirm(`Smazat kontakt "${displayName}" z Rašeliniště, iCloudu i Google?\n\nAuto-záloha proběhne před smazáním (Obnova ze zálohy v Nástrojích).`)) return;
+    setDeletingId(contactId);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/delete-everywhere`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Smazání selhalo.");
+        return;
+      }
+      const parts = [
+        "✓ Smazáno",
+        data.deletedFromIcloud ? "iCloud ✓" : data.icloudError ? `iCloud ✗ (${data.icloudError})` : null,
+        data.deletedFromGoogle ? "Google ✓" : data.googleError ? `Google ✗ (${data.googleError})` : null,
+        "z DB ✓",
+      ].filter(Boolean).join(" · ");
+      setMessage(parts);
+      setTimeout(() => setMessage(null), 6000);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const dirtyCount = dirty.size;
 
   return (
@@ -336,6 +376,27 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
               className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-rose)]/15 text-[var(--tint-rose)] font-mono hover:underline"
             >
               ⚠ iCloud nepřipojen
+            </a>
+          )}
+          {/* Google status — Petr 2026-05-16: chce stejně jako iCloud */}
+          {googleStatus.connected && googleStatus.hasContactsScope ? (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">
+              🟢 Google {googleStatus.username ?? ""}
+            </span>
+          ) : googleStatus.connected && !googleStatus.hasContactsScope ? (
+            <a
+              href="/settings/integrations/google"
+              className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-butter)]/15 text-[var(--tint-butter)] font-mono hover:underline"
+              title="Chybí scope contacts (write) — reauth potřebný"
+            >
+              ⚠ Google — reauth potřebný
+            </a>
+          ) : (
+            <a
+              href="/settings/integrations/google"
+              className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-rose)]/15 text-[var(--tint-rose)] font-mono hover:underline"
+            >
+              ⚠ Google nepřipojen
             </a>
           )}
           <button
@@ -365,6 +426,21 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Sync progress banner — během sync syncingIcloud/syncingGoogle */}
+      {(syncingIcloud || syncingGoogle) && (
+        <div className="rounded-md border border-[var(--tint-sky)]/30 bg-[var(--tint-sky)]/10 text-sm px-3 py-2 flex items-center gap-2">
+          <Loader2 className="size-4 animate-spin text-[var(--tint-sky)] shrink-0" />
+          <div>
+            <strong>
+              {syncingIcloud ? "iCloud sync běží" : "Google sync běží"}…
+            </strong>
+            <span className="text-xs text-muted-foreground ml-2">
+              Pull + auto-merge duplicit. Pro {syncingIcloud ? "~1000 kontaktů" : "obousměrný sync"} trvá typicky 1-3 min. Nezavírej tab.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Status messages */}
       {message && (
@@ -442,15 +518,16 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
               <th className="px-2 py-2 text-left w-[100px]">Narozeniny</th>
               <th className="px-2 py-2 text-center w-[60px]" title="VIP/Team flagy z Rašeliniště (overlay)">Flag</th>
               <th className="px-2 py-2 text-center w-[40px]" title="Push do iCloudu">⤴</th>
+              <th className="px-2 py-2 text-center w-[40px]" title="Smazat kontakt (DB + iCloud + Google)">🗑</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={11} className="px-3 py-12 text-center text-sm text-muted-foreground">
+              <tr><td colSpan={12} className="px-3 py-12 text-center text-sm text-muted-foreground">
                 <Loader2 className="size-5 animate-spin mx-auto mb-2" /> Načítám…
               </td></tr>
             ) : contacts.length === 0 ? (
-              <tr><td colSpan={11} className="px-3 py-12 text-center text-sm text-muted-foreground italic">
+              <tr><td colSpan={12} className="px-3 py-12 text-center text-sm text-muted-foreground italic">
                 Žádné kontakty v aktuálním filtru.
               </td></tr>
             ) : contacts.map((c) => {
@@ -508,6 +585,16 @@ export default function ContactsTable({ initialTotal, icloudStatus }: Props) {
                       className="text-muted-foreground hover:text-[var(--tint-sky)] disabled:opacity-30"
                     >
                       {pushingId === c.id ? <Loader2 className="size-3.5 animate-spin" /> : <CloudUpload className="size-3.5" />}
+                    </button>
+                  </td>
+                  <td className="px-2 py-2 text-center">
+                    <button
+                      onClick={() => deleteContact(c.id, eff.displayName)}
+                      disabled={deletingId === c.id}
+                      title="Smazat kontakt (DB + iCloud + Google)"
+                      className="text-muted-foreground hover:text-[var(--tint-rose)] disabled:opacity-30"
+                    >
+                      {deletingId === c.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
                     </button>
                   </td>
                 </tr>
