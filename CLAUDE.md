@@ -4,6 +4,26 @@
 
 Tento soubor se automaticky načte každou novou Claude Code session.
 
+---
+
+## 🚨🚨🚨 ČTI JAKO PRVNÍ — INFRASTRUKTURA 🚨🚨🚨
+
+**Rašeliniště běží na Synology NAS (DS718+) v domácí síti Petra.**
+**NIKOLI na Hetzneru, NIKOLI na serveru `diego` (to je Mediaface/Hlídač TK).**
+
+- Deploy: GitHub Actions → ghcr.io → Synology Container Manager (manual pull)
+- Doména: `https://www.raseliniste.cz` (DSM Reverse Proxy + Let's Encrypt)
+- DB: PostgreSQL 16 (pgvector) jako druhý kontejner ve stejném docker-compose
+- App port: 3333 (ne 3000)
+- Petr neumí push z terminálu — používá **GitHub Desktop**
+- `~/.ssh/config` má alias `diego` ale ten **NEMÁ co dělat s raseliniste**
+- **NEPLĚT** si raseliniste se servery z `~/.claude/CLAUDE.md` (Mediaface deploy guide platí pro jiné projekty)
+
+Detail: `SYNOLOGY_DEPLOY_PATTERN.md` (kořen repa).
+Memory: `feedback_completeness_lesson.md` — Petr 2026-05-13 vytkl právě tohle pletení.
+
+---
+
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
 0. **`INSTRUKCE/HANDOFF-2026-05-16.md`** ← **NEJNOVĚJŠÍ HANDOFF** — Kontakty polish (7+ commitů 2026-05-16): real-time sync progress s čísly (polling à 2s, `User.contactsSyncProgress`), custom AI prompt v projektech = volný markdown `customExtract` (místo strukturovaného JSON), velký toolbar redesign (Obnovit/Zahodit/Search/Page/Uložit-iCloud/+Google/Nový/Skupina), Google status v hero, delete-everywhere v každém řádku (DB+iCloud+Google), Nuclear reset endpoint, `&#13;` posílený cleanup, filter Klienti přes groups. Migrace `20260516060000_contacts_sync_progress`. **Žádné nové cron úlohy.**
