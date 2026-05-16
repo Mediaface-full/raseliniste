@@ -40,8 +40,6 @@ export default function ContactsTools({ groupNames, companyNames = [] }: { group
     <div className="space-y-3">
       <h2 className="font-serif text-xl tracking-tight">Nástroje</h2>
 
-      <CleanupEntitiesBanner />
-
       <DiagnoseSection />
 
       <Section title="Validace" icon={<Search className="size-4" />} isOpen={open.has("validation")} onToggle={() => toggle("validation")}>
@@ -75,6 +73,8 @@ export default function ContactsTools({ groupNames, companyNames = [] }: { group
       <Section title="Export VCF/CSV" icon={<Download className="size-4" />} isOpen={open.has("export")} onToggle={() => toggle("export")}>
         <ExportSection groupNames={groupNames} companyNames={companyNames} />
       </Section>
+
+      <CleanupEntitiesBanner />
     </div>
   );
 }
