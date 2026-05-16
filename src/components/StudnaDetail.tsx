@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Loader2, Plus, Pin, Trash2, Sparkles, FileText, Settings, Users, AudioLines,
   ChevronDown, ChevronRight, Copy, Check, FileAudio2, Mic, Send, FileDown,
@@ -322,6 +322,7 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
               onDelete={() => remove(r.id)}
               onRegenerate={() => regenerate(r.id)}
               onMarkError={() => markError(r.id)}
+              onRefresh={onRefresh}
             />
           ))}
         </div>
@@ -337,6 +338,7 @@ function RecordingCard({
   onDelete,
   onRegenerate,
   onMarkError,
+  onRefresh,
 }: {
   recording: ProjectDetail["recordings"][number];
   busy: boolean;
@@ -344,10 +346,40 @@ function RecordingCard({
   onRegenerate: () => void;
   onDelete: () => void;
   onMarkError: () => void;
+  onRefresh: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [showAudio, setShowAudio] = useState(false);
+  const [reuploading, setReuploading] = useState(false);
+  const reuploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function handleReupload(file: File) {
+    if (!confirm(
+      `Nahradit audio u tohoto záznamu souborem "${file.name}" (${(file.size / 1024 / 1024).toFixed(1)} MB)?\n\n` +
+      `Starý přepis i analýza se smažou a spustí se AI pipeline znovu nad novým souborem.`,
+    )) return;
+    setReuploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/studna/recordings/${recording.id}/replace-audio`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error ?? "Reupload selhal.");
+        return;
+      }
+      // Endpoint už spustil processing pipeline, jen znovu načti data.
+      onRefresh();
+    } finally {
+      setReuploading(false);
+      if (reuploadInputRef.current) reuploadInputRef.current.value = "";
+    }
+  }
+
   const created = new Date(recording.createdAt);
   const isUpload = recording.type === "UPLOAD";
   const tint = recording.type === "BRIEF" ? "mint" : isUpload ? "lavender" : "butter";
@@ -726,6 +758,25 @@ function RecordingCard({
         </div>
 
         <div className="flex flex-col gap-1 shrink-0">
+          {/* Skrytý file input pro reupload — admin nahradí audio (např. po konverzi formátu) */}
+          <input
+            ref={reuploadInputRef}
+            type="file"
+            accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.webm,.mp4,.flac"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleReupload(f);
+            }}
+          />
+          <button
+            onClick={() => reuploadInputRef.current?.click()}
+            disabled={busy || reuploading}
+            className="p-1.5 rounded hover:bg-[var(--tint-mint)]/20 transition-colors text-[var(--tint-mint)]"
+            title="Nahradit audio (např. konvertovaný MP3/WAV když Gemini selže). Spustí AI pipeline znovu."
+          >
+            {reuploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          </button>
           <button
             onClick={onTogglePin}
             disabled={busy}
