@@ -28,7 +28,7 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apk add --no-cache su-exec
+RUN apk add --no-cache su-exec ffmpeg
 
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 app

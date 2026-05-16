@@ -352,7 +352,31 @@ function RecordingCard({
   const [showTranscript, setShowTranscript] = useState(false);
   const [showAudio, setShowAudio] = useState(false);
   const [reuploading, setReuploading] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
   const reuploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function cleanAndRegenerate() {
+    if (!confirm(
+      "Vyčistit audio přes ffmpeg a regenerovat?\n\n" +
+      "Použij když Gemini nečte záznam kvůli hudbě/šumu v pozadí. " +
+      "Filtr: highpass 200 Hz + lowpass 3 kHz + dynamická normalizace.\n\n" +
+      "Pozor: ORIGINÁL SE PŘEPÍŠE vyčištěnou MP3 verzí. Pokud chceš zachovat původní, " +
+      "stáhni si ho nejdřív tlačítkem Stáhnout.\n\n" +
+      "Pokračovat?",
+    )) return;
+    setCleaning(true);
+    try {
+      const res = await fetch(`/api/studna/recordings/${recording.id}/clean-and-regenerate`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error ?? "Cleanup selhal.");
+        return;
+      }
+      onRefresh();
+    } finally {
+      setCleaning(false);
+    }
+  }
 
   async function handleReupload(file: File) {
     if (!confirm(
@@ -771,12 +795,22 @@ function RecordingCard({
           />
           <button
             onClick={() => reuploadInputRef.current?.click()}
-            disabled={busy || reuploading}
+            disabled={busy || reuploading || cleaning}
             className="p-1.5 rounded hover:bg-[var(--tint-mint)]/20 transition-colors text-[var(--tint-mint)]"
             title="Nahradit audio (např. konvertovaný MP3/WAV když Gemini selže). Spustí AI pipeline znovu."
           >
             {reuploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
           </button>
+          {recording.audioPath && (
+            <button
+              onClick={cleanAndRegenerate}
+              disabled={busy || reuploading || cleaning}
+              className="p-1.5 rounded hover:bg-[var(--tint-butter)]/20 transition-colors text-[var(--tint-butter)]"
+              title="Vyčistit audio přes ffmpeg (highpass 200 Hz + lowpass 3 kHz + dynaudnorm) a regenerovat. Použij když Gemini neumí přečíst kvůli hudbě/šumu v pozadí. POZOR: přepíše originál."
+            >
+              {cleaning ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+            </button>
+          )}
           <button
             onClick={onTogglePin}
             disabled={busy}
