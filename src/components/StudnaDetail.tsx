@@ -175,6 +175,34 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 // =============================================================================
 function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ownerName: string; onRefresh: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [regenAllBusy, setRegenAllBusy] = useState(false);
+
+  async function regenerateAll() {
+    const eligible = project.recordings.filter(
+      (r) => (r.type === "STANDARD" || r.type === "BRIEF") && r.transcript,
+    );
+    if (eligible.length === 0) {
+      alert("Žádné záznamy s přepisem k regeneraci.");
+      return;
+    }
+    if (!confirm(
+      `Přegenerovat AI analýzu u ${eligible.length} záznam${eligible.length === 1 ? "u" : eligible.length < 5 ? "ů" : "ů"}?\n\n` +
+      `Spustí se Stage 2 (analýza nad přepisem) — audio se nepřepisuje znovu, takže je to rychlé a levné.\n` +
+      `Použij po úpravě promptu projektu, ať se aplikuje na vše.`,
+    )) return;
+    setRegenAllBusy(true);
+    try {
+      const res = await fetch(`/api/studna/${project.id}/regenerate-all`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        onRefresh();
+      } else {
+        alert(data.error ?? "Hromadná regenerace selhala.");
+      }
+    } finally {
+      setRegenAllBusy(false);
+    }
+  }
 
   async function togglePin(recId: string, current: boolean) {
     setBusy(recId);
@@ -272,6 +300,19 @@ function FeedTab({ project, ownerName, onRefresh }: { project: ProjectDetail; ow
         </div>
       ) : (
         <div className="space-y-3">
+          {/* Hromadná regenerace — po úpravě promptu projektu */}
+          <div className="flex items-center justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={regenerateAll}
+              disabled={regenAllBusy}
+              title="Spustí Stage 2 (AI analýzu) znovu nad všemi záznamy s přepisem. Použij po úpravě promptu projektu. Audio se nepřepisuje znovu — rychlé a levné."
+            >
+              {regenAllBusy ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
+              Přegenerovat analýzu u všech
+            </Button>
+          </div>
           {project.recordings.map((r) => (
             <RecordingCard
               key={r.id}
