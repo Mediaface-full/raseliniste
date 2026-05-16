@@ -678,8 +678,31 @@ function RecordingCard({
           )}
 
           {recording.status === "error" && (
-            <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 text-xs px-3 py-2 font-mono">
-              {recording.processingError ?? "Zpracování selhalo."}
+            <div className="mt-2 space-y-2">
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 text-xs px-3 py-2 font-mono">
+                {recording.processingError ?? "Zpracování selhalo."}
+              </div>
+              {/* Petr 2026-05-16: při chybě potřebuje slyšet audio aby ověřil
+                  jestli je tiché/poškozené před regenerací. Předtím byl
+                  přehrávač jen ve `processed` bloku, error stav ho neměl. */}
+              {recording.audioPath && (
+                <div>
+                  <button
+                    onClick={() => setShowAudio(!showAudio)}
+                    className="text-[11px] font-mono text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  >
+                    {showAudio ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                    Přehrát audio (zkontroluj jestli není tiché/poškozené)
+                  </button>
+                  {showAudio && (
+                    <audio
+                      controls
+                      src={`/api/studna/recordings/${recording.id}/audio`}
+                      className="mt-2 w-full"
+                    />
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
