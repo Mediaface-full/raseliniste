@@ -26,6 +26,7 @@ import {
 import { parseVCardFull, buildVCard, type VCardContact } from "./vcard";
 import { normalizePhone } from "./phone";
 import { backupContact } from "./contacts-backup";
+import { startSyncProgress, updateSyncProgress, finishSyncProgress } from "./contacts-sync-progress";
 
 export interface SyncStats {
   ok: boolean;
@@ -134,6 +135,9 @@ export async function pullIcloudContacts(userId: string): Promise<SyncStats> {
   }
 
   try {
+    // Progress: discovery
+    await startSyncProgress(userId, "icloud");
+
     // Discovery (jednou — Apple addressbook URL se nemění)
     let addressbookUrl = await getCachedAddressbookUrl(userId);
     if (!addressbookUrl) {
@@ -141,9 +145,19 @@ export async function pullIcloudContacts(userId: string): Promise<SyncStats> {
       await setCachedAddressbookUrl(userId, addressbookUrl);
     }
 
+    // Progress: listing
+    await updateSyncProgress(userId, { stage: "listing", message: "Stahuji seznam kontaktů z iCloud…" });
+
     // List všech itemů (jen href + etag — žádný obsah)
     const items = await listAddressbookItems(addressbookUrl, creds);
     stats.pulled = items.length;
+
+    // Progress: fetching
+    await updateSyncProgress(userId, {
+      stage: "fetching",
+      total: items.length,
+      message: `Stahuji vCardy (${items.length} kontaktů)…`,
+    });
 
     // Fetch obsahu vCard
     const fetched = await fetchAddressbookItems(addressbookUrl, creds, items.map((i) => i.href));
@@ -159,13 +173,30 @@ export async function pullIcloudContacts(userId: string): Promise<SyncStats> {
       else contacts.push({ item: f, parsed });
     }
 
+    // Progress: saving (upsert každého kontaktu)
+    await updateSyncProgress(userId, {
+      stage: "saving",
+      total: contacts.length,
+      current: 0,
+      message: `Ukládám kontakty do Rašeliniště (0/${contacts.length})…`,
+    });
+
     // 1) Upsert kontaktů — match podle telefonu / emailu / icloudUid
+    let upsertedCount = 0;
     for (const { item, parsed } of contacts) {
       try {
         await upsertContact(userId, parsed, item.href, item.etag, stats);
       } catch (e) {
         console.warn(`[icloud-sync] contact ${parsed.uid} err:`, e instanceof Error ? e.message : e);
         stats.errors++;
+      }
+      upsertedCount++;
+      // Update progress každých 25 kontaktů (neflood DB)
+      if (upsertedCount % 25 === 0 || upsertedCount === contacts.length) {
+        await updateSyncProgress(userId, {
+          current: upsertedCount,
+          message: `Ukládám kontakty (${upsertedCount}/${contacts.length})…`,
+        });
       }
     }
 
@@ -189,6 +220,10 @@ export async function pullIcloudContacts(userId: string): Promise<SyncStats> {
     });
 
     stats.ok = true;
+    await finishSyncProgress(userId, "done", {
+      total: contacts.length,
+      message: `Hotovo. ${stats.created} nových · ${stats.matched} spárováno · ${stats.updated} update · ${stats.groups} skupin`,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     stats.error = msg;
@@ -196,6 +231,7 @@ export async function pullIcloudContacts(userId: string): Promise<SyncStats> {
       where: { userId, provider: "icloud" },
       data: { lastError: msg.slice(0, 1000) },
     }).catch(() => null);
+    await finishSyncProgress(userId, "error", { error: msg.slice(0, 200) });
   }
 
   stats.durationMs = Date.now() - start;

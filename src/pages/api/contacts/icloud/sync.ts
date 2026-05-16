@@ -53,9 +53,17 @@ export const POST: APIRoute = async ({ cookies }) => {
   }
 
   // Auto-merge po sync — pojistka pro případ kdy match strategie selže.
+  const { updateSyncProgress } = await import("@/lib/contacts-sync-progress");
   const autoMergeStats = { merged: 0, clusters: 0 };
   try {
     const clusters = await findDuplicateClusters(session.uid);
+    await updateSyncProgress(session.uid, {
+      stage: "merging",
+      total: clusters.length,
+      current: 0,
+      message: `Slučuji duplicity (0/${clusters.length} clusterů)…`,
+    });
+    let processed = 0;
     for (const cluster of clusters) {
       const sorted = cluster.contacts.slice().sort((a, b) => {
         const pa = (a.isVip ? 100 : 0) + (a.clientTag ? 30 : 0) + (a.icloudUid ? 10 : 0);
@@ -71,12 +79,26 @@ export const POST: APIRoute = async ({ cookies }) => {
         autoMergeStats.merged += r.mergedCount;
         autoMergeStats.clusters++;
       }
+      processed++;
+      if (processed % 5 === 0 || processed === clusters.length) {
+        await updateSyncProgress(session.uid, {
+          current: processed,
+          mergedClusters: autoMergeStats.clusters,
+          message: `Slučuji duplicity (${processed}/${clusters.length}, ${autoMergeStats.merged} smazáno)…`,
+        });
+      }
     }
   } catch (e) {
     console.warn("[icloud-sync] auto-merge after sync failed:", e instanceof Error ? e.message : e);
   }
 
   const finalCount = await prisma.contact.count({ where: { userId: session.uid } });
+  // Update finální progress message s konkrétními čísly
+  await updateSyncProgress(session.uid, {
+    stage: "done",
+    mergedClusters: autoMergeStats.clusters,
+    message: `Hotovo. Staženo ${stats.pulled}, vytvořeno ${stats.created}, spárováno ${stats.matched}, auto-sloučeno ${autoMergeStats.merged}. Celkem v DB: ${finalCount}.`,
+  });
 
   return Response.json({
     ok: true,

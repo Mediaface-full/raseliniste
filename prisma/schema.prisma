@@ -102,6 +102,11 @@ model User {
   // proti baseline a ukáže diff. "Označit prohlédnuté" = update baseline.
   contactsSeenBaselineAt DateTime?
 
+  // 2026-05-16 — Real-time progress sync pro UI banner. Sync funkce updatuje
+  // tenhle JSON v jednotlivých krocích, frontend polluje à 2s.
+  // Tvar: { provider: "icloud"|"google", stage: "...", current: N, total: N, mergedClusters: N, startedAt: "ISO", message: "..." }
+  contactsSyncProgress Json?
+
   // 2026-05-13 — Backfill state pro multi-tick zpetny import historie (6 let).
   // Beh: Petr klikne "Stahnout historii X let" → set gmailBackfillStartedAt +
   // gmailBackfillYears. Cron `posta-backfill` 15min volá backfillMetadata():

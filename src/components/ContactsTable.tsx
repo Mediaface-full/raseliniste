@@ -108,6 +108,41 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // Real-time sync progress (Petr 2026-05-16) — polluje à 2s pokud syncing
+  const [syncProgress, setSyncProgress] = useState<{
+    provider: string;
+    stage: string;
+    current: number;
+    total: number;
+    mergedClusters: number;
+    message?: string;
+    error?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!syncingIcloud && !syncingGoogle) {
+      // Po dokončení sync (state false) ještě 5s držet progress aby Petr viděl
+      // final "Hotovo" hlášku
+      const t = setTimeout(() => setSyncProgress(null), 5000);
+      return () => clearTimeout(t);
+    }
+    let active = true;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/contacts/sync-progress");
+        const data = await res.json();
+        if (active && data.ok && data.progress) {
+          setSyncProgress(data.progress);
+        }
+      } catch { /* ignore */ }
+    };
+    void poll();
+    const id = setInterval(poll, 2000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [syncingIcloud, syncingGoogle]);
 
   // Local edits — overlay nad fetched data, ať dirty se mění ihned v UI bez refetch
   const [localEdits, setLocalEdits] = useState<Map<string, Partial<Contact>>>(new Map());
@@ -427,17 +462,54 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         </div>
       </div>
 
-      {/* Sync progress banner — během sync syncingIcloud/syncingGoogle */}
-      {(syncingIcloud || syncingGoogle) && (
-        <div className="rounded-md border border-[var(--tint-sky)]/30 bg-[var(--tint-sky)]/10 text-sm px-3 py-2 flex items-center gap-2">
-          <Loader2 className="size-4 animate-spin text-[var(--tint-sky)] shrink-0" />
-          <div>
-            <strong>
-              {syncingIcloud ? "iCloud sync běží" : "Google sync běží"}…
-            </strong>
-            <span className="text-xs text-muted-foreground ml-2">
-              Pull + auto-merge duplicit. Pro {syncingIcloud ? "~1000 kontaktů" : "obousměrný sync"} trvá typicky 1-3 min. Nezavírej tab.
-            </span>
+      {/* Sync progress banner — během sync + 5s po. Real-time čísla z DB
+          (Petr 2026-05-16). Polling à 2s. */}
+      {(syncingIcloud || syncingGoogle || syncProgress) && (
+        <div className={`rounded-md border text-sm px-3 py-2 flex items-start gap-2 ${
+          syncProgress?.stage === "error"
+            ? "border-destructive/30 bg-destructive/10"
+            : syncProgress?.stage === "done"
+              ? "border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10"
+              : "border-[var(--tint-sky)]/30 bg-[var(--tint-sky)]/10"
+        }`}>
+          {syncProgress?.stage === "done" ? (
+            <Check className="size-4 text-[var(--tint-sage)] shrink-0 mt-0.5" />
+          ) : syncProgress?.stage === "error" ? (
+            <AlertTriangle className="size-4 text-destructive shrink-0 mt-0.5" />
+          ) : (
+            <Loader2 className="size-4 animate-spin text-[var(--tint-sky)] shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="font-medium">
+              {syncProgress?.provider === "google" ? "Google" : "iCloud"} sync
+              {syncProgress?.stage === "done" ? " hotov" : syncProgress?.stage === "error" ? " selhal" : " běží"}
+              {syncProgress && syncProgress.total > 0 && syncProgress.stage !== "done" && (
+                <span className="ml-2 font-mono text-xs">
+                  {syncProgress.current}/{syncProgress.total}
+                  {syncProgress.mergedClusters > 0 && ` · sloučeno ${syncProgress.mergedClusters} clusterů`}
+                </span>
+              )}
+            </div>
+            {syncProgress?.message && (
+              <div className="text-xs text-muted-foreground mt-0.5">{syncProgress.message}</div>
+            )}
+            {syncProgress?.error && (
+              <div className="text-xs text-destructive mt-0.5">Chyba: {syncProgress.error}</div>
+            )}
+            {!syncProgress && (
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Připravuji sync… (čísla se ukážou za chvíli)
+              </div>
+            )}
+            {/* Progress bar */}
+            {syncProgress && syncProgress.total > 0 && syncProgress.stage !== "done" && syncProgress.stage !== "error" && (
+              <div className="mt-2 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[var(--tint-sky)] transition-all"
+                  style={{ width: `${Math.min(100, (syncProgress.current / syncProgress.total) * 100)}%` }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

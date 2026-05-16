@@ -297,6 +297,7 @@ export async function syncIcloudToGoogle(
 // Overlay model: pull z Google NEPŘEPISUJE isVip/aliases/clientTag/...
 
 import { backupContact } from "./contacts-backup";
+import { startSyncProgress, updateSyncProgress, finishSyncProgress } from "./contacts-sync-progress";
 
 /**
  * Parse Google Person → core fields pro Contact upsert (overlay-safe).
@@ -338,6 +339,7 @@ export async function syncWithGoogle(
   const stats: GoogleSyncResult = { ok: false, created: 0, updated: 0, pulledCreated: 0, pulledUpdated: 0, skipped: 0, errors: 0, durationMs: 0 };
 
   try {
+    await startSyncProgress(userId, "google");
     // 1) Načti naše kontakty (scope filter)
     let where: Parameters<typeof prisma.contact.findMany>[0]["where"] = { userId };
     if (typeof options.scope === "object" && "company" in options.scope) {
@@ -348,6 +350,11 @@ export async function syncWithGoogle(
     const ourContacts = await prisma.contact.findMany({
       where,
       include: { phones: true, emails: true },
+    });
+    await updateSyncProgress(userId, {
+      stage: "fetching",
+      total: ourContacts.length,
+      message: `Stahuji Google connections (DB má ${ourContacts.length} kontaktů)…`,
     });
 
     // 2) Stáhni Google connections
@@ -512,8 +519,13 @@ export async function syncWithGoogle(
     }
 
     stats.ok = true;
+    await finishSyncProgress(userId, "done", {
+      message: `Hotovo. Z Google: ${stats.pulledCreated} nových + ${stats.pulledUpdated} update. Do Google: ${stats.created} nových + ${stats.updated} update. Skipped ${stats.skipped}.`,
+    });
   } catch (e) {
-    stats.error = e instanceof Error ? e.message : String(e);
+    const msg = e instanceof Error ? e.message : String(e);
+    stats.error = msg;
+    await finishSyncProgress(userId, "error", { error: msg.slice(0, 200) });
   }
 
   stats.durationMs = Date.now() - start;
