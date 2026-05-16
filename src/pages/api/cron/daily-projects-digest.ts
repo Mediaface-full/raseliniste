@@ -64,14 +64,16 @@ export const POST: APIRoute = async ({ request, url }) => {
   const summaries: Array<{ user: string; sent: boolean; reason?: string }> = [];
 
   for (const user of users) {
+    // Petr 2026-05-16: Prskavka (osobní) BYLA vyloučena z digestu, ale Petr chce
+    // souhrn obojího — pošlou se v jednom mailu, ale rozdělené do dvou sekcí:
+    // Studánka (sdílené projekty s hosty) + Prskavka (osobní, jen Petr).
     const projects = await prisma.projectBox.findMany({
       where: {
         userId: user.id,
         archivedAt: null,
         includeInDigest: true,
-        isPrivate: false, // Prskavka (osobní) NEPATŘÍ do digestu — Petr by si emailoval sám sobě
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, isPrivate: true },
     });
     if (projects.length === 0) {
       summaries.push({ user: user.username, sent: false, reason: "no_projects" });
@@ -125,7 +127,10 @@ export const POST: APIRoute = async ({ request, url }) => {
     const authorSubj = authorList.length <= 4
       ? authorList.join(", ")
       : `${authorList.slice(0, 4).join(", ")} +${authorList.length - 4}`;
-    const subject = `Studánka — ${recordings.length} ${plural(recordings.length, "nová nahrávka", "nové nahrávky", "nových nahrávek")} (${authorSubj})`;
+    const hasStudanka = projects.some((p) => !p.isPrivate && byProject.has(p.id));
+    const hasPrskavka = projects.some((p) => p.isPrivate && byProject.has(p.id));
+    const moduleLabel = hasStudanka && hasPrskavka ? "Studánka + Prskavka" : hasPrskavka ? "Prskavka" : "Studánka";
+    const subject = `${moduleLabel} — ${recordings.length} ${plural(recordings.length, "nová nahrávka", "nové nahrávky", "nových nahrávek")} (${authorSubj})`;
 
     const result = await sendMail({
       to: to_email,
@@ -157,60 +162,108 @@ function fmtTime(d: Date): string {
 }
 
 function renderDigestHtml(
-  projects: { id: string; name: string }[],
+  projects: { id: string; name: string; isPrivate: boolean }[],
   byProject: Map<string, RecordingForDigest[]>,
 ): string {
-  const projectMap = new Map(projects.map((p) => [p.id, p.name]));
-  const rows: string[] = [];
+  // Rozdělíme projekty na Studánku (sdílené) a Prskavku (osobní). V mailu
+  // budou jako dvě samostatné sekce s vlastním nadpisem a barvou akcentu.
+  const studanka = projects.filter((p) => !p.isPrivate && byProject.has(p.id));
+  const prskavka = projects.filter((p) => p.isPrivate && byProject.has(p.id));
 
-  for (const [projectId, recs] of byProject) {
-    const projectName = projectMap.get(projectId) ?? "Neznámý projekt";
-
-    const items: string[] = [];
-    for (const r of recs) {
-      const meta = [fmtTime(r.createdAt), r.type === "BRIEF" ? "BRIEF" : null, fmtDuration(r.audioDurationSec)]
-        .filter(Boolean)
-        .join(" · ");
-      const preview = snippet(r.transcript, 200);
-      items.push(`
-        <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.06);">
-          <div style="font-size:14px;color:#fff;margin-bottom:2px;">
-            <strong>${escapeHtml(r.authorName)}</strong>
-            <span style="color:#9a8f82;font-family:ui-monospace,monospace;font-size:12px;margin-left:6px;">${escapeHtml(meta)}</span>
-          </div>
-          ${preview ? `<div style="font-size:13px;color:#c9c2b6;line-height:1.55;font-style:italic;">„${escapeHtml(preview)}"</div>` : `<div style="font-size:12px;color:#6b665f;">(žádný přepis)</div>`}
-        </div>
-      `);
-    }
-
-    rows.push(`
-      <div style="border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:18px;margin-bottom:14px;background:#241f1b;">
-        <div style="font-family:Georgia,serif;font-size:18px;color:#fff;margin-bottom:4px;">${escapeHtml(projectName)}</div>
-        <div style="font-size:12px;color:#9a8f82;margin-bottom:14px;font-family:ui-monospace,monospace;">
-          ${recs.length} ${plural(recs.length, "záznam", "záznamy", "záznamů")}
-        </div>
-        ${items.join("")}
-      </div>
-    `);
+  const sections: string[] = [];
+  if (studanka.length > 0) {
+    sections.push(renderSection({
+      label: "Studánka",
+      sublabel: "sdílené projekty",
+      accent: "#9bb88a", // sage
+      projects: studanka,
+      byProject,
+    }));
+  }
+  if (prskavka.length > 0) {
+    sections.push(renderSection({
+      label: "Prskavka",
+      sublabel: "osobní záznamy",
+      accent: "#d4a3b8", // rose
+      projects: prskavka,
+      byProject,
+    }));
   }
 
+  const totalRecs = Array.from(byProject.values()).reduce((sum, recs) => sum + recs.length, 0);
+
   return `<!doctype html>
-<html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#1a1714;color:#e8e3d9;font-family:-apple-system,BlinkMacSystemFont,'Geist','Segoe UI',sans-serif;line-height:1.55;">
-  <div style="max-width:640px;margin:0 auto;padding:24px 20px;">
-    <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b8763c;font-family:ui-monospace,monospace;margin-bottom:6px;">
-      Rašeliniště · Studánka
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#1a1714;color:#e8e3d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55;">
+  <div style="max-width:640px;margin:0 auto;padding:28px 20px;">
+    <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b8763c;font-family:ui-monospace,monospace;margin-bottom:8px;">
+      Rašeliniště · denní souhrn
     </div>
-    <h1 style="font-family:Georgia,serif;font-size:24px;margin:0 0 18px;color:#fff;letter-spacing:-0.01em;">
-      Co se ve Studně dělo za posledních 24 h
+    <h1 style="font-family:Georgia,serif;font-size:26px;margin:0 0 6px;color:#fff;letter-spacing:-0.01em;font-weight:normal;">
+      Co se dělo za posledních 24 h
     </h1>
-    ${rows.join("")}
-    <div style="font-size:11px;color:#6b665f;font-family:ui-monospace,monospace;margin-top:18px;">
-      Plný výpis: <a href="https://www.raseliniste.cz/studna/aktivita" style="color:#b8763c;">/studna/aktivita</a>
+    <div style="font-size:13px;color:#9a8f82;margin-bottom:24px;">
+      ${totalRecs} ${plural(totalRecs, "nový záznam", "nové záznamy", "nových záznamů")}
+    </div>
+    ${sections.join('<div style="height:8px;"></div>')}
+    <div style="font-size:11px;color:#6b665f;font-family:ui-monospace,monospace;margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);">
+      Plný výpis: <a href="https://www.raseliniste.cz/studna/aktivita" style="color:#b8763c;text-decoration:none;">raseliniste.cz/studna/aktivita</a>
     </div>
   </div>
 </body>
 </html>`;
+}
+
+function renderSection(opts: {
+  label: string;
+  sublabel: string;
+  accent: string;
+  projects: { id: string; name: string; isPrivate: boolean }[];
+  byProject: Map<string, RecordingForDigest[]>;
+}): string {
+  const totalRecs = opts.projects.reduce((sum, p) => sum + (opts.byProject.get(p.id)?.length ?? 0), 0);
+
+  const projectBlocks = opts.projects.map((p) => {
+    const recs = opts.byProject.get(p.id) ?? [];
+    const items = recs.map((r) => {
+      const meta = [fmtTime(r.createdAt), r.type === "BRIEF" ? "BRIEF" : null, fmtDuration(r.audioDurationSec)]
+        .filter(Boolean)
+        .join(" · ");
+      const preview = snippet(r.transcript, 220);
+      return `
+        <tr><td style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.05);">
+          <div style="font-size:14px;color:#fff;margin-bottom:3px;">
+            <strong style="font-weight:600;">${escapeHtml(r.authorName)}</strong>
+            <span style="color:#7a7068;font-family:ui-monospace,monospace;font-size:11px;margin-left:8px;">${escapeHtml(meta)}</span>
+          </div>
+          ${preview
+            ? `<div style="font-size:13px;color:#c9c2b6;line-height:1.6;">${escapeHtml(preview)}</div>`
+            : `<div style="font-size:12px;color:#6b665f;font-style:italic;">(žádný přepis)</div>`}
+        </td></tr>`;
+    }).join("");
+
+    return `
+      <div style="background:#241f1b;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px 18px;margin-bottom:12px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-family:Georgia,serif;font-size:17px;color:#fff;font-weight:600;">${escapeHtml(p.name)}</div>
+          <div style="font-size:11px;color:${opts.accent};font-family:ui-monospace,monospace;letter-spacing:0.5px;">
+            ${recs.length} ${plural(recs.length, "záznam", "záznamy", "záznamů")}
+          </div>
+        </div>
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">${items}</table>
+      </div>`;
+  }).join("");
+
+  return `
+    <div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin:8px 0 12px;padding:8px 14px;background:${opts.accent}1a;border-left:3px solid ${opts.accent};border-radius:4px;">
+        <span style="font-family:Georgia,serif;font-size:18px;color:#fff;font-weight:600;">${opts.label}</span>
+        <span style="font-size:11px;color:#9a8f82;font-family:ui-monospace,monospace;letter-spacing:0.5px;text-transform:uppercase;">
+          ${opts.sublabel} · ${totalRecs} ${plural(totalRecs, "záznam", "záznamy", "záznamů")}
+        </span>
+      </div>
+      ${projectBlocks}
+    </div>`;
 }
 
 function escapeHtml(s: string): string {
