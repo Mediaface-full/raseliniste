@@ -353,7 +353,40 @@ function RecordingCard({
   const [showAudio, setShowAudio] = useState(false);
   const [reuploading, setReuploading] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualText, setManualText] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
   const reuploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function saveManualTranscript() {
+    const text = manualText.trim();
+    if (!text) {
+      alert("Přepis je prázdný.");
+      return;
+    }
+    if (!confirm(
+      `Uložit ruční přepis (${text.length} znaků) k tomuto záznamu od „${recording.authorName}"?\n\n` +
+      `Spustí se AI analýza nad tvým textem (themes, summary, atd.). Záznam zůstává patřit ${recording.authorName}.`,
+    )) return;
+    setManualSaving(true);
+    try {
+      const res = await fetch(`/api/studna/recordings/${recording.id}/manual-transcript`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transcript: text, runAnalysis: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error ?? "Uložení přepisu selhalo.");
+        return;
+      }
+      setManualOpen(false);
+      setManualText("");
+      onRefresh();
+    } finally {
+      setManualSaving(false);
+    }
+  }
 
   async function cleanAndRegenerate() {
     if (!confirm(
@@ -777,6 +810,41 @@ function RecordingCard({
                   )}
                 </div>
               )}
+
+              {/* Ruční přepis — Petr poslechne audio a napíše přepis sám,
+                  pak se spustí AI analýza. Záznam zůstává patřit původnímu autorovi. */}
+              <div className="pt-1">
+                <button
+                  onClick={() => setManualOpen(!manualOpen)}
+                  className="text-[11px] font-mono text-[var(--tint-mint)] hover:text-foreground flex items-center gap-1"
+                >
+                  {manualOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                  Napsat přepis ručně (spustí AI analýzu nad mým textem)
+                </button>
+                {manualOpen && (
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      value={manualText}
+                      onChange={(e) => setManualText(e.target.value)}
+                      placeholder={`Poslechni audio a napiš přepis sem. Po uložení se nad textem spustí AI analýza (summary, témata, ...). Záznam zůstává patřit ${recording.authorName}.`}
+                      rows={8}
+                      className="w-full text-sm bg-black/30 border border-white/10 rounded p-3 font-mono leading-relaxed"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={saveManualTranscript}
+                        disabled={manualSaving || !manualText.trim()}
+                        size="sm"
+                        className="bg-[var(--tint-mint)]/20 text-[var(--tint-mint)] border-[var(--tint-mint)]/40"
+                      >
+                        {manualSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                        Uložit přepis + spustit analýzu
+                      </Button>
+                      <span className="text-[11px] font-mono text-muted-foreground">{manualText.length} znaků</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
