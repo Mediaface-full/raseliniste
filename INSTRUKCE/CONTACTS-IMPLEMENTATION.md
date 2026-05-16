@@ -58,6 +58,17 @@ syncSource         String?   // "icloud" | "google" | "manual" | "restore"
 | `20260514210000_icloud_contacts` | Contact iCloud sloupce + ContactGroup |
 | `20260515110000_contact_backups` | ContactBackup tabulka |
 | `20260515120000_contacts_baseline` | User.contactsSeenBaselineAt |
+| `20260516060000_contacts_sync_progress` | User.contactsSyncProgress JSON (real-time progress) |
+
+## Crony
+
+**Modul Kontakty nemá žádné cron úlohy.** Vše manuálně z UI:
+- Sync iCloud / Sync Google z hero
+- Per-row push do iCloudu (CloudUpload ikona)
+- Delete-everywhere (DB + iCloud + Google) z trash ikony
+- Cleanup entities / Auto-merge / Nuclear reset z Nástrojů
+
+**DSM Task Scheduler nepotřebuje žádnou novou položku** (memory `feedback_cron_dispatcher_pattern.md` — jediný scheduler endpoint `/api/cron/scheduler` dispatchuje vše z `cron-schedule.ts`, kontakty tam nejsou).
 
 ## Fáze 1 — iCloud CardDAV sync (commits `175e2fd` … `74b3c27`)
 
@@ -247,6 +258,12 @@ syncSource         String?   // "icloud" | "google" | "manual" | "restore"
 | `2b4c75f` | Nuclear reset endpoint — smaže non-overlay, sync iCloud znovu |
 | `08ff2d8` | cleanup Google vrací detail chyby (typicky scope `contacts` write) |
 | `7d37951` | diagnostic endpoint `/api/contacts/diagnose` + UI sekce |
+| `2d715af` | custom prompt + hardcoded JSON contract (vyzkoušeno default+custom) |
+| `c27cabc` | dead `extractionPrompt` UI odstraněn + zvýrazněn správný studnaStandardPrompt |
+| `e460077` | custom prompt řídí **volný markdown extract** (customExtract field) místo struktury |
+| `acdd917` | Google status v hero + delete row tlačítko + sync progress banner + filter Klienti + posílený entity cleanup |
+| `bda7630` | real-time sync progress s čísly + progress bar (polling à 2s) |
+| `97d6f93` | velký toolbar redesign (Obnovit/Zahodit/Search/Page/Uložit iCloud/+Google/Nový/Skupina) |
 
 ## Provozní gotchas (důležité)
 
@@ -284,6 +301,56 @@ Pokud po sync přesto vzniknou duplicity, **Nuclear reset** (`2b4c75f`) smaže v
 - 20 nejnovějších kontaktů s timestamp + source
 
 UI sekce „Diagnostika" v Nástrojích (žlutá butter), tlačítko „Spočítat".
+
+### Real-time sync progress (2026-05-16)
+
+`User.contactsSyncProgress` JSON (migrace `20260516060000_contacts_sync_progress`):
+```ts
+{ provider, stage, current, total, mergedClusters, startedAt, message?, error? }
+```
+
+- **Lib** `src/lib/contacts-sync-progress.ts`: `startSyncProgress`, `updateSyncProgress`, `finishSyncProgress`, `getSyncProgress`, `clearSyncProgress`
+- **Endpoint** `GET /api/contacts/sync-progress` — frontend polling à 2s
+- **iCloud sync** updatuje progress v krocích: discovery → listing → fetching → saving (current/total) → merging → done
+- **Google sync** stejný pattern
+- **UI banner** zobrazí Loader2/Check/AlertTriangle + `current/total` + zprávu + progress bar
+
+### Custom prompt v Prskavce/Studánce (2026-05-15)
+
+Stage 2 analýza má **2 módy**:
+
+**Bez custom prompt** (default):
+- JSON contract obsahuje strukturovaná pole (transcript, summary, key_themes, thoughts, open_questions, sentiment, intensity_signals)
+- Brief má navíc: glossary, actors, decision_history
+- UI zobrazí defaultní layout (summary + chips + expandable thoughts)
+
+**S custom prompt** (Petrův pokyn):
+- JSON contract má JEN 2 pole: `transcript` (prázdné) + `customExtract` (volný markdown)
+- Custom prompt diktuje OBSAH `customExtract` (např. „Vytáhni seznam úkolů")
+- UI zobrazí mint box **🎯 Vlastní extrakt** s markdown render
+
+UI v project detail: sekce **🎯 Vlastní AI prompt pro analýzu nahrávek** (mint border).
+DB field: `ProjectBox.studnaStandardPrompt` (STANDARD recordings) + `studnaBriefPrompt` (BRIEF).
+
+**Pozor:** Stará UI měla matoucí pole `extractionPrompt` (label „Vlastní AI prompt") které se v žádném AI volání nepoužívalo (dead code). Odstraněno v `c27cabc`, DB field zachován.
+
+### Velký toolbar (2026-05-16, podle briefu 5.5)
+
+Hero:
+- Title + count + dirty count
+- Status pily iCloud / Google
+- Kompaktní Sync iCloud / Sync Google tlačítka
+
+Toolbar (velký blok pod hero):
+- **Obnovit** — reload z DB (vlavo)
+- **Zahodit** — clear dirty edits (confirm)
+- **Search** — full-text napříč displayName/firstName/lastName/company/phones/emails/note/groups
+- **Page size** — 10/25/50/100/200
+- **Validační filtr** — Vše / Bez telefonu / Bez emailu / Bez skupiny / ...
+- **Uložit (iCloud)** — save dirty + per-row push iCloud
+- **Uložit + Google** — save + push iCloud + obousměrný Google sync
+- **+ Nový kontakt** — prompt → POST /api/contacts
+- **+ Nová skupina** — prompt → POST /api/contacts/groups
 
 ## Workflow pro Petra (cheat sheet)
 

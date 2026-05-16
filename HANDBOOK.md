@@ -1496,6 +1496,54 @@ Garantujeme: i když Stage 2 selže, transcript je vždy uložený. Pokrývá re
 
 Vertex AI nepodporuje `genai.files.upload()` (Files API existuje jen v Google AI Studio). Pro audio > 14 MB v Vertex módu fallback na AI Studio Files API přes `GEMINI_API_KEY`.
 
+### Real-time sync progress pattern (2026-05-16)
+
+Pro dlouho běžící server operace (>10s) které nemůžeš streamovat klientovi
+přes WebSocket/SSE, použij **DB-backed progress polling**:
+
+1. Schema: `User.contactsSyncProgress Json?` (nebo per-feature column)
+2. Lib: `startProgress(userId, …)` → `updateProgress(userId, partial)` → `finishProgress(userId, "done"|"error", details)`
+3. Backend volá `updateProgress` v krocích (žádné `try/await` nesmí shodit sync — best-effort).
+4. Endpoint: `GET /api/.../progress` → vrátí aktuální stav
+5. Frontend: `useEffect` polluje à 2s pokud `running`, zastaví po 5s po doběhnutí (aby user viděl final hlášku)
+6. Auto-clear server-side po 30s
+
+Příklad `src/lib/contacts-sync-progress.ts` (commit `bda7630`).
+
+**Plus paterny:**
+- Update progress jen každých N iterací (25 contactů, 5 clusterů) — neflood DB
+- Stage enum string ("discovery"|"listing"|"fetching"|"saving"|"merging"|"done"|"error")
+- Final message obsahuje konkrétní čísla, ne jen „Hotovo"
+
+### Custom AI prompt pattern — struktura JSON vs obsah polí (2026-05-15/16)
+
+Když chceš dovolit uživateli **přepsat prompt** pro LLM analýzu, ale UI
+spoléhá na fixní strukturu JSON odpovědi, máš tři volby:
+
+**A) Custom prompt přepíše celé** → AI vrátí random JSON → UI breakne. ❌
+**B) Custom prompt = jen instrukce, struktura hardcoded** → AI vrátí
+   strukturovaný JSON, custom prompt řídí obsah polí (např. „summary
+   max 200 slov"). Bezpečné ale méně flexibilní. ✓
+**C) Custom prompt = úplně volný markdown override** → JSON má jen
+   `transcript` + `customExtract` (markdown), UI ho zobrazí jako hlavní
+   content. Plná kontrola. ✓✓
+
+Implementace v `src/lib/audio-transcribe.ts` (commits `2d715af`, `e460077`):
+
+```ts
+const hasCustomPrompt = Boolean(customForType && customForType.trim().length > 0);
+const jsonContract = hasCustomPrompt
+  ? `Struktura JSON (jen 2 pole): transcript (prázdné), customExtract (markdown)`
+  : `Struktura JSON: transcript, summary, key_themes, thoughts, ...`;
+```
+
+Frontend pak detekuje:
+```tsx
+const hasCustomExtract = typeof a?.customExtract === "string" && a.customExtract.trim();
+// pokud yes: zobraz mint box "🎯 Vlastní extrakt" s markdown
+// pokud no: zobraz default summary + chips + thoughts
+```
+
 ### CardDAV XML gotcha — Apple `&#13;` v datech (2026-05-15)
 
 **Symptom:** Po prvním iCloud sync se v Rašeliniště DB objevily kontakty
