@@ -10,12 +10,6 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data_v1:/var/lib/postgresql/data
-    # Petr 2026-05-17: app je v network_mode: host (kvůli Tailscale pro backup
-    # rsync). V host mode nefunguje Docker DNS resolution (žádné `postgres:5432`),
-    # takže postgres musí být dostupný přes localhost:5432 z hostu.
-    # Bind jen na 127.0.0.1 → není viditelný z LAN/Tailscale, jen z localhost.
-    ports:
-      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U raseliniste"]
       interval: 10s
@@ -27,25 +21,9 @@ services:
     image: ghcr.io/duchnotvor/raseliniste/app:latest
     container_name: raseliniste_app
     restart: unless-stopped
-    # Petr 2026-05-17: host network mode — container sdílí Synology host network,
-    # vidí tailscale0 interface a Tailscale IP druhého NASu pro backup rsync.
-    # Důsledky:
-    # - Žádné Docker DNS (postgres musí být na localhost:5432, viz výše)
-    # - Žádné port mapping (`ports:` ignorováno) — app poslouchá přímo na PORT
-    # - DSM Reverse Proxy už ukazuje na 127.0.0.1:3333, zachováno přes PORT env
-    network_mode: host
     environment:
       TZ: Europe/Prague
-      # Host network mode: postgres na hostu na 127.0.0.1:5432, ne `postgres:5432`
-      DATABASE_URL: postgresql://raseliniste:${DB_PASSWORD}@127.0.0.1:5432/raseliniste
-      # PORT 3333 ať odpovídá existující DSM Reverse Proxy konfiguraci (předtím
-      # bylo mapping 3333:3000, v host mode app musí přímo poslouchat na 3333).
-      PORT: "3333"
-      HOST: "0.0.0.0"
-      # Cron dispatcher (src/pages/api/cron/scheduler.ts) volá interně přes
-      # fetch(`${INTERNAL_BASE_URL}/api/cron/<name>`). Default localhost:3000
-      # by selhal protože app teď poslouchá na 3333 (host mode).
-      INTERNAL_BASE_URL: http://127.0.0.1:3333
+      DATABASE_URL: postgresql://raseliniste:${DB_PASSWORD}@postgres:5432/raseliniste
       SESSION_SECRET: ${SESSION_SECRET:?required}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       # Vertex AI (pokud VERTEX_PROJECT je vyplněný, má přednost před GEMINI_API_KEY)
@@ -93,8 +71,8 @@ services:
       # při startu failne — záměrně. Buď tam ten klíč dej, nebo tenhle
       # řádek zakomentuj (pak pojede GEMINI_API_KEY fallback).
       - ./gcp-key.json:/app/gcp-key.json:ro
-    # `ports:` v host network mode není potřeba (a Docker ho ignoruje).
-    # App přímo poslouchá na hostu na PORT (3333) díky `network_mode: host`.
+    ports:
+      - "3333:3000"
     depends_on:
       postgres:
         condition: service_healthy
