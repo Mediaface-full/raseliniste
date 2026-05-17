@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { promises as fs, createWriteStream } from "node:fs";
 import path from "node:path";
 import { env } from "@/lib/env";
 
@@ -227,7 +227,7 @@ async function pgDumpToFile(outPath: string): Promise<number> {
     ], { stdio: ["ignore", "pipe", "pipe"] });
 
     const gzip = spawn("gzip", ["-9"], { stdio: ["pipe", "pipe", "pipe"] });
-    const out = require("node:fs").createWriteStream(outPath);
+    const out = createWriteStream(outPath);
 
     dump.stdout.pipe(gzip.stdin);
     gzip.stdout.pipe(out);
