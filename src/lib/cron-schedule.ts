@@ -226,4 +226,11 @@ export const CRON_JOBS: CronJobDef[] = [
     schedule: { type: "daily", hour: 3, minute: 30 },
     description: "GoSMS — mazání SmsMessage starších 90 dní (mimo isPinned)",
   },
+  {
+    name: "backup",
+    endpoint: "/api/cron/backup",
+    schedule: { type: "daily", hour: 2, minute: 0 },
+    fireAndForget: true,
+    description: "Záloha: pg_dump + tar.gz uploads → rsync na druhý NAS přes Tailscale. Retention 30 dní.",
+  },
 ];

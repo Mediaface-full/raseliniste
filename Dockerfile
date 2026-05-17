@@ -28,9 +28,10 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apk add --no-cache su-exec ffmpeg tzdata
-# Petr 2026-05-17: bez tzdata Alpine nezná zóny → TZ=Europe/Prague v compose
-# by jinak fallback na UTC. Booking logika setHours() je timezone-sensitive.
+RUN apk add --no-cache su-exec ffmpeg tzdata postgresql-client rsync openssh-client
+# - tzdata: Europe/Prague (jinak Alpine fallback UTC, booking sloty rozbité)
+# - postgresql-client: pg_dump pro denní zálohu DB (src/lib/backup.ts)
+# - rsync + openssh-client: sync záloh na druhý NAS přes Tailscale
 
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 app

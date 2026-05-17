@@ -50,13 +50,29 @@ services:
       UPLOADS_PATH: /data/uploads
       CACHE_PATH: /data/cache
       NODE_ENV: production
+      # ---- Backup (denní v 2:00, src/lib/backup.ts + /api/cron/backup) ----
+      # Lokální složka pro pg_dump + uploads.tar.gz. Mount níž do ./backups.
+      BACKUP_LOCAL_PATH: /data/backups
+      BACKUP_LOCAL_RETENTION_DAYS: ${BACKUP_LOCAL_RETENTION_DAYS:-30}
+      # Tailscale hostname/IP druhého NASu. Pokud prázdné, rsync se přeskočí
+      # (jen lokální backup). Petr doplní po Tailscale check.
+      BACKUP_REMOTE_HOST: ${BACKUP_REMOTE_HOST:-}
+      BACKUP_REMOTE_PATH: ${BACKUP_REMOTE_PATH:-}
+      BACKUP_SSH_USER: ${BACKUP_SSH_USER:-admin}
+      BACKUP_SSH_KEY_PATH: /app/.ssh/backup_id
     volumes:
       - ./uploads:/data/uploads
+      - ./backups:/data/backups
       - app_cache:/data/cache
       # Vertex AI service-account JSON. Pokud soubor neexistuje, Docker
       # při startu failne — záměrně. Buď tam ten klíč dej, nebo tenhle
       # řádek zakomentuj (pak pojede GEMINI_API_KEY fallback).
       - ./gcp-key.json:/app/gcp-key.json:ro
+      # SSH klíč pro backup rsync na druhý NAS (read-only mount).
+      # Privátní klíč si vygeneruj `ssh-keygen -t ed25519 -f backup_id -N ''`
+      # a public přidej do druhého NASu (~/.ssh/authorized_keys přes Tailscale).
+      - ./backup_id:/app/.ssh/backup_id:ro
+      - ./known_hosts:/app/.ssh/known_hosts:ro
     ports:
       - "3333:3000"
     depends_on:
