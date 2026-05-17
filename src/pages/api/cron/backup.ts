@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { env } from "@/lib/env";
 import { runBackup } from "@/lib/backup";
 import { sendMail } from "@/lib/mailer";
+import { readSession } from "@/lib/session";
 
 export const prerender = false;
 
@@ -50,18 +51,23 @@ export const POST: APIRoute = async ({ request }) => {
 };
 
 /**
- * GET — manuální test endpoint (auth jen přes session, ne cron-key).
- * Pro Petra: otevřít /api/cron/backup v browseru přihlášený nebo
- * `curl -X GET https://.../api/cron/backup?key=<CRON_SECRET>`.
+ * GET — manuální test endpoint. Auth dvojí cestou:
+ *   - Přihlášený admin v browseru (session cookie) — Petr otevře v záložce
+ *   - Nebo ?key=<CRON_SECRET> pro skripty/curl bez session
  */
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, cookies }) => {
+  const session = await readSession(cookies);
   const secret = env.CRON_SECRET;
-  if (!secret) return Response.json({ error: "CRON_NOT_CONFIGURED" }, { status: 503 });
-  if (url.searchParams.get("key") !== secret) {
-    return Response.json({ error: "UNAUTHORIZED. Použij ?key=<CRON_SECRET>" }, { status: 401 });
+  const validKey = secret && url.searchParams.get("key") === secret;
+
+  if (!session && !validKey) {
+    return Response.json(
+      { error: "UNAUTHORIZED. Buď přihlas se v browseru, nebo použij ?key=<CRON_SECRET>." },
+      { status: 401 },
+    );
   }
 
-  console.log("[cron-backup] manual GET trigger");
+  console.log(`[cron-backup] manual GET trigger (${session ? "session" : "cron-key"})`);
   const result = await runBackup();
   return Response.json(result, { status: result.ok ? 200 : 500 });
 };
