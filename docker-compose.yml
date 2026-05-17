@@ -42,6 +42,10 @@ services:
       # bylo mapping 3333:3000, v host mode app musí přímo poslouchat na 3333).
       PORT: "3333"
       HOST: "0.0.0.0"
+      # Cron dispatcher (src/pages/api/cron/scheduler.ts) volá interně přes
+      # fetch(`${INTERNAL_BASE_URL}/api/cron/<name>`). Default localhost:3000
+      # by selhal protože app teď poslouchá na 3333 (host mode).
+      INTERNAL_BASE_URL: http://127.0.0.1:3333
       SESSION_SECRET: ${SESSION_SECRET:?required}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       # Vertex AI (pokud VERTEX_PROJECT je vyplněný, má přednost před GEMINI_API_KEY)
