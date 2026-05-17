@@ -343,7 +343,10 @@ async function rsyncToRemote(
     ? `${user}@${host}::${module}/${subpath}/`
     : `${user}@${host}::${module}/`;
 
-  const args = ["-avz", "--delete", `${localDir}/`, dest];
+  // Petr 2026-05-17: pokud někdo omylem nastaví BACKUP_REMOTE_* v containeru
+  // co nevidí Tailscale (default bridge network), rsync by čekal ~90s timeout.
+  // Tvrdý 30s connect/IO timeout aby app backup nevisel.
+  const args = ["-avz", "--delete", "--timeout=30", "--contimeout=15", `${localDir}/`, dest];
 
   return new Promise((resolve, reject) => {
     const rs = spawn("rsync", args, {
