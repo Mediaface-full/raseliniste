@@ -146,12 +146,36 @@ export default function BookingPicker({ token }: { token: string }) {
 
   const showFilter = invite.meetingType === "CHOICE_ANY" && filteredSlots.length > 0;
 
+  // Dynamický nadpis a popis podle typu pozvánky — ať klient hned ví o co jde.
+  const titleByType: Record<string, { title: string; intro: string }> = {
+    MEETING_ONLINE: {
+      title: "Rezervace online schůzky",
+      intro: "Vyber si termín, který ti vyhovuje. Po potvrzení ti přijde mailem pozvánka z Google Kalendáře s odkazem na videohovor.",
+    },
+    MEETING_PRAGUE: {
+      title: "Rezervace schůzky v Praze",
+      intro: "Vyber si termín. Po potvrzení ti přijde mailem pozvánka z Google Kalendáře s přesným místem.",
+    },
+    MEETING_HOME: {
+      title: "Rezervace schůzky u mě doma",
+      intro: "Vyber si termín. Po potvrzení ti přijde mailem pozvánka z Google Kalendáře s adresou.",
+    },
+    CHOICE_ANY: {
+      title: "Rezervace schůzky",
+      intro: "Vyber si formát a termín. Po potvrzení ti přijde mailem pozvánka z Google Kalendáře.",
+    },
+  };
+  const header = titleByType[invite.meetingType] ?? titleByType.CHOICE_ANY;
+
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-serif text-2xl">Volba termínu</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Délka: <span className="font-mono">{invite.slotDurationMin} min</span>.
+        <h1 className="font-serif text-2xl">{header.title}</h1>
+        <p className="text-sm text-foreground/80 mt-2 leading-relaxed">
+          {header.intro}
+        </p>
+        <p className="text-xs text-muted-foreground mt-2 font-mono">
+          Délka schůzky: {invite.slotDurationMin} min
         </p>
       </div>
 
@@ -178,10 +202,14 @@ export default function BookingPicker({ token }: { token: string }) {
         <div className="space-y-4">
           {Array.from(slotsByDay.entries()).slice(0, 14).map(([day, daySlots]) => {
             const dateObj = new Date(`${day}T00:00:00`);
-            const label = dateObj.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
+            const weekday = dateObj.toLocaleDateString("cs-CZ", { weekday: "long" });
+            const dayMonth = dateObj.toLocaleDateString("cs-CZ", { day: "numeric", month: "long" });
             return (
               <div key={day} className="glass rounded-xl p-4">
-                <div className="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-2">{label}</div>
+                <div className="flex items-baseline gap-2 mb-3 pb-2 border-b border-white/10">
+                  <span className="font-serif text-lg text-foreground capitalize">{weekday}</span>
+                  <span className="text-sm font-mono text-muted-foreground">{dayMonth}</span>
+                </div>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {daySlots.map((s, i) => {
                     const start = new Date(s.startsAt);
