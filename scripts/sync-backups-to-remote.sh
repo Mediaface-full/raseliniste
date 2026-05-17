@@ -26,10 +26,16 @@ set -euo pipefail
 # ---- Konfigurace ------------------------------------------------------------
 LOCAL_BACKUPS_DIR="/volume1/docker/raseliniste/backups"
 REMOTE_HOST="100.83.62.70"
-REMOTE_MODULE="ZALOHY_APLIKACI"
-REMOTE_PATH="raseliniste"
+REMOTE_MODULE="ZALOHY_APLIKACI"           # sdílená složka na cílovém NASu (sdílená pro víc projektů)
+REMOTE_PATH="raseliniste"                  # podsložka per projekt
 REMOTE_USER="app-raseliniste"
-REMOTE_PASSWORD="a4wVc0H3U1pUAPgaou8hxH43Jr9Z"
+
+# Heslo NE v skriptu — v separátním souboru s chmod 600 (vzor z hlidactk):
+#   sudo sh -c 'echo "PASSWORD" > /root/.rsync-raseliniste-password'
+#   sudo chmod 600 /root/.rsync-raseliniste-password
+# Skript ho přečte do RSYNC_PASSWORD env. Bezpečnost: mimo `ps` výstup,
+# mimo skript v git, mimo logy.
+PASSWORD_FILE="/root/.rsync-raseliniste-password"
 
 # Healthchecks.io ping URL (pro tenhle sync task — vlastní check, oddělený
 # od aplikačního /api/cron/backup checku). Pokud nechceš HC monitoring tady,
@@ -52,9 +58,18 @@ if [[ ! -d "${LOCAL_BACKUPS_DIR}" ]]; then
   exit 1
 fi
 
+# Kontrola password souboru
+if [[ ! -f "${PASSWORD_FILE}" ]]; then
+  echo "[error] Password file ${PASSWORD_FILE} neexistuje. Vytvoř ho:"
+  echo "  sudo sh -c 'echo \"HESLO\" > ${PASSWORD_FILE}'"
+  echo "  sudo chmod 600 ${PASSWORD_FILE}"
+  [[ -n "${HEALTHCHECK_URL}" ]] && curl -fsS -m 10 -o /dev/null "${HEALTHCHECK_URL}/fail" --data-raw "Password file missing"
+  exit 1
+fi
+
 # rsync s daemon protokolem (port 873). RSYNC_PASSWORD přes env (heslo
 # v CLI by bylo vidět v ps).
-export RSYNC_PASSWORD="${REMOTE_PASSWORD}"
+export RSYNC_PASSWORD="$(cat "${PASSWORD_FILE}")"
 
 RSYNC_OUTPUT=$(rsync -avz --delete \
   "${LOCAL_BACKUPS_DIR}/" \

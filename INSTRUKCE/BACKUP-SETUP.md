@@ -20,6 +20,8 @@
 
 ### 1. Cílový NAS (`100.83.62.70`)
 
+Stejný vzor jako `hlidactk` projekt — sdílená složka `ZALOHY_APLIKACI`, per-projekt podsložka + rsync account.
+
 DSM → **Control Panel** → **File Services** → **rsync** tab:
 - ☑ Enable rsync service (port 873 default)
 - **Edit rsync account** → vytvořit:
@@ -30,6 +32,13 @@ DSM → **Shared Folder** → `ZALOHY_APLIKACI` → Edit → **Permissions**:
 - Najít `app-raseliniste` → nastavit **Read/Write**
 
 File Station → otevřít `ZALOHY_APLIKACI` → New folder `raseliniste`.
+
+**Firewall**: DSM → Control Panel → **Security** → Firewall → ujisti se že existuje pravidlo:
+- Source IP: `100.64.0.0/10` (celý Tailscale CGNAT rozsah)
+- Ports: All
+- Action: **Allow**
+
+Pokud zálohuješ víc projektů z Tailscale, tohle pravidlo už nejspíš máš (vzor hlidactk).
 
 ### 2. Zdrojový NAS — aplikační backup
 
@@ -67,6 +76,13 @@ Zkopíruj skript z repa na NAS:
 sudo mkdir -p /volume1/scripts
 sudo cp /volume1/docker/raseliniste/scripts/sync-backups-to-remote.sh /volume1/scripts/
 sudo chmod +x /volume1/scripts/sync-backups-to-remote.sh
+```
+
+Heslo do separátního souboru (mimo skript, mimo git, chmod 600 — vzor hlidactk):
+
+```bash
+sudo sh -c 'echo "a4wVc0H3U1pUAPgaou8hxH43Jr9Z" > /root/.rsync-raseliniste-password'
+sudo chmod 600 /root/.rsync-raseliniste-password
 ```
 
 Pokud chceš HC monitoring i pro tenhle sync task (doporučuji — odděleně od aplikačního checku):
