@@ -22,6 +22,10 @@ services:
     container_name: raseliniste_app
     restart: unless-stopped
     environment:
+      # Petr 2026-05-17: Bez TZ Docker běží v UTC, takže setHours(17) v booking
+      # logice znamenalo 17:00 UTC = 19:00 CEST → klient viděl sloty 11-18 místo
+      # 9-16. Praha je Europe/Prague (CET zima / CEST léto, DST auto).
+      TZ: Europe/Prague
       DATABASE_URL: postgresql://raseliniste:${DB_PASSWORD}@postgres:5432/raseliniste
       SESSION_SECRET: ${SESSION_SECRET:?required}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
