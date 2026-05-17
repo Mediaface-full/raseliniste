@@ -54,12 +54,14 @@ services:
       # Lokální složka pro pg_dump + uploads.tar.gz. Mount níž do ./backups.
       BACKUP_LOCAL_PATH: /data/backups
       BACKUP_LOCAL_RETENTION_DAYS: ${BACKUP_LOCAL_RETENTION_DAYS:-30}
-      # Tailscale hostname/IP druhého NASu. Pokud prázdné, rsync se přeskočí
-      # (jen lokální backup). Petr doplní po Tailscale check.
+      # Synology rsync daemon (port 873) na druhém NASu. DSM > File Services > rsync.
+      # MODULE = shared folder name (např. ZALOHY_APLIKACI).
+      # PATH = subpath uvnitř modulu (např. raseliniste). Pokud prázdné, rsync skip.
       BACKUP_REMOTE_HOST: ${BACKUP_REMOTE_HOST:-}
+      BACKUP_REMOTE_MODULE: ${BACKUP_REMOTE_MODULE:-}
       BACKUP_REMOTE_PATH: ${BACKUP_REMOTE_PATH:-}
-      BACKUP_SSH_USER: ${BACKUP_SSH_USER:-admin}
-      BACKUP_SSH_KEY_PATH: /app/.ssh/backup_id
+      BACKUP_REMOTE_USER: ${BACKUP_REMOTE_USER:-}
+      BACKUP_REMOTE_PASSWORD: ${BACKUP_REMOTE_PASSWORD:-}
     volumes:
       - ./uploads:/data/uploads
       - ./backups:/data/backups
@@ -68,11 +70,6 @@ services:
       # při startu failne — záměrně. Buď tam ten klíč dej, nebo tenhle
       # řádek zakomentuj (pak pojede GEMINI_API_KEY fallback).
       - ./gcp-key.json:/app/gcp-key.json:ro
-      # SSH klíč pro backup rsync na druhý NAS (read-only mount).
-      # Privátní klíč si vygeneruj `ssh-keygen -t ed25519 -f backup_id -N ''`
-      # a public přidej do druhého NASu (~/.ssh/authorized_keys přes Tailscale).
-      - ./backup_id:/app/.ssh/backup_id:ro
-      - ./known_hosts:/app/.ssh/known_hosts:ro
     ports:
       - "3333:3000"
     depends_on:

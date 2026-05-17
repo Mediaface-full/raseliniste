@@ -18,16 +18,20 @@ import { env } from "@/lib/env";
  * Idempotence: pokud backup s dnešním datem existuje, přepíše se (denní = max 1×).
  *
  * Env config (docker-compose.yml):
- *   BACKUP_LOCAL_PATH         /data/backups (mount volume)
- *   BACKUP_UPLOADS_PATH       /data/uploads (zdroj — UPLOADS_PATH)
- *   BACKUP_REMOTE_HOST        hostname/IP druhého NASu v Tailscale
- *   BACKUP_REMOTE_PATH        cesta na vzdáleném NASu (např. /volume1/backups/raseliniste)
- *   BACKUP_SSH_USER           SSH uživatel druhého NASu (default: admin)
- *   BACKUP_SSH_KEY_PATH       cesta k privátnímu klíči v containeru (mount)
+ *   BACKUP_LOCAL_PATH            /data/backups (mount volume)
+ *   BACKUP_UPLOADS_PATH          /data/uploads (zdroj — UPLOADS_PATH)
+ *   BACKUP_REMOTE_HOST           IP/hostname druhého NASu (Tailscale: 100.83.62.70)
+ *   BACKUP_REMOTE_MODULE         rsync daemon modul (= shared folder name, např. ZALOHY_APLIKACI)
+ *   BACKUP_REMOTE_PATH           subpath uvnitř modulu (např. raseliniste)
+ *   BACKUP_REMOTE_USER           rsync user (z DSM File Services > rsync)
+ *   BACKUP_REMOTE_PASSWORD       rsync password
  *   BACKUP_LOCAL_RETENTION_DAYS  retention lokálně, default 30
  *
- * Vyžaduje v containeru: pg_dump (postgresql-client), tar (busybox), rsync,
- * ssh (openssh-client). Viz Dockerfile.
+ * Synology DSM > File Services > rsync musí být ENABLED s rsync účtem.
+ * Modul = shared folder, subpath = složka uvnitř. Port 873 (default).
+ *
+ * Vyžaduje v containeru: pg_dump (postgresql-client), tar (busybox), rsync.
+ * Viz Dockerfile.
  */
 
 export interface BackupResult {
@@ -93,12 +97,13 @@ export async function runBackup(): Promise<BackupResult> {
 
   // Step 3: rsync (jen pokud je nakonfigurované)
   const remoteHost = process.env.BACKUP_REMOTE_HOST;
-  const remotePath = process.env.BACKUP_REMOTE_PATH;
-  if (!remoteHost || !remotePath) {
-    result.steps.rsync = { ok: true, skipped: true, output: "BACKUP_REMOTE_HOST/PATH nenastaveno — jen lokální záloha." };
+  const remoteModule = process.env.BACKUP_REMOTE_MODULE;
+  const remotePath = process.env.BACKUP_REMOTE_PATH ?? "";
+  if (!remoteHost || !remoteModule) {
+    result.steps.rsync = { ok: true, skipped: true, output: "BACKUP_REMOTE_HOST/MODULE nenastaveno — jen lokální záloha." };
   } else {
     try {
-      const output = await rsyncToRemote(BACKUP_DIR, remoteHost, remotePath);
+      const output = await rsyncToRemote(BACKUP_DIR, remoteHost, remoteModule, remotePath);
       result.steps.rsync = { ok: true, output: output.slice(-500) };
     } catch (e) {
       result.steps.rsync = { ok: false, error: e instanceof Error ? e.message : String(e) };
@@ -222,27 +227,40 @@ async function tarGzDir(srcDir: string, outPath: string): Promise<number> {
   });
 }
 
-async function rsyncToRemote(localDir: string, host: string, remotePath: string): Promise<string> {
-  const user = process.env.BACKUP_SSH_USER ?? "admin";
-  const keyPath = process.env.BACKUP_SSH_KEY_PATH ?? "/app/.ssh/backup_id";
-  const sshOpts = [
-    "-o", "StrictHostKeyChecking=accept-new",
-    "-o", "UserKnownHostsFile=/app/.ssh/known_hosts",
-    "-i", keyPath,
-  ];
-  // -a archive, -v verbose, -z compress, --delete = remote mirror lokálního stavu
-  // (po pruneOldBackups lokálně smažeme staré, --delete to udělá i remote, takže
-  // remote retention = local retention. Pokud Petr chce delší remote retention,
-  // odebrat --delete).
-  const args = [
-    "-avz",
-    "--delete",
-    "-e", `ssh ${sshOpts.join(" ")}`,
-    `${localDir}/`,
-    `${user}@${host}:${remotePath}/`,
-  ];
+/**
+ * Rsync daemon protocol (port 873, dvojité dvojtečky `user@host::module/path`).
+ * Synology DSM > File Services > rsync. Heslo přes RSYNC_PASSWORD env.
+ *
+ * -avz archive+verbose+compress, --delete = remote mirror lokálního stavu
+ * (po pruneOldBackups smažeme staré lokálně, rsync --delete to dělá i remote).
+ */
+async function rsyncToRemote(
+  localDir: string,
+  host: string,
+  module: string,
+  remoteSubpath: string,
+): Promise<string> {
+  const user = process.env.BACKUP_REMOTE_USER ?? "";
+  const password = process.env.BACKUP_REMOTE_PASSWORD ?? "";
+  if (!user || !password) {
+    throw new Error("BACKUP_REMOTE_USER/PASSWORD nenastaveno.");
+  }
+
+  // Synology rsync URL: user@host::MODULE/subpath/
+  // Trailing slash u zdroje = obsah složky (ne složka sama).
+  const subpath = remoteSubpath.replace(/^\/+|\/+$/g, "");
+  const dest = subpath
+    ? `${user}@${host}::${module}/${subpath}/`
+    : `${user}@${host}::${module}/`;
+
+  const args = ["-avz", "--delete", `${localDir}/`, dest];
+
   return new Promise((resolve, reject) => {
-    const rs = spawn("rsync", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const rs = spawn("rsync", args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      // Heslo přes env, ne CLI (CLI by se objevilo v ps)
+      env: { ...process.env, RSYNC_PASSWORD: password },
+    });
     let stdout = "";
     let stderr = "";
     rs.stdout.on("data", (c) => { stdout += c.toString(); });

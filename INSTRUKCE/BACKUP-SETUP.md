@@ -1,4 +1,4 @@
-# Backup setup — denní záloha na druhou Synology přes Tailscale
+# Backup setup — denní záloha na druhou Synology přes Tailscale rsync
 
 ## Co to dělá
 
@@ -6,72 +6,83 @@ Každý den v **2:00 ráno** (cron `backup` v `cron-schedule.ts`):
 
 1. **pg_dump** PostgreSQL databáze → `/data/backups/db-YYYY-MM-DD.sql.gz`
 2. **tar.gz** složky `uploads/` → `/data/backups/uploads-YYYY-MM-DD.tar.gz`
-3. **rsync** celé složky `/data/backups/` na druhý NAS přes SSH/Tailscale
+3. **rsync daemon** (port 873) na druhý NAS přes Tailscale, ne SSH
 4. **Retention** — smaže lokální soubory starší 30 dní (`--delete` v rsync zrcadlí to i na vzdáleném)
 
 Pokud něco selže → mail na `NOTIFICATION_EMAIL`.
 
+## Cílový NAS (info)
+
+- **IP**: `100.83.62.70` (Tailscale)
+- **Shared folder**: `ZALOHY_APLIKACI`
+- **Subpath**: `raseliniste`
+- **Rsync user**: `app-raseliniste`
+
 ## Setup (jednorázově)
 
-### 1. SSH klíč pro Tailscale rsync
+### 1. Na CÍLOVÉM NASu — povolit rsync daemon
 
-Na **zdrojovém NASu** (kde běží raseliniste), v Bash:
+DSM (https://100.83.62.70:5001) → **Control Panel** → **File Services** → **rsync** (tab):
+
+- ☑ **Enable rsync service** (port 873 default)
+- Klik **Edit rsync account** → vytvořit účet:
+  - Username: `app-raseliniste`
+  - Password: heslo z chatu
+- Potvrdit, zavřít.
+
+Pak **Control Panel** → **Shared Folder** → vybrat `ZALOHY_APLIKACI` → **Edit** → **Permissions** tab:
+- Najdi `app-raseliniste` v "Local users"
+- Nastav **Read/Write** access
+- Save
+
+A vytvoř podsložku `raseliniste`:
+- **File Station** → otevřít `ZALOHY_APLIKACI` → New folder → `raseliniste`
+
+### 2. Otestovat rsync ze zdrojového NASu
+
+Předtím než to dáme do produkce, ověř že rsync vůbec projde. SSH na **zdrojový** NAS (kde běží raseliniste):
 
 ```bash
-cd /volume1/docker/raseliniste/   # tady kde máš docker-compose.yml
-ssh-keygen -t ed25519 -f backup_id -N ''
-chmod 600 backup_id
-cat backup_id.pub
+# Test ping přes Tailscale
+ping -c 2 100.83.62.70
+
+# Test rsync auth (--list-only nepřenáší data, jen prověří login)
+RSYNC_PASSWORD='a4wVc0H3U1pUAPgaou8hxH43Jr9Z' \
+  rsync --list-only app-raseliniste@100.83.62.70::ZALOHY_APLIKACI/
 ```
 
-Vypíše public key. Tenhle public key přidej na **cílový NAS** do `~/.ssh/authorized_keys` (přihlášený jako SSH uživatel co bude přijímat zálohy, typicky `admin`).
+Pokud to vrátí listing složky, **OK pokračuj**. Pokud `auth failed`, zkontroluj DSM rsync user + heslo.
 
-### 2. Cílová složka na druhém NASu
-
-Na **cílovém NASu** vytvoř složku pro zálohy:
-
-```bash
-# přihlas se SSH na druhý NAS (Tailscale)
-ssh admin@<TAILSCALE_HOST_DRUHEHO_NASU>
-mkdir -p /volume1/backups/raseliniste
-chown admin:users /volume1/backups/raseliniste
-```
-
-### 3. Doplň env proměnné
+### 3. Doplnit env proměnné
 
 Na zdrojovém NASu v `/volume1/docker/raseliniste/.env` přidej:
 
 ```bash
-BACKUP_REMOTE_HOST=<tailscale-hostname-druheho-nasu>  # např. zaloha-nas.tail-net.ts.net
-BACKUP_REMOTE_PATH=/volume1/backups/raseliniste
-BACKUP_SSH_USER=admin
+BACKUP_REMOTE_HOST=100.83.62.70
+BACKUP_REMOTE_MODULE=ZALOHY_APLIKACI
+BACKUP_REMOTE_PATH=raseliniste
+BACKUP_REMOTE_USER=app-raseliniste
+BACKUP_REMOTE_PASSWORD=a4wVc0H3U1pUAPgaou8hxH43Jr9Z
 # Volitelně override default 30 dní:
 # BACKUP_LOCAL_RETENTION_DAYS=30
 ```
 
-### 4. Known_hosts (one-time TOFU)
+⚠️ **Bezpečnost**: heslo je v `.env` plaintext. Soubor musí mít perms `600` a vlastnit root nebo aspoň `app` user (uid 1001).
 
-Před prvním spuštěním backupu ověř SSH připojení z hostu (vytvoří `known_hosts`):
+### 4. Vytvořit lokální složku pro zálohy
 
-```bash
-ssh -i backup_id -o UserKnownHostsFile=./known_hosts admin@<TAILSCALE_HOST> 'echo ok'
-# napíše "The authenticity of host... yes/no" → yes
-# pak "ok" → odpoj se
-chmod 644 known_hosts
-```
-
-`known_hosts` musí být v stejné složce jako `docker-compose.yml`.
-
-### 5. Vytvoř lokální složku pro zálohy
+Na zdrojovém NASu:
 
 ```bash
 mkdir -p /volume1/docker/raseliniste/backups
-chown -R 1001:1001 /volume1/docker/raseliniste/backups   # uid app v containeru
+chown -R 1001:1001 /volume1/docker/raseliniste/backups
 ```
 
-### 6. Restart containeru
+### 5. Pull image + Recreate container
 
-V DSM Container Manager → Project `raseliniste` → **Recreate** (ne Restart — env z compose se musí znovu načíst).
+DSM Container Manager → Image → **Pull** ghcr.io image latest (kvůli novým apk dependencies pg_client + rsync).
+
+Pak Container Manager → Project `raseliniste` → **Recreate** (ne Restart — env z compose se musí znovu načíst).
 
 ## Test (manuální spuštění)
 
@@ -88,25 +99,33 @@ curl -X POST https://www.raseliniste.cz/api/cron/backup \
      -H "x-cron-key: <CRON_SECRET>"
 ```
 
-Vrátí JSON s 4 kroky. Pokud `ok: true`, všechno OK. Pokud `ok: false`, viz `steps.<krok>.error`.
+Vrátí JSON. Klíčové:
+- `ok: true` → všechno proběhlo (pg_dump + uploads + rsync + retention)
+- `steps.pgDump.bytes` → velikost DB dumpu (typicky 1-50 MB)
+- `steps.uploadsTar.bytes` → velikost uploads tarballu (může být GB)
+- `steps.rsync.output` → poslední řádky rsync logu
+
+Po test ověř na cílovém NASu (`File Station` → `ZALOHY_APLIKACI/raseliniste`) že tam dnešní `db-*.sql.gz` a `uploads-*.tar.gz` jsou.
 
 ## Co dělat když rsync selže
 
 Typické chyby:
 
-- **Permission denied (publickey)** — public key na cílovém NASu chybí nebo má špatné práva. Zkontroluj `~/.ssh/authorized_keys` (perms 600, parent .ssh 700).
-- **Host key verification failed** — `known_hosts` chybí nebo cílový host změnil klíč. Smaž `known_hosts` a opakuj krok 4.
-- **No route to host** — Tailscale na jednom ze strojů odpojený. `tailscale status` ověř.
+- **`auth failed on module`** — DSM rsync user neexistuje nebo špatné heslo. Zkontroluj DSM > File Services > rsync.
+- **`Permission denied`** — user nemá Read/Write na shared folder. Zkontroluj Shared Folder > Permissions.
+- **`@ERROR: Unknown module 'ZALOHY_APLIKACI'`** — modul = přesné jméno shared folderu (case-sensitive). Zkontroluj v DSM.
+- **`No route to host`** — Tailscale na jednom ze strojů odpojený. `tailscale status`.
+- **`connection refused port 873`** — rsync daemon vypnutý v DSM File Services.
 
 ## Restore (kdyby bylo zle)
 
 ### DB restore
 
 ```bash
-# zkopíruj backup zpět na NAS
-scp admin@<TAILSCALE_HOST>:/volume1/backups/raseliniste/db-2026-05-17.sql.gz .
+# Stáhnout backup z cílového NASu zpět
+RSYNC_PASSWORD='...' rsync app-raseliniste@100.83.62.70::ZALOHY_APLIKACI/raseliniste/db-2026-05-17.sql.gz .
 
-# v Docker postgres containeru
+# V Docker postgres containeru raseliniste_db
 docker exec -i raseliniste_db psql -U raseliniste -d raseliniste \
     < <(gunzip -c db-2026-05-17.sql.gz)
 ```
@@ -116,16 +135,16 @@ docker exec -i raseliniste_db psql -U raseliniste -d raseliniste \
 ### Uploads restore
 
 ```bash
-scp admin@<TAILSCALE_HOST>:/volume1/backups/raseliniste/uploads-2026-05-17.tar.gz .
+RSYNC_PASSWORD='...' rsync app-raseliniste@100.83.62.70::ZALOHY_APLIKACI/raseliniste/uploads-2026-05-17.tar.gz .
 # uploads/ je host bind mount v compose ./uploads → /data/uploads
 tar -xzf uploads-2026-05-17.tar.gz -C /volume1/docker/raseliniste/
 ```
 
 ## Bezpečnostní poznámka
 
-- DB dump obsahuje **všechna data včetně OAuth tokenů, hashed hesel, atd.** Cílový NAS musí být důvěryhodný (tvůj).
-- SSH klíč v repo NEKOMITOVAT — je v `.gitignore` (auto, protože `backup_id` není v `git ls-files`).
-- Pokud druhý NAS pojede Tailscale ACL, omez přístup jen na rsync port (22) ze zdrojového NASu.
+- DB dump obsahuje **všechna data včetně OAuth tokenů, hashed hesel, atd.** Cílový NAS musí být v důvěryhodné síti (Tailscale OK).
+- **Heslo `app-raseliniste`** je v `.env` plaintext. Pro zvýšenou bezpečnost zvážit Docker secrets (až bude potřeba).
+- Heslo bylo posláno v chatu — po nastavení **doporučuji změnit** v DSM a aktualizovat `.env`.
 
 ## Co dělá rsync `--delete`
 

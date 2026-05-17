@@ -39,11 +39,7 @@ yarn-error.log*
 # ale .env.example je šablona (bez secretů), tu chceme v repu
 !.env.example
 
-# Backup SSH klíče a known_hosts (mounted do containeru z deploy NASu)
-backup_id
-backup_id.pub
-known_hosts
-# Lokální backupy (host bind mount)
+# Lokální backupy (host bind mount na NASu)
 backups/
 uploads/
 

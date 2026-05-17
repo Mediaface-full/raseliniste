@@ -28,10 +28,10 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apk add --no-cache su-exec ffmpeg tzdata postgresql-client rsync openssh-client
+RUN apk add --no-cache su-exec ffmpeg tzdata postgresql-client rsync
 # - tzdata: Europe/Prague (jinak Alpine fallback UTC, booking sloty rozbité)
 # - postgresql-client: pg_dump pro denní zálohu DB (src/lib/backup.ts)
-# - rsync + openssh-client: sync záloh na druhý NAS přes Tailscale
+# - rsync: sync záloh na druhý NAS přes Tailscale (rsync daemon, port 873)
 
 RUN addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 app
