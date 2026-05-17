@@ -1867,6 +1867,39 @@ model CronRun {
   @@index([jobName])
 }
 
+// Historie backupů — záznam po každém /api/cron/backup runu. Admin UI
+// /settings/backup-log čte tuto tabulku. Vzor hlidactk (denní záloha
+// modul). Petr 2026-05-17.
+model BackupRun {
+  id              String    @id @default(cuid())
+  startedAt       DateTime
+  finishedAt      DateTime
+  durationMs      Int
+  ok              Boolean
+  triggeredBy     String    // "cron" | "manual-session" | "manual-key"
+
+  pgDumpOk        Boolean
+  pgDumpBytes     Int?      // nullable: fail = no bytes
+  pgDumpError     String?   @db.Text
+
+  uploadsTarOk    Boolean
+  uploadsTarBytes Int?
+  uploadsTarError String?   @db.Text
+
+  rsyncOk         Boolean
+  rsyncSkipped    Boolean   @default(false)
+  rsyncError      String?   @db.Text
+
+  retentionOk     Boolean
+  retentionDeleted Int?
+  retentionError  String?   @db.Text
+
+  createdAt       DateTime  @default(now())
+
+  @@index([startedAt(sort: Desc)])
+  @@index([ok])
+}
+
 // Audit log pro Todoist routing — kde úkol skončil + proč.
 // Viditelný v /settings/crons (sekce "Routing audit log").
 // Smaže se po 30 dnech (cron cleanup-audit-log nebo manuálně).

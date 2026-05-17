@@ -1,0 +1,186 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// Posledních 100 backupů, nejnovější první
+const runs = await prisma.backupRun.findMany({
+  orderBy: { startedAt: "desc" },
+  take: 100,
+});
+
+// Statistika
+const totalRuns = await prisma.backupRun.count();
+const okRuns = await prisma.backupRun.count({ where: { ok: true } });
+const failRuns = totalRuns - okRuns;
+const lastOk = await prisma.backupRun.findFirst({
+  where: { ok: true },
+  orderBy: { startedAt: "desc" },
+  select: { startedAt: true },
+});
+const lastFail = await prisma.backupRun.findFirst({
+  where: { ok: false },
+  orderBy: { startedAt: "desc" },
+  select: { startedAt: true },
+});
+
+function fmtBytes(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function fmtDuration(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
+  return `${(ms / 60_000).toFixed(1)} min`;
+}
+
+function relativeTime(d: Date | null | undefined): string {
+  if (!d) return "—";
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "před chvílí";
+  if (min < 60) return `před ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `před ${h} h`;
+  const days = Math.floor(h / 24);
+  return `před ${days} dny`;
+}
+
+const TRIGGERED_LABEL: Record<string, string> = {
+  "cron": "🕐 cron",
+  "manual-session": "👤 ručně (session)",
+  "manual-key": "🔑 ručně (key)",
+};
+---
+
+<Shell
+  title="Backup log · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Nastavení" }, { label: "Backup log" }]}
+>
+  <div class="max-w-5xl space-y-4">
+    <div class="glass-strong rounded-xl p-4 space-y-3">
+      <h1 class="font-serif text-2xl">Backup log</h1>
+      <p class="text-sm text-muted-foreground">
+        Historie všech běhů zálohy aplikace (<code class="font-mono text-xs">/api/cron/backup</code>).
+        Denní v 02:00, retention 30 dní lokálně + Tailscale sync z hostu na druhý NAS v 03:00
+        (viz <a href="/INSTRUKCE/BACKUP-SETUP.md" class="underline">BACKUP-SETUP.md</a>).
+      </p>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+        <div class="rounded-md bg-black/20 p-3">
+          <div class="text-xs font-mono uppercase text-muted-foreground">Celkem</div>
+          <div class="text-2xl font-serif">{totalRuns}</div>
+        </div>
+        <div class="rounded-md bg-[var(--tint-sage)]/10 p-3 border border-[var(--tint-sage)]/20">
+          <div class="text-xs font-mono uppercase text-[var(--tint-sage)]">OK</div>
+          <div class="text-2xl font-serif">{okRuns}</div>
+        </div>
+        <div class={`rounded-md p-3 border ${failRuns > 0 ? "bg-destructive/10 border-destructive/30" : "bg-black/20 border-white/10"}`}>
+          <div class={`text-xs font-mono uppercase ${failRuns > 0 ? "text-destructive" : "text-muted-foreground"}`}>FAIL</div>
+          <div class="text-2xl font-serif">{failRuns}</div>
+        </div>
+        <div class="rounded-md bg-black/20 p-3">
+          <div class="text-xs font-mono uppercase text-muted-foreground">Poslední OK</div>
+          <div class="text-sm font-mono mt-1">{relativeTime(lastOk?.startedAt)}</div>
+          {lastFail && lastOk && lastFail.startedAt > lastOk.startedAt && (
+            <div class="text-xs text-destructive mt-1">⚠ od poslední OK byly chyby</div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {runs.length === 0 ? (
+      <div class="glass rounded-xl p-6 text-center text-sm text-muted-foreground">
+        Zatím žádné běhy. Po prvním cron tickání v 02:00 (nebo manuálním test přes
+        <code class="font-mono text-xs">/api/cron/backup</code>) tu uvidíš záznamy.
+      </div>
+    ) : (
+      <div class="glass rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-black/30">
+            <tr class="text-left text-xs font-mono uppercase text-muted-foreground">
+              <th class="px-3 py-2">Čas</th>
+              <th class="px-3 py-2">Stav</th>
+              <th class="px-3 py-2">Trigger</th>
+              <th class="px-3 py-2">Trvání</th>
+              <th class="px-3 py-2">pg_dump</th>
+              <th class="px-3 py-2">uploads</th>
+              <th class="px-3 py-2">rsync</th>
+              <th class="px-3 py-2">retention</th>
+            </tr>
+          </thead>
+          <tbody>
+            {runs.map((r) => (
+              <tr class={`border-t border-white/5 ${r.ok ? "" : "bg-destructive/5"}`}>
+                <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">
+                  {r.startedAt.toLocaleString("cs-CZ", { timeZone: "Europe/Prague", dateStyle: "short", timeStyle: "short" })}
+                  <div class="text-[10px] text-muted-foreground">{relativeTime(r.startedAt)}</div>
+                </td>
+                <td class="px-3 py-2">
+                  {r.ok ? (
+                    <span class="text-[var(--tint-sage)] font-mono text-xs">✓ OK</span>
+                  ) : (
+                    <span class="text-destructive font-mono text-xs">✗ FAIL</span>
+                  )}
+                </td>
+                <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">{TRIGGERED_LABEL[r.triggeredBy] ?? r.triggeredBy}</td>
+                <td class="px-3 py-2 font-mono text-xs">{fmtDuration(r.durationMs)}</td>
+                <td class="px-3 py-2 text-xs">
+                  {r.pgDumpOk ? (
+                    <span class="text-[var(--tint-sage)] font-mono">✓ {fmtBytes(r.pgDumpBytes)}</span>
+                  ) : (
+                    <span class="text-destructive font-mono" title={r.pgDumpError ?? ""}>✗ {(r.pgDumpError ?? "fail").slice(0, 30)}</span>
+                  )}
+                </td>
+                <td class="px-3 py-2 text-xs">
+                  {r.uploadsTarOk ? (
+                    <span class="text-[var(--tint-sage)] font-mono">✓ {fmtBytes(r.uploadsTarBytes)}</span>
+                  ) : (
+                    <span class="text-destructive font-mono" title={r.uploadsTarError ?? ""}>✗ {(r.uploadsTarError ?? "fail").slice(0, 30)}</span>
+                  )}
+                </td>
+                <td class="px-3 py-2 text-xs">
+                  {r.rsyncSkipped ? (
+                    <span class="text-muted-foreground font-mono">— skipped</span>
+                  ) : r.rsyncOk ? (
+                    <span class="text-[var(--tint-sage)] font-mono">✓</span>
+                  ) : (
+                    <span class="text-destructive font-mono" title={r.rsyncError ?? ""}>✗</span>
+                  )}
+                </td>
+                <td class="px-3 py-2 text-xs">
+                  {r.retentionOk ? (
+                    <span class="text-[var(--tint-sage)] font-mono">✓ {r.retentionDeleted ?? 0} smazáno</span>
+                  ) : (
+                    <span class="text-destructive font-mono" title={r.retentionError ?? ""}>✗</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+
+    <div class="glass rounded-xl p-4 text-xs text-muted-foreground space-y-1">
+      <p><strong>rsync skipped</strong> = aplikační backup je jen lokální (do <code>/data/backups</code>),
+        sync na druhý NAS dělá samostatný shell skript na DSM hostu (Tailscale není dostupný uvnitř containeru).</p>
+      <p>Healthcheck monitoring: <a href="https://healthchecks.io" class="underline" target="_blank">healthchecks.io</a>.
+        DSM Task Scheduler log: Control Panel → Task Scheduler → Run History.</p>
+    </div>
+  </div>
+</Shell>

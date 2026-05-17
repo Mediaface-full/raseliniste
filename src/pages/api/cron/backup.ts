@@ -24,7 +24,7 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   console.log("[cron-backup] start");
-  const result = await runBackup();
+  const result = await runBackup({ triggeredBy: "cron" });
   console.log(`[cron-backup] done in ${result.durationMs}ms, ok=${result.ok}`);
 
   // Mail při fail (info-level success do logu stačí)
@@ -68,6 +68,6 @@ export const GET: APIRoute = async ({ url, cookies }) => {
   }
 
   console.log(`[cron-backup] manual GET trigger (${session ? "session" : "cron-key"})`);
-  const result = await runBackup();
+  const result = await runBackup({ triggeredBy: session ? "manual-session" : "manual-key" });
   return Response.json(result, { status: result.ok ? 200 : 500 });
 };

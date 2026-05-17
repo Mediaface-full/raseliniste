@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { promises as fs, createWriteStream } from "node:fs";
 import path from "node:path";
 import { env } from "@/lib/env";
+import { prisma } from "@/lib/db";
 
 /**
  * Backup pipeline pro raseliniste.
@@ -55,7 +56,7 @@ const BACKUP_DIR = process.env.BACKUP_LOCAL_PATH ?? "/data/backups";
 const UPLOADS_DIR = process.env.UPLOADS_PATH ?? "/data/uploads";
 const LOCAL_RETENTION_DAYS = Number(process.env.BACKUP_LOCAL_RETENTION_DAYS ?? "30");
 
-export async function runBackup(): Promise<BackupResult> {
+export async function runBackup(opts: { triggeredBy?: "cron" | "manual-session" | "manual-key" } = {}): Promise<BackupResult> {
   const startedAt = new Date();
   const stamp = ymd(startedAt);
 
@@ -134,6 +135,33 @@ export async function runBackup(): Promise<BackupResult> {
   // Healthchecks.io success / fail ping (best-effort)
   const summary = buildHealthcheckSummary(result);
   await pingHealthcheck(result.ok ? "success" : "fail", summary);
+
+  // Zápis do DB tabulky BackupRun pro admin /settings/backup-log UI
+  try {
+    await prisma.backupRun.create({
+      data: {
+        startedAt,
+        finishedAt,
+        durationMs: result.durationMs,
+        ok: result.ok,
+        triggeredBy: opts.triggeredBy ?? "cron",
+        pgDumpOk: result.steps.pgDump.ok,
+        pgDumpBytes: result.steps.pgDump.bytes ?? null,
+        pgDumpError: result.steps.pgDump.error ?? null,
+        uploadsTarOk: result.steps.uploadsTar.ok,
+        uploadsTarBytes: result.steps.uploadsTar.bytes ?? null,
+        uploadsTarError: result.steps.uploadsTar.error ?? null,
+        rsyncOk: result.steps.rsync.ok,
+        rsyncSkipped: result.steps.rsync.skipped ?? false,
+        rsyncError: result.steps.rsync.error ?? null,
+        retentionOk: result.steps.retention.ok,
+        retentionDeleted: result.steps.retention.deleted ?? null,
+        retentionError: result.steps.retention.error ?? null,
+      },
+    });
+  } catch (e) {
+    console.error("[backup] failed to log BackupRun to DB:", e instanceof Error ? e.message : e);
+  }
 
   return result;
 }
