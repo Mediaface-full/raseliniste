@@ -65,7 +65,32 @@ BACKUP_REMOTE_USER=app-raseliniste
 BACKUP_REMOTE_PASSWORD=a4wVc0H3U1pUAPgaou8hxH43Jr9Z
 # Volitelně override default 30 dní:
 # BACKUP_LOCAL_RETENTION_DAYS=30
+# Healthchecks.io monitoring (krok 3b níž):
+BACKUP_HEALTHCHECK_URL=https://hc-ping.com/<uuid-z-healthchecks>
 ```
+
+### 3b. Healthchecks.io monitoring
+
+Registrace na **https://healthchecks.io** (zdarma pro 20 check účtů).
+
+1. Login → **Add Check**:
+   - Name: `raseliniste-backup`
+   - Period: **1 day** (každý den čekáme ping)
+   - Grace Time: **1 hour** (kolik tolerance, než označí "down")
+   - Save
+2. Vidíš ping URL: `https://hc-ping.com/<uuid>` — zkopíruj
+3. Dej do `.env` jako `BACKUP_HEALTHCHECK_URL=https://hc-ping.com/<uuid>`
+4. V healthchecks.io → **Notifications** → přidej kanál:
+   - Email (jednoduché)
+   - Nebo Telegram/SMS/Slack
+   - Ten kanál připoj k checku `raseliniste-backup`
+
+Co tě bude notifikovat:
+- **Backup neproběhl** (žádný ping za 1 den + 1 hour grace) → mail "is DOWN"
+- **Backup selhal** (`/fail` ping) → mail s detailem proč
+- **Backup OK** → silent (jen vidíš zelený check v dashboardu)
+
+V healthchecks.io každý check ukazuje **historii pingů** s body textem — uvidíš tam summary backupu (pg_dump bytes, uploads bytes, rsync output) i bez otevírání mailu.
 
 ⚠️ **Bezpečnost**: heslo je v `.env` plaintext. Soubor musí mít perms `600` a vlastnit root nebo aspoň `app` user (uid 1001).
 

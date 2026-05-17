@@ -26,6 +26,9 @@ import { env } from "@/lib/env";
  *   BACKUP_REMOTE_USER           rsync user (z DSM File Services > rsync)
  *   BACKUP_REMOTE_PASSWORD       rsync password
  *   BACKUP_LOCAL_RETENTION_DAYS  retention lokálně, default 30
+ *   BACKUP_HEALTHCHECK_URL       https://hc-ping.com/<uuid> — ping start/success/fail
+ *                                pro monitoring přes healthchecks.io. Detekuje
+ *                                missed pings a posílá mail/SMS Petrovi.
  *
  * Synology DSM > File Services > rsync musí být ENABLED s rsync účtem.
  * Modul = shared folder, subpath = složka uvnitř. Port 873 (default).
@@ -55,6 +58,9 @@ const LOCAL_RETENTION_DAYS = Number(process.env.BACKUP_LOCAL_RETENTION_DAYS ?? "
 export async function runBackup(): Promise<BackupResult> {
   const startedAt = new Date();
   const stamp = ymd(startedAt);
+
+  // Healthchecks.io start ping (best-effort, neblokuje běh)
+  await pingHealthcheck("start");
 
   await fs.mkdir(BACKUP_DIR, { recursive: true });
 
@@ -125,7 +131,63 @@ export async function runBackup(): Promise<BackupResult> {
   // remote nenastavený) bere se jako OK, ale fail rsync = celkový fail.
   result.ok = result.steps.pgDump.ok && result.steps.uploadsTar.ok && result.steps.rsync.ok;
 
+  // Healthchecks.io success / fail ping (best-effort)
+  const summary = buildHealthcheckSummary(result);
+  await pingHealthcheck(result.ok ? "success" : "fail", summary);
+
   return result;
+}
+
+/**
+ * Healthchecks.io ping. Petr nastaví BACKUP_HEALTHCHECK_URL = https://hc-ping.com/<uuid>.
+ * Pošlou se 3 endpointy:
+ *   - /start  na začátku (pro duration tracking)
+ *   - /       po úspěchu
+ *   - /fail   po chybě
+ * Body obsahuje text summary co Petr uvidí v HC dashboardu.
+ *
+ * Best-effort: pokud ping selže (síť, timeout), neblokuje backup samotný.
+ */
+async function pingHealthcheck(kind: "start" | "success" | "fail", body?: string): Promise<void> {
+  const baseUrl = process.env.BACKUP_HEALTHCHECK_URL;
+  if (!baseUrl) return;
+  const url = kind === "start" ? `${baseUrl}/start`
+            : kind === "fail" ? `${baseUrl}/fail`
+            : baseUrl;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    await fetch(url, {
+      method: "POST",
+      body: body ?? "",
+      signal: controller.signal,
+    }).catch((e) => { console.warn(`[backup] healthcheck ${kind} failed:`, e instanceof Error ? e.message : e); });
+    clearTimeout(timeout);
+  } catch (e) {
+    console.warn(`[backup] healthcheck ${kind} error:`, e instanceof Error ? e.message : e);
+  }
+}
+
+function buildHealthcheckSummary(r: BackupResult): string {
+  const lines: string[] = [
+    `Backup ${r.startedAt} → ${r.finishedAt}`,
+    `Duration: ${(r.durationMs / 1000).toFixed(1)}s`,
+    `Overall: ${r.ok ? "OK" : "FAIL"}`,
+    ``,
+    `pg_dump:   ${r.steps.pgDump.ok ? `OK (${fmtBytes(r.steps.pgDump.bytes)})` : `FAIL — ${r.steps.pgDump.error ?? ""}`}`,
+    `uploads:   ${r.steps.uploadsTar.ok ? `OK (${fmtBytes(r.steps.uploadsTar.bytes)})` : `FAIL — ${r.steps.uploadsTar.error ?? ""}`}`,
+    `rsync:     ${r.steps.rsync.ok ? (r.steps.rsync.skipped ? "SKIPPED (remote nenastaven)" : "OK") : `FAIL — ${r.steps.rsync.error ?? ""}`}`,
+    `retention: ${r.steps.retention.ok ? `OK (smazáno ${r.steps.retention.deleted ?? 0})` : `FAIL — ${r.steps.retention.error ?? ""}`}`,
+  ];
+  return lines.join("\n");
+}
+
+function fmtBytes(n: number | undefined): string {
+  if (n === undefined || n === null) return "?";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 function ymd(d: Date): string {

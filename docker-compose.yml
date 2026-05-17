@@ -62,6 +62,10 @@ services:
       BACKUP_REMOTE_PATH: ${BACKUP_REMOTE_PATH:-}
       BACKUP_REMOTE_USER: ${BACKUP_REMOTE_USER:-}
       BACKUP_REMOTE_PASSWORD: ${BACKUP_REMOTE_PASSWORD:-}
+      # Healthchecks.io monitoring — pošle start/success/fail ping.
+      # https://healthchecks.io vytvoř check „raseliniste-backup" s period 1d
+      # + grace 1h, zkopíruj ping URL (https://hc-ping.com/<uuid>) sem.
+      BACKUP_HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
     volumes:
       - ./uploads:/data/uploads
       - ./backups:/data/backups
