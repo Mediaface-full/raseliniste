@@ -1200,6 +1200,20 @@ Plný postup v `SYNOLOGY_DEPLOY_PATTERN.md`. Zkráceně:
 
 **Update flow**: git push → Actions buildnou → na NASu: Container Manager → Image → Pull latest → Project → Restart.
 
+### Timezone (Europe/Prague) — kritické
+
+Container běží v `TZ=Europe/Prague` (commit `79f8388`, 2026-05-17). To je nutné protože:
+
+- **Alpine `node:22-alpine`** nemá `tzdata` by default → bez `apk add tzdata` v Dockerfile `TZ` env nemá efekt a Node fallbackuje na UTC.
+- **`docker-compose.yml` app service** má `TZ: Europe/Prague` v environment.
+- **JS `Date.setHours()` / `getHours()`** používá process timezone. Booking sloty, crony, formátování datumů — vše tichá závislost na TZ.
+
+**Bug history**: Před fixem container běžel v UTC. `setHours(9)` v `src/lib/rules-config.ts:timeOnDate()` znamenal 9:00 UTC = 11:00 CEST v browseru. Klient viděl booking sloty 11:00–18:00 místo 09:00–16:00. Diagnose: `/api/calendar/diagnose` endpoint vrátí TZ + sample setHours + slot list — Petr otevře v browseru, hned vidíme co je špatně.
+
+**Pravidlo pro novou feature s časem**: před implementací grep `setHours\|getHours\|toLocaleString` v okolním modulu. Při použití `toLocaleString` vždy explicit `timeZone: "Europe/Prague"` (nezávislé na process TZ). Po deploy container restart (TZ se čte při Node.js startu).
+
+Detail: memory `feedback_docker_timezone.md`.
+
 ---
 
 ## Email (Resend)
