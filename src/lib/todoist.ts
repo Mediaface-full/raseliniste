@@ -17,6 +17,15 @@ export interface TodoistProject {
   color: string;
   parent_id?: string | null;
   is_inbox_project?: boolean;
+
+  // Team Workspace fieldy (Sync API only, REST v1 /projects je neposílá).
+  // Petr 2026-05-18 — audit dokázal že workspace_id je přítomné pro Team
+  // projekty (např. 7 projektů v Mefa workspace 645948) a null/undefined
+  // pro Personal projekty.
+  workspace_id?: string | null;
+  access?: { visibility?: string };
+  is_shared?: boolean;
+  can_assign_tasks?: boolean;
 }
 
 export interface TodoistTask {

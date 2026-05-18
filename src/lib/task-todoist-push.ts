@@ -8,6 +8,7 @@ import {
   createSection as todoistCreateSection,
   taskPriorityToTodoist,
 } from "./todoist";
+import { resolveClientProject } from "./todoist-workspace";
 
 /**
  * Push standalone Task (modul Úkoly /ukoly) do Todoistu.
@@ -134,7 +135,7 @@ async function ensureSection(
 
 interface RouteResolution {
   projectId: string | undefined;
-  sectionId?: string;
+  sectionId?: string | null;
   routedHow: string;
   rule: string;
   matchedValue: string | null;
@@ -214,6 +215,7 @@ export function normalizeTagRules(raw: unknown): TagRule[] {
 
 interface RouteContext {
   token: string;
+  userId: string;                            // pro lookup TodoistProjectMirror (Team Workspace)
   fallbackProjectId: string | undefined;     // mojeUkoly / Inbox
   praceProjectName: string;                  // typicky "Práce"
   peopleProjectName: string;                 // typicky "Lidé"
@@ -241,17 +243,37 @@ async function resolveRoute(
   // Filtr t-* (jsou meta, ne routing) — pravidlo #1 i #5 hledá v očištěném seznamu
   const routableTags = task.tags.filter((t) => !t.startsWith(T_TAG_PREFIX));
 
-  // ---- #1 Tag klient-<slug> → Práce / sekce <slug> ----
+  // ---- #1 Tag klient-<slug> → Team Workspace root projekt (preferred) NEBO
+  //         Personal Práce + sekce <slug> (fallback) ----
+  // Petr 2026-05-18 (Cesta B): klientské projekty jsou v Team Mefa
+  // (workspaceId=645948) jako root projekty. Smart routing nejdřív zkusí
+  // najít root projekt v Team mirror (slugify match), pokud nenajde,
+  // fallback na původní Personal Práce + sekce.
   const klientTag = routableTags.find((t) => t.startsWith(KLIENT_TAG_PREFIX));
   if (klientTag) {
     const slug = klientTag.slice(KLIENT_TAG_PREFIX.length);
+    // Preferential Team Workspace lookup
+    const teamProject = await resolveClientProject(ctx.userId, [klientTag]);
+    if (teamProject) {
+      return {
+        projectId: teamProject.todoistId,
+        sectionId: null,
+        routedHow: `[klient-tag → team] "${teamProject.name}" (workspace ${teamProject.workspaceId})`,
+        rule: "klient-tag",
+        matchedValue: slug,
+        projectName: teamProject.name,
+        sectionName: null,
+        ...audit,
+      };
+    }
+    // Fallback: Personal Práce + sekce
     const sectionName = humanizeSlug(slug);
     const project = await ensureProject(ctx.token, ctx.praceProjectName, audit);
     const section = await ensureSection(ctx.token, project.id, sectionName, audit);
     return {
       projectId: project.id,
       sectionId: section.id,
-      routedHow: `[klient-tag] "${ctx.praceProjectName}" → "${section.name}"`,
+      routedHow: `[klient-tag → personal-fallback] "${ctx.praceProjectName}" → "${section.name}"`,
       rule: "klient-tag",
       matchedValue: slug,
       projectName: project.name,
@@ -260,16 +282,32 @@ async function resolveRoute(
     };
   }
 
-  // ---- #2 assignedToContact.clientTag → Práce / sekce ----
+  // ---- #2 assignedToContact.clientTag → Team Workspace root (preferred) NEBO
+  //         Personal Práce + sekce (fallback) ----
   if (task.assignedToContact?.clientTag) {
     const slug = task.assignedToContact.clientTag;
+    // Preferential Team Workspace lookup (přes pseudo-tag klient-<slug>)
+    const teamProject = await resolveClientProject(ctx.userId, [`${KLIENT_TAG_PREFIX}${slug}`]);
+    if (teamProject) {
+      return {
+        projectId: teamProject.todoistId,
+        sectionId: null,
+        routedHow: `[klient-contact → team] "${teamProject.name}" (workspace ${teamProject.workspaceId})`,
+        rule: "klient-contact",
+        matchedValue: `${task.assignedToContact.displayName} → ${slug}`,
+        projectName: teamProject.name,
+        sectionName: null,
+        ...audit,
+      };
+    }
+    // Fallback: Personal Práce + sekce
     const sectionName = humanizeSlug(slug);
     const project = await ensureProject(ctx.token, ctx.praceProjectName, audit);
     const section = await ensureSection(ctx.token, project.id, sectionName, audit);
     return {
       projectId: project.id,
       sectionId: section.id,
-      routedHow: `[klient-contact] "${ctx.praceProjectName}" → "${section.name}"`,
+      routedHow: `[klient-contact → personal-fallback] "${ctx.praceProjectName}" → "${section.name}"`,
       rule: "klient-contact",
       matchedValue: `${task.assignedToContact.displayName} → ${slug}`,
       projectName: project.name,
@@ -448,6 +486,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
   } else {
     const ctx: RouteContext = {
       token,
+      userId: task.userId,
       fallbackProjectId: cfg.mojeUkoly,
       praceProjectName: cfg.praceProjectName ?? DEFAULT_PRACE_PROJECT,
       peopleProjectName: cfg.peopleProjectName ?? DEFAULT_PEOPLE_PROJECT,

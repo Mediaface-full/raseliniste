@@ -63,6 +63,14 @@ services:
       # https://healthchecks.io vytvoř check „raseliniste-backup" s period 1d
       # + grace 1h, zkopíruj ping URL (https://hc-ping.com/<uuid>) sem.
       BACKUP_HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
+      # ---- Todoist Team Workspace (Cesta B, Petr 2026-05-18) ----
+      # ID Mefa Team Workspace. Bez tohoto env smart routing běží v
+      # Personal-only mode (decidePreferTeam vrací jen false fallbacky).
+      TODOIST_TEAM_WORKSPACE_ID: ${TODOIST_TEAM_WORKSPACE_ID:-}
+      # Hot fix A (Petr 2026-05-18): pokud "false", ensureProject nevyrobí
+      # nový Personal projekt — místo toho hodí chybu. Smysl: během migrace
+      # do Team Workspace nechceme tichá duplicit. Default "true" (auto-create OK).
+      TODOIST_AUTO_CREATE: ${TODOIST_AUTO_CREATE:-true}
     volumes:
       - ./uploads:/data/uploads
       - ./backups:/data/backups

@@ -236,6 +236,14 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
   stats.projectsReceived = projects.length;
   for (const p of projects) {
     try {
+      // Team Workspace metadata (Cesta B, Petr 2026-05-18):
+      // - workspace_id přítomný = Team projekt, null = Personal
+      // - access.visibility sekundární diskriminátor ("team" vs "restricted")
+      // Sync API spolehlivě tato pole vrací pro Team projekty (audit potvrzeno).
+      const workspaceId = p.workspace_id ?? null;
+      const isTeamProject = workspaceId !== null;
+      const accessVisibility = p.access?.visibility ?? null;
+
       await prisma.todoistProjectMirror.upsert({
         where: { userId_todoistId: { userId, todoistId: p.id } },
         update: {
@@ -243,6 +251,9 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
           color: p.color ?? null,
           isInbox: p.is_inbox_project ?? false,
           parentId: p.parent_id ?? null,
+          workspaceId,
+          isTeamProject,
+          accessVisibility,
           syncedAt: new Date(),
         },
         create: {
@@ -252,6 +263,9 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
           color: p.color ?? null,
           isInbox: p.is_inbox_project ?? false,
           parentId: p.parent_id ?? null,
+          workspaceId,
+          isTeamProject,
+          accessVisibility,
         },
       });
       stats.projectsUpserted!++;

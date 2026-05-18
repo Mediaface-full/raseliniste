@@ -1845,8 +1845,18 @@ model TodoistProjectMirror {
   parentId        String?
   syncedAt        DateTime  @default(now())
 
+  // Team Workspace support (Petr 2026-05-18 — Cesta B).
+  // workspaceId = id Team Workspace (např. "645948" = Mefa) nebo null = Personal.
+  // Sync API vrací `workspace_id` na Team projektech, na Personal je field absentní.
+  // isTeamProject = derived (workspaceId != null), persisted pro index speed.
+  // accessVisibility = "team" / "restricted" — sekundární diskriminátor.
+  workspaceId       String?
+  isTeamProject     Boolean   @default(false)
+  accessVisibility  String?
+
   @@unique([userId, todoistId])
   @@index([userId])
+  @@index([userId, workspaceId])
 }
 
 // Tracking spuštění interního cron scheduleru (1 DSM entry → dispatcher → 16 jobs).
