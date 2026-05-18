@@ -71,10 +71,14 @@ fi
 # v CLI by bylo vidět v ps).
 export RSYNC_PASSWORD="$(cat "${PASSWORD_FILE}")"
 
-RSYNC_OUTPUT=$(rsync -avz --delete \
+# Petr 2026-05-18: `set -e` zabíjelo skript při rsync error PŘED tím než
+# se vypsalo proč. Dočasně vypnout pro capture exit code, pak zase zapnout.
+set +e
+RSYNC_OUTPUT=$(rsync -avz --delete --timeout=60 \
   "${LOCAL_BACKUPS_DIR}/" \
   "${REMOTE_USER}@${REMOTE_HOST}::${REMOTE_MODULE}/${REMOTE_PATH}/" 2>&1)
 RSYNC_EXIT=$?
+set -e
 
 unset RSYNC_PASSWORD
 
