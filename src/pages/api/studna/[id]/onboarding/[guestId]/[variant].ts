@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { prisma } from "@/lib/db";
 import { readSession } from "@/lib/session";
 import { renderOnboardingPdf } from "@/lib/onboarding-pdf";
+import { env } from "@/lib/env";
 
 export const prerender = false;
 
@@ -37,8 +38,15 @@ export const GET: APIRoute = async ({ cookies, params, request }) => {
   });
   if (!guest) return new Response("Not found", { status: 404 });
 
-  const baseUrl = new URL(request.url).origin;
-  const inviteLink = `${baseUrl}/me/${guest.guestToken}`;
+  // Petr 2026-05-18: v containeru je `request.url` vždy http://localhost:3000
+  // (reverse proxy nepředává originální host) — PDF tedy obsahoval lokální URL.
+  // Použij canonical APP_URL z env, fallback x-forwarded-host.
+  const fwdHost = request.headers.get("x-forwarded-host");
+  const fwdProto = request.headers.get("x-forwarded-proto") ?? "https";
+  const baseUrl =
+    env.APP_URL ??
+    (fwdHost ? `${fwdProto}://${fwdHost}` : new URL(request.url).origin);
+  const inviteLink = `${baseUrl.replace(/\/$/, "")}/me/${guest.guestToken}`;
 
   const pdfBuf = await renderOnboardingPdf(variant, {
     guestName: guest.name,

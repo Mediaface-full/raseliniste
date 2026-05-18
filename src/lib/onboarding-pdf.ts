@@ -230,39 +230,15 @@ function Footer() {
 // Stránka 1 — společná pro Standard i Brief: uvítání + projekt + link nahoře
 // -----------------------------------------------------------------------------
 function PageWelcome(d: OnboardingData, opts: { brandText: string; title: string }): ReactElement {
+  // Petr 2026-05-18: vyhozený dlouhý úvod + "Co si představit" — host dostane
+  // jen odkaz a rovnou jak na to. Header + LinkBox.
   return h(Page as any, { size: "A4", style: styles.page },
     h(Header, {
       brandText: opts.brandText,
       title: opts.title,
       subtitle: d.projectName,
     }),
-
-    // Link hned nahoře, hezky viditelný
     h(LinkBox, { link: d.inviteLink }),
-
-    // Pozdrav (vyhýbá se vokativu — "Ahoj!" bez jména)
-    h(Text, { style: styles.intro },
-      `Ahoj!\n\nGideon tě pozval do projektu „${d.projectName}". Tady je krátký a srozumitelný návod, jak to bude celé fungovat. Není to nic složitého.`,
-    ),
-
-    // O projektu
-    d.projectDescription && h(View, null,
-      h(Text, { style: styles.h2 }, "O projektu"),
-      h(Text, { style: styles.para }, d.projectDescription),
-    ),
-
-    // Co si má představit
-    h(Text, { style: styles.h2 }, "Co si pod tím představit"),
-    h(Text, { style: styles.para },
-      "Studánka je sdílená nahrávárna pro tým. Když tě napadne myšlenka, postřeh, otázka nebo nápad k projektu, otevřeš odkaz výše a hlasem to nahraješ. Mluvíš normálně, jako bys to říkal po telefonu Gideonovi.",
-    ),
-    h(Text, { style: styles.para },
-      "Umělá inteligence záznam přepíše a vytáhne z něj klíčové body. Gideon si to pak v klidu projde. Nemusíš nic psát.",
-    ),
-    h(Text, { style: styles.para },
-      "Gideon u každého záznamu vidí, kdo ho natočil — autorství se nikdy neztratí.",
-    ),
-
     h(Footer),
   );
 }
@@ -289,15 +265,6 @@ function PageBriefInfo(d: OnboardingData): ReactElement {
     Bullet("Důležitá rozhodnutí, která padla — proč, kdy, kdo."),
     Bullet("Pojmy a zkratky, které v projektu používáme."),
 
-    h(Text, { style: styles.h2 }, "Tipy, ať tvůj brief dobře sedne"),
-    Bullet("Mluv jednoduše a přirozeně. AI si s odbočkami a vsuvkami poradí."),
-    Bullet('Když si na něco vzpomeneš později v záznamu, klidně se vrať („Ještě k tomu, co jsem říkal…"). Lineárnost není potřeba.'),
-    Bullet("Klidně si dej pauzu na kafe — nahrávka může trvat dlouho."),
-    Bullet('Nemusíš mluvit „akademicky". Tvůj přirozený způsob, jak o projektu přemýšlíš, je to nejcennější.'),
-    Bullet("Chyby v řeči neřeš — AI je opraví."),
-
-    Tip("Tip:", "Klidně si dopředu udělej pár bodů na papír. Ale neřeš to moc — pokud zapomeneš, prostě se vrátíš a doplníš."),
-
     h(Footer),
   );
 }
@@ -306,12 +273,11 @@ function PageBriefInfo(d: OnboardingData): ReactElement {
 // Stránka „Nahrání záznamů do Studny" — pro oba typy
 // Pro brief verzi obsahuje navíc sekci o uploadu souboru (pro dlouhé briefy).
 // -----------------------------------------------------------------------------
-function PageHowToRecord(d: OnboardingData, opts: { includeBriefUpload: boolean }): ReactElement {
+function PageHowToRecord(d: OnboardingData, _opts: { includeBriefUpload: boolean }): ReactElement {
+  // Petr 2026-05-18: jen iPhone + Android + Upload (i ve standard verzi).
+  // Vyhozené: intro, "Jak nahrát rychlý záznam" sekce, Tipy.
   return h(Page as any, { size: "A4", style: styles.page },
     h(Text, { style: styles.h2 }, "Nahrání záznamů do Studny"),
-    h(Text, { style: styles.intro },
-      "Komentář, nápad, informace, otázka — cokoliv tě k projektu napadne. Nahraješ to hlasem, my si s tím poradíme.",
-    ),
 
     h(Text, { style: styles.h3 }, "iPhone — uložení odkazu na plochu"),
     Step(1, "V aplikaci Safari otevři odkaz, který máš nahoře na první stránce."),
@@ -326,35 +292,15 @@ function PageHowToRecord(d: OnboardingData, opts: { includeBriefUpload: boolean 
     Step(3, 'Vyber „Přidat na plochu" (nebo „Install app").'),
     Step(4, "Potvrď. Ikona se objeví na hlavní obrazovce."),
 
-    h(Text, { style: styles.h3 }, "Jak nahrát rychlý záznam"),
-    Step(1, "Klepni na ikonu Studny na ploše."),
-    Step(2, "Pokud máš víc projektů, zvol nahoře ten, do kterého nahráváš."),
-    Step(3, "Klepni na velký kruh s mikrofonem uprostřed obrazovky."),
-    Step(4, 'Telefon se zeptá, jestli smí používat mikrofon. Klepni „Povolit".'),
-    Step(5, "Začne se nahrávat. Mluv normálně. Uvidíš odpočet, kolik času ti zbývá."),
-    Step(6, 'Až skončíš, klepni „Stop". Maximální délka je 10 minut, pak se to vypne samo.'),
-    Step(7, 'Za pár vteřin uvidíš „Záznam uložen ✓". Hotovo.'),
-
-    // Pokud je to brief verze, přidáme sekci pro upload dlouhého audio souboru
-    opts.includeBriefUpload && h(View, null,
-      h(Text, { style: styles.h3 }, "Jak nahrát dlouhý brief (přes upload souboru)"),
-      h(Text, { style: styles.para },
-        "Brief NEnahrávej přímo přes web — devadesát minut v prohlížeči je riskantní (vybitá baterie, výpadek sítě, telefon se uspí). Místo toho použij standardní aplikaci na hlasové poznámky a hotový soubor pak nahraj.",
-      ),
-      Step(1, "Otevři aplikaci Hlasové poznámky (iPhone) nebo Záznamník (Android)."),
-      Step(2, "Klepni na nahrávací tlačítko a začni mluvit. Telefon můžeš položit na stůl."),
-      Step(3, "Po skončení klepni Stop. Záznam se uloží do aplikace."),
-      Step(4, 'Otevři odkaz na Studnu, klepni pod mikrofonem na malý odkaz „Klíčový brief — nahrát soubor →".'),
-      Step(5, 'Klepni na „Vybrat soubor" a najdi nahrávku, kterou jsi natočil.'),
-      Step(6, 'Klepni „Odeslat brief". Vydrž 2–5 minut — AI ho zpracovává.'),
-      Step(7, 'Až uvidíš „Záznam uložen ✓", máš hotovo.'),
+    h(Text, { style: styles.h3 }, "Nahrání hotového audio souboru (upload)"),
+    h(Text, { style: styles.para },
+      "Pokud máš nahrávku už hotovou v telefonu (Hlasové poznámky iPhone, Záznamník Android, podcast, zápis z mítinku), nemusíš ji nahrávat přes web — můžeš ji rovnou uploadnout.",
     ),
-
-    h(Text, { style: styles.h3 }, "Tipy, ať to dobře dopadne"),
-    Bullet("Mluv klidně, ne v hlučném prostředí — Gemini rozumí češtině moc dobře."),
-    Bullet("Jeden záznam = jedna myšlenka nebo téma. Radši víc krátkých než jeden dlouhý."),
-    Bullet('Nemusíš formulovat „spisovně". Stačí říct, co tě napadlo.'),
-    Bullet("Pokud zkazíš, klidně to natočíš znovu — Gideon starý záznam smaže."),
+    Step(1, "Otevři odkaz na Studnu (ikona G na ploše)."),
+    Step(2, 'Pod hlavním nahrávacím kruhem najdi tlačítko „📎 Nahrát audio soubor".'),
+    Step(3, "Klepni na něj — telefon nabídne odkud vybrat (Knihovna fotek / Files / iCloud / Google Drive)."),
+    Step(4, "Vyber soubor. Upload poběží na pozadí, vidíš progress."),
+    Step(5, 'Až uvidíš „Záznam uložen ✓", máš hotovo. Přepis se zpracovává automaticky (do 5 min).'),
 
     h(Footer),
   );
