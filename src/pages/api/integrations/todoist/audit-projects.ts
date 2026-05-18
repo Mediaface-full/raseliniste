@@ -76,29 +76,44 @@ export const GET: APIRoute = async ({ cookies }) => {
     .filter(([, list]) => list.length > 1)
     .map(([name, list]) => ({ name, projects: list }));
 
-  // Sync API sample — chceme vědět zda response.projects[*] obsahuje workspace_id
-  // pro Team workspace projekty (vs jen Personal). Tohle určí strategii Cesty B
-  // — jestli stačí Sync API persistnout workspace_id, nebo musí jiný endpoint.
-  let syncSample: { projectCount: number; sampleProjects: any[]; rawKeys: string[]; error: string | null } = {
-    projectCount: 0, sampleProjects: [], rawKeys: [], error: null,
-  };
+  // Sync API experiment — projects resource nevrací workspace_id (audit
+  // 2026-05-18). Zkusíme širší resource_types: zda Todoist API dá workspace
+  // info v jiném resource (workspaces, user_workspaces, team_invitations,
+  // collaborators).
+  let syncSample: any = { error: null };
   try {
-    const sync = await syncFetch(token, "*", ["projects"]);
-    const projects = (sync.projects ?? []) as any[];
-    syncSample.projectCount = projects.length;
-    // Vzít 3-5 vzorek — jeden Personal root, jeden Personal child, ideálně Team root.
-    // Klíče prvního projektu (rawKeys) ukáží zda workspace_id existuje.
-    syncSample.sampleProjects = projects.slice(0, 5).map((p) => ({
-      id: p.id,
-      name: p.name,
-      parent_id: p.parent_id,
-      workspace_id: p.workspace_id ?? null,
-      is_workspace_project: p.is_workspace_project ?? null,
-      shared: p.shared ?? null,
-      // Plus všechna pole pro inspection (debug)
-      __all_keys: Object.keys(p).sort(),
-    }));
-    if (projects.length > 0) syncSample.rawKeys = Object.keys(projects[0]).sort();
+    const sync: any = await syncFetch(token, "*", [
+      "projects",
+      "workspaces",
+      "user_workspaces",
+      "team_invitations",
+      "collaborators",
+      "user",
+    ]);
+    syncSample = {
+      // Top-level klíče celé response — zjistíme co Todoist vůbec vrátí
+      responseKeys: Object.keys(sync).sort(),
+      // Per-resource sample
+      projects: {
+        count: (sync.projects ?? []).length,
+        firstProjectKeys: sync.projects?.[0] ? Object.keys(sync.projects[0]).sort() : [],
+        sampleProject: sync.projects?.[0] ?? null,
+      },
+      workspaces: sync.workspaces ?? null,
+      user_workspaces: sync.user_workspaces ?? null,
+      team_invitations: sync.team_invitations ?? null,
+      collaborators: sync.collaborators ?? null,
+      // user objekt může mít business/team flag
+      userTeamRelevant: sync.user ? {
+        id: sync.user.id,
+        full_name: sync.user.full_name,
+        team_inbox_id: sync.user.team_inbox_id ?? null,
+        business_account_id: sync.user.business_account_id ?? null,
+        has_business_account: sync.user.has_business_account ?? null,
+        __keys: Object.keys(sync.user).sort(),
+      } : null,
+      error: null,
+    };
   } catch (e) {
     syncSample.error = e instanceof Error ? e.message : String(e);
   }
