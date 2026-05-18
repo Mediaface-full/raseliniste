@@ -437,22 +437,41 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
   /**
    * Vytvoří nový prázdný kontakt — POST /api/contacts, pak refresh.
    */
+  /**
+   * Petr 2026-05-18: žádný prompt dialog — rovnou založ prázdný kontakt
+   * s placeholder názvem, scrollni na něj a označ jako dirty. Petr ho
+   * přejmenuje inline v tabulce a klikne Uložit.
+   */
   async function createNewContact() {
-    const name = prompt("Jméno nového kontaktu:")?.trim();
-    if (!name) return;
     try {
+      const placeholderName = "(nový kontakt)";
       const res = await fetch("/api/contacts", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ displayName: name, syncSource: "manual", importedFrom: "manual" }),
+        body: JSON.stringify({ displayName: placeholderName, syncSource: "manual", importedFrom: "manual" }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Vytvoření selhalo.");
         return;
       }
-      setMessage(`✓ Vytvořeno: ${name}. Doplň údaje v tabulce a Ulož.`);
-      setTimeout(() => setMessage(null), 4000);
+      setMessage(`✓ Prázdný kontakt přidán. Přepiš jméno v prvním sloupci a klikni Uložit.`);
+      setTimeout(() => setMessage(null), 5000);
       await load();
+      // Scroll + focus na nový řádek (pokud máme ID v response)
+      const newId: string | undefined = data?.id;
+      if (newId && typeof window !== "undefined") {
+        requestAnimationFrame(() => {
+          const row = document.querySelector<HTMLElement>(`[data-row-id="${newId}"]`);
+          if (row) {
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+            const firstInput = row.querySelector<HTMLInputElement>("input[type='text'], input:not([type])");
+            if (firstInput) {
+              firstInput.focus();
+              firstInput.select();
+            }
+          }
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -730,7 +749,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
               const eff = effective(c);
               const isDirty = Array.from(dirty.values()).some((d) => d.id === c.id);
               return (
-                <tr key={c.id} className={`border-b border-white/5 hover:bg-white/[0.02] ${isDirty ? "bg-[var(--tint-rose)]/[0.06]" : ""}`}>
+                <tr key={c.id} data-row-id={c.id} className={`border-b border-white/5 hover:bg-white/[0.02] ${isDirty ? "bg-[var(--tint-rose)]/[0.06]" : ""}`}>
                   <EditableCell value={eff.firstName ?? ""} onSave={(v) => editCell(c.id, "firstName", v)} />
                   <EditableCell value={eff.lastName ?? ""} onSave={(v) => editCell(c.id, "lastName", v)} />
                   <EditableCell value={eff.company ?? ""} onSave={(v) => editCell(c.id, "company", v)} />
