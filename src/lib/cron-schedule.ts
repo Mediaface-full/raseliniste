@@ -146,7 +146,8 @@ export const CRON_JOBS: CronJobDef[] = [
     name: "todoist-sync",
     endpoint: "/api/cron/todoist-sync",
     schedule: { type: "every", minutes: 5 },
-    description: "Todoist obousměrný sync (status + nové úkoly)",
+    fireAndForget: true,
+    description: "Todoist obousměrný sync (status + nové úkoly). 2026-05-18 Petr: fireAndForget=true protože sync s 23+ projekty + tasks překračuje 90s dispatcher timeout (errorCount 75%); běží na pozadí bez čekání.",
   },
   {
     name: "poll-sms-status",
