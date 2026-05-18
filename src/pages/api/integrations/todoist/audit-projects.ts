@@ -90,32 +90,61 @@ export const GET: APIRoute = async ({ cookies }) => {
       "collaborators",
       "user",
     ]);
+    // Tabulka VŠECH projektů s diskriminačními fieldy — kde uvidíme rozdíl
+    // Personal vs Team. Po Mefa workspace existence chceme zjistit který
+    // z 23 projektů jsou v Mefa Team Workspace.
+    const allProjects = (sync.projects ?? []).map((p: any) => ({
+      name: p.name,
+      id: p.id,
+      access_visibility: p.access?.visibility ?? null,
+      is_shared: p.is_shared ?? null,
+      role: p.role ?? null,
+      can_assign_tasks: p.can_assign_tasks ?? null,
+      parent_id: p.parent_id ?? null,
+      // Hledáme cokoliv co odkazuje workspace
+      workspace_id: p.workspace_id ?? null,
+      v2_workspace_id: p.v2_workspace_id ?? null,
+      collaborators_count: Array.isArray(p.collaborator_uids) ? p.collaborator_uids.length : null,
+    }));
+
     syncSample = {
-      // Top-level klíče celé response — zjistíme co Todoist vůbec vrátí
       responseKeys: Object.keys(sync).sort(),
-      // Per-resource sample
       projects: {
         count: (sync.projects ?? []).length,
-        firstProjectKeys: sync.projects?.[0] ? Object.keys(sync.projects[0]).sort() : [],
-        sampleProject: sync.projects?.[0] ?? null,
+        allWithDiscriminators: allProjects,
       },
       workspaces: sync.workspaces ?? null,
-      user_workspaces: sync.user_workspaces ?? null,
-      team_invitations: sync.team_invitations ?? null,
       collaborators: sync.collaborators ?? null,
-      // user objekt může mít business/team flag
       userTeamRelevant: sync.user ? {
-        id: sync.user.id,
-        full_name: sync.user.full_name,
-        team_inbox_id: sync.user.team_inbox_id ?? null,
         business_account_id: sync.user.business_account_id ?? null,
-        has_business_account: sync.user.has_business_account ?? null,
-        __keys: Object.keys(sync.user).sort(),
+        team_inbox_id: sync.user.team_inbox_id ?? null,
       } : null,
       error: null,
     };
   } catch (e) {
     syncSample.error = e instanceof Error ? e.message : String(e);
+  }
+
+  // REST endpoint experiments — zda existuje workspace-specific projects fetch
+  const restExperiments: Record<string, any> = {};
+  for (const path of [
+    "/api/v1/projects?workspace_id=645948",
+    "/api/v1/workspaces/645948/projects",
+    "/api/v1/workspaces/645948",
+    "/api/v1/projects/workspace/645948",
+  ]) {
+    try {
+      const r = await fetch(`https://api.todoist.com${path}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const text = await r.text();
+      restExperiments[path] = {
+        status: r.status,
+        body: text.slice(0, 800),
+      };
+    } catch (e) {
+      restExperiments[path] = { error: e instanceof Error ? e.message : String(e) };
+    }
   }
 
   return Response.json({
@@ -134,5 +163,6 @@ export const GET: APIRoute = async ({ cookies }) => {
       remote: remoteDuplicates,
     },
     syncSample,
+    restExperiments,
   });
 };
