@@ -966,6 +966,7 @@ model ProjectRecording {
   userAgent       String?
 
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
   archivedAt      DateTime?
 
   @@index([projectId, createdAt])
