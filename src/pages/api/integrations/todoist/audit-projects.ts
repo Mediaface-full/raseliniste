@@ -1,8 +1,20 @@
 import type { APIRoute } from "astro";
 import { readSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { getTodoistToken } from "@/lib/integrations";
+import { decryptSecret } from "@/lib/crypto";
 import { listProjects } from "@/lib/todoist";
+
+async function getTodoistToken(userId: string): Promise<string | null> {
+  const integration = await prisma.userIntegration.findUnique({
+    where: { userId_provider: { userId, provider: "todoist" } },
+  });
+  if (!integration) return null;
+  try {
+    return decryptSecret({ enc: integration.tokenEnc, iv: integration.tokenIv, tag: integration.tokenTag });
+  } catch {
+    return null;
+  }
+}
 
 export const prerender = false;
 
