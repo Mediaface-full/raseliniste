@@ -80,7 +80,14 @@ function findProject(cache: CacheEntry, name: string): { id: string; name: strin
   return cache.projects.find((p) => p.name.toLowerCase() === lower);
 }
 
-/** Najde nebo vytvoří projekt + zaloguje auto-create info do `audit`. */
+/** Najde nebo vytvoří projekt + zaloguje auto-create info do `audit`.
+ *
+ * Petr 2026-05-18 (Hot fix A pro Team Workspace migraci):
+ * Env `TODOIST_AUTO_CREATE=false` zakáže auto-create. Důvod: před přesunem
+ * Práce do Team Workspace nechceme aby kód vyrobil nové Personal projekty
+ * stejného jména (regresí). Po implementaci Cesty B (workspace-aware routing)
+ * bude flag opět default true.
+ */
 async function ensureProject(
   token: string,
   name: string,
@@ -89,6 +96,12 @@ async function ensureProject(
   const cache = await getCache(token);
   const existing = findProject(cache, name);
   if (existing) return existing;
+  if (process.env.TODOIST_AUTO_CREATE === "false") {
+    throw new Error(
+      `Todoist projekt "${name}" neexistuje a TODOIST_AUTO_CREATE=false (Hot fix A před Team Workspace migrací). ` +
+      `Buď vytvoř projekt ručně v Todoistu, nebo nastav TODOIST_AUTO_CREATE=true v .env.`,
+    );
+  }
   const created = await todoistCreateProject(token, name);
   audit.autoCreatedProject = true;
   invalidateCache(token);
