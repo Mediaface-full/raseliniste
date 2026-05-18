@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { readSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { decryptSecret } from "@/lib/crypto";
-import { listProjects } from "@/lib/todoist";
+import { listProjects, syncFetch } from "@/lib/todoist";
 
 async function getTodoistToken(userId: string): Promise<string | null> {
   const integration = await prisma.userIntegration.findUnique({
@@ -76,8 +76,35 @@ export const GET: APIRoute = async ({ cookies }) => {
     .filter(([, list]) => list.length > 1)
     .map(([name, list]) => ({ name, projects: list }));
 
+  // Sync API sample — chceme vědět zda response.projects[*] obsahuje workspace_id
+  // pro Team workspace projekty (vs jen Personal). Tohle určí strategii Cesty B
+  // — jestli stačí Sync API persistnout workspace_id, nebo musí jiný endpoint.
+  let syncSample: { projectCount: number; sampleProjects: any[]; rawKeys: string[]; error: string | null } = {
+    projectCount: 0, sampleProjects: [], rawKeys: [], error: null,
+  };
+  try {
+    const sync = await syncFetch(token, "*", ["projects"]);
+    const projects = (sync.projects ?? []) as any[];
+    syncSample.projectCount = projects.length;
+    // Vzít 3-5 vzorek — jeden Personal root, jeden Personal child, ideálně Team root.
+    // Klíče prvního projektu (rawKeys) ukáží zda workspace_id existuje.
+    syncSample.sampleProjects = projects.slice(0, 5).map((p) => ({
+      id: p.id,
+      name: p.name,
+      parent_id: p.parent_id,
+      workspace_id: p.workspace_id ?? null,
+      is_workspace_project: p.is_workspace_project ?? null,
+      shared: p.shared ?? null,
+      // Plus všechna pole pro inspection (debug)
+      __all_keys: Object.keys(p).sort(),
+    }));
+    if (projects.length > 0) syncSample.rawKeys = Object.keys(projects[0]).sort();
+  } catch (e) {
+    syncSample.error = e instanceof Error ? e.message : String(e);
+  }
+
   return Response.json({
-    note: "API v1 /projects vrací JEN Personal workspace. Team Workspace projekty zde nevidíš (audit potvrzeno).",
+    note: "API v1 /projects vrací JEN Personal workspace. Team Workspace projekty zde nevidíš. Sync API ukázka níže — uvidíme zda workspace_id v project objektu existuje.",
     mirror: {
       count: mirror.length,
       projects: mirror,
@@ -91,5 +118,6 @@ export const GET: APIRoute = async ({ cookies }) => {
       mirror: duplicates,
       remote: remoteDuplicates,
     },
+    syncSample,
   });
 };
