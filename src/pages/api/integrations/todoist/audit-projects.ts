@@ -40,7 +40,16 @@ export const GET: APIRoute = async ({ cookies }) => {
   const mirror = await prisma.todoistProjectMirror.findMany({
     where: { userId: session.uid },
     orderBy: { name: "asc" },
-    select: { todoistId: true, name: true, parentId: true, isInbox: true, syncedAt: true },
+    select: {
+      todoistId: true,
+      name: true,
+      parentId: true,
+      isInbox: true,
+      syncedAt: true,
+      workspaceId: true,
+      isTeamProject: true,
+      accessVisibility: true,
+    },
   });
 
   // Čerstvý fetch z Todoist API (v1 /projects)
@@ -151,6 +160,8 @@ export const GET: APIRoute = async ({ cookies }) => {
     note: "API v1 /projects vrací JEN Personal workspace. Team Workspace projekty zde nevidíš. Sync API ukázka níže — uvidíme zda workspace_id v project objektu existuje.",
     mirror: {
       count: mirror.length,
+      teamCount: mirror.filter((p) => (p as any).isTeamProject).length,
+      personalCount: mirror.filter((p) => !(p as any).isTeamProject).length,
       projects: mirror,
     },
     remote: {
