@@ -1200,6 +1200,21 @@ Plný postup v `SYNOLOGY_DEPLOY_PATTERN.md`. Zkráceně:
 
 **Update flow**: git push → Actions buildnou → na NASu: Container Manager → Image → Pull latest → Project → Restart.
 
+### URL bug pattern — server-side `request.url`
+
+V Astro server-side má `request.url` hodnotu `http://localhost:3000` (interní port containeru), **ne** veřejnou URL. Reverse proxy nepředává originální host pokud explicit `x-forwarded-host`. Když generuju link do PDF/email/clipboard, MUSÍM použít:
+
+```ts
+const fwdHost = request.headers.get("x-forwarded-host");
+const fwdProto = request.headers.get("x-forwarded-proto") ?? "https";
+const baseUrl =
+  env.APP_URL ??  // canonical z env (.env: APP_URL=https://www.raseliniste.cz)
+  (fwdHost ? `${fwdProto}://${fwdHost}` : new URL(request.url).origin);
+const link = `${baseUrl.replace(/\/$/, "")}/me/${token}`;
+```
+
+Pattern už použit v: `src/pages/api/studna/[id]/invite.ts`, `src/pages/api/studna/[id]/onboarding/[guestId]/[variant].ts`. Bug nalezen 2026-05-18 v PDF onboardingu (Petr viděl `localhost:3000/me/...` místo `raseliniste.cz/me/...`).
+
 ### Timezone (Europe/Prague) — kritické
 
 Container běží v `TZ=Europe/Prague` (commit `79f8388`, 2026-05-17). To je nutné protože:
