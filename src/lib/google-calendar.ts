@@ -348,3 +348,43 @@ export async function deleteGoogleEvent(userId: string, eventId: string): Promis
   });
   await recordUsage(userId);
 }
+
+/**
+ * Update existující Google Calendar event. Pro OOO (Dovolená/Nomád) — Petr
+ * 2026-05-19 — chce editovat datum/název přímo v Rašeliništi.
+ *
+ * Pošle patch (jen vyplněná pole). Pro all-day range respektuje stejný
+ * pattern jako createGoogleEvent (date YYYY-MM-DD, end exclusive).
+ */
+export async function updateGoogleEvent(
+  userId: string,
+  eventId: string,
+  input: {
+    summary?: string;
+    startsAt?: Date;
+    endsAt?: Date;
+    allDay?: boolean;
+  },
+): Promise<void> {
+  const auth = await getAuthorizedClient(userId);
+  const calendar = google.calendar({ version: "v3", auth });
+
+  const requestBody: calendar_v3.Schema$Event = {};
+  if (input.summary !== undefined) requestBody.summary = input.summary;
+  if (input.startsAt && input.endsAt) {
+    if (input.allDay) {
+      requestBody.start = { date: input.startsAt.toISOString().slice(0, 10) };
+      requestBody.end = { date: input.endsAt.toISOString().slice(0, 10) };
+    } else {
+      requestBody.start = { dateTime: input.startsAt.toISOString(), timeZone: "Europe/Prague" };
+      requestBody.end = { dateTime: input.endsAt.toISOString(), timeZone: "Europe/Prague" };
+    }
+  }
+
+  await calendar.events.patch({
+    calendarId: "primary",
+    eventId,
+    requestBody,
+  });
+  await recordUsage(userId);
+}

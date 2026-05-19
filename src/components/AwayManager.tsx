@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plane, Laptop, Plus, Loader2, Check, AlertTriangle, ExternalLink } from "lucide-react";
+import { Plane, Laptop, Plus, Loader2, Check, AlertTriangle, ExternalLink, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
@@ -21,6 +21,88 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Petr 2026-05-19: edit + delete existujících OOO období přímo v Rašeliništi
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFromDate, setEditFromDate] = useState("");
+  const [editToDate, setEditToDate] = useState("");
+  const [editTitle, setEditTitle] = useState("");
+  const [editMode, setEditMode] = useState<"FULL" | "TRAVEL_WORKING">("FULL");
+
+  function startEdit(e: OooEvent) {
+    setEditingId(e.id);
+    const start = new Date(e.startsAt);
+    const end = new Date(e.endsAt);
+    // endsAt v DB je exclusive (next day 00:00). Pro UI date input chceme inkluzivní poslední den.
+    const inclusiveEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    setEditFromDate(start.toISOString().slice(0, 10));
+    setEditToDate(inclusiveEnd.toISOString().slice(0, 10));
+    // Strip prefix emoji + "NOMÁD: " pro editaci čistého názvu
+    const rawTitle = e.title
+      .replace(/^🌴\s*/, "")
+      .replace(/^💻\s*NOMÁD:\s*/, "")
+      .trim();
+    setEditTitle(rawTitle);
+    setEditMode(e.type === "OOO_FULL" ? "FULL" : "TRAVEL_WORKING");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditFromDate("");
+    setEditToDate("");
+    setEditTitle("");
+  }
+
+  async function saveEdit(id: string) {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`/api/calendar/away/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fromDate: editFromDate,
+          toDate: editToDate,
+          mode: editMode,
+          title: editTitle.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Úprava selhala.");
+        return;
+      }
+      setSuccess("✓ Upraveno (Google + Rašeliniště).");
+      cancelEdit();
+      const refreshRes = await fetch("/api/calendar/away");
+      if (refreshRes.ok) {
+        const fresh = await refreshRes.json();
+        setEvents(fresh.events);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string, title: string) {
+    if (!confirm(`Opravdu smazat „${title}" z Google Calendaru?`)) return;
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(`/api/calendar/away/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Smazání selhalo.");
+        return;
+      }
+      setSuccess("✓ Smazáno.");
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function create() {
     setBusy(true);
@@ -140,14 +222,53 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
               const start = new Date(e.startsAt);
               const end = new Date(e.endsAt);
               const isFull = e.type === "OOO_FULL";
+              const isEditing = editingId === e.id;
+
+              if (isEditing) {
+                return (
+                  <div key={e.id} className="rounded-md p-3 bg-black/30 border border-[var(--tint-butter)]/40 space-y-3">
+                    <div className="text-xs font-mono uppercase text-[var(--tint-butter)]">Úprava</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditMode("FULL")}
+                        className={`rounded-md border p-2 text-xs text-left transition ${editMode === "FULL" ? "border-[var(--tint-rose)] bg-[var(--tint-rose)]/10" : "border-white/10 hover:bg-white/5"}`}
+                      >
+                        <Plane className="size-3 inline text-[var(--tint-rose)]" /> Dovolená
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditMode("TRAVEL_WORKING")}
+                        className={`rounded-md border p-2 text-xs text-left transition ${editMode === "TRAVEL_WORKING" ? "border-[var(--tint-mint)] bg-[var(--tint-mint)]/10" : "border-white/10 hover:bg-white/5"}`}
+                      >
+                        <Laptop className="size-3 inline text-[var(--tint-mint)]" /> Nomád
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input type="date" value={editFromDate} onChange={(ev) => setEditFromDate(ev.target.value)} />
+                      <Input type="date" value={editToDate} onChange={(ev) => setEditToDate(ev.target.value)} />
+                    </div>
+                    <Input value={editTitle} onChange={(ev) => setEditTitle(ev.target.value)} placeholder="Název (volitelně)" />
+                    <div className="flex gap-2">
+                      <Button onClick={() => saveEdit(e.id)} disabled={busy || !editFromDate || !editToDate} size="sm">
+                        {busy ? <Loader2 className="animate-spin size-4" /> : <Check className="size-4" />} Uložit
+                      </Button>
+                      <Button onClick={cancelEdit} variant="outline" size="sm">
+                        <X className="size-4" /> Zrušit
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={e.id}
                   className="flex items-center gap-3 rounded-md p-3 bg-black/15 border border-white/5"
                 >
                   {isFull ? <Plane className="size-4 text-[var(--tint-rose)]" /> : <Laptop className="size-4 text-[var(--tint-mint)]" />}
-                  <div className="flex-1">
-                    <div className="font-medium">{e.title}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{e.title}</div>
                     <div className="text-xs font-mono text-muted-foreground">
                       {start.toLocaleDateString("cs-CZ")} – {new Date(end.getTime() - 24 * 60 * 60 * 1000).toLocaleDateString("cs-CZ")}
                     </div>
@@ -155,8 +276,24 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
                   <span className="text-xs font-mono text-muted-foreground">
                     {isFull ? "FULL" : "NOMÁD"}
                   </span>
+                  <button
+                    onClick={() => startEdit(e)}
+                    disabled={busy}
+                    className="p-1.5 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                    title="Upravit"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button
+                    onClick={() => remove(e.id, e.title)}
+                    disabled={busy}
+                    className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+                    title="Smazat z Google Calendar"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
                   {e.sourceUrl && (
-                    <a href={e.sourceUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
+                    <a href={e.sourceUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground" title="Otevřít v Google Calendar">
                       <ExternalLink className="size-3.5" />
                     </a>
                   )}
@@ -166,7 +303,7 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
           </div>
         )}
         <p className="text-xs text-muted-foreground mt-3">
-          Mazání nebo úpravy řeš přímo v Google Calendar (Fantastical) — sync stáhne změny do 5 min.
+          Edituj nebo maž tlačítky vpravo — změny se propíšou do Google Calendaru ihned.
         </p>
       </div>
     </div>
