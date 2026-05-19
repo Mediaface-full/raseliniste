@@ -240,3 +240,94 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ============================================================================
+ * F3 — PDF export přes browser print dialog (window.print()).
+ * Petr klikne tlačítko "Export PDF" → browser otevře print preview →
+ * uloží jako PDF (A3 landscape recommended v dialogu).
+ *
+ * @media print skryje filter chipy, theme toggle, action buttons,
+ * detail karta (klient-friendly verze). Použije se vždy LIGHT theme
+ * v tisku (Petr ne vždy chce dark backgroun na bílém papíře).
+ * ========================================================================== */
+@media print {
+  @page {
+    size: A3 landscape;
+    margin: 10mm;
+  }
+
+  /* Vždy light theme v tisku */
+  .timeline-view {
+    background: white !important;
+    background-image: none !important;
+    color: #1d1d1f !important;
+    padding: 0 !important;
+  }
+  .timeline-view[data-theme] {
+    --tv-bg: white;
+    --tv-text: #1d1d1f;
+    --tv-text-secondary: #6e6e73;
+    --tv-text-tertiary: #86868b;
+    --tv-weekend-bg: rgba(0, 0, 0, 0.025);
+    --tv-lane-divider: rgba(0, 0, 0, 0.1);
+    --tv-glass-bg: white;
+    --tv-glass-border: #e5e5e5;
+    --tv-glass-shadow: none;
+    --tv-glass-inner-bg: #f5f5f5;
+    --tv-glass-inner-border: #e5e5e5;
+    --tv-today: #D97766;
+    --tv-milestone: #E8C45F;
+    --tv-milestone-check: #5A4520;
+  }
+
+  .timeline-view .tv-card {
+    box-shadow: none !important;
+    background: white !important;
+    backdrop-filter: none !important;
+    border: 1px solid #e5e5e5 !important;
+    page-break-inside: avoid;
+  }
+
+  /* Skryj UI co klient nepotřebuje */
+  .tv-no-print { display: none !important; }
+
+  /* Canvas wrapper bez scrollu (vytiskne celou šířku) */
+  .timeline-view .tv-canvas-wrapper {
+    overflow: visible !important;
+    cursor: default !important;
+  }
+
+  /* Watermark dole */
+  .tv-print-footer {
+    display: block !important;
+    margin-top: 12mm;
+    text-align: center;
+    font-size: 9pt;
+    color: #86868b;
+    font-family: ui-monospace, monospace;
+  }
+}
+
+.tv-print-footer { display: none; }
+
+/* ============================================================================
+ * F4 — Read-only share view CSS hooks
+ * ========================================================================== */
+.timeline-view.tv-readonly .tv-canvas-wrapper {
+  /* drag stále funguje (scroll), ale žádné selection */
+}
+.timeline-view.tv-readonly .tv-task {
+  cursor: default;
+}
+.timeline-view.tv-readonly .tv-task:hover {
+  transform: none;
+  filter: none;
+}
+
+/* ============================================================================
+ * F5 — Drag task na jiný den (visual cue)
+ * ========================================================================== */
+.timeline-view .tv-task--dragging {
+  opacity: 0.6;
+  cursor: grabbing !important;
+}

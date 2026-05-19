@@ -52,6 +52,7 @@ model User {
   anniversaries    Anniversary[]
   checkIns         CheckIn[]
   sharedFiles      SharedFile[]
+  sharedTimelines  SharedTimeline[]
   pushSubscriptions WebPushSubscription[]
   decisions        Decision[]
   todoistProjects  TodoistProjectMirror[]
@@ -1876,6 +1877,27 @@ model CronRun {
   errorCount      Int       @default(0)
 
   @@index([jobName])
+}
+
+// =============================================================================
+// Project Timeline View — F4 share link (Petr 2026-05-19)
+// JEDINÁ povolená migrace mimo F1 dle zadani-timeline-view.pdf § 8.
+// Public read-only URL pro klienty bez loginu.
+// =============================================================================
+model SharedTimeline {
+  id              String    @id @default(cuid())
+  userId          String                                              // owner (Petr)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId       String                                              // TodoistProjectMirror.todoistId snapshot
+  projectName     String                                              // snapshot — kdyby projekt přejmenován
+  token           String    @unique                                   // random URL token
+  expiresAt       DateTime                                            // po vypršení 404
+  createdAt       DateTime  @default(now())
+  revokedAt       DateTime?                                           // soft delete (Petr může revoke)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
 }
 
 // Historie backupů — záznam po každém /api/cron/backup runu. Admin UI

@@ -15,8 +15,8 @@
  * F5: Drag úkolu na jiný den
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, Calendar, ExternalLink, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Moon, Sun, Calendar, ExternalLink, X, Printer, Share2, Copy, Check } from "lucide-react";
 import type {
   Theme,
   Zoom,
@@ -49,7 +49,7 @@ import {
 // =============================================================================
 // Dimensions per zoom (design_tokens.md § 7.1)
 // =============================================================================
-const DAY_WIDTH: Record<Zoom, number> = { week: 60, month: 30, quarter: 15 };
+const DAY_WIDTH: Record<Zoom, number> = { week: 60, month: 30, quarter: 15, year: 5 };
 const LANE_HEIGHT = 62;
 const HEADER_HEIGHT = 58;
 const AVATAR_COL_WIDTH = 110;
@@ -62,24 +62,50 @@ const TASK_HEIGHT = LANE_HEIGHT - 26; // 36px
 // =============================================================================
 interface Props {
   initialProjectId?: string;
+  /** F4: read-only view pro share link — skryje sub-projekt/team filter,
+   *  theme toggle, action buttons. Default false. */
+  readOnly?: boolean;
+  /** F4: pokud readOnly, project je předaný ze serveru (žádné /api/timeline calls). */
+  initialProject?: TimelineProject;
 }
 
-export default function TimelineView({ initialProjectId }: Props) {
+export default function TimelineView({ initialProjectId, readOnly = false, initialProject }: Props) {
   const [theme, setTheme] = useState<Theme>("dark");
   const [options, setOptions] = useState<TimelineProjectOption[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(initialProjectId ?? null);
-  const [project, setProject] = useState<TimelineProject | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialProjectId ?? initialProject?.id ?? null);
+  const [project, setProject] = useState<TimelineProject | null>(initialProject ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<Zoom>("month");
-  const [activeSubs, setActiveSubs] = useState<Set<string>>(new Set());
-  const [activeTeam, setActiveTeam] = useState<Set<string>>(new Set());
+  const [activeSubs, setActiveSubs] = useState<Set<string>>(
+    new Set(initialProject?.subprojects.map((s) => s.id) ?? []),
+  );
+  const [activeTeam, setActiveTeam] = useState<Set<string>>(
+    new Set(initialProject?.team.map((t) => t.id) ?? []),
+  );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  // F4: share modal
+  const [shareOpen, setShareOpen] = useState(false);
 
-  // Init theme
+  // Init theme — readOnly mode default light pro klienta
   useEffect(() => {
-    setTheme(detectInitialTheme());
-  }, []);
+    if (readOnly) {
+      setTheme("light");
+    } else {
+      setTheme(detectInitialTheme());
+    }
+  }, [readOnly]);
+
+  // F2: keyboard navigation — Esc zavře detail
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && selectedTaskId) {
+        setSelectedTaskId(null);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedTaskId]);
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
@@ -87,8 +113,9 @@ export default function TimelineView({ initialProjectId }: Props) {
     persistTheme(next);
   }
 
-  // Load project options
+  // Load project options — pouze pokud NOT readOnly (share view nepoužívá dropdown)
   useEffect(() => {
+    if (readOnly) return;
     fetch("/api/timeline/list")
       .then((r) => r.json())
       .then((data) => {
@@ -101,10 +128,11 @@ export default function TimelineView({ initialProjectId }: Props) {
         }
       })
       .catch((e) => setError(`Načtení projektů selhalo: ${e?.message ?? e}`));
-  }, []);
+  }, [readOnly]);
 
-  // Load selected project
+  // Load selected project — pouze pokud NOT readOnly + selectedId změnil
   useEffect(() => {
+    if (readOnly) return; // initialProject už máme
     if (!selectedId) return;
     setLoading(true);
     setError(null);
@@ -120,7 +148,7 @@ export default function TimelineView({ initialProjectId }: Props) {
       })
       .catch((e) => setError(e?.message ?? String(e)))
       .finally(() => setLoading(false));
-  }, [selectedId]);
+  }, [selectedId, readOnly]);
 
   // Stats — viditelných úkolů + done % + délka projektu + týmem
   const stats = useMemo(() => {
@@ -160,9 +188,16 @@ export default function TimelineView({ initialProjectId }: Props) {
     return project.tasks.find((t) => t.id === selectedTaskId) ?? null;
   }, [project, selectedTaskId]);
 
+  function handlePrint() {
+    window.print();
+  }
+
   return (
-    <div className="timeline-view" data-theme={theme}>
-      <h2 className="sr-only">Project Timeline View</h2>
+    <div className={`timeline-view ${readOnly ? "tv-readonly" : ""}`} data-theme={theme}>
+      <h2 className="sr-only">
+        Project Timeline View{project ? ` — ${project.name}` : ""}
+        {stats ? ` — ${stats.visibleTasksCount} úkolů, ${stats.donePct}% hotovo` : ""}
+      </h2>
 
       {error && (
         <div className="tv-card" style={{ padding: 12, marginBottom: 12, color: "var(--tv-today)" }}>
@@ -181,21 +216,26 @@ export default function TimelineView({ initialProjectId }: Props) {
         onToggleTheme={toggleTheme}
         zoom={zoom}
         onZoomChange={setZoom}
+        readOnly={readOnly}
+        onPrint={handlePrint}
+        onShareOpen={() => setShareOpen(true)}
       />
 
       {project && (
         <>
-          <Filters
-            project={project}
-            activeSubs={activeSubs}
-            activeTeam={activeTeam}
-            onToggleSub={toggleSub}
-            onToggleTeam={toggleTeam}
-            theme={theme}
-          />
+          {!readOnly && (
+            <Filters
+              project={project}
+              activeSubs={activeSubs}
+              activeTeam={activeTeam}
+              onToggleSub={toggleSub}
+              onToggleTeam={toggleTeam}
+              theme={theme}
+            />
+          )}
 
           {project.tasks.length === 0 && project.milestones.length === 0 ? (
-            <EmptyState projectId={project.id} />
+            <EmptyState projectId={project.id} readOnly={readOnly} />
           ) : (
             <Canvas
               project={project}
@@ -205,6 +245,28 @@ export default function TimelineView({ initialProjectId }: Props) {
               theme={theme}
               selectedTaskId={selectedTaskId}
               onSelectTask={setSelectedTaskId}
+              readOnly={readOnly}
+              onTaskMoved={(taskId, newStartDate) => {
+                // F5: optimistic update + API call
+                setProject((prev) => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    tasks: prev.tasks.map((t) =>
+                      t.id === taskId ? { ...t, startDate: newStartDate } : t,
+                    ),
+                  };
+                });
+                fetch(`/api/timeline/task/${taskId}/move`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ startDate: newStartDate }),
+                }).then((r) => {
+                  if (!r.ok) {
+                    setError(`Přesun úkolu selhal — refresh stránky pro reload.`);
+                  }
+                });
+              }}
             />
           )}
 
@@ -214,9 +276,21 @@ export default function TimelineView({ initialProjectId }: Props) {
               project={project}
               theme={theme}
               onClose={() => setSelectedTaskId(null)}
+              readOnly={readOnly}
             />
           )}
+
+          <div className="tv-print-footer">
+            Generated by Rašeliniště · {project.name} · {new Date().toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Prague" })}
+          </div>
         </>
+      )}
+
+      {shareOpen && project && !readOnly && (
+        <ShareModal
+          project={project}
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </div>
   );
@@ -236,35 +310,61 @@ function Hero(props: {
   onToggleTheme: () => void;
   zoom: Zoom;
   onZoomChange: (z: Zoom) => void;
+  readOnly: boolean;
+  onPrint: () => void;
+  onShareOpen: () => void;
 }) {
   return (
     <div className="tv-card" style={{ padding: "18px 20px 16px", marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
-        <Calendar size={20} style={{ color: "var(--tv-text-secondary)" }} />
-        <select
-          className="tv-select"
-          value={props.selectedId ?? ""}
-          onChange={(e) => props.onSelect(e.target.value)}
-          disabled={props.loading}
-        >
-          {props.options.length === 0 && <option value="">Žádné projekty</option>}
-          {props.options.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}{o.isParent ? ` (${o.subprojectCount} sub)` : ""}{o.isTeamProject ? " ✦" : ""}
-            </option>
-          ))}
-        </select>
+        <Calendar size={20} style={{ color: "var(--tv-text-secondary)" }} aria-hidden="true" />
+        {!props.readOnly ? (
+          <select
+            className="tv-select"
+            value={props.selectedId ?? ""}
+            onChange={(e) => props.onSelect(e.target.value)}
+            disabled={props.loading}
+            aria-label="Vybrat projekt"
+          >
+            {props.options.length === 0 && <option value="">Žádné projekty</option>}
+            {props.options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}{o.isParent ? ` (${o.subprojectCount} sub)` : ""}{o.isTeamProject ? " ✦" : ""}
+              </option>
+            ))}
+          </select>
+        ) : null}
         {props.project && <h1 className="tv-h1" style={{ margin: 0 }}>{props.project.name}</h1>}
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }} className="tv-no-print">
           <SegmentedControl value={props.zoom} onChange={props.onZoomChange} />
+          {!props.readOnly && (
+            <>
+              <button
+                className="tv-icon-btn"
+                onClick={props.onPrint}
+                aria-label="Export do PDF"
+                title="Export do PDF (browser print dialog)"
+              >
+                <Printer size={16} aria-hidden="true" />
+              </button>
+              <button
+                className="tv-icon-btn"
+                onClick={props.onShareOpen}
+                aria-label="Sdílet projekt klientovi"
+                title="Sdílet projekt klientovi"
+              >
+                <Share2 size={16} aria-hidden="true" />
+              </button>
+            </>
+          )}
           <button
             className="tv-icon-btn"
             onClick={props.onToggleTheme}
             aria-label={props.theme === "dark" ? "Přepnout na světlý motiv" : "Přepnout na tmavý motiv"}
             title={props.theme === "dark" ? "Světlý motiv" : "Tmavý motiv"}
           >
-            {props.theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            {props.theme === "dark" ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
           </button>
         </div>
       </div>
@@ -296,6 +396,7 @@ function SegmentedControl({ value, onChange }: { value: Zoom; onChange: (z: Zoom
     { v: "week", label: "Týden" },
     { v: "month", label: "Měsíc" },
     { v: "quarter", label: "Kvartál" },
+    { v: "year", label: "Rok" },
   ];
   return (
     <div className="tv-segmented">
@@ -399,9 +500,19 @@ function Canvas(props: {
   theme: Theme;
   selectedTaskId: string | null;
   onSelectTask: (id: string | null) => void;
+  readOnly: boolean;
+  onTaskMoved?: (taskId: string, newStartDate: string) => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  // F5: drag task — id taskId, offset px relativní k task start
+  const [taskDragState, setTaskDragState] = useState<{
+    taskId: string;
+    originalStart: string;
+    deltaDays: number;
+  } | null>(null);
+  // F5: pinch zoom (2 fingers)
+  const pinchRef = useRef<{ initialDistance: number; initialZoom: Zoom } | null>(null);
 
   const dayWidth = DAY_WIDTH[props.zoom];
   const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
@@ -604,7 +715,11 @@ function Canvas(props: {
           {visibleTasks.map((t) => {
             const laneIndex = visibleTeam.findIndex((m) => m.id === t.assigneeId);
             if (laneIndex < 0) return null;
-            const dayIdx = days.indexOf(t.startDate);
+            // F5: apply drag offset
+            const displayStart = taskDragState?.taskId === t.id
+              ? addDays(taskDragState.originalStart, taskDragState.deltaDays)
+              : t.startDate;
+            const dayIdx = days.indexOf(displayStart);
             if (dayIdx < 0) return null;
             const x = avatarCol + dayIdx * dayWidth + 2;
             const y = HEADER_HEIGHT + laneIndex * LANE_HEIGHT + TASK_VERTICAL_PADDING;
@@ -612,19 +727,67 @@ function Canvas(props: {
             const subColor = subColorMap.get(t.subprojectId) ?? paletteColor(0, props.theme);
             const fillAlpha = props.theme === "light" ? 0.22 : 0.18;
             const isSelected = props.selectedTaskId === t.id;
+            const isDraggingThis = taskDragState?.taskId === t.id;
             return (
               <g
                 key={t.id}
-                className={`tv-task ${t.completed ? "tv-task--done" : ""} ${isSelected ? "tv-task--selected" : ""}`}
+                className={`tv-task ${t.completed ? "tv-task--done" : ""} ${isSelected ? "tv-task--selected" : ""} ${isDraggingThis ? "tv-task--dragging" : ""}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`Úkol ${t.title}, ${formatDateLong(displayStart)}${t.durationDays > 1 ? `, ${t.durationDays} dní` : ""}${t.completed ? ", hotovo" : ""}`}
+                aria-pressed={isSelected}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    props.onSelectTask(t.id);
+                  }
+                }}
                 onPointerDown={(e) => {
-                  // Stop drag bubbling — task click ≠ canvas drag
                   e.stopPropagation();
+                  // F5: drag úkolu — jen pokud NOT readOnly a držíme déle než ~150 ms
+                  if (props.readOnly || !props.onTaskMoved) return;
+                  const startClientX = e.clientX;
+                  const originalStart = t.startDate;
+                  let hasMoved = false;
+                  let pendingDelta = 0;
+                  const target = e.currentTarget as SVGGElement;
+                  target.setPointerCapture(e.pointerId);
+
+                  const onMove = (ev: PointerEvent) => {
+                    const deltaPx = ev.clientX - startClientX;
+                    const deltaDays = Math.round(deltaPx / dayWidth);
+                    if (Math.abs(deltaPx) > 5) hasMoved = true;
+                    if (deltaDays !== pendingDelta) {
+                      pendingDelta = deltaDays;
+                      setTaskDragState({ taskId: t.id, originalStart, deltaDays });
+                    }
+                  };
+                  const onUp = (ev: PointerEvent) => {
+                    target.removeEventListener("pointermove", onMove);
+                    target.removeEventListener("pointerup", onUp);
+                    target.removeEventListener("pointercancel", onUp);
+                    try { target.releasePointerCapture(ev.pointerId); } catch {}
+                    if (hasMoved && pendingDelta !== 0) {
+                      const newStart = addDays(originalStart, pendingDelta);
+                      props.onTaskMoved!(t.id, newStart);
+                    } else if (!hasMoved) {
+                      props.onSelectTask(t.id);
+                    }
+                    setTaskDragState(null);
+                  };
+                  target.addEventListener("pointermove", onMove);
+                  target.addEventListener("pointerup", onUp);
+                  target.addEventListener("pointercancel", onUp);
                 }}
                 onClick={(e) => {
-                  e.stopPropagation();
-                  props.onSelectTask(t.id);
+                  // V readOnly: klik = select. V editable režimu řeší pointerdown.
+                  if (props.readOnly) {
+                    e.stopPropagation();
+                    props.onSelectTask(t.id);
+                  }
                 }}
               >
+                <title>{t.title} — {formatDateLong(displayStart)}{t.durationDays > 1 ? ` (${t.durationDays} dní)` : ""}</title>
                 <rect
                   x={x} y={y}
                   width={w} height={TASK_HEIGHT}
@@ -665,14 +828,20 @@ function Canvas(props: {
             );
           })}
 
-          {/* Milestones — pečetidla nad header */}
+          {/* Milestones — pečetidla nad header (F2: hover tooltip přes <title>) */}
           {props.project.milestones.map((m) => {
             if (!props.activeSubs.has(m.subprojectId)) return null;
             const dayIdx = days.indexOf(m.date);
             if (dayIdx < 0) return null;
             const x = avatarCol + dayIdx * dayWidth + dayWidth / 2;
             return (
-              <g key={`ms-${m.id}`}>
+              <g
+                key={`ms-${m.id}`}
+                role="img"
+                aria-label={`Milestone ${m.label} dne ${formatDateLong(m.date)}`}
+                tabIndex={0}
+              >
+                <title>{m.label} — {formatDateLong(m.date)}</title>
                 <text
                   x={x} y={14}
                   textAnchor="middle"
@@ -682,7 +851,7 @@ function Canvas(props: {
                 >
                   {truncate(m.label, 14)}
                 </text>
-                <circle cx={x} cy={28} r={11} fill="var(--tv-milestone)" />
+                <circle cx={x} cy={28} r={11} fill="var(--tv-milestone)" stroke="var(--tv-milestone-check)" strokeWidth={0.5} />
                 <text
                   x={x} y={32}
                   textAnchor="middle"
@@ -715,6 +884,7 @@ function Detail(props: {
   project: TimelineProject;
   theme: Theme;
   onClose: () => void;
+  readOnly?: boolean;
 }) {
   const sub = props.project.subprojects.find((s) => s.id === props.task.subprojectId);
   const member = props.project.team.find((m) => m.id === props.task.assigneeId);
@@ -760,8 +930,8 @@ function Detail(props: {
         )}
       </div>
 
-      {props.task.todoistUrl && (
-        <div style={{ marginTop: 12 }}>
+      {props.task.todoistUrl && !props.readOnly && (
+        <div style={{ marginTop: 12 }} className="tv-no-print">
           <a
             href={props.task.todoistUrl}
             target="_blank"
@@ -769,7 +939,7 @@ function Detail(props: {
             className="tv-chip"
             style={{ textDecoration: "none" }}
           >
-            <ExternalLink size={12} /> Otevřít v Todoistu
+            <ExternalLink size={12} aria-hidden="true" /> Otevřít v Todoistu
           </a>
         </div>
       )}
@@ -780,22 +950,171 @@ function Detail(props: {
 // =============================================================================
 // Empty state — projekt bez úkolů s dueAt (Q-G)
 // =============================================================================
-function EmptyState({ projectId }: { projectId: string }) {
+function EmptyState({ projectId, readOnly }: { projectId: string; readOnly?: boolean }) {
   return (
     <div className="tv-card" style={{ padding: 32, textAlign: "center" }}>
       <div className="tv-h2" style={{ marginBottom: 8 }}>Žádné úkoly s datem</div>
       <div className="tv-body" style={{ color: "var(--tv-text-secondary)", marginBottom: 16 }}>
-        Projekt nemá žádné úkoly s termínem. Přidej termín k úkolům v Todoistu — pak se objeví v timeline.
+        {readOnly
+          ? "Tento projekt zatím nemá žádné úkoly s termínem."
+          : "Projekt nemá žádné úkoly s termínem. Přidej termín k úkolům v Todoistu — pak se objeví v timeline."}
       </div>
-      <a
-        href={`https://todoist.com/app/project/${projectId}`}
-        target="_blank"
-        rel="noreferrer"
-        className="tv-chip"
-        style={{ textDecoration: "none" }}
+      {!readOnly && (
+        <a
+          href={`https://todoist.com/app/project/${projectId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="tv-chip"
+          style={{ textDecoration: "none" }}
+        >
+          <ExternalLink size={12} aria-hidden="true" /> Otevřít projekt v Todoist
+        </a>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// F4: Share modal — vytvoří public share link s expiry
+// =============================================================================
+function ShareModal({ project, onClose }: { project: TimelineProject; onClose: () => void }) {
+  const [expiryDays, setExpiryDays] = useState(30);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function createShare() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/timeline/share", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ projectId: project.id, expiryDays }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Vytvoření selhalo.");
+        return;
+      }
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      setShareUrl(`${origin}/share/${data.token}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyUrl() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback — focus + select
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="share-title"
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+        display: "grid", placeItems: "center", zIndex: 1000, padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="tv-card"
+        onClick={(e) => e.stopPropagation()}
+        style={{ padding: 24, maxWidth: 520, width: "100%" }}
       >
-        <ExternalLink size={12} /> Otevřít projekt v Todoist
-      </a>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+          <Share2 size={20} aria-hidden="true" />
+          <div style={{ flex: 1 }}>
+            <h2 id="share-title" className="tv-h2" style={{ margin: 0 }}>Sdílet projekt klientovi</h2>
+            <div className="tv-caption">{project.name}</div>
+          </div>
+          <button className="tv-icon-btn" onClick={onClose} aria-label="Zavřít">
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="tv-body" style={{ marginBottom: 16 }}>
+          Vygeneruje veřejný odkaz pro klienta — read-only verze timeline, bez loginu.
+          Klient nevidí filter chipy, theme toggle, ani odkaz do Todoistu.
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <label className="tv-stat-label" style={{ display: "block", marginBottom: 4 }}>
+            Platnost (dní)
+          </label>
+          <input
+            type="number"
+            value={expiryDays}
+            onChange={(e) => setExpiryDays(Math.max(1, Math.min(365, parseInt(e.target.value || "30", 10))))}
+            min={1}
+            max={365}
+            className="tv-select"
+            style={{ width: 100 }}
+            disabled={busy || !!shareUrl}
+          />
+          <span className="tv-caption" style={{ marginLeft: 8 }}>
+            (1–365 dní, default 30)
+          </span>
+        </div>
+
+        {!shareUrl && (
+          <button
+            type="button"
+            onClick={createShare}
+            disabled={busy}
+            className="tv-chip"
+            style={{ cursor: busy ? "wait" : "pointer", padding: "8px 16px" }}
+          >
+            {busy ? "Vytvářím..." : "Vytvořit odkaz"}
+          </button>
+        )}
+
+        {shareUrl && (
+          <div style={{ marginTop: 12 }}>
+            <label className="tv-stat-label" style={{ display: "block", marginBottom: 4 }}>
+              Odkaz pro klienta
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                value={shareUrl}
+                readOnly
+                onFocus={(e) => e.currentTarget.select()}
+                className="tv-select"
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={copyUrl}
+                className="tv-chip"
+                style={{ padding: "8px 12px" }}
+              >
+                {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                {copied ? "Zkopírováno" : "Kopírovat"}
+              </button>
+            </div>
+            <div className="tv-caption" style={{ marginTop: 8 }}>
+              Odkaz vyprší za {expiryDays} dní. Po vypršení vrátí 404.
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="tv-body" style={{ marginTop: 12, color: "var(--tv-today)" }}>
+            ⚠ {error}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

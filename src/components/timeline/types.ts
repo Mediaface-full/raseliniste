@@ -10,7 +10,7 @@
 
 export type Theme = "light" | "dark";
 
-export type Zoom = "week" | "month" | "quarter";
+export type Zoom = "week" | "month" | "quarter" | "year";
 
 export interface TimelineTeamMember {
   id: string;

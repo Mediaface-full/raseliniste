@@ -1,0 +1,41 @@
+---
+import Base from "../../layouts/Base.astro";
+import TimelineView from "../../components/timeline/TimelineView";
+import { prisma } from "../../lib/db";
+import { loadTimelineProject } from "../../lib/timeline/data-loader";
+import "../../styles/timeline.css";
+
+const token = Astro.params.token;
+let project = null;
+let errorMsg: string | null = null;
+
+if (!token) {
+  errorMsg = "Neplatný odkaz.";
+} else {
+  const share = await prisma.sharedTimeline.findUnique({ where: { token } });
+  if (!share) {
+    errorMsg = "Odkaz neexistuje.";
+  } else if (share.revokedAt) {
+    errorMsg = "Odkaz byl zrušen.";
+  } else if (share.expiresAt < new Date()) {
+    errorMsg = "Platnost odkazu vypršela.";
+  } else {
+    project = await loadTimelineProject(share.userId, share.projectId);
+    if (!project) errorMsg = "Projekt nebyl nalezen.";
+  }
+}
+---
+
+<Base title={project ? `${project.name} · Timeline` : "Timeline"}>
+  {errorMsg ? (
+    <main style="min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #fafafa; color: #1d1d1f; font-family: -apple-system, sans-serif;">
+      <div style="text-align: center; max-width: 400px;">
+        <div style="font-size: 48px; margin-bottom: 12px;">🔗</div>
+        <h1 style="font-size: 20px; font-weight: 500; margin: 0 0 8px;">Tento odkaz nelze otevřít</h1>
+        <p style="color: #6e6e73; margin: 0;">{errorMsg}</p>
+      </div>
+    </main>
+  ) : (
+    <TimelineView client:load readOnly initialProject={project} />
+  )}
+</Base>
