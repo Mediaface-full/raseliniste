@@ -52,11 +52,16 @@ export async function createInvite(input: CreateInviteInput): Promise<{
   if (input.contactId) {
     const c = await prisma.contact.findUnique({
       where: { id: input.contactId },
-      select: { displayName: true, firstName: true, emails: true, phones: true },
+      select: { displayName: true, firstName: true, lastName: true, emails: true, phones: true },
     });
     if (!c) throw new Error("Kontakt nenalezen.");
+    // Petr 2026-05-19: bug — předtím `c.firstName ?? c.displayName` brala jen
+    // křestní jméno (kalendář pak ukázal "🤝 Jan" místo "🤝 Jan Novák").
+    // Priorita: displayName (typicky "Jméno Příjmení") → firstName+lastName join
+    // → firstName fallback. To dá v kalendáři čitelný plný název.
+    const fullFromParts = [c.firstName, c.lastName].filter(Boolean).join(" ").trim();
     contactSnapshot = {
-      name: c.firstName ?? c.displayName,
+      name: c.displayName?.trim() || fullFromParts || c.firstName || undefined,
       email: c.emails[0]?.email,
       phone: c.phones[0]?.number,
     };
