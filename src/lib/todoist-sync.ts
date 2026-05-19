@@ -23,7 +23,7 @@
 
 import { prisma } from "./db";
 import { decryptSecret } from "./crypto";
-import { syncFetch, getTask, type TodoistSyncItem } from "./todoist";
+import { syncFetch, type TodoistSyncItem } from "./todoist";
 
 export interface TodoistSyncStats {
   userId: string;
@@ -275,81 +275,18 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
     }
   }
 
-  // === RECONCILE: porovnání naší DB se skutečným stavem v Todoistu ===
+  // === RECONCILE: VYPNUTÉ (Petr 2026-05-19) ===
   //
-  // KLÍČOVÉ: Todoist v1 GET /tasks/:id vrací 200 i pro completed tasky
-  // (s field `is_completed: true`). 404 vrací JEN pro smazané (hard delete).
-  // Tedy musíme kontrolovat is_completed flag, ne pouhou existenci.
+  // Reconcile dělal `getTask(...)` per každý task v DB → s 1502 open tasks
+  // znamená 1502+ jednotlivých API requestů per sync. Plus cron tick každých
+  // 5 min → exponenciálně rostoucí 429 rate-limit ban (až 1280s retry-after).
   //
-  // Stav v Todoistu:
-  //   null (404)                → smazán → close u nás
-  //   { is_completed: true }    → odškrtnut → close u nás
-  //   { is_completed: false }   → aktivní → reopen u nás (pokud máme done)
-  try {
-    const callLogs = await prisma.callLog.findMany({
-      where: { userId, wasVip: true, todoistTaskId: { not: null } },
-      select: { id: true, todoistTaskId: true, seenAt: true },
-    });
-    const tasks = await prisma.task.findMany({
-      where: { userId, todoistTaskId: { not: null } },
-      select: { id: true, todoistTaskId: true, status: true },
-    });
-
-    function isClosedInTodoist(task: { is_completed?: boolean; checked?: boolean } | null): boolean {
-      if (task === null) return true; // 404 = smazán
-      return task.is_completed === true || task.checked === true;
-    }
-
-    for (const cl of callLogs) {
-      if (!cl.todoistTaskId) continue;
-      try {
-        const task = await getTask(token, cl.todoistTaskId);
-        const closedInTodoist = isClosedInTodoist(task);
-        if (closedInTodoist && cl.seenAt === null) {
-          // Todoist completed/deleted ALE u nás otevřené → propíšeme close
-          await prisma.callLog.update({
-            where: { id: cl.id },
-            data: { seenAt: new Date() },
-          });
-          stats.reconciledClosed!++;
-        } else if (!closedInTodoist && cl.seenAt !== null) {
-          // Todoist aktivní ALE u nás zavřené → reopen detekován
-          await prisma.callLog.update({
-            where: { id: cl.id },
-            data: { seenAt: null },
-          });
-          stats.reconciledClosed!++;
-        }
-      } catch (e) {
-        console.warn(`[todoist-sync reconcile callLog ${cl.id}]`, e instanceof Error ? e.message : String(e));
-      }
-    }
-
-    for (const t of tasks) {
-      if (!t.todoistTaskId) continue;
-      try {
-        const task = await getTask(token, t.todoistTaskId);
-        const closedInTodoist = isClosedInTodoist(task);
-        if (closedInTodoist && t.status === "open") {
-          await prisma.task.update({
-            where: { id: t.id },
-            data: { status: "done", completedAt: new Date() },
-          });
-          stats.reconciledClosed!++;
-        } else if (!closedInTodoist && t.status === "done") {
-          await prisma.task.update({
-            where: { id: t.id },
-            data: { status: "open", completedAt: null },
-          });
-          stats.reconciledClosed!++;
-        }
-      } catch (e) {
-        console.warn(`[todoist-sync reconcile task ${t.id}]`, e instanceof Error ? e.message : String(e));
-      }
-    }
-  } catch (e) {
-    console.warn(`[todoist-sync] reconcile pass failed:`, e instanceof Error ? e.message : String(e));
-  }
+  // Sync API už VRACÍ completed/deleted flagy v response.items (is_deleted,
+  // checked, completed_at). Reconcile přes per-task GET je redundantní —
+  // klasická change-tracking pattern jsou v Sync API items[] z sync_token.
+  //
+  // Pokud bude potřeba full reconcile (data drift), udělat ho weekly cronem
+  // s rate-limit awareness (max 100 req/min), ne v každém 5-min syncu.
 
   // === LABELS — upsert do TodoistLabelMirror ===
   const labels = response.labels ?? [];
