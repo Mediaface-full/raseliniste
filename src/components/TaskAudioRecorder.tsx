@@ -101,27 +101,30 @@ export default function TaskAudioRecorder() {
   }
 
   async function upload(audio: Blob, durationSec: number) {
-    setPhase("uploading");
+    // Petr 2026-05-19: žádný "uploading" spinner ani "done" overlay. Po stop
+    // se UI vrátí rovnou na idle (ready pro další nahrávku). Upload + AI
+    // běží na pozadí. Pokud upload selže, ukáže se error banner až po faktu.
     const fd = new FormData();
     const ext = audio.type.includes("webm") ? "webm" : audio.type.includes("mp4") ? "mp4" : "audio";
     fd.append("audio", new File([audio], `task-salva.${ext}`, { type: audio.type }));
     fd.append("durationSec", String(durationSec));
 
-    try {
-      const res = await fetch("/api/ukoly/audio", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) {
-        setPhase("error");
-        setError(data.error ?? `Server vrátil ${res.status}`);
-        return;
+    setPhase("idle");
+    setElapsedMs(0);
+    setError(null);
+
+    // Fire-and-forget — UI nečeká
+    void (async () => {
+      try {
+        const res = await fetch("/api/ukoly/audio", { method: "POST", body: fd });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error ?? `Upload selhal (${res.status})`);
+        }
+      } catch (e) {
+        setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
       }
-      // Žádné přesměrování — AI běží na pozadí. Petr nemusí čekat.
-      // Salvu najde v /ukoly (sekce „Čeká na review"). Na PC v klidu projde Triage.
-      setPhase("done");
-    } catch (e) {
-      setPhase("error");
-      setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    })();
   }
 
   async function uploadFile(file: File) {

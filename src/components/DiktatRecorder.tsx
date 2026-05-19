@@ -156,32 +156,34 @@ export default function DiktatRecorder() {
   }
 
   async function upload(audio: Blob, durationSec: number) {
-    setPhase("uploading");
+    // Petr 2026-05-19: žádný "uploading" spinner ani redirect po uploadu.
+    // Po stop UI rovnou idle (ready pro další nahrávku). Upload + AI běží
+    // na pozadí. Pokud chce Petr na review screen (úkoly) nebo detail
+    // (deník), klikne si tam ručně přes navigation.
     const fd = new FormData();
     const ext = audio.type.includes("webm") ? "webm" : audio.type.includes("mp4") ? "mp4" : "audio";
     const name = mode === "task" ? "task-salva" : "denik";
     fd.append("audio", new File([audio], `${name}.${ext}`, { type: audio.type }));
     fd.append("durationSec", String(durationSec));
     if (mode === "journal") {
-      // Předej dnešní datum (default v server endpointu)
       fd.append("date", new Date().toISOString().slice(0, 10));
     }
 
-    try {
-      const res = await fetch(cfg.endpoint, { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) {
-        setPhase("error");
-        setError(data.error ?? `Server vrátil ${res.status}`);
-        return;
+    setPhase("idle");
+    setElapsedMs(0);
+    setError(null);
+
+    void (async () => {
+      try {
+        const res = await fetch(cfg.endpoint, { method: "POST", body: fd });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error ?? `Upload selhal (${res.status})`);
+        }
+      } catch (e) {
+        setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
       }
-      setPhase("redirecting");
-      const id = data.batchId ?? data.entryId;
-      window.location.href = cfg.successPath(id);
-    } catch (e) {
-      setPhase("error");
-      setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    })();
   }
 
   async function uploadFile(file: File) {

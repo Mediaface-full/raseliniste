@@ -177,36 +177,33 @@ export default function GuestRecorder({
 
   async function sendTextOnly() {
     if (!guestNote.trim() || !selectedProjectId) return;
-    setPhase("uploading");
+    // Petr 2026-05-19: bez spinneru, rovnou idle. Pozadí.
+    const noteText = guestNote.trim();
+    const projectId = selectedProjectId;
+    setPhase("idle");
+    setGuestNote("");
+    setNoteOpen(false);
     setError(null);
-    try {
-      const res = await fetch(`/api/me/${token}/note`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId: selectedProjectId, text: guestNote.trim() }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setPhase("error");
-        setError(data.error ?? `Server vrátil ${res.status}.`);
-        return;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/me/${token}/note`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ projectId, text: noteText }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error ?? `Upload selhal (${res.status}).`);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
       }
-      setPhase("done");
-      setTimeout(() => {
-        setPhase("idle");
-        setGuestNote("");
-        setNoteOpen(false);
-      }, 3000);
-    } catch (e) {
-      setPhase("error");
-      setError(e instanceof Error ? e.message : String(e));
-    }
+    })();
   }
 
   async function uploadAudio(audio: Blob, type: "STANDARD" | "BRIEF", durationSec: number) {
-    setPhase("uploading");
-    setError(null);
-
+    // Petr 2026-05-19: žádný "uploading" spinner ani "done" overlay 4s.
+    // Po stop UI rovnou idle (ready pro další). Upload + AI na pozadí.
     const fd = new FormData();
     fd.append("projectId", selectedProjectId);
     fd.append("type", type);
@@ -217,32 +214,28 @@ export default function GuestRecorder({
       fd.append("guestNote", guestNote.trim());
     }
 
-    try {
-      // Po upload bytí setPhase("processing")
-      const res = await fetch(`/api/me/${token}/recording`, {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setPhase("error");
-        setError(data.error ?? `Server vrátil ${res.status}.`);
-        return;
+    setPhase("idle");
+    setBriefMode(false);
+    setBriefFile(null);
+    setElapsedMs(0);
+    setGuestNote("");
+    setNoteOpen(false);
+    setError(null);
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/me/${token}/recording`, {
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error ?? `Upload selhal (${res.status}).`);
+        }
+      } catch (e) {
+        setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
       }
-      setPhase("done");
-      // Reset po 4 sec, ať může nahrát další
-      setTimeout(() => {
-        setPhase("idle");
-        setBriefMode(false);
-        setBriefFile(null);
-        setElapsedMs(0);
-        setGuestNote("");
-        setNoteOpen(false);
-      }, 4000);
-    } catch (e) {
-      setPhase("error");
-      setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    })();
   }
 
   async function uploadBriefFile() {

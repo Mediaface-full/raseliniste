@@ -132,27 +132,32 @@ export default function OwnerRecorder({
   }
 
   async function upload(audio: Blob, type: "STANDARD" | "BRIEF", durationSec: number) {
-    setPhase("uploading");
+    // Petr 2026-05-19: žádný "uploading" spinner ani "done" overlay 3s.
+    // Po stop UI rovnou ready pro další nahrávku. Upload + AI běží na pozadí.
     const fd = new FormData();
     fd.append("type", type);
     fd.append("durationSec", String(durationSec));
     fd.append("audio", new File([audio], "recording", { type: audio.type }));
 
-    const res = await fetch(`/api/studna/${selectedId}/recording`, { method: "POST", body: fd });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setPhase("error");
-      setError(data.error ?? `Server vrátil ${res.status}`);
-      return;
-    }
-    setPhase("done");
-    onSuccess?.();
-    setTimeout(() => {
-      setPhase("idle");
-      setBriefMode(false);
-      setBriefFile(null);
-      setElapsedMs(0);
-    }, 3000);
+    setPhase("idle");
+    setBriefMode(false);
+    setBriefFile(null);
+    setElapsedMs(0);
+    setError(null);
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/studna/${selectedId}/recording`, { method: "POST", body: fd });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error ?? `Upload selhal (${res.status})`);
+          return;
+        }
+        onSuccess?.();
+      } catch (e) {
+        setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    })();
   }
 
   const remainingMs = Math.max(0, STANDARD_LIMIT_SEC * 1000 - elapsedMs);
