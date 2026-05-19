@@ -73,7 +73,14 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
         setError(data.error ?? "Úprava selhala.");
         return;
       }
-      setSuccess("✓ Upraveno (Google + Rašeliniště).");
+      // Petr 2026-05-19: Google API občas tichu odmítne change (např.
+      // outOfOffice eventType). Backend kontroluje zda Google vrátil
+      // stejné datum jako jsme poslali → pokud ne, ukážeme warning.
+      if (data.google?.warning) {
+        setError(`⚠ ${data.google.warning}`);
+      } else {
+        setSuccess("✓ Upraveno (Google + Rašeliniště).");
+      }
       cancelEdit();
       const refreshRes = await fetch("/api/calendar/away");
       if (refreshRes.ok) {

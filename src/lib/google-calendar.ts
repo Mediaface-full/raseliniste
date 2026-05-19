@@ -365,7 +365,7 @@ export async function updateGoogleEvent(
     endsAt?: Date;
     allDay?: boolean;
   },
-): Promise<void> {
+): Promise<{ id: string; updated: string | null; start: any; end: any; summary: string | null }> {
   const auth = await getAuthorizedClient(userId);
   const calendar = google.calendar({ version: "v3", auth });
 
@@ -373,18 +373,31 @@ export async function updateGoogleEvent(
   if (input.summary !== undefined) requestBody.summary = input.summary;
   if (input.startsAt && input.endsAt) {
     if (input.allDay) {
-      requestBody.start = { date: input.startsAt.toISOString().slice(0, 10) };
-      requestBody.end = { date: input.endsAt.toISOString().slice(0, 10) };
+      // Petr 2026-05-19: PATCH s `start.date` nestačil — Google si držel
+      // starý `start.dateTime`. Musíme explicitně null-ovat dateTime
+      // aby Google přepnul na all-day mode. Stejně tak `timeZone`.
+      requestBody.start = { date: input.startsAt.toISOString().slice(0, 10), dateTime: null, timeZone: null } as any;
+      requestBody.end = { date: input.endsAt.toISOString().slice(0, 10), dateTime: null, timeZone: null } as any;
     } else {
-      requestBody.start = { dateTime: input.startsAt.toISOString(), timeZone: "Europe/Prague" };
-      requestBody.end = { dateTime: input.endsAt.toISOString(), timeZone: "Europe/Prague" };
+      requestBody.start = { dateTime: input.startsAt.toISOString(), timeZone: "Europe/Prague", date: null } as any;
+      requestBody.end = { dateTime: input.endsAt.toISOString(), timeZone: "Europe/Prague", date: null } as any;
     }
   }
 
-  await calendar.events.patch({
+  const res = await calendar.events.patch({
     calendarId: "primary",
     eventId,
     requestBody,
   });
   await recordUsage(userId);
+
+  console.log(`[google-calendar.update] eventId=${eventId} → start=${JSON.stringify(res.data.start)} end=${JSON.stringify(res.data.end)} summary="${res.data.summary}"`);
+
+  return {
+    id: res.data.id ?? eventId,
+    updated: res.data.updated ?? null,
+    start: res.data.start,
+    end: res.data.end,
+    summary: res.data.summary ?? null,
+  };
 }

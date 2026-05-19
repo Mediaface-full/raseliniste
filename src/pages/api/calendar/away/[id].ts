@@ -58,12 +58,22 @@ export const PATCH: APIRoute = async ({ request, params, cookies }) => {
       : `💻 NOMÁD: ${title ?? "Pracuji odjinud"}`;
 
   try {
-    await updateGoogleEvent(session.uid, event.externalId, {
+    const googleResult = await updateGoogleEvent(session.uid, event.externalId, {
       summary,
       startsAt,
       endsAt: endsAtExclusive,
       allDay: true,
     });
+
+    // Sanity check — pokud Google vrátil JINÉ datum než jsme poslali,
+    // něco je špatně. Často outOfOffice eventType odmítá změnu (Google
+    // si drží původní). Ukážeme Petrovi diff.
+    const sentStartDate = startsAt.toISOString().slice(0, 10);
+    const sentEndDate = endsAtExclusive.toISOString().slice(0, 10);
+    const gotStartDate = googleResult.start?.date ?? null;
+    const gotEndDate = googleResult.end?.date ?? null;
+    const dateMatches = gotStartDate === sentStartDate && gotEndDate === sentEndDate;
+
     // Local mirror update — sync à 5 min by to taky zachytil, ale rovnou
     // ať Petr v UI vidí změnu hned.
     await prisma.calendarEvent.update({
@@ -75,7 +85,21 @@ export const PATCH: APIRoute = async ({ request, params, cookies }) => {
         type: mode === "FULL" ? "OOO_FULL" : "OOO_TRAVEL_WORKING",
       },
     });
-    return Response.json({ ok: true });
+
+    return Response.json({
+      ok: true,
+      google: {
+        eventId: googleResult.id,
+        updatedAt: googleResult.updated,
+        start: googleResult.start,
+        end: googleResult.end,
+        summary: googleResult.summary,
+        dateMatches,
+        warning: !dateMatches
+          ? `Google vrátil jiné datum než jsme poslali (sent ${sentStartDate}–${sentEndDate}, got ${gotStartDate}–${gotEndDate}). Změna možná neprošla — zkontroluj v Google Calendar.`
+          : null,
+      },
+    });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
