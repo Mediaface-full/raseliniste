@@ -1,0 +1,36 @@
+---
+import Shell from "../../../layouts/Shell.astro";
+import TimelineView from "../../../components/timeline/TimelineView";
+import { readSession } from "../../../lib/session";
+import { prisma } from "../../../lib/db";
+import "../../../styles/timeline.css";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const id = Astro.params.id;
+if (!id) return Astro.redirect("/projekt");
+
+// Najdi projekt v mirroru — pokud existuje, použij jeho jméno v breadcrumb
+const project = await prisma.todoistProjectMirror.findFirst({
+  where: { userId: session.uid, todoistId: id },
+  select: { name: true },
+});
+---
+
+<Shell
+  title={project ? `${project.name} · Timeline` : "Timeline · Rašeliniště"}
+  username={user.username}
+  breadcrumb={[
+    { label: "Timeline", href: "/projekt" },
+    { label: project?.name ?? "Projekt" },
+  ]}
+>
+  <TimelineView client:load initialProjectId={id} />
+</Shell>

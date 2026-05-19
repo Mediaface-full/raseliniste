@@ -1,0 +1,24 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import TimelineView from "../../components/timeline/TimelineView";
+import { readSession } from "../../lib/session";
+import { prisma } from "../../lib/db";
+import "../../styles/timeline.css";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Timeline · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Timeline" }]}
+>
+  <TimelineView client:load />
+</Shell>

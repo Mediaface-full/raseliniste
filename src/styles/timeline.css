@@ -1,0 +1,242 @@
+/**
+ * Timeline View — CSS variables + base styles.
+ *
+ * Petr 2026-05-19 — viz design_tokens.md.
+ * Modul je "ostrov" s data-theme atributem (light/dark) NEZÁVISLÝ na globálním
+ * Rašeliniště theme.
+ *
+ * Apple Liquid Glass — backdrop-filter + saturate + subtle border.
+ */
+
+.timeline-view {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Geist Variable", "Inter", sans-serif;
+  min-height: 100vh;
+  padding: 14px;
+  color: var(--tv-text);
+  background: var(--tv-bg);
+  background-image: var(--tv-bg-wash-1), var(--tv-bg-wash-2), var(--tv-bg-wash-3), var(--tv-bg-wash-4);
+  background-attachment: fixed;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.timeline-view[data-theme="light"] {
+  --tv-bg: #fafafa;
+  --tv-bg-wash-1: radial-gradient(at 8% 12%, #fde6d4 0, transparent 45%);
+  --tv-bg-wash-2: radial-gradient(at 92% 8%, #dce8f5 0, transparent 45%);
+  --tv-bg-wash-3: radial-gradient(at 50% 100%, #e3eedd 0, transparent 50%);
+  --tv-bg-wash-4: radial-gradient(at 100% 60%, #f0e0e8 0, transparent 45%);
+  --tv-text: #1d1d1f;
+  --tv-text-secondary: #6e6e73;
+  --tv-text-tertiary: #86868b;
+  --tv-weekend-bg: rgba(0, 0, 0, 0.025);
+  --tv-lane-divider: rgba(0, 0, 0, 0.06);
+
+  --tv-glass-bg: rgba(255, 255, 255, 0.55);
+  --tv-glass-border: rgba(255, 255, 255, 0.6);
+  --tv-glass-shadow: 0 4px 24px rgba(70, 60, 80, 0.05);
+
+  --tv-glass-inner-bg: rgba(255, 255, 255, 0.45);
+  --tv-glass-inner-border: rgba(255, 255, 255, 0.5);
+
+  --tv-today: #D97766;
+  --tv-milestone: #E8C45F;
+  --tv-milestone-check: #5A4520;
+}
+
+.timeline-view[data-theme="dark"] {
+  --tv-bg: #0a0a0c;
+  --tv-bg-wash-1: radial-gradient(at 8% 12%, #3a2618 0, transparent 50%);
+  --tv-bg-wash-2: radial-gradient(at 92% 8%, #1a2738 0, transparent 50%);
+  --tv-bg-wash-3: radial-gradient(at 50% 100%, #1a2a1f 0, transparent 55%);
+  --tv-bg-wash-4: radial-gradient(at 100% 60%, #2a1a26 0, transparent 50%);
+  --tv-text: #f5f5f7;
+  --tv-text-secondary: #a0a0a8;
+  --tv-text-tertiary: #86868b;
+  --tv-weekend-bg: rgba(255, 255, 255, 0.03);
+  --tv-lane-divider: rgba(255, 255, 255, 0.08);
+
+  --tv-glass-bg: rgba(255, 255, 255, 0.06);
+  --tv-glass-border: rgba(255, 255, 255, 0.1);
+  --tv-glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+
+  --tv-glass-inner-bg: rgba(255, 255, 255, 0.04);
+  --tv-glass-inner-border: rgba(255, 255, 255, 0.08);
+
+  --tv-today: #E89380;
+  --tv-milestone: #F0CF73;
+  --tv-milestone-check: #3A2810;
+}
+
+/* Glass cards */
+.timeline-view .tv-card {
+  background: var(--tv-glass-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 0.5px solid var(--tv-glass-border);
+  border-radius: 18px;
+  box-shadow: var(--tv-glass-shadow);
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+.timeline-view .tv-card-inner {
+  background: var(--tv-glass-inner-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 0.5px solid var(--tv-glass-inner-border);
+  border-radius: 12px;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+/* Type scale */
+.timeline-view .tv-h1 { font-size: 24px; font-weight: 500; letter-spacing: -0.4px; line-height: 1.1; }
+.timeline-view .tv-h2 { font-size: 18px; font-weight: 500; letter-spacing: -0.3px; line-height: 1.1; }
+.timeline-view .tv-h3 { font-size: 15px; font-weight: 500; line-height: 1.3; }
+.timeline-view .tv-body { font-size: 13px; font-weight: 400; line-height: 1.55; }
+.timeline-view .tv-caption { font-size: 12px; font-weight: 500; line-height: 1.4; color: var(--tv-text-secondary); }
+.timeline-view .tv-eyebrow {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.6px;
+  text-transform: uppercase; line-height: 1.4;
+  color: var(--tv-text-tertiary);
+}
+.timeline-view .tv-stat-label {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.3px;
+  text-transform: uppercase; color: var(--tv-text-tertiary);
+}
+
+@media (max-width: 640px) {
+  .timeline-view .tv-h1 { font-size: 20px; }
+}
+
+/* Task hover lift */
+.timeline-view .tv-task {
+  cursor: pointer;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+.timeline-view .tv-task:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+.timeline-view .tv-task--done {
+  opacity: 0.5;
+}
+.timeline-view .tv-task--selected {
+  filter: brightness(1.1);
+}
+
+/* Filter chips */
+.timeline-view .tv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 13px;
+  background: var(--tv-glass-inner-bg);
+  border: 0.5px solid var(--tv-glass-inner-border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tv-text);
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  user-select: none;
+}
+.timeline-view .tv-chip--inactive {
+  opacity: 0.4;
+}
+.timeline-view .tv-chip__dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+}
+
+/* Project dropdown */
+.timeline-view .tv-select {
+  background: transparent;
+  color: var(--tv-text);
+  border: 0.5px solid var(--tv-glass-inner-border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+/* Segmented control */
+.timeline-view .tv-segmented {
+  display: inline-flex;
+  background: var(--tv-glass-inner-bg);
+  border: 0.5px solid var(--tv-glass-inner-border);
+  border-radius: 9px;
+  padding: 2px;
+}
+.timeline-view .tv-segmented__btn {
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tv-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.timeline-view .tv-segmented__btn--active {
+  background: var(--tv-glass-bg);
+  color: var(--tv-text);
+}
+
+/* Icon button */
+.timeline-view .tv-icon-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--tv-glass-inner-bg);
+  border: 0.5px solid var(--tv-glass-inner-border);
+  display: grid; place-items: center;
+  cursor: pointer;
+  color: var(--tv-text);
+  transition: background 0.15s, transform 0.3s;
+}
+.timeline-view .tv-icon-btn:hover { background: var(--tv-glass-bg); }
+
+/* Canvas wrapper — horizontal scroll */
+.timeline-view .tv-canvas-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  cursor: grab;
+}
+.timeline-view .tv-canvas-wrapper--dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+.timeline-view .tv-canvas-wrapper::-webkit-scrollbar { height: 8px; }
+.timeline-view .tv-canvas-wrapper::-webkit-scrollbar-thumb {
+  background: var(--tv-lane-divider);
+  border-radius: 4px;
+}
+
+/* Focus ring */
+.timeline-view *:focus-visible {
+  outline: 2px solid var(--tv-today);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Detail card */
+.timeline-view .tv-detail__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 0;
+}
+
+.timeline-view .tv-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .timeline-view .tv-stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
