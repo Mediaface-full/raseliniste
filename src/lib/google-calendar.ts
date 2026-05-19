@@ -369,19 +369,59 @@ export async function updateGoogleEvent(
   const auth = await getAuthorizedClient(userId);
   const calendar = google.calendar({ version: "v3", auth });
 
+  // Petr 2026-05-20: PATCH s `start.date` nestačil — Google ignoroval změnu
+  // i s `dateTime: null` hackem. Pro all-day eventy (typicky OOO Dovolená/Nomád)
+  // jdeme cestou DELETE + CREATE. Spolehlivé, vždy funguje. Nový event má jiný
+  // ID — caller musí update local mirror.externalId.
+  if (input.allDay && input.startsAt && input.endsAt) {
+    // 1. Načti původní event pro defaultní hodnoty (kdyby summary chyběl v input)
+    let originalSummary = input.summary;
+    if (originalSummary === undefined) {
+      try {
+        const orig = await calendar.events.get({ calendarId: "primary", eventId });
+        originalSummary = orig.data.summary ?? "";
+      } catch {
+        originalSummary = "";
+      }
+    }
+
+    // 2. DELETE starý
+    try {
+      await calendar.events.delete({ calendarId: "primary", eventId });
+    } catch (e: any) {
+      // 410 Gone = už smazaný, OK pokračovat
+      if (e?.code !== 410 && e?.response?.status !== 410) throw e;
+    }
+
+    // 3. CREATE nový
+    const created = await calendar.events.insert({
+      calendarId: "primary",
+      requestBody: {
+        summary: originalSummary,
+        start: { date: input.startsAt.toISOString().slice(0, 10) },
+        end: { date: input.endsAt.toISOString().slice(0, 10) },
+      },
+    });
+
+    await recordUsage(userId);
+
+    console.log(`[google-calendar.update] DELETE+CREATE old=${eventId} new=${created.data.id} → start=${JSON.stringify(created.data.start)} end=${JSON.stringify(created.data.end)}`);
+
+    return {
+      id: created.data.id!,
+      updated: created.data.updated ?? null,
+      start: created.data.start,
+      end: created.data.end,
+      summary: created.data.summary ?? null,
+    };
+  }
+
+  // Non-all-day events: zachovat původní PATCH cestu
   const requestBody: calendar_v3.Schema$Event = {};
   if (input.summary !== undefined) requestBody.summary = input.summary;
   if (input.startsAt && input.endsAt) {
-    if (input.allDay) {
-      // Petr 2026-05-19: PATCH s `start.date` nestačil — Google si držel
-      // starý `start.dateTime`. Musíme explicitně null-ovat dateTime
-      // aby Google přepnul na all-day mode. Stejně tak `timeZone`.
-      requestBody.start = { date: input.startsAt.toISOString().slice(0, 10), dateTime: null, timeZone: null } as any;
-      requestBody.end = { date: input.endsAt.toISOString().slice(0, 10), dateTime: null, timeZone: null } as any;
-    } else {
-      requestBody.start = { dateTime: input.startsAt.toISOString(), timeZone: "Europe/Prague", date: null } as any;
-      requestBody.end = { dateTime: input.endsAt.toISOString(), timeZone: "Europe/Prague", date: null } as any;
-    }
+    requestBody.start = { dateTime: input.startsAt.toISOString(), timeZone: "Europe/Prague" } as any;
+    requestBody.end = { dateTime: input.endsAt.toISOString(), timeZone: "Europe/Prague" } as any;
   }
 
   const res = await calendar.events.patch({
@@ -391,7 +431,7 @@ export async function updateGoogleEvent(
   });
   await recordUsage(userId);
 
-  console.log(`[google-calendar.update] eventId=${eventId} → start=${JSON.stringify(res.data.start)} end=${JSON.stringify(res.data.end)} summary="${res.data.summary}"`);
+  console.log(`[google-calendar.update] PATCH eventId=${eventId} → start=${JSON.stringify(res.data.start)} end=${JSON.stringify(res.data.end)} summary="${res.data.summary}"`);
 
   return {
     id: res.data.id ?? eventId,

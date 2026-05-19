@@ -76,6 +76,8 @@ export const PATCH: APIRoute = async ({ request, params, cookies }) => {
 
     // Local mirror update — sync à 5 min by to taky zachytil, ale rovnou
     // ať Petr v UI vidí změnu hned.
+    // Petr 2026-05-20: delete+create cesta vrací NOVÝ eventId, musíme
+    // update externalId v mirroru jinak by sync příště nahrál duplicit.
     await prisma.calendarEvent.update({
       where: { id },
       data: {
@@ -83,6 +85,7 @@ export const PATCH: APIRoute = async ({ request, params, cookies }) => {
         startsAt,
         endsAt: endsAtExclusive,
         type: mode === "FULL" ? "OOO_FULL" : "OOO_TRAVEL_WORKING",
+        externalId: googleResult.id,
       },
     });
 
