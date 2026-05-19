@@ -23,6 +23,18 @@ const unseenFirewall = await prisma.callLog.count({
   where: { userId: session.uid, seenAt: null },
 });
 
+// Petr 2026-05-19: KPI Otevřené úkoly byla od začátku projektu hardcoded "—".
+// 1502 open tasks v DB — pojďme to konečně ukázat. Plus due-today counter
+// jako delta (kolik z toho má dnešní termín).
+const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
+const [openTasksCount, dueTodayCount] = await Promise.all([
+  prisma.task.count({ where: { userId: session.uid, status: "open" } }),
+  prisma.task.count({
+    where: { userId: session.uid, status: "open", dueAt: { gte: todayStart, lt: todayEnd } },
+  }),
+]);
+
 // Plán — eventy které se konají TEĎ nebo v nejbližších 2 dnech.
 // Klíč: `endsAt > teď` (ne `>= dayStart`), aby se nezobrazily eventy
 // co dnes brzo ráno už skončily.
@@ -97,7 +109,7 @@ const sourceTint = (src: string): Tint =>
   src === "ICLOUD_SON" ? "mint" : src === "ICLOUD_PARTNER" ? "lavender" : "sky";
 
 const kpis: { label: string; value: string; delta?: string; deltaDir?: "up" | "down" | "flat"; href?: string; icon: string; tint: Tint }[] = [
-  { label: "Otevřené úkoly",  value: "—", delta: "—",   deltaDir: "flat", icon: "lucide:check-square",  tint: "peach" },
+  { label: "Otevřené úkoly",  value: openTasksCount.toString(), delta: dueTodayCount > 0 ? `${dueTodayCount} dnes` : "nic dnes",   deltaDir: dueTodayCount > 0 ? "up" : "flat", href: "/ukoly", icon: "lucide:check-square",  tint: "peach" },
   { label: "Poznámky týden",  value: "—", delta: "—",   deltaDir: "flat", icon: "lucide:notebook-pen",  tint: "mint" },
   { label: "Firewall",        value: unseenFirewall.toString(), delta: unseenFirewall === 0 ? "žádné" : "nevyřízené", deltaDir: unseenFirewall > 0 ? "up" : "flat", href: "/firewall", icon: "lucide:shield", tint: "peach" },
   { label: "Passkey",         value: user.passkeys.length.toString(), delta: "aktivní", deltaDir: "up", icon: "lucide:fingerprint", tint: "lavender" },

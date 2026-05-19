@@ -188,7 +188,15 @@ export async function dispatchScheduledJobs(opts: {
     if (job.fireAndForget) {
       // Spustíme volání bez čekání na response — scheduler dokončí rychle.
       // Job záznam se update-ne v background po doběhu.
-      callEndpoint(job, opts.baseUrl, opts.cronKey, ctrl.signal)
+      //
+      // Petr 2026-05-19: ZÁSADNĚ NEPOSÍLAT ctrl.signal do callEndpoint!
+      // AbortController.abort() po 2s by propagoval do fetch → request.signal
+      // na serveru → Prisma vyhodí "This operation was aborted" v mid-sync.
+      // Sync musí běžet volně, dispatcher se odpojí jen logicky (Promise
+      // se vyřeší kdy chce). 2s timeout je teď JEN housekeeping na update
+      // CronRun error, ne abort serveru.
+      const noAbortSignal = new AbortController().signal; // never aborted
+      callEndpoint(job, opts.baseUrl, opts.cronKey, noAbortSignal)
         .then(async ({ status }) => {
           clearTimeout(timeout);
           const ok = status >= 200 && status < 300;
