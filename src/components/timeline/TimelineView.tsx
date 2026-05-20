@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, Calendar, ExternalLink, X, Printer, Share2, Copy, Check } from "lucide-react";
+import { Moon, Sun, Calendar, ExternalLink, X, Printer, Share2, Copy, Check, ChevronDown } from "lucide-react";
 import type {
   Theme,
   Zoom,
@@ -72,7 +72,13 @@ interface Props {
 export default function TimelineView({ initialProjectId, readOnly = false, initialProject }: Props) {
   const [theme, setTheme] = useState<Theme>("dark");
   const [options, setOptions] = useState<TimelineProjectOption[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(initialProjectId ?? initialProject?.id ?? null);
+  // Petr 2026-05-20: multi-select — pole IDs (1 = single, >1 = aggregate).
+  // initialProjectId / initialProject.id může být comma-separated nebo "folder:X".
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
+    const raw = initialProjectId ?? initialProject?.id ?? null;
+    if (!raw) return [];
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  });
   const [project, setProject] = useState<TimelineProject | null>(initialProject ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,22 +127,23 @@ export default function TimelineView({ initialProjectId, readOnly = false, initi
       .then((data) => {
         const opts: TimelineProjectOption[] = data.options ?? [];
         setOptions(opts);
-        if (!selectedId && opts.length > 0) {
+        if (selectedIds.length === 0 && opts.length > 0) {
           // Prefer Team projekt, fallback první
           const firstTeam = opts.find((o) => o.isTeamProject);
-          setSelectedId(firstTeam?.id ?? opts[0]!.id);
+          setSelectedIds([firstTeam?.id ?? opts[0]!.id]);
         }
       })
       .catch((e) => setError(`Načtení projektů selhalo: ${e?.message ?? e}`));
   }, [readOnly]);
 
-  // Load selected project — pouze pokud NOT readOnly + selectedId změnil
+  // Load selected projects — comma-separated když je víc
   useEffect(() => {
-    if (readOnly) return; // initialProject už máme
-    if (!selectedId) return;
+    if (readOnly) return;
+    if (selectedIds.length === 0) return;
     setLoading(true);
     setError(null);
-    fetch(`/api/timeline/${encodeURIComponent(selectedId)}`)
+    const idsParam = selectedIds.join(",");
+    fetch(`/api/timeline/${encodeURIComponent(idsParam)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) throw new Error(data.error);
@@ -148,7 +155,7 @@ export default function TimelineView({ initialProjectId, readOnly = false, initi
       })
       .catch((e) => setError(e?.message ?? String(e)))
       .finally(() => setLoading(false));
-  }, [selectedId, readOnly]);
+  }, [selectedIds.join(","), readOnly]);
 
   // Stats — viditelných úkolů + done % + délka projektu + týmem
   const stats = useMemo(() => {
@@ -207,8 +214,8 @@ export default function TimelineView({ initialProjectId, readOnly = false, initi
 
       <Hero
         options={options}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
+        selectedIds={selectedIds}
+        onSelectChange={setSelectedIds}
         project={project}
         loading={loading}
         stats={stats}
@@ -301,8 +308,8 @@ export default function TimelineView({ initialProjectId, readOnly = false, initi
 // =============================================================================
 function Hero(props: {
   options: TimelineProjectOption[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedIds: string[];
+  onSelectChange: (ids: string[]) => void;
   project: TimelineProject | null;
   loading: boolean;
   stats: { visibleTasksCount: number; doneCount: number; donePct: number; days: number; teamCount: number } | null;
@@ -318,22 +325,14 @@ function Hero(props: {
     <div className="tv-card" style={{ padding: "18px 20px 16px", marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 14 }}>
         <Calendar size={20} style={{ color: "var(--tv-text-secondary)" }} aria-hidden="true" />
-        {!props.readOnly ? (
-          <select
-            className="tv-select"
-            value={props.selectedId ?? ""}
-            onChange={(e) => props.onSelect(e.target.value)}
+        {!props.readOnly && (
+          <ProjectMultiSelect
+            options={props.options}
+            selectedIds={props.selectedIds}
+            onChange={props.onSelectChange}
             disabled={props.loading}
-            aria-label="Vybrat projekt"
-          >
-            {props.options.length === 0 && <option value="">Žádné projekty</option>}
-            {props.options.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}{o.isParent ? ` (${o.subprojectCount} sub)` : ""}{o.isTeamProject ? " ✦" : ""}
-              </option>
-            ))}
-          </select>
-        ) : null}
+          />
+        )}
         {props.project && <h1 className="tv-h1" style={{ margin: 0 }}>{props.project.name}</h1>}
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }} className="tv-no-print">
@@ -375,6 +374,130 @@ function Hero(props: {
           <StatTile label="Hotovo" value={`${props.stats.donePct}%`} meta="z viditelných" />
           <StatTile label="Délka" value={`${props.stats.days} dní`} meta="rozsah projektu" />
           <StatTile label="Tým" value={props.stats.teamCount.toString()} meta="aktivních" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Multi-select dropdown pro projekty (Petr 2026-05-20).
+ * Checkboxy uvnitř pop-overu. Trigger zobrazí "N vybráno" nebo seznam.
+ */
+function ProjectMultiSelect({
+  options,
+  selectedIds,
+  onChange,
+  disabled,
+}: {
+  options: TimelineProjectOption[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Zavřít kliknutím mimo
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (!open) return;
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const selectedSet = new Set(selectedIds);
+  const selectedOptions = options.filter((o) => selectedSet.has(o.id));
+
+  function toggle(id: string) {
+    if (selectedSet.has(id)) {
+      // Zákaz odebrat poslední — musí být aspoň jeden
+      if (selectedIds.length <= 1) return;
+      onChange(selectedIds.filter((x) => x !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  }
+
+  const triggerLabel = selectedOptions.length === 0
+    ? "Vybrat projekt"
+    : selectedOptions.length === 1
+      ? selectedOptions[0]!.name
+      : `${selectedOptions.length} projektů vybráno`;
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Vybrat projekty"
+        className="tv-select"
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: disabled ? "wait" : "pointer", minWidth: 200 }}
+      >
+        <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {triggerLabel}
+        </span>
+        <ChevronDown size={14} style={{ opacity: 0.6, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} aria-hidden="true" />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-multiselectable="true"
+          className="tv-card"
+          style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0,
+            minWidth: 260, maxHeight: 360, overflowY: "auto",
+            padding: 6, zIndex: 100,
+          }}
+        >
+          {options.length === 0 && (
+            <div style={{ padding: 12, color: "var(--tv-text-tertiary)", fontSize: 13 }}>
+              Žádné projekty
+            </div>
+          )}
+          {options.map((o) => {
+            const checked = selectedSet.has(o.id);
+            return (
+              <label
+                key={o.id}
+                role="option"
+                aria-selected={checked}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "6px 8px", borderRadius: 8, cursor: "pointer",
+                  background: checked ? "var(--tv-glass-inner-bg)" : "transparent",
+                }}
+                onMouseEnter={(e) => { if (!checked) e.currentTarget.style.background = "var(--tv-glass-inner-bg)"; }}
+                onMouseLeave={(e) => { if (!checked) e.currentTarget.style.background = "transparent"; }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(o.id)}
+                  style={{ margin: 0, cursor: "pointer" }}
+                />
+                <span style={{ flex: 1, fontSize: 13 }}>
+                  {o.name}
+                  {o.isParent && o.subprojectCount > 1 && (
+                    <span style={{ color: "var(--tv-text-tertiary)", marginLeft: 6 }}>
+                      ({o.subprojectCount})
+                    </span>
+                  )}
+                </span>
+                {o.isTeamProject && (
+                  <span title="Team Workspace" style={{ color: "var(--tv-text-tertiary)", fontSize: 11 }}>✦</span>
+                )}
+              </label>
+            );
+          })}
         </div>
       )}
     </div>
