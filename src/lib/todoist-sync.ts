@@ -48,26 +48,41 @@ function parseTodoistDate(s: string | null | undefined): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function parseDue(due: TodoistSyncItem["due"]): { dueAt: Date | null; dueIsTime: boolean } {
-  if (!due?.date) return { dueAt: null, dueIsTime: false };
-  const hasTime = due.date.includes("T");
-
+function parseDateString(dateStr: string): { dueAt: Date | null; dueIsTime: boolean } {
+  const hasTime = dateStr.includes("T");
   if (hasTime) {
-    // Datetime string (s časem) — parsuj jak je. Todoist dodá ISO 8601 s tz info,
-    // pokud time-only bez tz, JS parsuje jako lokální (správně pro náš účel).
-    const d = new Date(due.date);
+    const d = new Date(dateStr);
     return isNaN(d.getTime()) ? { dueAt: null, dueIsTime: false } : { dueAt: d, dueIsTime: true };
   }
-
-  // All-day datum "YYYY-MM-DD" — `new Date("2026-05-10")` parsuje jako UTC midnight,
-  // což v Praze (UTC+2) zobrazí jako 9. května 02:00. Musíme sestavit lokální půlnoc.
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(due.date);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
   if (!m) return { dueAt: null, dueIsTime: false };
   const [, y, mo, d] = m;
   const localDate = new Date(parseInt(y, 10), parseInt(mo, 10) - 1, parseInt(d, 10));
   return isNaN(localDate.getTime())
     ? { dueAt: null, dueIsTime: false }
     : { dueAt: localDate, dueIsTime: false };
+}
+
+/**
+ * Parse due s deadline fallbackem (Petr 2026-05-20):
+ * Todoist má 2 koncepty datumu:
+ *   - `due` = kdy úkol naplánován (Plánovač / "Today" filtr)
+ *   - `deadline` = do kdy musí být hotový (nezahrnuto v "Today")
+ *
+ * Pro Timeline view potřebujeme alespoň jedno datum. Pokud due chybí ale
+ * deadline existuje → použij deadline (úkol bude v timeline na deadline datum).
+ */
+function parseDue(item: { due?: TodoistSyncItem["due"]; deadline?: TodoistSyncItem["deadline"] }): {
+  dueAt: Date | null;
+  dueIsTime: boolean;
+} {
+  if (item.due?.date) {
+    return parseDateString(item.due.date);
+  }
+  if (item.deadline?.date) {
+    return parseDateString(item.deadline.date);
+  }
+  return { dueAt: null, dueIsTime: false };
 }
 
 function priorityFromTodoist(p: number | undefined): "low" | "normal" | "high" {
@@ -115,7 +130,7 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
 
   let response;
   try {
-    response = await syncFetch(token, startToken, ["items", "projects", "labels"]);
+    response = await syncFetch(token, startToken, ["items", "projects", "labels", "folders"]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     stats.error = msg;
@@ -160,7 +175,7 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
         select: { id: true, completedAt: true },
       });
 
-      const { dueAt, dueIsTime } = parseDue(item.due);
+      const { dueAt, dueIsTime } = parseDue(item);
 
       // Defenzivní fallback — Todoist u smazaných/archivovaných itemů občas
       // vrací prázdný/null content; bez fallbacku by Prisma create spadl.
@@ -234,15 +249,20 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
   // === PROJECTS — upsert do TodoistProjectMirror ===
   const projects = response.projects ?? [];
   stats.projectsReceived = projects.length;
+  // Folder lookup mapa pro persist project.folder_id → folder.name
+  // (Petr 2026-05-20: Team Workspace folders místo sub-projektů)
+  const foldersMap = new Map<string, string>();
+  for (const f of response.folders ?? []) {
+    foldersMap.set(f.id, f.name);
+  }
+
   for (const p of projects) {
     try {
-      // Team Workspace metadata (Cesta B, Petr 2026-05-18):
-      // - workspace_id přítomný = Team projekt, null = Personal
-      // - access.visibility sekundární diskriminátor ("team" vs "restricted")
-      // Sync API spolehlivě tato pole vrací pro Team projekty (audit potvrzeno).
       const workspaceId = p.workspace_id ?? null;
       const isTeamProject = workspaceId !== null;
       const accessVisibility = p.access?.visibility ?? null;
+      const folderId = p.folder_id ?? null;
+      const folderName = folderId ? (foldersMap.get(folderId) ?? null) : null;
 
       await prisma.todoistProjectMirror.upsert({
         where: { userId_todoistId: { userId, todoistId: p.id } },
@@ -254,6 +274,8 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
           workspaceId,
           isTeamProject,
           accessVisibility,
+          folderId,
+          folderName,
           syncedAt: new Date(),
         },
         create: {
@@ -266,6 +288,8 @@ export async function syncTodoistForUser(userId: string): Promise<TodoistSyncSta
           workspaceId,
           isTeamProject,
           accessVisibility,
+          folderId,
+          folderName,
         },
       });
       stats.projectsUpserted!++;

@@ -1856,6 +1856,13 @@ model TodoistProjectMirror {
   isTeamProject     Boolean   @default(false)
   accessVisibility  String?
 
+  // Folder support (Petr 2026-05-20). Todoist Team Workspace nepodporuje
+  // sub-projekty přes parent_id — místo toho má FOLDERS. Více projektů ve
+  // stejné složce sdílí folder_id. Pro Timeline View modul potřebujeme
+  // agregovat projekty ze stejné složky do jedné timeline.
+  folderId          String?
+  folderName        String?
+
   @@unique([userId, todoistId])
   @@index([userId])
   @@index([userId, workspaceId])

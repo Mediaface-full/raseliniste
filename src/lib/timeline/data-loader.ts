@@ -20,8 +20,15 @@ import { toIsoDate, parseDurationDays, isMilestone, todayIso, addDays } from "./
 import { hashToColorIndex } from "./color-utils";
 
 /**
- * Seznam projektů pro dropdown — parents + standalone (bez children).
- * Vrací JEN aktivní projekty (z mirroru, kde TodoistProjectMirror.isInbox=false).
+ * Seznam projektů pro dropdown.
+ *
+ * Petr 2026-05-20 — rozšířeno o folder-aware:
+ *   - Pro projekty s `folderId` vytvoříme **pseudo-option "📁 <folderName>"**
+ *     která pokrývá všechny projekty stejné složky (Team Workspace folder).
+ *   - Samostatné projekty (bez folder_id) jsou normální options
+ *   - Sub-projekty (parentId != null) jsou stále skryté — agreguje je parent
+ *
+ * ID pseudo-folder option = `folder:<folderId>` (prefix pro routing).
  */
 export async function listProjectOptions(userId: string): Promise<TimelineProjectOption[]> {
   const all = await prisma.todoistProjectMirror.findMany({
@@ -31,11 +38,12 @@ export async function listProjectOptions(userId: string): Promise<TimelineProjec
       name: true,
       parentId: true,
       isTeamProject: true,
+      folderId: true,
+      folderName: true,
     },
     orderBy: [{ isTeamProject: "desc" }, { name: "asc" }],
   });
 
-  // Spočti children per parent
   const childCount = new Map<string, number>();
   for (const p of all) {
     if (p.parentId) {
@@ -43,66 +51,136 @@ export async function listProjectOptions(userId: string): Promise<TimelineProjec
     }
   }
 
-  // Filter: jen root (parentId=null) — to jsou "parent folders" nebo standalone
-  return all
-    .filter((p) => p.parentId === null)
-    .map((p) => ({
+  // Sgrupuj projekty per folder
+  const foldersMap = new Map<string, { name: string; projects: typeof all }>();
+  for (const p of all) {
+    if (p.folderId) {
+      const folderName = p.folderName ?? "(neznámá složka)";
+      const entry = foldersMap.get(p.folderId) ?? { name: folderName, projects: [] };
+      entry.projects.push(p);
+      foldersMap.set(p.folderId, entry);
+    }
+  }
+
+  const options: TimelineProjectOption[] = [];
+
+  // 1. Folders jako pseudo-options (id = "folder:<folderId>")
+  for (const [folderId, entry] of foldersMap) {
+    options.push({
+      id: `folder:${folderId}`,
+      name: `📁 ${entry.name}`,
+      isParent: true,
+      subprojectCount: entry.projects.length,
+      isTeamProject: entry.projects.some((p) => p.isTeamProject),
+    });
+  }
+
+  // 2. Root projekty BEZ folder_id (samostatné)
+  for (const p of all) {
+    if (p.parentId !== null) continue; // sub-projekty pod parents skryté
+    if (p.folderId) continue;          // už pokryto folder pseudo-option
+    options.push({
       id: p.todoistId,
       name: p.name,
       isParent: (childCount.get(p.todoistId) ?? 0) > 0,
       subprojectCount: childCount.get(p.todoistId) ?? 0,
       isTeamProject: p.isTeamProject,
-    }));
+    });
+  }
+
+  // Sort: Team projekty první, pak folders, pak samostatné, abecedně
+  options.sort((a, b) => {
+    if (a.isTeamProject !== b.isTeamProject) return a.isTeamProject ? -1 : 1;
+    return a.name.localeCompare(b.name, "cs");
+  });
+
+  return options;
 }
 
 /**
  * Načte kompletní TimelineProject pro zobrazení.
  *
- * Algoritmus:
- *   1. Find parent projekt podle todoistId
- *   2. Find children (sub-projekty) podle parentId === parent.todoistId
- *   3. Pokud žádné children → "single mode" (fake jediný sub-projekt s názvem projektu)
- *   4. Načti Tasks s todoistProjectId IN (parent + children) AND dueAt IS NOT NULL
- *   5. Pro každý task vypočti durationDays (Q-G priority)
- *   6. Separuj tasks vs milestones (label "milestone")
- *   7. Sestav team z unique assignedToContact (+ owner=Petr fallback)
- *   8. startDate = min(tasks.dueAt) - 7 dní pufr, endDate = max(task end) + 14 dní pufr
+ * Podporuje multi-select (Petr 2026-05-20 — Q-I follow-up): místo jednoho
+ * todoistId přijímá pole. Pokud více, agreguje úkoly ze všech, název složený.
  */
 export async function loadTimelineProject(
   userId: string,
-  projectTodoistId: string,
+  projectTodoistIdOrIds: string | string[],
 ): Promise<TimelineProject | null> {
-  const parent = await prisma.todoistProjectMirror.findFirst({
-    where: { userId, todoistId: projectTodoistId },
-  });
-  if (!parent) return null;
+  const rawIds = Array.isArray(projectTodoistIdOrIds) ? projectTodoistIdOrIds : [projectTodoistIdOrIds];
+  if (rawIds.length === 0) return null;
 
-  // Children pod tímto parentem (přes parentId match na todoistId)
-  const children = await prisma.todoistProjectMirror.findMany({
-    where: { userId, parentId: parent.todoistId },
+  // Petr 2026-05-20: rozšiř "folder:<id>" tokeny na seznam todoistId všech
+  // projektů v dané složce. Single project ID zůstávají jak jsou.
+  const expandedIds: string[] = [];
+  let virtualFolderName: string | null = null;
+  for (const rawId of rawIds) {
+    if (rawId.startsWith("folder:")) {
+      const folderId = rawId.slice("folder:".length);
+      const inFolder = await prisma.todoistProjectMirror.findMany({
+        where: { userId, folderId },
+        select: { todoistId: true, folderName: true },
+      });
+      if (inFolder.length === 0) continue;
+      // Zapamatuj folder name pro virtuální projekt
+      if (!virtualFolderName) virtualFolderName = inFolder[0]!.folderName ?? null;
+      for (const p of inFolder) expandedIds.push(p.todoistId);
+    } else {
+      expandedIds.push(rawId);
+    }
+  }
+
+  if (expandedIds.length === 0) return null;
+
+  const parents = await prisma.todoistProjectMirror.findMany({
+    where: { userId, todoistId: { in: expandedIds } },
+    orderBy: { name: "asc" },
+  });
+  if (parents.length === 0) return null;
+
+  // Pro každý parent najdi children
+  const childrenAll = await prisma.todoistProjectMirror.findMany({
+    where: { userId, parentId: { in: parents.map((p) => p.todoistId) } },
     orderBy: { name: "asc" },
   });
 
-  // Sub-projekty pro UI
-  let subprojects: TimelineSubproject[];
-  let projectIdsForTasks: string[];
-
-  if (children.length > 0) {
-    subprojects = children.map((c) => ({
-      id: c.todoistId,
-      name: c.name,
-      colorIndex: hashToColorIndex(c.todoistId),
-    }));
-    projectIdsForTasks = [parent.todoistId, ...children.map((c) => c.todoistId)];
-  } else {
-    // Standalone projekt — fake "Realizace" sub-projekt = sám projekt
-    subprojects = [{
-      id: parent.todoistId,
-      name: parent.name,
-      colorIndex: hashToColorIndex(parent.todoistId),
-    }];
-    projectIdsForTasks = [parent.todoistId];
+  // Sub-projekty — každý parent + jeho children (pokud jsou), nebo parent jako jediný
+  const subprojects: TimelineSubproject[] = [];
+  const projectIdsForTasks: string[] = [];
+  for (const parent of parents) {
+    const myChildren = childrenAll.filter((c) => c.parentId === parent.todoistId);
+    if (myChildren.length > 0) {
+      // Parent má skutečné sub-projekty
+      for (const c of myChildren) {
+        subprojects.push({
+          id: c.todoistId,
+          name: c.name,
+          colorIndex: hashToColorIndex(c.todoistId),
+        });
+        projectIdsForTasks.push(c.todoistId);
+      }
+      projectIdsForTasks.push(parent.todoistId);
+    } else {
+      // Standalone — parent sám je sub-projekt
+      subprojects.push({
+        id: parent.todoistId,
+        name: parent.name,
+        colorIndex: hashToColorIndex(parent.todoistId),
+      });
+      projectIdsForTasks.push(parent.todoistId);
+    }
   }
+
+  // První parent (pro fallback subprojectId u úkolu co nemá nic jiného)
+  const firstParent = parents[0]!;
+  // Multi-select: vytvoř virtuální "project" se složeným názvem
+  // Pokud byl input folder:X, použij folder name. Jinak seskládej jména.
+  const combinedName = virtualFolderName
+    ? `📁 ${virtualFolderName}`
+    : (parents.length === 1 ? firstParent.name : parents.map((p) => p.name).join(" + "));
+  const combinedId = rawIds.length === 1
+    ? rawIds[0]!
+    : rawIds.join(",");
 
   // Načti Tasks — JEN s dueAt (Q-G), status open nebo done (skipni cancelled)
   const tasksRaw = await prisma.task.findMany({
@@ -166,7 +244,7 @@ export async function loadTimelineProject(
     if (!t.dueAt) continue; // safety (where už filtroval)
     const startIso = toIsoDate(t.dueAt);
     const assigneeId = t.assignedToContactId ?? OWNER_ID;
-    const subprojectId = t.todoistProjectId ?? parent.todoistId;
+    const subprojectId = t.todoistProjectId ?? firstParent.todoistId;
     const todoistUrl = t.todoistTaskId
       ? `https://todoist.com/showTask?id=${t.todoistTaskId}`
       : null;
@@ -214,11 +292,11 @@ export async function loadTimelineProject(
   const endDate = addDays(maxDate, 14);
 
   return {
-    id: parent.todoistId,
-    name: parent.name,
-    parentId: parent.parentId,
-    workspaceId: parent.workspaceId,
-    isTeamProject: parent.isTeamProject,
+    id: combinedId,
+    name: combinedName,
+    parentId: firstParent.parentId,
+    workspaceId: firstParent.workspaceId,
+    isTeamProject: parents.every((p) => p.isTeamProject),
     subprojects,
     team: Array.from(teamMap.values()),
     tasks,

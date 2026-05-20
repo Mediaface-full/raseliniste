@@ -25,7 +25,9 @@ export const GET: APIRoute = async ({ cookies, params }) => {
     return Response.json({ options });
   }
 
-  const project = await loadTimelineProject(session.uid, projectId);
+  // Petr 2026-05-20: multi-select — comma-separated IDs (např. "id1,id2,id3")
+  const ids = projectId.includes(",") ? projectId.split(",").filter(Boolean) : projectId;
+  const project = await loadTimelineProject(session.uid, ids);
   if (!project) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
 
   return Response.json({ project });

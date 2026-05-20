@@ -26,6 +26,17 @@ export interface TodoistProject {
   access?: { visibility?: string };
   is_shared?: boolean;
   can_assign_tasks?: boolean;
+
+  // Folder support (Petr 2026-05-20). Team Workspace má folders místo
+  // sub-projektů. Sync API vrací folder_id u projektů ve složce.
+  folder_id?: string | null;
+}
+
+/** Todoist folder objekt (Sync API resource_type "folders"). */
+export interface TodoistFolder {
+  id: string;
+  name: string;
+  workspace_id?: string | null;
 }
 
 export interface TodoistTask {
@@ -339,6 +350,13 @@ export interface TodoistSyncItem {
     string?: string;
     timezone?: string | null;
   } | null;
+  // Petr 2026-05-20: Todoist má vedle `due` ještě `deadline` (datum dokončení).
+  // Pokud úkol nemá `due` ale má `deadline`, použijeme deadline jako fallback
+  // pro Task.dueAt — Timeline view ho potřebuje pro zobrazení.
+  deadline?: {
+    date?: string;       // YYYY-MM-DD (deadline je všeobecně all-day)
+    lang?: string;
+  } | null;
   added_at?: string;
   completed_at?: string | null;
   checked?: boolean;
@@ -351,12 +369,13 @@ export interface TodoistSyncResponse {
   items?: TodoistSyncItem[];
   projects?: TodoistProject[];
   labels?: TodoistLabel[];
+  folders?: TodoistFolder[];
 }
 
 export async function syncFetch(
   token: string,
   syncToken: string,
-  resourceTypes: string[] = ["items", "projects"],
+  resourceTypes: string[] = ["items", "projects", "folders"],
 ): Promise<TodoistSyncResponse> {
   return call<TodoistSyncResponse>(token, "/sync", {
     method: "POST",
