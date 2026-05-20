@@ -15,7 +15,8 @@
  * F5: Drag úkolu na jiný den
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Moon, Sun, Calendar, ExternalLink, X, Printer, Share2, Copy, Check, ChevronDown } from "lucide-react";
 import type {
   Theme,
@@ -396,15 +397,37 @@ function ProjectMultiSelect({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
-  // Zavřít kliknutím mimo
+  // Petr 2026-05-20: bug se z-indexem — popover jako child Hero glass cardu
+  // se ocitne POD jiným glass cardem (Filter) kvůli backdrop-filter, který
+  // vytváří vlastní stacking context. Fix: Portal do body + position: fixed.
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    function updatePos() {
+      if (!triggerRef.current) return;
+      const r = triggerRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 260) });
+    }
+    updatePos();
+    window.addEventListener("scroll", updatePos, true);
+    window.addEventListener("resize", updatePos);
+    return () => {
+      window.removeEventListener("scroll", updatePos, true);
+      window.removeEventListener("resize", updatePos);
+    };
+  }, [open]);
+
+  // Zavřít kliknutím mimo (trigger ani popover)
   useEffect(() => {
     function onDown(e: MouseEvent) {
       if (!open) return;
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -415,7 +438,6 @@ function ProjectMultiSelect({
 
   function toggle(id: string) {
     if (selectedSet.has(id)) {
-      // Zákaz odebrat poslední — musí být aspoň jeden
       if (selectedIds.length <= 1) return;
       onChange(selectedIds.filter((x) => x !== id));
     } else {
@@ -430,8 +452,9 @@ function ProjectMultiSelect({
       : `${selectedOptions.length} projektů vybráno`;
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+    <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={disabled}
@@ -447,15 +470,21 @@ function ProjectMultiSelect({
         <ChevronDown size={14} style={{ opacity: 0.6, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} aria-hidden="true" />
       </button>
 
-      {open && (
+      {open && pos && typeof document !== "undefined" && createPortal(
         <div
+          ref={popoverRef}
           role="listbox"
           aria-multiselectable="true"
           className="tv-card"
           style={{
-            position: "absolute", top: "calc(100% + 4px)", left: 0,
-            minWidth: 260, maxHeight: 360, overflowY: "auto",
-            padding: 6, zIndex: 100,
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            width: pos.width,
+            maxHeight: 360,
+            overflowY: "auto",
+            padding: 6,
+            zIndex: 10000,
           }}
         >
           {options.length === 0 && (
@@ -498,9 +527,10 @@ function ProjectMultiSelect({
               </label>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
 
