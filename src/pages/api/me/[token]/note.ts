@@ -6,7 +6,10 @@ export const prerender = false;
 
 const Body = z.object({
   projectId: z.string().min(1),
-  text: z.string().min(1).max(8000),
+  // Petr 2026-05-20: `.min(1)` bez trim povolovalo poslat samé mezery.
+  // V `data.guestNote: body.text.trim()` se to pak stalo "" → empty shell
+  // Recording v DB. Trim PŘED min(1) zaručí že text má aspoň 1 viditelný znak.
+  text: z.string().trim().min(1, "Text nesmí být prázdný.").max(8000),
 });
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;

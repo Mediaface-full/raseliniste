@@ -447,13 +447,26 @@ function RecordingCard({
   const hasCustomExtract = typeof a?.customExtract === "string" && a.customExtract.trim().length > 0;
   const customTitle: string | null = typeof a?.customTitle === "string" && a.customTitle.trim().length > 0 ? a.customTitle.trim() : null;
   const mainText: string = hasCustomExtract ? a.customExtract.trim() : (typeof a?.summary === "string" ? a.summary : "");
-  // Pokud má custom prompt vlastní title, prefer ho jako snippet — jasnější
-  // než prvních 140 znaků markdownu (typicky "## Title\n\n...").
+  const noteText = recording.guestNote?.trim() ?? "";
+  // Petr 2026-05-20: snippet fallback chain: customTitle → mainText → transcript → guestNote
+  // (host mohl poslat jen text přes /api/me/[token]/note bez audia)
   const summarySnippet = customTitle
     ? customTitle
     : (mainText
         ? mainText.slice(0, 140) + (mainText.length > 140 ? "…" : "")
-        : (recording.transcript ?? "").trim().slice(0, 140));
+        : ((recording.transcript ?? "").trim().slice(0, 140)
+            || noteText.slice(0, 140)));
+
+  // Petr 2026-05-20: prázdný shell — žádný audio, žádný transcript, žádný text.
+  // Vznikl bug v note.ts validaci (text trim po min(1)) — opravený, ale starší
+  // records v DB pořád existují. UI ukáže delete placeholder místo neviditelného nic.
+  const isEmptyShell =
+    recording.status === "processed" &&
+    !recording.audioPath &&
+    !(recording.transcript ?? "").trim() &&
+    !noteText &&
+    !hasCustomExtract &&
+    !(typeof a?.summary === "string" && a.summary.trim());
 
   return (
     <div
@@ -531,6 +544,13 @@ function RecordingCard({
               <ChevronRight className="size-4 mt-0.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-transform" />
               <span className="line-clamp-2 leading-relaxed italic">{summarySnippet}</span>
             </button>
+          )}
+
+          {/* Prázdný shell — vznikl bugem ve validaci /api/me/[token]/note (opraveno) */}
+          {isEmptyShell && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground italic">
+              <span>Prázdný záznam (žádné audio ani text). Můžeš smazat →</span>
+            </div>
           )}
           {recording.status === "processed" && expanded && (
             <button
