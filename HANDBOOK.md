@@ -287,6 +287,22 @@ raseliniste/
 
 ## Moduly — aktuální stav
 
+### ✅ Project Timeline View (hotovo, 2026-05-19/20 — F1-F5)
+- URL: `/projekt` (výběr) a `/projekt/[id]/timeline`
+- Public read-only: `/share/[token]` (žádný auth, expiry 1–365 dní)
+- Klientský projekt jako horizontální časová osa (Apple Liquid Glass)
+- Drag canvas (pointer events), today line, filter chipy (sub-projekty + tým)
+- Theme local light/dark (NEZASAHUJE do globálního dark-only)
+- PDF export přes `window.print()` + @media print CSS (A3 landscape)
+- Share modal s expiry date picker + clipboard copy
+- Drag úkolu na jiný den → Todoist API push
+- Multi-select dropdown projektů (checkboxy) přes React Portal
+- **Folder-aware**: pseudo-option „📁 Bohemian Moldavite" agreguje úkoly všech projektů ve složce (Team Workspace folders místo sub-projektů)
+- **Deadline fallback**: úkoly s Todoist `deadline` (ne `due`) jsou viditelné — sync čte oba
+- Soubory: `src/components/timeline/*`, `src/lib/timeline/*`, `src/pages/projekt/*`, `src/pages/api/timeline/*`, `src/styles/timeline.css`
+- Schema: + `SharedTimeline` (F4 migrace), + `TodoistProjectMirror.folderId/folderName`
+- Detail v memory `session_2026_05_20_timeline_view.md`
+
 ### ✅ Auth (hotovo)
 Heslo + passkey (WebAuthn). Viz [Auth](#auth).
 
