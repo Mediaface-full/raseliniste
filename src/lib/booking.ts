@@ -55,16 +55,25 @@ export async function createInvite(input: CreateInviteInput): Promise<{
       select: { displayName: true, firstName: true, lastName: true, emails: true, phones: true },
     });
     if (!c) throw new Error("Kontakt nenalezen.");
-    // Petr 2026-05-19: bug — předtím `c.firstName ?? c.displayName` brala jen
-    // křestní jméno (kalendář pak ukázal "🤝 Jan" místo "🤝 Jan Novák").
-    // Priorita: displayName (typicky "Jméno Příjmení") → firstName+lastName join
-    // → firstName fallback. To dá v kalendáři čitelný plný název.
     const fullFromParts = [c.firstName, c.lastName].filter(Boolean).join(" ").trim();
     contactSnapshot = {
       name: c.displayName?.trim() || fullFromParts || c.firstName || undefined,
       email: c.emails[0]?.email,
       phone: c.phones[0]?.number,
     };
+
+    // Petr 2026-05-20: kontakt bez emailu = nemůžeme poslat booking
+    // confirmation mail. Petr měl případ Martin Dlouhý: rezervace
+    // proběhla, Google Calendar event vytvořen, ale mail tichu vynechán.
+    // Lepší padnout tady s jasnou hláškou než tichu skipnout odeslání.
+    if (!contactSnapshot.email) {
+      throw new Error(
+        `Kontakt "${contactSnapshot.name ?? "(bez jména)"}" nemá zadaný email. ` +
+        `Doplň email v Kontaktech → /contacts/tabulka, jinak host nedostane ` +
+        `potvrzovací mail. (Pro pozvánku bez emailu použij univerzální invite — ` +
+        `contactId=null, host zadá email při rezervaci.)`,
+      );
+    }
   }
 
   const invite = await prisma.bookingInvite.create({
@@ -285,6 +294,15 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
   });
 
   // Potvrzovací mail příjemci. Neutrální tón, bez tykání/vykání a bez "děkuji" floskulí.
+  // Petr 2026-05-20: pokud invite NEMÁ email (legacy invite vytvořená před
+  // validation fixem), zaloguj proč mail neodejde — ať nezmizí tichu.
+  if (!invite.inviteeEmail) {
+    console.warn(
+      `[booking.reserve] invite ${invite.id} (${invite.inviteeName ?? "?"}) nemá email — ` +
+      `potvrzovací mail PŘESKOČEN. Příčina: kontakt v DB nemá emails[0], nebo univerzální ` +
+      `invite kde host email nezadal. Google Calendar event vytvořen, klient bez emailu.`,
+    );
+  }
   if (invite.inviteeEmail) {
     const dateStr = startsAt.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
     const timeStr = `${fmtTime(startsAt)}–${fmtTime(endsAt)}`;
