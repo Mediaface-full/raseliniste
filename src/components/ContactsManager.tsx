@@ -57,6 +57,30 @@ export default function ContactsManager() {
     // eslint-disable-next-line
   }, [q, vipOnly]);
 
+  // Petr 2026-05-24: tichý iCloud pull při otevření /contacts, aby se mobilní
+  // úpravy propsaly i sem (ne jen v /contacts/tabulka kde je manuální tlačítko).
+  // Endpoint má 30s rate-limit, takže opakované otevření stránky nevolá Apple.
+  // Po úspěšném pullu se reloaduje seznam — žádný spinner, žádný error popup,
+  // aby UX zůstala klidná. Cron `sync-contacts-icloud` (30 min) je hlavní cesta,
+  // tohle je doplněk pro „právě jsem upravil mobil, koukám hned".
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/contacts/icloud/sync", { method: "POST" });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (!cancelled && data?.ok) await load();
+        }
+      } catch {
+        /* network error — ticho, DB data stačí */
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line
+  }, []);
+
   async function toggleVip(c: Contact) {
     const res = await fetch(`/api/contacts/${c.id}`, {
       method: "PATCH",

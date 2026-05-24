@@ -55,6 +55,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pull Google Contacts (People API)",
   },
   {
+    name: "sync-contacts-icloud",
+    endpoint: "/api/cron/sync-contacts-icloud",
+    schedule: { type: "every", minutes: 30 },
+    description: "Pull iCloud Contacts (CardDAV) + auto-merge duplicit",
+  },
+  {
     name: "nightly-briefing",
     endpoint: "/api/cron/nightly-briefing",
     schedule: { type: "daily", hour: 22, minute: 0 },
