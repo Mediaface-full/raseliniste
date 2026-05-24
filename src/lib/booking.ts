@@ -306,6 +306,7 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
         <p>Petr Peřina</p>
       `,
       text: `Termín ${dateStr} ${timeStr} je potvrzen.\n${result.meetLink ? `\nMeet: ${result.meetLink}\n` : ""}\nPetr Peřina`,
+      context: "booking-confirm",
     });
   }
 
@@ -341,6 +342,7 @@ export async function cancelInvite(inviteId: string): Promise<void> {
         <p>Petr Peřina</p>
       `,
       text: `Termín byl zrušen.\nPro nový termín odepište na tento e-mail.\n\nPetr Peřina`,
+      context: "booking-cancel",
     });
   }
 }

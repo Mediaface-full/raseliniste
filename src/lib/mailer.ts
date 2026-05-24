@@ -18,6 +18,8 @@ export type MailInput = {
   subject: string;
   html: string;
   text?: string;
+  /** Volitelný štítek pro MailLog — např. "booking-confirm", "share-link", "backup-fail". */
+  context?: string;
 };
 
 export type MailResult =
@@ -140,11 +142,15 @@ async function sendViaResend(input: MailInput, apiKey: string, from: string): Pr
 }
 
 export async function sendMail(input: MailInput): Promise<MailResult> {
+  let result: MailResult;
+
   // 1) SMTP z DB
   try {
     const smtp = await getSmtpConfig();
     if (smtp) {
-      return await sendViaSmtp(input, smtp.config, smtp.password);
+      result = await sendViaSmtp(input, smtp.config, smtp.password);
+      await logMail(input, result);
+      return result;
     }
   } catch (err) {
     console.error("[mailer] SMTP config lookup failed:", err);
@@ -154,14 +160,40 @@ export async function sendMail(input: MailInput): Promise<MailResult> {
   const apiKey = env.RESEND_API_KEY;
   const from = env.NOTIFICATION_FROM;
   if (apiKey && from) {
-    return await sendViaResend(input, apiKey, from);
+    result = await sendViaResend(input, apiKey, from);
+    await logMail(input, result);
+    return result;
   }
 
   // 3) Log-only fallback
   console.log(
     `[mailer] Žádný transport nenakonfigurován. Mail by šel na ${input.to}:\n  subject: ${input.subject}\n  (html ${input.html.length} chars)`
   );
-  return { ok: true, provider: "log" };
+  result = { ok: true, provider: "log" };
+  await logMail(input, result);
+  return result;
+}
+
+/**
+ * Persist do MailLog tabulky (Petr 2026-05-20).
+ * Best-effort — pokud DB selže, mail-result se vrací beze změny.
+ */
+async function logMail(input: MailInput, result: MailResult): Promise<void> {
+  try {
+    await prisma.mailLog.create({
+      data: {
+        to: input.to,
+        subject: input.subject,
+        provider: result.ok ? result.provider : "unknown",
+        ok: result.ok,
+        providerId: result.ok ? result.id ?? null : null,
+        error: result.ok ? null : result.error,
+        context: input.context ?? null,
+      },
+    });
+  } catch (e) {
+    console.warn("[mailer] MailLog persist failed:", e instanceof Error ? e.message : String(e));
+  }
 }
 
 /**

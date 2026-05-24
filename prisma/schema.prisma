@@ -1907,6 +1907,27 @@ model SharedTimeline {
   @@index([expiresAt])
 }
 
+// =============================================================================
+// MailLog — historie všech odeslaných mailů z aplikace (Petr 2026-05-20)
+// Pro retrospektivní ověření zda email odešel (booking confirmace, sdílení,
+// notifikace). Bez tohoto byly maily black box — Resend dashboard mimo Rašeliniště.
+// =============================================================================
+model MailLog {
+  id          String   @id @default(cuid())
+  to          String                                    // recipient email
+  subject     String
+  provider    String                                    // "smtp" | "resend" | "log"
+  ok          Boolean
+  providerId  String?                                   // Resend message ID nebo SMTP messageId
+  error       String?  @db.Text
+  context     String?                                   // "booking-confirm" / "share-link" / ...
+  createdAt   DateTime @default(now())
+
+  @@index([to])
+  @@index([createdAt(sort: Desc)])
+  @@index([context, createdAt(sort: Desc)])
+}
+
 // Historie backupů — záznam po každém /api/cron/backup runu. Admin UI
 // /settings/backup-log čte tuto tabulku. Vzor hlidactk (denní záloha
 // modul). Petr 2026-05-17.
