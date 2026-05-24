@@ -141,9 +141,13 @@ export default function InviteCreator() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(override ? { email: override } : {}),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) {
-      alert(`Odeslání selhalo: ${data.error ?? "neznámá chyba"}`);
+    const text = await res.text();
+    let data: any = null;
+    try { data = JSON.parse(text); } catch { /* ignore */ }
+    if (!res.ok || !data?.ok) {
+      const detail = data?.error ?? text?.slice(0, 300) ?? `HTTP ${res.status}`;
+      alert(`Odeslání selhalo (${res.status}):\n\n${detail}`);
+      console.error("[booking.resend] fail", res.status, data ?? text);
       return;
     }
     alert(`✓ Mail odeslán na ${data.sentTo} (${data.provider}${data.providerId ? ` · ${data.providerId}` : ""})`);
