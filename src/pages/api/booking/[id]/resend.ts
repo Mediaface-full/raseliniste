@@ -43,7 +43,6 @@ export const POST: APIRoute = async ({ request, params, cookies }) => {
   const invite = await prisma.bookingInvite.findUnique({
     where: { id },
     include: {
-      reservedSlot: true,
       contact: { select: { displayName: true, firstName: true, lastName: true, emails: true } },
     },
   });
@@ -54,8 +53,10 @@ export const POST: APIRoute = async ({ request, params, cookies }) => {
       { status: 400 },
     );
   }
-  if (!invite.reservedSlot) {
-    return Response.json({ error: "Pozvánka nemá rezervovaný slot." }, { status: 400 });
+  // reservedSlot je JSON sloupec (ne relation) — { startsAt, endsAt, type }
+  const slotJson = invite.reservedSlot as { startsAt?: string; endsAt?: string; type?: string } | null;
+  if (!slotJson?.startsAt || !slotJson?.endsAt) {
+    return Response.json({ error: "Pozvánka nemá platný rezervovaný slot." }, { status: 400 });
   }
 
   // Priorita pro email:
@@ -86,18 +87,20 @@ export const POST: APIRoute = async ({ request, params, cookies }) => {
   }
 
   // Sestav mail (stejný formát jako v reserveSlot)
-  const slot = invite.reservedSlot;
-  const startsAt = slot.startsAt;
-  const endsAt = slot.endsAt;
+  const startsAt = new Date(slotJson.startsAt);
+  const endsAt = new Date(slotJson.endsAt);
+  if (isNaN(startsAt.getTime()) || isNaN(endsAt.getTime())) {
+    return Response.json({ error: "reservedSlot.startsAt/endsAt není platný datum." }, { status: 400 });
+  }
   const dateStr = startsAt.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Prague" });
   const timeStr = `${fmtTime(startsAt)}–${fmtTime(endsAt)}`;
 
   let locationLine = "";
-  if (slot.type === "MEETING_ONLINE") {
+  if (slotJson.type === "MEETING_ONLINE") {
     locationLine = `<p><em>Pokud máme Google Meet link, najdeš ho v kalendářové pozvánce z Google.</em></p>`;
-  } else if (slot.type === "MEETING_PRAGUE") {
+  } else if (slotJson.type === "MEETING_PRAGUE") {
     locationLine = `<p><strong>Místo:</strong> Praha — adresa pošta samostatně.</p>`;
-  } else if (slot.type === "MEETING_HOME") {
+  } else if (slotJson.type === "MEETING_HOME") {
     locationLine = `<p><strong>Místo:</strong> u Petra doma — adresa pošta samostatně.</p>`;
   }
 
