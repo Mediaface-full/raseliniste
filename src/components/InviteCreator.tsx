@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Send, Copy, Check, Loader2, AlertTriangle, User, Globe, Trash2, ExternalLink,
+  Send, Copy, Check, Loader2, AlertTriangle, User, Globe, Trash2, ExternalLink, Mail,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -118,6 +118,36 @@ export default function InviteCreator() {
     if (!confirm("Opravdu zrušit tuto pozvánku?")) return;
     const res = await fetch(`/api/booking/${inviteId}/cancel`, { method: "POST" });
     if (res.ok) void loadInvites();
+  }
+
+  // Petr 2026-05-21: znovu odeslat potvrzovací mail. Použít pokud kontakt
+  // neměl email v Contacts při create — Petr ho mezi tím doplnil, klikne
+  // "Poslat znovu" → backend sáhne pro aktuální Contact.emails[0] nebo
+  // si Petr v dialogu zadá email ručně.
+  async function resend(inviteId: string, existingEmail: string | null) {
+    let override: string | null = null;
+    if (!existingEmail) {
+      const input = prompt(
+        "Pozvánka nemá v DB email. Zadej email pro odeslání:",
+        "",
+      );
+      if (!input?.trim()) return;
+      override = input.trim();
+    } else {
+      if (!confirm(`Poslat potvrzovací mail znovu na ${existingEmail}?`)) return;
+    }
+    const res = await fetch(`/api/booking/${inviteId}/resend`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(override ? { email: override } : {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      alert(`Odeslání selhalo: ${data.error ?? "neznámá chyba"}`);
+      return;
+    }
+    alert(`✓ Mail odeslán na ${data.sentTo} (${data.provider}${data.providerId ? ` · ${data.providerId}` : ""})`);
+    void loadInvites();
   }
 
   // Search už dělá server přes ?q= — tady jen vezmeme prvních 20 z response.
@@ -298,8 +328,17 @@ export default function InviteCreator() {
                     <a href={url} target="_blank" rel="noreferrer" className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1">
                       <ExternalLink className="size-3" /> Otevřít
                     </a>
+                    {(inv.status === "CONFIRMED" || inv.status === "RESERVED") && (
+                      <button
+                        onClick={() => resend(inv.id, inv.inviteeEmail ?? null)}
+                        className="ml-auto text-xs text-[var(--tint-sky)] hover:underline flex items-center gap-1"
+                        title={inv.inviteeEmail ? `Poslat na ${inv.inviteeEmail}` : "Pozvánka nemá email — zadáš ho v dialogu"}
+                      >
+                        <Mail className="size-3" /> Poslat mail
+                      </button>
+                    )}
                     {inv.status !== "CANCELED" && inv.status !== "EXPIRED" && (
-                      <button onClick={() => cancel(inv.id)} className="ml-auto text-xs text-destructive hover:underline flex items-center gap-1">
+                      <button onClick={() => cancel(inv.id)} className={`${inv.status === "CONFIRMED" || inv.status === "RESERVED" ? "" : "ml-auto"} text-xs text-destructive hover:underline flex items-center gap-1`}>
                         <Trash2 className="size-3" /> Zrušit
                       </button>
                     )}
