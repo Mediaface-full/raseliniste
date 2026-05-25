@@ -13,6 +13,17 @@ import { decryptSecret } from "./crypto";
  * SMTP (Seznam/Gmail) má obvykle 100-500 mailů / den, bohatě stačí.
  */
 
+/**
+ * Příloha mailu. Content = utf-8 string (např. .ics, .txt) nebo base64 string
+ * pro binární data. Pro binární vždy nastav `encoding: "base64"`.
+ */
+export type MailAttachment = {
+  filename: string;
+  content: string;
+  contentType?: string;
+  encoding?: "utf-8" | "base64";
+};
+
 export type MailInput = {
   to: string;
   subject: string;
@@ -20,6 +31,8 @@ export type MailInput = {
   text?: string;
   /** Volitelný štítek pro MailLog — např. "booking-confirm", "share-link", "backup-fail". */
   context?: string;
+  /** Petr 2026-05-25: přílohy (např. .ics pro booking confirm). */
+  attachments?: MailAttachment[];
 };
 
 export type MailResult =
@@ -83,6 +96,12 @@ async function sendViaSmtp(input: MailInput, cfg: SmtpConfig, password: string):
       subject: input.subject,
       html: input.html,
       text: input.text,
+      attachments: input.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+        encoding: a.encoding === "base64" ? "base64" : undefined,
+      })),
     });
 
     // Update lastUsedAt
@@ -128,6 +147,14 @@ async function sendViaResend(input: MailInput, apiKey: string, from: string): Pr
         subject: input.subject,
         html: input.html,
         text: input.text,
+        // Resend chce attachment.content jako base64 string. Pro utf-8 vstupy
+        // (typicky .ics) převedeme.
+        attachments: input.attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.encoding === "base64"
+            ? a.content
+            : Buffer.from(a.content, "utf-8").toString("base64"),
+        })),
       }),
     });
     if (!res.ok) {

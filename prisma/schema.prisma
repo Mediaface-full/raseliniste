@@ -1120,6 +1120,11 @@ model BookingInvite {
   reservedSlot    Json?               // {startsAt, endsAt, type}
   confirmedAt     DateTime?
 
+  // Petr 2026-05-25: Meet link + Google event ID persistované, aby resend
+  // mohl poslat skutečný odkaz a /diagnose endpoint zobrazil celý řetězec.
+  meetLink        String?
+  googleEventId   String?
+
   events          CalendarEvent[]
 
   createdAt       DateTime            @default(now())

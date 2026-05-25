@@ -288,9 +288,16 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
     conferenceData: slot.type === "MEETING_ONLINE",
   });
 
+  // Petr 2026-05-25: persistuj meetLink + googleEventId, ať to má resend
+  // i diagnose endpoint bez query do Google API.
   const updated = await prisma.bookingInvite.update({
     where: { id: invite.id },
-    data: { status: "CONFIRMED", confirmedAt: new Date() },
+    data: {
+      status: "CONFIRMED",
+      confirmedAt: new Date(),
+      meetLink: result.meetLink,
+      googleEventId: result.eventId,
+    },
   });
 
   // Potvrzovací mail příjemci. Neutrální tón, bez tykání/vykání a bez "děkuji" floskulí.
@@ -304,27 +311,30 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
     );
   }
   if (invite.inviteeEmail) {
-    const dateStr = startsAt.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
-    const timeStr = `${fmtTime(startsAt)}–${fmtTime(endsAt)}`;
-    const meetSection = result.meetLink
-      ? `<p><strong>Google Meet:</strong> <a href="${result.meetLink}">${result.meetLink}</a></p>`
-      : slot.type === "MEETING_PRAGUE"
-        ? `<p><strong>Místo:</strong> Praha — adresa pošta samostatně.</p>`
-        : slot.type === "MEETING_HOME"
-          ? `<p><strong>Místo:</strong> u Petra doma — adresa pošta samostatně.</p>`
-          : "";
+    const mail = buildBookingConfirmMail({
+      startsAt,
+      endsAt,
+      slotType: slot.type,
+      meetLink: result.meetLink,
+      inviteeName: invite.inviteeName,
+      inviteeEmail: invite.inviteeEmail,
+      inviteeSubject: invite.inviteeSubject,
+    });
 
     await sendMail({
       to: invite.inviteeEmail,
-      subject: `Termín potvrzen — ${dateStr} ${timeStr}`,
-      html: `
-        <p>Termín <strong>${dateStr} ${timeStr}</strong> je potvrzen.</p>
-        ${meetSection}
-        <p>Pozvánka přijde samostatně z Google Kalendáře.</p>
-        <p>Petr Peřina</p>
-      `,
-      text: `Termín ${dateStr} ${timeStr} je potvrzen.\n${result.meetLink ? `\nMeet: ${result.meetLink}\n` : ""}\nPetr Peřina`,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
       context: "booking-confirm",
+      attachments: [
+        {
+          filename: "schuzka.ics",
+          content: mail.ics,
+          contentType: "text/calendar; charset=utf-8; method=REQUEST",
+          encoding: "utf-8",
+        },
+      ],
     });
   }
 
@@ -370,5 +380,125 @@ export async function cancelInvite(inviteId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function fmtTime(d: Date): string {
-  return d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Prague" });
+}
+
+/**
+ * Petr 2026-05-25: jednotná stavba booking confirm mailu — sdílí
+ * confirmReservation() a resend.ts endpoint. Vrací subject + html + text + .ics
+ * attachment, takže host má vždy:
+ *   - skutečný Meet link v těle (ne placeholder „viz Google invite")
+ *   - kalendářový .ics soubor co si může přidat do libovolného kalendáře
+ *     bez ohledu na to, jestli Google nativní invite (sendUpdates:all) dorazí
+ *
+ * Důvod: deliverability stížnosti květen 2026 (Jitka @lachevre.cz nedostala
+ * potvrzení ani Meet link). Když selže jeden kanál, druhý ho vyrovná.
+ */
+export function buildBookingConfirmMail(params: {
+  startsAt: Date;
+  endsAt: Date;
+  slotType: string;
+  meetLink: string | null;
+  inviteeName?: string | null;
+  inviteeEmail: string;
+  inviteeSubject?: string | null;
+}): {
+  subject: string;
+  html: string;
+  text: string;
+  ics: string;
+} {
+  const { startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject } = params;
+
+  const dateStr = startsAt.toLocaleDateString("cs-CZ", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Prague",
+  });
+  const timeStr = `${fmtTime(startsAt)}–${fmtTime(endsAt)}`;
+
+  const meetSection = meetLink
+    ? `<p><strong>Google Meet:</strong> <a href="${meetLink}">${meetLink}</a></p>`
+    : slotType === "MEETING_PRAGUE"
+      ? `<p><strong>Místo:</strong> Praha — adresa pošta samostatně.</p>`
+      : slotType === "MEETING_HOME"
+        ? `<p><strong>Místo:</strong> u Petra doma — adresa pošta samostatně.</p>`
+        : "";
+
+  const html = `
+    <p>Termín <strong>${dateStr} ${timeStr}</strong> je potvrzen.</p>
+    ${meetSection}
+    <p>V příloze najdeš kalendářový soubor (.ics) — můžeš si jím přidat termín do libovolného kalendáře.</p>
+    <p>Petr Peřina</p>
+  `;
+
+  const text = `Termín ${dateStr} ${timeStr} je potvrzen.\n${
+    meetLink ? `\nMeet: ${meetLink}\n` : ""
+  }\nV příloze je kalendářový .ics soubor.\n\nPetr Peřina`;
+
+  return {
+    subject: `Termín potvrzen — ${dateStr} ${timeStr}`,
+    html,
+    text,
+    ics: buildIcs({ startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject }),
+  };
+}
+
+/**
+ * Postaví minimální validní VEVENT pro Apple/Google/Outlook/Mozilla Thunderbird.
+ * Klíčové: UID stabilní (= booking invite id nebo deterministicky), DTSTART/DTEND
+ * v UTC s `Z` suffixem (žádné TZID), LOCATION = meetLink pokud online (Apple
+ * Mail tak ukáže Meet jako klikatelnou location).
+ */
+function buildIcs(params: {
+  startsAt: Date;
+  endsAt: Date;
+  slotType: string;
+  meetLink: string | null;
+  inviteeName?: string | null;
+  inviteeEmail: string;
+  inviteeSubject?: string | null;
+}): string {
+  const { startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject } = params;
+  const fmtIcs = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const uid = `booking-${startsAt.getTime()}-${inviteeEmail}@raseliniste.cz`;
+  const summary = inviteeName
+    ? `${slotType === "MEETING_ONLINE" ? "🎥" : "🤝"} Schůzka s Petrem Peřinou${inviteeSubject ? ` — ${inviteeSubject}` : ""}`
+    : `Schůzka s Petrem Peřinou${inviteeSubject ? ` — ${inviteeSubject}` : ""}`;
+  const location = slotType === "MEETING_ONLINE" && meetLink
+    ? meetLink
+    : slotType === "MEETING_PRAGUE"
+      ? "Praha (adresa pošta samostatně)"
+      : slotType === "MEETING_HOME"
+        ? "U Petra doma (adresa pošta samostatně)"
+        : "";
+  const description = meetLink
+    ? `Google Meet: ${meetLink}`
+    : "Potvrzeno přes booking Rašeliniště.";
+
+  // Escapování CR/LF a `;`,`,` per RFC 5545 — minimální, ale stačí pro běžné texty.
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Raseliniste//Booking//CS",
+    "CALSCALE:GREGORIAN",
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${fmtIcs(new Date())}`,
+    `DTSTART:${fmtIcs(startsAt)}`,
+    `DTEND:${fmtIcs(endsAt)}`,
+    `SUMMARY:${esc(summary)}`,
+    `DESCRIPTION:${esc(description)}`,
+    location ? `LOCATION:${esc(location)}` : "",
+    `ORGANIZER;CN=Petr Peřina:mailto:oko@raseliniste.cz`,
+    `ATTENDEE;CN=${esc(inviteeName ?? inviteeEmail)};RSVP=FALSE:mailto:${inviteeEmail}`,
+    "STATUS:CONFIRMED",
+    "SEQUENCE:0",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].filter(Boolean).join("\r\n");
 }
