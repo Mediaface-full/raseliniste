@@ -55,7 +55,7 @@ export async function evaluateSlot(input: EvaluateInput): Promise<EvaluationResu
   const queryFrom = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
   const queryTo = new Date(dayEnd.getTime() + 24 * 60 * 60 * 1000);
 
-  const sameWindow = await prisma.calendarEvent.findMany({
+  const calendarEvents = await prisma.calendarEvent.findMany({
     where: {
       deletedRemotely: false,
       AND: [{ endsAt: { gte: queryFrom } }, { startsAt: { lte: queryTo } }],
@@ -65,6 +65,46 @@ export async function evaluateSlot(input: EvaluateInput): Promise<EvaluationResu
       id: true, type: true, startsAt: true, endsAt: true, source: true, title: true,
     },
   });
+
+  // Petr 2026-05-25: aktivní bookingy taky blokují slot, i když Google sync
+  // ještě neproběhl (cron sync-calendars běží à 5 min, mezi confirmReservation
+  // a dalším tickem byl slot „volný" → druhá rezervace ho znovu nabídla).
+  //
+  // Loadnout RESERVED/CONFIRMED invites v okně a reprezentovat je jako virtuální
+  // CalendarEvent typu MEETING_*, ať padají do HARD_BUSY_OVERLAP stejně jako
+  // skutečné Google eventy.
+  const activeBookings = await prisma.bookingInvite.findMany({
+    where: {
+      status: { in: ["RESERVED", "CONFIRMED"] },
+    },
+    select: {
+      id: true,
+      status: true,
+      reservedSlot: true,
+      inviteeName: true,
+    },
+  });
+  const bookingPseudoEvents = activeBookings
+    .map((b) => {
+      const slot = b.reservedSlot as { startsAt?: string; endsAt?: string; type?: string } | null;
+      if (!slot?.startsAt || !slot?.endsAt) return null;
+      const startsAt = new Date(slot.startsAt);
+      const endsAt = new Date(slot.endsAt);
+      if (isNaN(startsAt.getTime()) || isNaN(endsAt.getTime())) return null;
+      if (endsAt < queryFrom || startsAt > queryTo) return null;
+      const t = (slot.type ?? "MEETING_ONLINE") as typeof calendarEvents[number]["type"];
+      return {
+        id: `booking:${b.id}`,
+        type: t,
+        startsAt,
+        endsAt,
+        source: "GOOGLE_PRIMARY" as typeof calendarEvents[number]["source"],
+        title: b.inviteeName ? `Booking — ${b.inviteeName}` : "Booking (rezervováno)",
+      };
+    })
+    .filter((e): e is NonNullable<typeof e> => e !== null);
+
+  const sameWindow = [...calendarEvents, ...bookingPseudoEvents];
 
   // Eventy v daný den (pro per-day count pravidla)
   const sameDay = sameWindow.filter((e) =>
