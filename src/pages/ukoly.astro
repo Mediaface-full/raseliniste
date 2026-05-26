@@ -58,7 +58,9 @@ function fmtDuration(sec: number | null) {
   heading="Úkoly"
   breadcrumb={[{ label: "Organizace" }, { label: "Úkoly" }]}
 >
-  <div class="max-w-3xl space-y-4">
+  <!-- Petr 2026-05-25: max-w-3xl → max-w-6xl. Sidebar lze sbalit šipkou
+       v levém panelu (Shell má desktop collapse přes data-sidebar-collapsed). -->
+  <div class="max-w-6xl space-y-4">
     {pendingBatches.length > 0 && (
       <section class="glass rounded-xl p-4 space-y-3" style="--c: var(--tint-peach);">
         <div class="flex items-center gap-2">

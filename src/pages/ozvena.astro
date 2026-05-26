@@ -26,8 +26,10 @@ if (!user) return Astro.redirect("/login");
       <span class="text-xs font-mono text-muted-foreground">{user.username}</span>
     </div>
 
+    <!-- Petr 2026-05-25: max-w-2xl → max-w-5xl, ať tabulky úkolů a review
+         mají dech a nemusí se text wrapovat na desktopu. -->
     <div class="flex-1 flex items-start sm:items-center justify-center p-4 sm:p-6">
-      <div class="w-full max-w-2xl">
+      <div class="w-full max-w-5xl">
         <DiktatRecorder client:load />
       </div>
     </div>

@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
+import { InlineTitle } from "./ui/InlineTitle";
 
 /**
  * Trvání úkolu — pevný set hodnot. Petr si v Triage zvolí dropdown,
@@ -416,14 +417,14 @@ function ProposalRow({
   const dueObj = proposal.dueAt ? new Date(proposal.dueAt) : null;
 
   return (
-    <div className={`${isSubtask ? "rounded-md p-2 bg-white/3" : "glass rounded-xl p-3"} ${!proposal._checked ? "opacity-50" : ""}`}>
+    <div className={`${isSubtask ? "rounded-md p-3 bg-white/[0.04]" : "glass rounded-xl p-4 border border-white/10"} ${!proposal._checked ? "opacity-50" : ""}`}>
       <div className="flex items-start gap-3">
         <button
           onClick={() => onChange({ _checked: !proposal._checked })}
-          className={`mt-0.5 size-5 rounded border shrink-0 ${
+          className={`mt-1 size-5 rounded border shrink-0 ${
             proposal._checked
               ? "bg-[var(--tint-peach)]/40 border-[var(--tint-peach)]"
-              : "border-white/30 hover:border-white/60"
+              : "border-white/40 hover:border-white/70"
           } grid place-items-center`}
         >
           {proposal._checked && <Check className="size-3" />}
@@ -432,12 +433,17 @@ function ProposalRow({
         <div className="flex-1 min-w-0">
           {!proposal._editing ? (
             <>
-              <div className="text-sm">{proposal.title}</div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs">
+              {/* Petr 2026-05-25: inline edit title — klik = edit, blur/Enter ukládá do
+                  local proposal state (commit do DB jde najednou tlačítkem dole). */}
+              <InlineTitle
+                value={proposal.title}
+                onSave={(next) => onChange({ title: next })}
+              />
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm">
                 {/* Dropdown Trvání — vždy viditelný, pevný set hodnot. Hodnota se
                     ukládá jako extra tag (t-*). Default t-? = nezvoleno. */}
                 <label className="flex items-center gap-1 cursor-pointer">
-                  <Hourglass className="size-3 text-[var(--tint-lavender)]" />
+                  <Hourglass className="size-3.5 text-[var(--tint-lavender)]" />
                   <select
                     value={getTTag(proposal.tags)}
                     onChange={(e) => {
@@ -445,7 +451,7 @@ function ProposalRow({
                       const stripped = stripTTag(proposal.tags);
                       onChange({ tags: [...stripped, newTTag] });
                     }}
-                    className="bg-black/30 border border-white/10 rounded px-1.5 py-0.5 text-xs cursor-pointer hover:border-white/30 focus:outline-none focus:border-[var(--tint-lavender)]/50 font-mono"
+                    className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm cursor-pointer hover:border-white/40 focus:outline-none focus:border-[var(--tint-lavender)]/70 font-mono"
                     title="Trvání úkolu — uloží se jako tag"
                   >
                     {T_TAGS.map((t) => (
@@ -454,35 +460,35 @@ function ProposalRow({
                   </select>
                 </label>
                 {dueObj && (
-                  <span className="flex items-center gap-1 font-mono text-muted-foreground">
-                    <Clock className="size-3" />
+                  <span className="flex items-center gap-1 font-mono text-foreground/80">
+                    <Clock className="size-3.5" />
                     {dueObj.toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" })}
                     {proposal.dueIsTime && ` ${dueObj.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}`}
                   </span>
                 )}
                 {proposal.assignedToContactId && (
                   <span className="flex items-center gap-1 text-[var(--tint-lavender)]">
-                    <UserCheck className="size-3" />
+                    <UserCheck className="size-3.5" />
                     {contacts.find((c) => c.id === proposal.assignedToContactId)?.displayName ?? proposal.assignedToContactName}
                   </span>
                 )}
                 {proposal.assignedToContactName && !proposal.assignedToContactId && (
                   <span className="flex items-center gap-1 text-[var(--tint-butter)]">
-                    <UserCheck className="size-3" /> {proposal.assignedToContactName} (nesedne na kontakt — vyber)
+                    <UserCheck className="size-3.5" /> {proposal.assignedToContactName} (nesedne na kontakt — vyber)
                   </span>
                 )}
                 {proposal.priority === "high" && <span className="text-[var(--tint-rose)] font-mono">! priorita</span>}
-                {proposal.priority === "low" && <span className="text-muted-foreground font-mono">↓ low</span>}
+                {proposal.priority === "low" && <span className="text-foreground/70 font-mono">↓ low</span>}
                 {/* Tagy bez t-* (ty má dropdown výše). */}
                 {stripTTag(proposal.tags).length > 0 && (
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Tag className="size-3" /> {stripTTag(proposal.tags).map((t) => `#${t}`).join(" ")}
+                  <span className="flex items-center gap-1 text-foreground/75">
+                    <Tag className="size-3.5" /> {stripTTag(proposal.tags).map((t) => `#${t}`).join(" ")}
                   </span>
                 )}
               </div>
-              {proposal.notes && <div className="text-xs text-muted-foreground mt-1">{proposal.notes}</div>}
+              {proposal.notes && <div className="text-sm text-foreground/80 mt-1.5">{proposal.notes}</div>}
               {proposal.rawSnippet && (
-                <div className="text-xs italic text-muted-foreground mt-1">„{proposal.rawSnippet}"</div>
+                <div className="text-sm italic text-muted-foreground mt-1">„{proposal.rawSnippet}"</div>
               )}
             </>
           ) : (

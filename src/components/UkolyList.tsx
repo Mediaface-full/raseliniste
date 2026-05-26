@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
+import { InlineTitle } from "./ui/InlineTitle";
 
 interface Contact {
   id: string;
@@ -401,13 +402,13 @@ function TaskRow({
   const isToday = dueDate && dueDate.toDateString() === new Date().toDateString();
 
   return (
-    <div className={`glass rounded-xl p-3 ${isDone ? "opacity-50" : ""}`}>
+    <div className={`glass rounded-xl p-4 border border-white/10 ${isDone ? "opacity-50" : ""}`}>
       <div className="flex items-start gap-3">
         <button
           onClick={onToggleDone}
           disabled={busy}
-          className={`mt-0.5 size-5 rounded border shrink-0 ${
-            isDone ? "bg-[var(--tint-sage)]/40 border-[var(--tint-sage)]" : "border-white/30 hover:border-white/60"
+          className={`mt-1 size-5 rounded border shrink-0 ${
+            isDone ? "bg-[var(--tint-sage)]/40 border-[var(--tint-sage)]" : "border-white/40 hover:border-white/70"
           } grid place-items-center`}
         >
           {isDone && <Check className="size-3" />}
@@ -415,30 +416,43 @@ function TaskRow({
         </button>
 
         <div className="flex-1 min-w-0">
-          <div className={`text-sm ${isDone ? "line-through" : ""}`}>{task.title}</div>
+          {/* Petr 2026-05-25: klik na název = inline edit, blur/Enter ukládá,
+              Escape ruší. Šetří otevírání plného Edit panelu pro 90 % případů. */}
+          <InlineTitle
+            value={task.title}
+            done={isDone}
+            onSave={(newTitle) => {
+              const trimmed = newTitle.trim();
+              if (trimmed && trimmed !== task.title) {
+                onUpdate({ title: trimmed });
+              }
+            }}
+          />
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs">
+          {/* Petr 2026-05-25: vyšší kontrast — text-xs→text-sm, foreground/80
+              místo muted-foreground na neutrálních metách. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm">
             {dueDate && (
-              <span className={`flex items-center gap-1 font-mono ${isOverdue ? "text-[var(--tint-rose)]" : isToday ? "text-[var(--tint-butter)]" : "text-muted-foreground"}`}>
-                <Clock className="size-3" />
+              <span className={`flex items-center gap-1 font-mono ${isOverdue ? "text-[var(--tint-rose)]" : isToday ? "text-[var(--tint-butter)]" : "text-foreground/80"}`}>
+                <Clock className="size-3.5" />
                 {dueDate.toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" })}
                 {task.dueIsTime && ` ${dueDate.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}`}
               </span>
             )}
             {task.assignedToContact && (
               <span className="flex items-center gap-1 text-[var(--tint-lavender)]">
-                <UserCheck className="size-3" /> {task.assignedToContact.displayName}
+                <UserCheck className="size-3.5" /> {task.assignedToContact.displayName}
               </span>
             )}
             {task.priority === "high" && (
               <span className="flex items-center gap-1 text-[var(--tint-rose)] font-mono">! priorita</span>
             )}
             {task.priority === "low" && (
-              <span className="text-muted-foreground font-mono">↓ low</span>
+              <span className="text-foreground/70 font-mono">↓ low</span>
             )}
             {task.tags.length > 0 && (
-              <span className="flex items-center gap-1 text-muted-foreground">
-                <Tag className="size-3" />
+              <span className="flex items-center gap-1 text-foreground/75">
+                <Tag className="size-3.5" />
                 {task.tags.map((t) => `#${t}`).join(" ")}
               </span>
             )}
@@ -452,7 +466,7 @@ function TaskRow({
               <span className="font-mono text-[var(--tint-rose)]">⭐ VIP firewall</span>
             )}
             {task.source !== "manual" && task.source !== "vip_call_log" && (
-              <span className="text-muted-foreground font-mono">[{task.source}]</span>
+              <span className="text-muted-foreground font-mono text-xs">[{task.source}]</span>
             )}
           </div>
 
@@ -584,3 +598,4 @@ function EditInline({
     </div>
   );
 }
+
