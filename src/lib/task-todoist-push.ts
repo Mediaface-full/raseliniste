@@ -433,7 +433,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: {
-      assignedToContact: { select: { displayName: true, firstName: true, isTeam: true, clientTag: true } },
+      assignedToContact: { select: { displayName: true, firstName: true, isTeam: true, clientTag: true, todoistUserId: true } },
       parent: { select: { id: true, todoistTaskId: true, todoistProjectId: true } },
     },
   });
@@ -532,6 +532,11 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
   );
 
   try {
+    // Petr 2026-05-25: pokud má kontakt todoistUserId, asignuj v Todoistu
+    // skutečně. Bez tohoto se úkol vytvoří v jeho sekci, ale je dál
+    // asignován Petrovi (žádná notifikace pro člena týmu).
+    const responsibleUid = task.assignedToContact?.todoistUserId ?? undefined;
+
     const created = await todoistCreateTask(token, {
       content: task.title.slice(0, 500),
       description: descLines.join("\n").slice(0, 16000) || undefined,
@@ -542,6 +547,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
       due_date,
       due_datetime,
       labels,
+      responsible_uid: responsibleUid,
     });
 
     await prisma.task.update({

@@ -13,6 +13,7 @@ interface Contact {
   note: string | null;
   isVip: boolean;
   isTeam: boolean;
+  todoistUserId: string | null;
   clientTag: string | null;
   aliases: string[];
   clientTagAliases: string[];
@@ -372,6 +373,7 @@ function ContactEditor({ contact, onClose }: EditorProps) {
   const [note, setNote] = useState(contact?.note ?? "");
   const [isVip, setIsVip] = useState(contact?.isVip ?? false);
   const [isTeam, setIsTeam] = useState(contact?.isTeam ?? false);
+  const [todoistUserId, setTodoistUserId] = useState(contact?.todoistUserId ?? "");
   const [clientTag, setClientTag] = useState(contact?.clientTag ?? "");
   // Aliases — input je čárkou oddělený řetězec, parsujeme při uložení.
   // Display chip list pod inputem ukazuje aktuálně uložené hodnoty.
@@ -407,6 +409,7 @@ function ContactEditor({ contact, onClose }: EditorProps) {
       note: note.trim() || null,
       isVip,
       isTeam,
+      todoistUserId: todoistUserId.trim() || null,
       // clientTag — povolíme jen lowercase + pomlčky bez diakritiky (server to taky validuje).
       clientTag: clientTag.trim() ? clientTag.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || null : null,
       // Parse comma-separated aliases — server pak trim+lowercase+dedup
@@ -534,6 +537,26 @@ function ContactEditor({ contact, onClose }: EditorProps) {
                 <strong>Tým</strong> — úkoly delegované této osobě → projekt „Práce" / sekce <em>{firstName || "(jméno)"}</em>
               </span>
             </label>
+            {isTeam && (
+              <div className="pl-6">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block mb-1">
+                  Todoist user ID (volitelně) — pro reálné přiřazení v Todoistu
+                </label>
+                <Input
+                  value={todoistUserId}
+                  onChange={(e) => setTodoistUserId(e.target.value)}
+                  placeholder="např. 12345678"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                  Bez tohoto: úkol skončí v sekci s jejím jménem, ale je asignovaný tobě. S vyplněným ID se asignuje
+                  reálně a dostane notifikaci. ID si zjistíš na{" "}
+                  <a href="/api/integrations/todoist/collaborators" target="_blank" className="underline text-[var(--tint-sky)]">
+                    /api/integrations/todoist/collaborators
+                  </a>
+                  {" "}— vrátí všechny členy Workspace.
+                </p>
+              </div>
+            )}
             <div>
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block mb-1">
                 Klient slug (volitelně) — např. <code>tk-stavby</code>

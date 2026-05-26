@@ -418,6 +418,12 @@ model Contact {
   // Routing: assignee s isTeam=true → projekt "Práce" / sekce <jméno>.
   isTeam              Boolean        @default(false)
 
+  // Petr 2026-05-25: Todoist Workspace user ID. Když přiřadí úkol členovi
+  // týmu a tohle je vyplněné, task-todoist-push.ts pošle responsible_uid
+  // → Gáťa/Lucie/Matěj dostanou reálnou notifikaci v Todoistu.
+  // Bez tohoto se úkol jen vytvoří v jejich sekci, ale je asignován Petrovi.
+  todoistUserId       String?
+
   // Slug klienta — kontakt patří k tomuto klientovi (např. tk-stavby).
   // Jeden kontakt = jeden klient (kontaktní osoba). Routing #2: assignee
   // s clientTag → projekt "Práce" / sekce odpovídající slugu.

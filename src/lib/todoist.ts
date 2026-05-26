@@ -61,6 +61,9 @@ export interface CreateTaskInput {
   due_date?: string;     // "YYYY-MM-DD" — all-day datum
   due_datetime?: string; // RFC3339 / ISO 8601 — datum + čas. Přesné, timezone-aware.
   labels?: string[];
+  // Petr 2026-05-25: assignment v shared Workspace projektech. Todoist user ID
+  // (= Contact.todoistUserId). Asignovaný uživatel dostane notifikaci.
+  responsible_uid?: string;
 }
 
 /**
@@ -393,4 +396,40 @@ export async function testConnection(token: string): Promise<{ ok: true; project
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * Petr 2026-05-25: list všech collaborators co user vidí napříč Workspace
+ * projekty. Použito v /api/integrations/todoist/collaborators — Petr si tam
+ * najde Todoist user ID Gáti/Lucie/Matěje a vyplní v Contact.todoistUserId,
+ * aby push posílal responsible_uid.
+ *
+ * Strategie: list všech projektů, pro každý dotaz GET /projects/{id}/collaborators,
+ * deduplikace přes id. Workspace endpoint /workspaces není v REST API v1 spolehlivý.
+ */
+export interface TodoistCollaborator {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export async function listAllCollaborators(token: string): Promise<TodoistCollaborator[]> {
+  const projects = await listProjects(token);
+  const map = new Map<string, TodoistCollaborator>();
+  // Limit na paralel requesty — Todoist API má rate limit, takže sériově.
+  for (const p of projects) {
+    try {
+      const collabs = await call<unknown>(token, `/projects/${encodeURIComponent(p.id)}/collaborators`);
+      // Response může být array nebo paginated { results, next_cursor }.
+      const arr: TodoistCollaborator[] = Array.isArray(collabs)
+        ? (collabs as TodoistCollaborator[])
+        : ((collabs as { results?: TodoistCollaborator[] }).results ?? []);
+      for (const c of arr) {
+        if (c.id && !map.has(c.id)) map.set(c.id, { id: c.id, name: c.name, email: c.email });
+      }
+    } catch {
+      // Personal projekt collaborators API selže — preskočit, pokračovat.
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "cs"));
 }

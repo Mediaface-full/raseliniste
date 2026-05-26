@@ -16,6 +16,9 @@ const PatchBody = z.object({
   note: z.string().max(2000).nullable().optional(),
   isVip: z.boolean().optional(),
   isTeam: z.boolean().optional(),
+  // Petr 2026-05-25: Todoist Workspace user ID (string, většinou číselné).
+  // Vyplnit u členů týmu, ať push posílá responsible_uid.
+  todoistUserId: z.string().max(40).nullable().optional(),
   // Slug klienta — povolen jen lowercase, číslice, pomlčka. Server-side
   // poslední bezpečnost před AI-generated slugy.
   clientTag: z.string().max(60).regex(/^[a-z0-9-]*$/, "Slug může obsahovat jen malá písmena, číslice a pomlčky").nullable().optional(),
@@ -93,6 +96,7 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
       ...(body.note !== undefined ? { note: body.note } : {}),
       ...(body.isVip !== undefined ? { isVip: body.isVip } : {}),
       ...(body.isTeam !== undefined ? { isTeam: body.isTeam } : {}),
+      ...(body.todoistUserId !== undefined ? { todoistUserId: body.todoistUserId?.trim() || null } : {}),
       ...(body.clientTag !== undefined ? { clientTag: body.clientTag || null } : {}),
       // Aliases — trim + lowercase + dedup
       ...(body.aliases !== undefined ? {
