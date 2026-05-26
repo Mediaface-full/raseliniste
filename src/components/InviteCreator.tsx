@@ -42,6 +42,9 @@ export default function InviteCreator() {
   // Petr 2026-05-25: per-invite "sloty dostupné od" — YYYY-MM-DD string.
   // Prázdné = jen globální lead time (72h klient / 24h přítel).
   const [availableFrom, setAvailableFrom] = useState("");
+  // Petr 2026-05-25: veřejná poznámka pro hosta. Zobrazí se v pickeru,
+  // v Google eventu (description) a v .ics mailové příloze.
+  const [publicNote, setPublicNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
@@ -98,6 +101,7 @@ export default function InviteCreator() {
           validityDays: parseInt(validity),
           internalNote: internalNote.trim() || undefined,
           availableFrom: availableFrom.trim() || undefined,
+          publicNote: publicNote.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -288,6 +292,22 @@ export default function InviteCreator() {
           <p className="text-xs text-muted-foreground mt-1">
             Host nedostane sloty před tímto datem. Prázdné = jen globální lead time
             ({mode === "CLIENT" ? "72 h klient" : "24 h přítel"}).
+          </p>
+        </div>
+
+        <div>
+          <label className="text-xs font-mono uppercase text-muted-foreground">
+            Poznámka pro hosta (volitelně)
+          </label>
+          <textarea
+            value={publicNote}
+            onChange={(e) => setPublicNote(e.target.value)}
+            placeholder='Třeba: „Přines prosím podklady, které jsme řešili minule." nebo „Mám připravenou ukázku."'
+            rows={3}
+            className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm leading-relaxed resize-y min-h-[72px]"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Uvidí ji host v rezervační stránce, v Google kalendářovém eventu a v .ics příloze mailu.
           </p>
         </div>
 

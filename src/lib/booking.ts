@@ -43,6 +43,11 @@ export interface CreateInviteInput {
    * se MAX(now + leadTime, availableFrom).
    */
   availableFrom?: Date | null;
+  /**
+   * Petr 2026-05-25: veřejná poznámka — host ji uvidí v rezervačním pickeru,
+   * v Google kalendářovém eventu (description) a v .ics popisu události.
+   */
+  publicNote?: string;
 }
 
 export async function createInvite(input: CreateInviteInput): Promise<{
@@ -91,6 +96,7 @@ export async function createInvite(input: CreateInviteInput): Promise<{
       slotDurationMin: input.slotDurationMin ?? 60,
       validUntil,
       internalNote: input.internalNote,
+      publicNote: input.publicNote?.trim() || null,
       status: "PENDING",
       // Snapshot vyplníme jen u univerzálního invite když ho použije cold lead
       // (vyplní se v reserveSlot). U personalizovaného známe od začátku.
@@ -279,10 +285,12 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
     : `🤝 Schůzka${invite.inviteeSubject ? ` — ${invite.inviteeSubject}` : ""}`;
 
   const description = [
+    invite.publicNote ? invite.publicNote : "",
+    invite.publicNote ? "" : "", // prázdný řádek za public note pokud byla
     invite.inviteeSubject ? `**Téma:** ${invite.inviteeSubject}` : "",
     invite.inviteeEmail ? `**E-mail:** ${invite.inviteeEmail}` : "",
     invite.inviteePhone ? `**Telefon:** ${invite.inviteePhone}` : "",
-    invite.internalNote ? `**Poznámka:** ${invite.internalNote}` : "",
+    invite.internalNote ? `**Poznámka (jen pro Petra):** ${invite.internalNote}` : "",
     "",
     `_Vytvořeno z bookingu Rašeliniště._`,
   ].filter(Boolean).join("\n");
@@ -327,6 +335,7 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
       inviteeName: invite.inviteeName,
       inviteeEmail: invite.inviteeEmail,
       inviteeSubject: invite.inviteeSubject,
+      publicNote: invite.publicNote,
     });
 
     await sendMail({
@@ -410,13 +419,14 @@ export function buildBookingConfirmMail(params: {
   inviteeName?: string | null;
   inviteeEmail: string;
   inviteeSubject?: string | null;
+  publicNote?: string | null;
 }): {
   subject: string;
   html: string;
   text: string;
   ics: string;
 } {
-  const { startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject } = params;
+  const { startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject, publicNote } = params;
 
   const dateStr = startsAt.toLocaleDateString("cs-CZ", {
     weekday: "long",
@@ -434,23 +444,39 @@ export function buildBookingConfirmMail(params: {
         ? `<p><strong>Místo:</strong> u Petra doma — adresa pošta samostatně.</p>`
         : "";
 
+  // Petr 2026-05-25: pokud je publicNote, ukáže se v mailu pod místem.
+  const publicNoteHtml = publicNote
+    ? `<div style="padding:12px;border-left:3px solid #b8763c;background:rgba(184,118,60,0.08);margin:12px 0;border-radius:4px;"><p style="margin:0;white-space:pre-wrap;">${escapeHtml(publicNote)}</p></div>`
+    : "";
+  const publicNoteText = publicNote ? `\n\n${publicNote}\n` : "";
+
   const html = `
     <p>Termín <strong>${dateStr} ${timeStr}</strong> je potvrzen.</p>
     ${meetSection}
-    <p>V příloze najdeš kalendářový soubor (.ics) — můžeš si jím přidat termín do libovolného kalendáře.</p>
+    ${publicNoteHtml}
+    <p>V příloze najdete kalendářový soubor (.ics) — můžete si jím přidat termín do libovolného kalendáře.</p>
     <p>Petr Peřina</p>
   `;
 
   const text = `Termín ${dateStr} ${timeStr} je potvrzen.\n${
     meetLink ? `\nMeet: ${meetLink}\n` : ""
-  }\nV příloze je kalendářový .ics soubor.\n\nPetr Peřina`;
+  }${publicNoteText}\nV příloze je kalendářový .ics soubor.\n\nPetr Peřina`;
 
   return {
     subject: `Termín potvrzen — ${dateStr} ${timeStr}`,
     html,
     text,
-    ics: buildIcs({ startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject }),
+    ics: buildIcs({ startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject, publicNote }),
   };
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -467,8 +493,9 @@ function buildIcs(params: {
   inviteeName?: string | null;
   inviteeEmail: string;
   inviteeSubject?: string | null;
+  publicNote?: string | null;
 }): string {
-  const { startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject } = params;
+  const { startsAt, endsAt, slotType, meetLink, inviteeName, inviteeEmail, inviteeSubject, publicNote } = params;
   const fmtIcs = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   const uid = `booking-${startsAt.getTime()}-${inviteeEmail}@raseliniste.cz`;
   const summary = inviteeName
@@ -481,9 +508,12 @@ function buildIcs(params: {
       : slotType === "MEETING_HOME"
         ? "U Petra doma (adresa pošta samostatně)"
         : "";
-  const description = meetLink
-    ? `Google Meet: ${meetLink}`
-    : "Potvrzeno přes booking Rašeliniště.";
+  // Petr 2026-05-25: publicNote do popisu eventu — host ji uvidí v kalendáři
+  const descParts: string[] = [];
+  if (publicNote) descParts.push(publicNote);
+  if (meetLink) descParts.push(`Google Meet: ${meetLink}`);
+  if (descParts.length === 0) descParts.push("Potvrzeno přes booking Rašeliniště.");
+  const description = descParts.join("\n\n");
 
   // Escapování CR/LF a `;`,`,` per RFC 5545 — minimální, ale stačí pro běžné texty.
   const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");

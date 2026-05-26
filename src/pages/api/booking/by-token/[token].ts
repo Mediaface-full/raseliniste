@@ -36,6 +36,8 @@ export const GET: APIRoute = async ({ params }) => {
       inviteeName: result.invite.inviteeName,
       inviteeEmail: result.invite.inviteeEmail,
       requiresIdentification: !result.invite.contactId && !result.invite.inviteeEmail,
+      // Petr 2026-05-25: veřejná poznámka pro klienta
+      publicNote: result.invite.publicNote,
     },
     slots: result.slots.map((s) => ({
       startsAt: s.startsAt.toISOString(),

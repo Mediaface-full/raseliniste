@@ -1111,6 +1111,9 @@ model BookingInvite {
   inviteeSubject  String?
 
   internalNote    String?
+  // Petr 2026-05-25: veřejná poznámka — host ji uvidí v pickeru, v Google
+  // eventu (description) a v .ics. Doplňuje internalNote (jen pro Petra).
+  publicNote      String?
 
   // Délka slotu v minutách — Petr volí při tvorbě (30/45/60/90/120)
   slotDurationMin Int                 @default(60)

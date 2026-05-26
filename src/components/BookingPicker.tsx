@@ -16,6 +16,7 @@ interface Invite {
   inviteeName: string | null;
   inviteeEmail: string | null;
   requiresIdentification: boolean;
+  publicNote?: string | null;
 }
 
 export default function BookingPicker({ token }: { token: string }) {
@@ -270,6 +271,14 @@ export default function BookingPicker({ token }: { token: string }) {
           Délka schůzky: {invite.slotDurationMin} min
         </p>
       </div>
+
+      {/* Petr 2026-05-25: veřejná poznámka pro hosta — uvidí ji nahoře nad sloty */}
+      {invite.publicNote && (
+        <div className="glass rounded-xl p-4 border-l-4" style={{ borderLeftColor: "var(--tint-butter)" }}>
+          <div className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-1">Poznámka</div>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{invite.publicNote}</p>
+        </div>
+      )}
 
       {showFilter && (
         <div className="flex gap-2 flex-wrap">

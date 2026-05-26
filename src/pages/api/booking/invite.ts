@@ -13,6 +13,7 @@ const schema = z.object({
   slotDurationMin: z.number().int().min(15).max(240).optional(),
   validityDays: z.number().int().min(1).max(90).optional(),
   internalNote: z.string().max(500).optional(),
+  publicNote: z.string().max(1000).optional(),
   // Petr 2026-05-25: per-invite earliest slot. Akceptujeme ISO date (YYYY-MM-DD)
   // nebo plný ISO datetime. Prázdný string nebo null = žádné omezení.
   availableFrom: z.string().min(1).optional().nullable(),
