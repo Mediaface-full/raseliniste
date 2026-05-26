@@ -284,15 +284,17 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
     ? `${slot.type === "MEETING_ONLINE" ? "🎥" : "🤝"} ${invite.inviteeName}${invite.inviteeSubject ? ` — ${invite.inviteeSubject}` : ""}`
     : `🤝 Schůzka${invite.inviteeSubject ? ` — ${invite.inviteeSubject}` : ""}`;
 
+  // Petr 2026-05-25: Google Calendar description nerenderuje markdown,
+  // **bold** a _italic_ se zobrazují doslova. Plain text + odrážky.
   const description = [
     invite.publicNote ? invite.publicNote : "",
     invite.publicNote ? "" : "", // prázdný řádek za public note pokud byla
-    invite.inviteeSubject ? `**Téma:** ${invite.inviteeSubject}` : "",
-    invite.inviteeEmail ? `**E-mail:** ${invite.inviteeEmail}` : "",
-    invite.inviteePhone ? `**Telefon:** ${invite.inviteePhone}` : "",
-    invite.internalNote ? `**Poznámka (jen pro Petra):** ${invite.internalNote}` : "",
+    invite.inviteeSubject ? `Téma: ${invite.inviteeSubject}` : "",
+    invite.inviteeEmail ? `E-mail: ${invite.inviteeEmail}` : "",
+    invite.inviteePhone ? `Telefon: ${invite.inviteePhone}` : "",
+    invite.internalNote ? `Poznámka (jen pro Petra): ${invite.internalNote}` : "",
     "",
-    `_Vytvořeno z bookingu Rašeliniště._`,
+    `— Vytvořeno z bookingu Rašeliniště`,
   ].filter(Boolean).join("\n");
 
   const result = await createGoogleEvent(ownerUserId, {
