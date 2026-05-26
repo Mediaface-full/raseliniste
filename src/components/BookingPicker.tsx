@@ -210,13 +210,13 @@ export default function BookingPicker({ token }: { token: string }) {
         <div className="text-sm text-foreground/80 leading-relaxed space-y-2">
           {email && (
             <p>
-              Pozvánka s kalendářovým souborem (.ics) ti za chvíli přijde mailem
+              Pozvánka s kalendářovým souborem (.ics) Vám za chvíli přijde mailem na
               {" "}<span className="font-mono text-foreground">{email}</span>.
             </p>
           )}
           <p className="text-muted-foreground text-xs">
-            Pokud do 5 minut nic nedorazí, mrkni do spamu. Kdyby přesto nic,
-            ozvi se na <a href="mailto:oko@raseliniste.cz" className="underline">oko@raseliniste.cz</a>.
+            Pokud do 5 minut nic nedorazí, mrkněte prosím do spamu. Kdyby přesto nic,
+            ozvěte se na <a href="mailto:oko@raseliniste.cz" className="underline">oko@raseliniste.cz</a>.
           </p>
         </div>
 
