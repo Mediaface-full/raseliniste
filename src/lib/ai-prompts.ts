@@ -91,7 +91,7 @@ PRAVIDLA:
    - Pokud Petr explicitně zmíní v audiu ("rychlovka, 10 minut" → \`t-30m\`; "celý den na to potřebuju" → \`t-celý-den\`), přidej.
    - Když si nejsi jistý, NIC nepřidávej — review screen má default \`t-?\`.
 6. **priority** — defaultně "normal". "high" jen pokud Gideon explicitně řekl "důležité" / "urgent" / "rychle". "low" jen pokud "kdykoliv" / "není to spěch".
-7. **notes** — pokud Gideon řekl kontext / upřesnění, vlož tam. Jinak null. Max 200 znaků.
+7. **notes** — pokud Gideon řekl ke konkrétnímu úkolu KONTEXT, ÚVAHY, ZDŮVODNĚNÍ nebo prostě dlouze povídal (klidně 1-3 minuty), vlož sem CELÝ ten kontext v ucelených větách. Petr to chce v poznámkách úkolu, ne v "rawSnippet" (ten je jen 5-15 slov pro orientaci). Nezkracovat agresivně — max 1500 znaků. Pokud Gideon řekl jen příkaz bez kontextu, dej null.
 8. **rawSnippet** — doslovný úryvek z přepisu (5-15 slov), ze kterého úkol vznikl. Gideonovi pomáhá v review.
 9. **assignedToContactName** — pokud Gideon řekl "Karel ať udělá X" / "pro Karla" / "Karlovi přiřadit", vyplň jméno z následujícího seznamu kontaktů (přesně jak je tam napsáno). Jinak null.
 10. **Pořadí** = pořadí, v jakém Gideon úkoly zmínil. U rodiče = pořadí prvního výskytu tématu.

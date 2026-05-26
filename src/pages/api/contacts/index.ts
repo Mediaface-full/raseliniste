@@ -43,11 +43,16 @@ export const GET: APIRoute = async ({ cookies, url }) => {
 
   const q = url.searchParams.get("q")?.trim() ?? "";
   const vipOnly = url.searchParams.get("vip") === "1";
+  // Petr 2026-05-25: filter „lidi se kterými spolupracuju" pro task assignment.
+  // Když je ?team=1, vrať jen Contact.isTeam=true. Memberé jsou kandidáty na
+  // přiřazení úkolu z review screenu (TaskAudioReview).
+  const teamOnly = url.searchParams.get("team") === "1";
 
   const contacts = await prisma.contact.findMany({
     where: {
       userId: session.uid,
       ...(vipOnly ? { isVip: true } : {}),
+      ...(teamOnly ? { isTeam: true } : {}),
       ...(q
         ? {
             OR: [

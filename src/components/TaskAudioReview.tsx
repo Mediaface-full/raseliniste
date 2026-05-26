@@ -93,7 +93,9 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
   }, [batch?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadContacts() {
-    const res = await fetch("/api/contacts");
+    // Petr 2026-05-25: jen členové týmu (Contact.isTeam=true) — Petr nechce
+    // v dropdownu přiřazení mít celý adresář, jen lidi se kterými spolupracuje.
+    const res = await fetch("/api/contacts?team=1");
     if (res.ok) {
       const data = await res.json();
       setContacts(data.contacts ?? data);
@@ -142,7 +144,7 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
 
   async function ensureContacts(): Promise<Contact[]> {
     if (contacts.length > 0) return contacts;
-    const res = await fetch("/api/contacts");
+    const res = await fetch("/api/contacts?team=1");
     if (res.ok) {
       const data = await res.json();
       const cs = data.contacts ?? data;
