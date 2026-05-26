@@ -1125,6 +1125,11 @@ model BookingInvite {
   meetLink        String?
   googleEventId   String?
 
+  // Petr 2026-05-25: per-invite earliest slot — host neuvidí sloty před
+  // tímhle datem. Null = jen globální lead time z SchedulingConfig.
+  // Použije se MAX(now + leadTime, availableFrom).
+  availableFrom   DateTime?
+
   events          CalendarEvent[]
 
   createdAt       DateTime            @default(now())

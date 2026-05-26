@@ -411,6 +411,11 @@ export interface AvailabilityOpts {
   bookingMode: "CLIENT" | "FRIEND";
   horizonDays?: number;
   slotDurationMinutes?: number;
+  /**
+   * Petr 2026-05-25: per-invite earliest start. Pokud nastaveno, použije se
+   * MAX(now + leadTime, earliestSlotStart) — přísnější z obou vyhrává.
+   */
+  earliestSlotStart?: Date;
 }
 
 export interface Slot {
@@ -430,7 +435,11 @@ export async function listAvailableSlots(opts: AvailabilityOpts): Promise<Slot[]
     opts.bookingMode === "CLIENT"
       ? cfg.minLeadTimeClientHours
       : cfg.minLeadTimeFriendHours;
-  const earliest = new Date(now.getTime() + minLead * 60 * 60 * 1000);
+  const leadEarliest = new Date(now.getTime() + minLead * 60 * 60 * 1000);
+  // Petr 2026-05-25: respektovat per-invite availableFrom — přísnější z obou platí.
+  const earliest = opts.earliestSlotStart && opts.earliestSlotStart > leadEarliest
+    ? opts.earliestSlotStart
+    : leadEarliest;
   const latest = new Date(now.getTime() + horizon * 24 * 60 * 60 * 1000);
 
   for (let day = new Date(earliest); day <= latest; day = addDays(day, 1)) {

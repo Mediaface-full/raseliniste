@@ -39,6 +39,9 @@ export default function InviteCreator() {
   const [duration, setDuration] = useState("60");
   const [validity, setValidity] = useState("14");
   const [internalNote, setInternalNote] = useState("");
+  // Petr 2026-05-25: per-invite "sloty dostupné od" — YYYY-MM-DD string.
+  // Prázdné = jen globální lead time (72h klient / 24h přítel).
+  const [availableFrom, setAvailableFrom] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
@@ -94,6 +97,7 @@ export default function InviteCreator() {
           slotDurationMin: parseInt(duration),
           validityDays: parseInt(validity),
           internalNote: internalNote.trim() || undefined,
+          availableFrom: availableFrom.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -269,6 +273,22 @@ export default function InviteCreator() {
               <option value="90">90 dní</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-mono uppercase text-muted-foreground">
+            Sloty dostupné od (volitelně)
+          </label>
+          <input
+            type="date"
+            value={availableFrom}
+            onChange={(e) => setAvailableFrom(e.target.value)}
+            className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Host nedostane sloty před tímto datem. Prázdné = jen globální lead time
+            ({mode === "CLIENT" ? "72 h klient" : "24 h přítel"}).
+          </p>
         </div>
 
         <div>

@@ -37,6 +37,12 @@ export interface CreateInviteInput {
   slotDurationMin?: number;          // default 60
   validityDays?: number;             // default 14
   internalNote?: string;
+  /**
+   * Petr 2026-05-25: nejdřívější datum kdy host uvidí sloty. Pokud je v minulosti
+   * nebo null, použije se jen globální lead time. Pokud v budoucnu, aplikuje
+   * se MAX(now + leadTime, availableFrom).
+   */
+  availableFrom?: Date | null;
 }
 
 export async function createInvite(input: CreateInviteInput): Promise<{
@@ -91,6 +97,7 @@ export async function createInvite(input: CreateInviteInput): Promise<{
       inviteeName: contactSnapshot.name,
       inviteeEmail: contactSnapshot.email,
       inviteePhone: contactSnapshot.phone,
+      availableFrom: input.availableFrom ?? null,
     },
     select: { id: true, token: true },
   });
@@ -123,6 +130,7 @@ export async function getSlotsForInvite(inviteId: string): Promise<{
     meetingTypes,
     bookingMode: invite.mode as BookingModeStr,
     slotDurationMinutes: invite.slotDurationMin,
+    earliestSlotStart: invite.availableFrom ?? undefined,
   });
 
   return { invite, slots };

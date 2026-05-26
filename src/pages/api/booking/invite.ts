@@ -13,6 +13,9 @@ const schema = z.object({
   slotDurationMin: z.number().int().min(15).max(240).optional(),
   validityDays: z.number().int().min(1).max(90).optional(),
   internalNote: z.string().max(500).optional(),
+  // Petr 2026-05-25: per-invite earliest slot. Akceptujeme ISO date (YYYY-MM-DD)
+  // nebo plný ISO datetime. Prázdný string nebo null = žádné omezení.
+  availableFrom: z.string().min(1).optional().nullable(),
 });
 
 /**
@@ -30,7 +33,22 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   try {
-    const result = await createInvite(parsed.data);
+    // availableFrom: YYYY-MM-DD nebo plný ISO. Parse → Date, nebo null pokud
+    // prázdné/v minulosti. Pokud Petr pošle jen datum, bere se 00:00 Europe/Prague.
+    let availableFrom: Date | null = null;
+    if (parsed.data.availableFrom && parsed.data.availableFrom.trim()) {
+      const raw = parsed.data.availableFrom.trim();
+      // YYYY-MM-DD → datetime 00:00 v Praha TZ (UTC+1/+2). Pro DST safety
+      // sestavíme jako lokální midnight a JS Date to bere jako server-local
+      // (v kontejneru je TZ=Europe/Prague — viz feedback_docker_timezone.md).
+      const d = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+        ? new Date(`${raw}T00:00:00`)
+        : new Date(raw);
+      if (!isNaN(d.getTime()) && d > new Date()) {
+        availableFrom = d;
+      }
+    }
+    const result = await createInvite({ ...parsed.data, availableFrom });
     return Response.json(result);
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
