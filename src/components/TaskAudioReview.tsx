@@ -431,86 +431,126 @@ function ProposalRow({
         </button>
 
         <div className="flex-1 min-w-0">
-          {!proposal._editing ? (
-            <>
-              {/* Petr 2026-05-25: inline edit title — klik = edit, blur/Enter ukládá do
-                  local proposal state (commit do DB jde najednou tlačítkem dole). */}
-              <InlineTitle
-                value={proposal.title}
-                onSave={(next) => onChange({ title: next })}
+          {/* Petr 2026-05-25: vše inline — žádný „rozkliknout edit panel".
+              Title editovatelný klikem, ostatní pole vždy viditelné selecty/inputy.
+              Tab přeskakuje, změny se ukládají rovnou do local state (DB commit
+              jde tlačítkem „Uložit X úkolů" dole). */}
+          <InlineTitle
+            value={proposal.title}
+            onSave={(next) => onChange({ title: next })}
+          />
+
+          <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+            {/* Trvání (t-* tag) */}
+            <label className="flex items-center gap-1 cursor-pointer" title="Trvání úkolu">
+              <Hourglass className="size-3.5 text-[var(--tint-lavender)]" />
+              <select
+                value={getTTag(proposal.tags)}
+                onChange={(e) => {
+                  const newTTag = e.target.value as TTag;
+                  onChange({ tags: [...stripTTag(proposal.tags), newTTag] });
+                }}
+                className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm font-mono cursor-pointer hover:border-white/40 focus:outline-none focus:border-[var(--tint-lavender)]/70"
+              >
+                {T_TAGS.map((t) => (
+                  <option key={t} value={t}>{T_LABEL[t]}</option>
+                ))}
+              </select>
+            </label>
+
+            {/* Datum — vždy viditelný native date input, prázdné = bez termínu */}
+            <label className="flex items-center gap-1" title="Datum splnění">
+              <Clock className="size-3.5 text-foreground/70" />
+              <input
+                type="date"
+                value={proposal.dueAt ? proposal.dueAt.slice(0, 10) : ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onChange({ dueAt: v ? new Date(`${v}T09:00:00`).toISOString() : null, dueIsTime: false });
+                }}
+                className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm font-mono cursor-pointer hover:border-white/40 focus:outline-none focus:border-[var(--tint-butter)]/70"
               />
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm">
-                {/* Dropdown Trvání — vždy viditelný, pevný set hodnot. Hodnota se
-                    ukládá jako extra tag (t-*). Default t-? = nezvoleno. */}
-                <label className="flex items-center gap-1 cursor-pointer">
-                  <Hourglass className="size-3.5 text-[var(--tint-lavender)]" />
-                  <select
-                    value={getTTag(proposal.tags)}
-                    onChange={(e) => {
-                      const newTTag = e.target.value as TTag;
-                      const stripped = stripTTag(proposal.tags);
-                      onChange({ tags: [...stripped, newTTag] });
-                    }}
-                    className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm cursor-pointer hover:border-white/40 focus:outline-none focus:border-[var(--tint-lavender)]/70 font-mono"
-                    title="Trvání úkolu — uloží se jako tag"
-                  >
-                    {T_TAGS.map((t) => (
-                      <option key={t} value={t}>{T_LABEL[t]}</option>
-                    ))}
-                  </select>
-                </label>
-                {dueObj && (
-                  <span className="flex items-center gap-1 font-mono text-foreground/80">
-                    <Clock className="size-3.5" />
-                    {dueObj.toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" })}
-                    {proposal.dueIsTime && ` ${dueObj.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}`}
-                  </span>
-                )}
-                {proposal.assignedToContactId && (
-                  <span className="flex items-center gap-1 text-[var(--tint-lavender)]">
-                    <UserCheck className="size-3.5" />
-                    {contacts.find((c) => c.id === proposal.assignedToContactId)?.displayName ?? proposal.assignedToContactName}
-                  </span>
-                )}
-                {proposal.assignedToContactName && !proposal.assignedToContactId && (
-                  <span className="flex items-center gap-1 text-[var(--tint-butter)]">
-                    <UserCheck className="size-3.5" /> {proposal.assignedToContactName} (nesedne na kontakt — vyber)
-                  </span>
-                )}
-                {proposal.priority === "high" && <span className="text-[var(--tint-rose)] font-mono">! priorita</span>}
-                {proposal.priority === "low" && <span className="text-foreground/70 font-mono">↓ low</span>}
-                {/* Tagy bez t-* (ty má dropdown výše). */}
-                {stripTTag(proposal.tags).length > 0 && (
-                  <span className="flex items-center gap-1 text-foreground/75">
-                    <Tag className="size-3.5" /> {stripTTag(proposal.tags).map((t) => `#${t}`).join(" ")}
-                  </span>
-                )}
-              </div>
-              {proposal.notes && <div className="text-sm text-foreground/80 mt-1.5">{proposal.notes}</div>}
-              {proposal.rawSnippet && (
-                <div className="text-sm italic text-muted-foreground mt-1">„{proposal.rawSnippet}"</div>
-              )}
-            </>
-          ) : (
-            <ProposalEdit
-              proposal={proposal}
-              contacts={contacts}
-              onSave={(patch) => onChange({ ...patch, _editing: false })}
-              onCancel={() => onChange({ _editing: false })}
-            />
+            </label>
+
+            {/* Priorita — vždy viditelný select */}
+            <label className="flex items-center gap-1" title="Priorita">
+              <span className="text-foreground/70 font-mono">!</span>
+              <select
+                value={proposal.priority}
+                onChange={(e) => onChange({ priority: e.target.value as "low" | "normal" | "high" })}
+                className={`bg-black/40 border border-white/20 rounded px-2 py-1 text-sm font-mono cursor-pointer hover:border-white/40 focus:outline-none ${
+                  proposal.priority === "high" ? "text-[var(--tint-rose)]" : proposal.priority === "low" ? "text-foreground/70" : "text-foreground"
+                }`}
+              >
+                <option value="low">↓ Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">! Priorita</option>
+              </select>
+            </label>
+
+            {/* Kontakt — vždy viditelný select, prázdné = „Já" */}
+            <label className="flex items-center gap-1" title="Komu úkol patří">
+              <UserCheck className={`size-3.5 ${proposal.assignedToContactId ? "text-[var(--tint-lavender)]" : "text-foreground/70"}`} />
+              <select
+                value={proposal.assignedToContactId ?? ""}
+                onChange={(e) => onChange({ assignedToContactId: e.target.value || null })}
+                className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm cursor-pointer hover:border-white/40 focus:outline-none focus:border-[var(--tint-lavender)]/70 max-w-[160px]"
+              >
+                <option value="">Já</option>
+                {contacts.map((c) => <option key={c.id} value={c.id}>{c.displayName}</option>)}
+              </select>
+            </label>
+            {proposal.assignedToContactName && !proposal.assignedToContactId && (
+              <span className="flex items-center gap-1 text-[var(--tint-butter)] text-xs italic">
+                AI nabídla: {proposal.assignedToContactName} (vyber kontakt ↑)
+              </span>
+            )}
+
+            {/* Tagy — inline input s čárkou. Zachovává t-* tag mimo. */}
+            <label className="flex items-center gap-1 flex-1 min-w-[160px]" title="Tagy oddělené čárkou (bez #, bez t-*)">
+              <Tag className="size-3.5 text-foreground/70" />
+              <input
+                type="text"
+                defaultValue={stripTTag(proposal.tags).join(", ")}
+                onBlur={(e) => {
+                  const raw = e.target.value;
+                  const newTags = raw.split(",").map((s) => s.trim().replace(/^#/, "")).filter(Boolean);
+                  const tTag = getTTag(proposal.tags);
+                  onChange({ tags: [...newTags, tTag] });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                placeholder="tagy, čárkou"
+                className="flex-1 min-w-0 bg-black/40 border border-white/20 rounded px-2 py-1 text-sm font-mono hover:border-white/40 focus:outline-none focus:border-[var(--tint-sage)]/70"
+              />
+            </label>
+          </div>
+
+          {/* Poznámka — inline textarea, vždy viditelná, prázdný placeholder */}
+          <textarea
+            value={proposal.notes ?? ""}
+            onChange={(e) => onChange({ notes: e.target.value || null })}
+            placeholder="+ poznámka"
+            rows={proposal.notes ? 2 : 1}
+            className="w-full mt-2 bg-black/30 border border-white/10 rounded px-2 py-1.5 text-sm leading-snug resize-y hover:border-white/20 focus:outline-none focus:border-white/40 placeholder:text-muted-foreground/60"
+          />
+
+          {/* Surová citace z přepisu — read only */}
+          {proposal.rawSnippet && (
+            <div className="text-sm italic text-muted-foreground mt-1.5">„{proposal.rawSnippet}"</div>
           )}
         </div>
 
-        {!proposal._editing && (
-          <div className="flex items-center gap-1 shrink-0">
-            <button onClick={() => onChange({ _editing: true })} className="p-1.5 rounded hover:bg-white/5 text-muted-foreground" title="Upravit">
-              <Edit3 className="size-3.5" />
-            </button>
-            <button onClick={onRemove} className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground" title="Smazat">
-              <X className="size-3.5" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={onRemove}
+            className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground"
+            title="Smazat tento návrh"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
