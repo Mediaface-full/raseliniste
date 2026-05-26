@@ -23,7 +23,9 @@ const [user, contactsWithBirthday, anniversaries] = await Promise.all([
       birthMonth: { not: null },
       birthDay: { not: null },
     },
-    select: { displayName: true, firstName: true, birthMonth: true, birthDay: true },
+    // Petr 2026-05-25: zobrazit celé jméno, ne jen křestní. Vezmeme
+    // displayName (= obvykle "Petr Pilný") nebo composit firstName+lastName.
+    select: { displayName: true, firstName: true, lastName: true, birthMonth: true, birthDay: true },
   }),
   prisma.anniversary.findMany({
     where: { userId: session.uid },
@@ -41,19 +43,25 @@ type Tile = {
   badge?: string;
 };
 
-const tiles: Tile[] = [
-  { href: "/dnes",                          title: "Mise",          icon: "custom:mise-raketa",            tint: "sky" },
-  { href: "/ozvena?mode=journal",           title: "Deník",         icon: "lucide:book-open",              tint: "butter" },
-  { href: "/ozvena?mode=task",              title: "Úkoly",         icon: "lucide:check-square",           tint: "peach" },
-  { href: "/studna/nahravka",               title: "Studánka",      icon: "lucide:waves",                  tint: "mint" },
-  // Petr 2026-05-14: na /start chybělo přímé tlačítko upload audio do studánky.
+// Petr 2026-05-25: dvě sekce — hlavní (denní akce) + audio cluster (Studánka,
+// Nahrát audio, Prskavka, Myši) je teď pod fold, ať na první obrazovce nesvítí.
+// Také prohozeno pořadí Deník<->Úkoly.
+const tilesPrimary: Tile[] = [
+  { href: "/dnes",                title: "Mise",       icon: "custom:mise-raketa",             tint: "sky" },
+  { href: "/calendar/tyden",      title: "Týden",      icon: "lucide:calendar-days",           tint: "lavender" },
+  { href: "/ozvena?mode=task",    title: "Úkoly",      icon: "lucide:check-square",            tint: "peach" },
+  { href: "/ozvena?mode=journal", title: "Deník",      icon: "lucide:book-open",               tint: "butter" },
+  { href: "/zeptat-se",           title: "Zeptat se",  icon: "lucide:message-circle-question", tint: "sage" },
+  { href: "/zijes/novy",          title: "ŽIJEŠ?",     icon: "lucide:heart-pulse",             tint: "pink" },
+];
+
+const tilesAudio: Tile[] = [
+  { href: "/studna/nahravka",          title: "Studánka",      icon: "lucide:waves",     tint: "mint" },
   // ?upload=1 auto-otevře upload card hned po načtení (stejný pattern jako
   // /ozvena?upload=1 pro úkoly+deník).
-  { href: "/studna/nahravka?upload=1",      title: "Nahrát audio",  icon: "lucide:upload",                 tint: "lavender" },
-  { href: "/prskavka/nahravka",             title: "Prskavka",      icon: "lucide:sparkles",               tint: "rose" },
-  { href: "/zeptat-se",                     title: "Zeptat se",     icon: "lucide:message-circle-question", tint: "sage" },
-  { href: "/zijes/novy",                    title: "ŽIJEŠ?",        icon: "lucide:heart-pulse",            tint: "pink" },
-  { href: "/bwmys",                         title: "Myši",          icon: "custom:bw-mys",                 tint: "sage" },
+  { href: "/studna/nahravka?upload=1", title: "Nahrát audio",  icon: "lucide:upload",    tint: "lavender" },
+  { href: "/prskavka/nahravka",        title: "Prskavka",      icon: "lucide:sparkles",  tint: "rose" },
+  { href: "/bwmys",                    title: "Myši",          icon: "custom:bw-mys",    tint: "sage" },
 ];
 
 const today = new Date();
@@ -68,9 +76,17 @@ function daysUntil(month: number, day: number): number {
   return Math.round((target.getTime() - t.getTime()) / 86_400_000);
 }
 
+// Petr 2026-05-25: celé jméno (displayName), fallback na složené firstName+lastName.
+function fullName(c: { displayName: string | null; firstName: string | null; lastName: string | null }): string {
+  const dn = c.displayName?.trim();
+  if (dn) return dn;
+  const composed = [c.firstName, c.lastName].filter(Boolean).join(" ").trim();
+  return composed || "?";
+}
+
 const birthdaysSoon = contactsWithBirthday
   .map((c) => ({
-    name: c.firstName?.trim() || c.displayName,
+    name: fullName(c),
     month: c.birthMonth!,
     day: c.birthDay!,
     days: daysUntil(c.birthMonth!, c.birthDay!),
@@ -171,48 +187,74 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
           )}
         </header>
 
+        {/* Hlavní sekce — denní akce */}
         <div class="grid grid-cols-2 gap-3">
-          {tiles.map((tile) => {
-            const Tag = tile.disabled ? "div" : "a";
-            return (
-              <Tag
-                href={tile.disabled ? undefined : tile.href}
-                class={`glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition ${
-                  tile.disabled
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-white/5 active:scale-[0.98]"
-                }`}
+          {tilesPrimary.map((tile) => (
+            <a
+              href={tile.href}
+              class="glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition hover:bg-white/5 active:scale-[0.98]"
+              style={`--c: var(--tint-${tile.tint});`}
+            >
+              <div
+                class="absolute -top-12 -right-12 size-32 rounded-full blur-2xl pointer-events-none"
+                style="background: color-mix(in oklch, var(--c) 28%, transparent);"
+              ></div>
+              <div
+                class="size-10 rounded-xl grid place-items-center [&>svg]:size-5"
+                style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
+              >
+                {tile.icon === "custom:bw-mys" ? (
+                  <Fragment set:html={bwMysSvg} />
+                ) : tile.icon === "custom:mise-raketa" ? (
+                  <Fragment set:html={miseRaketaSvg} />
+                ) : (
+                  <Icon name={tile.icon} class="size-5" />
+                )}
+              </div>
+              <div class="relative mt-auto text-base font-semibold tracking-tight flex items-center gap-2">
+                {tile.title}
+                {tile.badge && (
+                  <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">
+                    {tile.badge}
+                  </span>
+                )}
+              </div>
+            </a>
+          ))}
+        </div>
+
+        {/* Audio sekce — vlastní podnadpis, vizuálně oddělené */}
+        <div class="pt-2 space-y-2">
+          <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground/70 px-1">
+            Nahrávání
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            {tilesAudio.map((tile) => (
+              <a
+                href={tile.href}
+                class="glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[88px] transition hover:bg-white/5 active:scale-[0.98]"
                 style={`--c: var(--tint-${tile.tint});`}
               >
                 <div
                   class="absolute -top-12 -right-12 size-32 rounded-full blur-2xl pointer-events-none"
-                  style="background: color-mix(in oklch, var(--c) 28%, transparent);"
+                  style="background: color-mix(in oklch, var(--c) 22%, transparent);"
                 ></div>
-
                 <div
-                  class="size-10 rounded-xl grid place-items-center [&>svg]:size-5"
+                  class="size-9 rounded-xl grid place-items-center [&>svg]:size-5"
                   style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
                 >
                   {tile.icon === "custom:bw-mys" ? (
                     <Fragment set:html={bwMysSvg} />
-                  ) : tile.icon === "custom:mise-raketa" ? (
-                    <Fragment set:html={miseRaketaSvg} />
                   ) : (
                     <Icon name={tile.icon} class="size-5" />
                   )}
                 </div>
-
-                <div class="relative mt-auto text-base font-semibold tracking-tight flex items-center gap-2">
+                <div class="relative mt-auto text-sm font-semibold tracking-tight">
                   {tile.title}
-                  {tile.badge && (
-                    <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">
-                      {tile.badge}
-                    </span>
-                  )}
                 </div>
-              </Tag>
-            );
-          })}
+              </a>
+            ))}
+          </div>
         </div>
 
         <!-- Plnošířkové tlačítko Dashboard — proklik do hlavního systému -->
