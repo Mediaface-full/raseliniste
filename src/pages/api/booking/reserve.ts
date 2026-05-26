@@ -81,7 +81,11 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       inviteePhone: parsed.data.inviteePhone,
       inviteeSubject: parsed.data.inviteeSubject,
     });
-    return Response.json({ ok: true, inviteId: result.inviteId });
+    return Response.json({
+      ok: true,
+      inviteId: result.inviteId,
+      meetLink: result.meetLink,
+    });
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
   }

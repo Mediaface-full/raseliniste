@@ -5,7 +5,7 @@ import BookingPicker from "../../components/BookingPicker";
 const token = Astro.params.token as string;
 ---
 
-<Base title="Termín | Gideon">
+<Base title="Rezervace termínu schůzky | Gideon">
   <main class="min-h-screen flex items-start justify-center py-8 px-4">
     <div class="w-full max-w-2xl">
       <BookingPicker client:load token={token} />

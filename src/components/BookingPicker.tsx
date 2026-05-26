@@ -32,6 +32,10 @@ export default function BookingPicker({ token }: { token: string }) {
   const [subject, setSubject] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  // Petr 2026-05-25: confirmation screen ukazuje detaily místo holé hlášky
+  // — reserve.ts vrátí meetLink, my zachytíme + zobrazíme v rich card.
+  const [confirmedMeetLink, setConfirmedMeetLink] = useState<string | null>(null);
+  const [confirmedSlot, setConfirmedSlot] = useState<Slot | null>(null);
 
   // Mobile UX: po vybrání slotu rolovat dolů na form, ať uživatel
   // vidí, že je třeba doplnit jméno/e-mail/téma. Bez toho lidé kliknou
@@ -99,6 +103,8 @@ export default function BookingPicker({ token }: { token: string }) {
         setError(data.error ?? "Rezervace selhala.");
         return;
       }
+      setConfirmedSlot(chosenSlot);
+      setConfirmedMeetLink(data.meetLink ?? null);
       setDone(true);
     } finally {
       setSubmitting(false);
@@ -130,9 +136,95 @@ export default function BookingPicker({ token }: { token: string }) {
     return centerCard("⌛", "Pozvánka už neplatí", "Pošlu ti novou.");
   }
 
-  if (done) {
-    return centerCard("✓", "Termín potvrzen",
-      `Pozvánka přijde mailem z Google Kalendáře${email ? ` na ${email}` : ""}.`);
+  if (done && confirmedSlot) {
+    // Bohatá confirmation karta — datum, čas, Meet link (pokud byl), email
+    // a kontextový info. Petr 2026-05-25: dřív tu byl jen „centerCard" se
+    // suchou textovou hláškou, host si měl pozvánku hledat v mailu.
+    const slotStart = new Date(confirmedSlot.startsAt);
+    const slotEnd = new Date(confirmedSlot.endsAt);
+    const dateStr = slotStart.toLocaleDateString("cs-CZ", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    const timeStr = `${slotStart.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}–${slotEnd.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}`;
+
+    return (
+      <div className="glass-strong rounded-2xl p-7 sm:p-9 space-y-6">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center size-16 rounded-full bg-[var(--tint-sage)]/20 border border-[var(--tint-sage)]/40 mb-1">
+            <Check className="size-8 text-[var(--tint-sage)]" strokeWidth={2.5} />
+          </div>
+          <h1 className="font-serif text-2xl">Termín potvrzen</h1>
+          <p className="text-sm text-muted-foreground">Schůzka je zapsaná v kalendáři.</p>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <Calendar className="size-5 mt-0.5 text-[var(--tint-sage)] shrink-0" />
+            <div>
+              <div className="text-xs font-mono uppercase text-muted-foreground tracking-wide">Termín</div>
+              <div className="text-base font-medium capitalize">{dateStr}</div>
+              <div className="text-base font-mono">{timeStr}</div>
+            </div>
+          </div>
+
+          {confirmedMeetLink && (
+            <div className="flex items-start gap-3 pt-3 border-t border-white/5">
+              <Video className="size-5 mt-0.5 text-[var(--tint-sage)] shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-mono uppercase text-muted-foreground tracking-wide">Google Meet</div>
+                <a
+                  href={confirmedMeetLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-mono text-[var(--tint-sage)] hover:underline break-all"
+                >
+                  {confirmedMeetLink}
+                </a>
+              </div>
+            </div>
+          )}
+
+          {confirmedSlot.type === "MEETING_PRAGUE" && (
+            <div className="flex items-start gap-3 pt-3 border-t border-white/5">
+              <MapPin className="size-5 mt-0.5 text-[var(--tint-sage)] shrink-0" />
+              <div>
+                <div className="text-xs font-mono uppercase text-muted-foreground tracking-wide">Místo</div>
+                <div className="text-sm">Praha — přesnou adresu pošlu samostatně.</div>
+              </div>
+            </div>
+          )}
+
+          {confirmedSlot.type === "MEETING_HOME" && (
+            <div className="flex items-start gap-3 pt-3 border-t border-white/5">
+              <Home className="size-5 mt-0.5 text-[var(--tint-sage)] shrink-0" />
+              <div>
+                <div className="text-xs font-mono uppercase text-muted-foreground tracking-wide">Místo</div>
+                <div className="text-sm">U mě doma — adresu pošlu samostatně.</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="text-sm text-foreground/80 leading-relaxed space-y-2">
+          {email && (
+            <p>
+              Pozvánka s kalendářovým souborem (.ics) ti za chvíli přijde mailem
+              {" "}<span className="font-mono text-foreground">{email}</span>.
+            </p>
+          )}
+          <p className="text-muted-foreground text-xs">
+            Pokud do 5 minut nic nedorazí, mrkni do spamu. Kdyby přesto nic,
+            ozvi se na <a href="mailto:oko@raseliniste.cz" className="underline">oko@raseliniste.cz</a>.
+          </p>
+        </div>
+
+        <div className="text-center pt-2 text-xs text-muted-foreground font-mono">
+          Petr Peřina · raseliniste.cz
+        </div>
+      </div>
+    );
   }
 
   // Group sloty po dnech
@@ -203,33 +295,75 @@ export default function BookingPicker({ token }: { token: string }) {
           {Array.from(slotsByDay.entries()).slice(0, 14).map(([day, daySlots]) => {
             const dateObj = new Date(`${day}T00:00:00`);
             const weekday = dateObj.toLocaleDateString("cs-CZ", { weekday: "long" });
-            const dayMonth = dateObj.toLocaleDateString("cs-CZ", { day: "numeric", month: "long" });
+            const dayNum = dateObj.getDate();
+            const monthStr = dateObj.toLocaleDateString("cs-CZ", { month: "long" });
+            const relChip = relativeDayChip(dateObj);
+            // Per-weekday pastel tint — vizuální anchor, ať host hned vidí
+            // o jaký den jde i bez čtení názvu. Petr 2026-05-25.
+            const tint = WEEKDAY_TINTS[dateObj.getDay()];
             return (
-              <div key={day} className="glass rounded-xl p-4">
-                <div className="flex items-baseline gap-2 mb-3 pb-2 border-b border-white/10">
-                  <span className="font-serif text-lg text-foreground capitalize">{weekday}</span>
-                  <span className="text-sm font-mono text-muted-foreground">{dayMonth}</span>
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {daySlots.map((s, i) => {
-                    const start = new Date(s.startsAt);
-                    const time = start.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
-                    const isPicked = chosenSlot?.startsAt === s.startsAt && chosenSlot?.type === s.type;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => setChosenSlot(s)}
-                        className={`rounded-md border p-2 text-sm font-mono transition ${
-                          isPicked
-                            ? "border-[var(--tint-sage)] bg-[var(--tint-sage)]/15"
-                            : "border-white/10 hover:border-white/30 hover:bg-white/5"
-                        }`}
-                      >
-                        <div className="font-medium">{time}</div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">{typeShort(s.type)}</div>
-                      </button>
-                    );
-                  })}
+              <div
+                key={day}
+                className="glass rounded-2xl overflow-hidden relative"
+                style={{ ["--tint" as string]: `var(--tint-${tint})` }}
+              >
+                {/* Levý barevný pruh per weekday */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-1.5"
+                  style={{ background: `var(--tint)` }}
+                />
+                <div className="p-4 sm:p-5 pl-5 sm:pl-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    {/* Velké číslo dne v měsíci */}
+                    <div
+                      className="flex flex-col items-center justify-center rounded-xl border border-white/10 px-3 py-2 min-w-[64px]"
+                      style={{ background: `color-mix(in oklch, var(--tint) 12%, transparent)` }}
+                    >
+                      <span className="font-serif text-3xl leading-none">{dayNum}</span>
+                      <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
+                        {monthStr.slice(0, 3)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="font-serif text-xl text-foreground capitalize leading-tight">
+                          {weekday}
+                        </span>
+                        {relChip && (
+                          <span
+                            className="font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-white/15"
+                            style={{ background: `color-mix(in oklch, var(--tint) 20%, transparent)` }}
+                          >
+                            {relChip}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-mono text-muted-foreground mt-0.5">
+                        {daySlots.length} {daySlots.length === 1 ? "termín" : daySlots.length < 5 ? "termíny" : "termínů"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {daySlots.map((s, i) => {
+                      const start = new Date(s.startsAt);
+                      const time = start.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
+                      const isPicked = chosenSlot?.startsAt === s.startsAt && chosenSlot?.type === s.type;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setChosenSlot(s)}
+                          className={`rounded-lg border p-2.5 text-sm font-mono transition active:scale-95 ${
+                            isPicked
+                              ? "border-[var(--tint-sage)] bg-[var(--tint-sage)]/20 shadow-[0_0_0_2px_color-mix(in_oklch,var(--tint-sage)_30%,transparent)]"
+                              : "border-white/10 hover:border-white/40 hover:bg-white/5"
+                          }`}
+                        >
+                          <div className="font-medium text-base leading-tight">{time}</div>
+                          <div className="text-[10px] text-muted-foreground mt-1">{typeShort(s.type)}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             );
@@ -310,6 +444,33 @@ function typeShort(t: string): string {
   if (t === "MEETING_ONLINE") return "online";
   if (t === "MEETING_HOME") return "doma";
   return t;
+}
+
+// Pastel tints per weekday — vizuální anchor ať host na první pohled odliší dny.
+// Index = getDay() (0 = neděle, 1 = pondělí, …). Pořadí ladí s dashboardem.
+const WEEKDAY_TINTS = [
+  "rose",     // neděle
+  "peach",    // pondělí
+  "lavender", // úterý
+  "mint",     // středa
+  "sky",      // čtvrtek
+  "butter",   // pátek
+  "sage",     // sobota
+];
+
+/**
+ * Vrátí chip „Dnes" / „Zítra" pro dnešní/zítřejší datum, jinak null.
+ * Porovnává jen Y-M-D složky, ignoruje čas.
+ */
+function relativeDayChip(d: Date): string | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = new Date(d);
+  day.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((day.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays === 0) return "Dnes";
+  if (diffDays === 1) return "Zítra";
+  return null;
 }
 
 function centerCard(icon: string, title: string, body: string) {
