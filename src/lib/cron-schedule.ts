@@ -65,7 +65,7 @@ export const CRON_JOBS: CronJobDef[] = [
     endpoint: "/api/cron/nightly-briefing",
     schedule: { type: "daily", hour: 22, minute: 0 },
     fireAndForget: true,
-    description: "Noční briefing → Todoist",
+    description: "Večerní briefing pro zítřek → Todoist",
   },
   {
     name: "retry-stuck-recordings",

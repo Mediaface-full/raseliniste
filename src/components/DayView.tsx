@@ -359,7 +359,7 @@ export default function DayView({ initial }: { initial: Initial }) {
       <section className="glass rounded-xl p-5" style={{ ["--c" as string]: "var(--tint-rose)" }}>
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="size-4" style={{ color: "var(--c)" }} />
-          <h2 className="font-serif text-lg">Noční briefing</h2>
+          <h2 className="font-serif text-lg">Večerní briefing</h2>
           {briefing && (
             <span className="ml-auto text-xs font-mono text-muted-foreground">
               vygenerováno {new Date(briefing.generatedAt).toLocaleString("cs-CZ")}
