@@ -217,7 +217,11 @@ export async function classifyEmail(
       contents: prompt,
       config: {
         temperature: 0.2,
-        maxOutputTokens: 800,
+        // Petr 2026-05-27: 800 tokenů classify obvykle stačí, ale občas
+        // Gemini Flash thinking si vezme moc → truncated. Zvedáme + explicit
+        // nízký thinking budget (stejně jako úkoly v process-task-audio.ts).
+        maxOutputTokens: 2000,
+        thinkingConfig: { thinkingBudget: 1024 },
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA as never,
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -438,11 +442,26 @@ function parseAndValidate(rawText: string): LlmClassification {
     if (m) trimmed = m[1].trim();
   }
 
+  // Petr 2026-05-27: tolerantní JSON parser — Gemini Flash často vrací
+  // truncated nebo malformed JSON pro classification (49/50 errors v logu).
+  // Stejný pattern jako u úkolů (process-task-audio.ts 5bbfc80):
+  //   1. Najdi první balanced { ... } pomocí brace-stack scanu (sní přebytky)
+  //   2. Pokud i tak fail, zkus oříznout na poslední validní `}` a parsing
+  //   3. Pokud i tak fail, throw — caller (cron) si to zaloguje a přeskočí
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);
-  } catch (e) {
-    throw new Error(`LLM vrátil neparsovatelný JSON: ${(e instanceof Error ? e.message : "?")}. Text: ${trimmed.slice(0, 200)}`);
+  } catch {
+    const balanced = extractFirstBalancedObject(trimmed);
+    if (balanced) {
+      try {
+        parsed = JSON.parse(balanced);
+      } catch (e2) {
+        throw new Error(`LLM vrátil neparsovatelný JSON i po orezání: ${(e2 instanceof Error ? e2.message : "?")}. Text: ${trimmed.slice(0, 200)}`);
+      }
+    } else {
+      throw new Error(`LLM vrátil neparsovatelný JSON bez balanced object. Text: ${trimmed.slice(0, 200)}`);
+    }
   }
 
   if (!parsed || typeof parsed !== "object") {
@@ -487,4 +506,59 @@ function stripHtml(html: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Petr 2026-05-27: tolerantní extrakce prvního balanced JSON object z textu.
+ * Sní přebytky před a za, ignoruje stringy + escape characters. Pokud LLM
+ * vrátí truncated JSON (typický bug u Gemini Flash classify), zkus aspoň
+ * orezat na poslední validní `}` a doplnit chybějící závorky.
+ */
+function extractFirstBalancedObject(raw: string): string | null {
+  const start = raw.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < raw.length; i++) {
+    const c = raw[i];
+    if (escape) { escape = false; continue; }
+    if (c === "\\") { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return raw.slice(start, i + 1);
+    }
+  }
+
+  // Pokud jsme nenašli balanced end, zkus oříznout na poslední úspěšný
+  // klíč-hodnota pár — najdi poslední `,` nebo `}` a doplň chybějící závorky.
+  const lastComma = raw.lastIndexOf(",");
+  const lastBrace = raw.lastIndexOf("}");
+  const cut = Math.max(lastComma, lastBrace);
+  if (cut > start) {
+    // Pokud končí čárkou, oddělej ji
+    let slice = raw.slice(start, cut + 1).trim();
+    if (slice.endsWith(",")) slice = slice.slice(0, -1);
+    // Spočítej kolik { vs } a doplň chybějící
+    let open = 0;
+    let close = 0;
+    let inStr = false;
+    let esc = false;
+    for (const c of slice) {
+      if (esc) { esc = false; continue; }
+      if (c === "\\") { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === "{") open++;
+      else if (c === "}") close++;
+    }
+    const missing = open - close;
+    if (missing > 0) slice = slice + "}".repeat(missing);
+    return slice;
+  }
+  return null;
 }
