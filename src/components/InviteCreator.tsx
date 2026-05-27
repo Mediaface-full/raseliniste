@@ -371,44 +371,69 @@ export default function InviteCreator() {
           <div className="text-sm text-muted-foreground italic">Žádné pozvánky.</div>
         ) : (
           <div className="space-y-2">
+            {/* Petr 2026-05-27 #22: mobile-friendly karty — větší touch
+                targets, info zalomené pod sebe, akce v gridu s text-sm. */}
             {invites.map((inv) => {
               const url = `${APP_URL_BASE}/i/${inv.token}`;
               const isUniversal = !inv.contact && !inv.inviteeName;
+              const isActive = inv.status !== "CANCELED" && inv.status !== "EXPIRED";
+              const canResend = inv.status === "CONFIRMED" || inv.status === "RESERVED";
               return (
-                <div key={inv.id} className="rounded-md border border-white/5 bg-black/15 p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <StatusBadge status={inv.status} />
-                    <span className="text-sm font-medium">
-                      {inv.contact?.displayName ?? inv.inviteeName ?? (isUniversal ? "Univerzální link" : "—")}
-                    </span>
-                    <span className="ml-auto text-xs font-mono text-muted-foreground">
-                      {inv.slotDurationMin} min · {inv.mode === "CLIENT" ? "klient" : "přítel"} · {meetingTypeLabel(inv.meetingType)}
+                <div key={inv.id} className="rounded-lg border border-white/10 bg-black/15 p-4">
+                  {/* Header: jméno + status (zalomené na mobilu) */}
+                  <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <StatusBadge status={inv.status} />
+                      <span className="text-base font-medium truncate">
+                        {inv.contact?.displayName ?? inv.inviteeName ?? (isUniversal ? "Univerzální link" : "—")}
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono text-muted-foreground shrink-0">
+                      {inv.slotDurationMin} min · {inv.mode === "CLIENT" ? "klient" : "přítel"}
                     </span>
                   </div>
-                  {inv.reservedSlot && (
-                    <div className="text-xs text-[var(--tint-butter)] mb-1">
-                      🕐 {new Date(inv.reservedSlot.startsAt).toLocaleString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 mt-2">
-                    <button onClick={() => copy(url)} className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1">
-                      <Copy className="size-3" /> Kopírovat link
+
+                  {/* Typ schůzky + rezervovaný slot */}
+                  <div className="text-xs text-muted-foreground mb-3 flex items-center gap-2 flex-wrap">
+                    <span>{meetingTypeLabel(inv.meetingType)}</span>
+                    {inv.reservedSlot && (
+                      <span className="text-[var(--tint-butter)]">
+                        · 🕐 {new Date(inv.reservedSlot.startsAt).toLocaleString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Akce — 2-sloupcový grid na mobilu, řádkový na desktopu */}
+                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                    <button
+                      onClick={() => copy(url)}
+                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 text-foreground"
+                    >
+                      <Copy className="size-4" /> Kopírovat
                     </button>
-                    <a href={url} target="_blank" rel="noreferrer" className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1">
-                      <ExternalLink className="size-3" /> Otevřít
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 text-foreground"
+                    >
+                      <ExternalLink className="size-4" /> Otevřít
                     </a>
-                    {(inv.status === "CONFIRMED" || inv.status === "RESERVED") && (
+                    {canResend && (
                       <button
                         onClick={() => resend(inv.id, inv.inviteeEmail ?? null)}
-                        className="ml-auto text-xs text-[var(--tint-sky)] hover:underline flex items-center gap-1"
+                        className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-[var(--tint-sky)]/15 hover:bg-[var(--tint-sky)]/25 text-[var(--tint-sky)] sm:ml-auto"
                         title={inv.inviteeEmail ? `Poslat na ${inv.inviteeEmail}` : "Pozvánka nemá email — zadáš ho v dialogu"}
                       >
-                        <Mail className="size-3" /> Poslat mail
+                        <Mail className="size-4" /> Poslat mail
                       </button>
                     )}
-                    {inv.status !== "CANCELED" && inv.status !== "EXPIRED" && (
-                      <button onClick={() => cancel(inv.id)} className={`${inv.status === "CONFIRMED" || inv.status === "RESERVED" ? "" : "ml-auto"} text-xs text-destructive hover:underline flex items-center gap-1`}>
-                        <Trash2 className="size-3" /> Zrušit
+                    {isActive && (
+                      <button
+                        onClick={() => cancel(inv.id)}
+                        className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-destructive/15 hover:bg-destructive/25 text-[var(--tint-rose)]"
+                      >
+                        <Trash2 className="size-4" /> Zrušit
                       </button>
                     )}
                   </div>

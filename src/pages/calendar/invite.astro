@@ -19,7 +19,9 @@ if (!user) return Astro.redirect("/login");
   username={user.username}
   breadcrumb={[{ label: "Kalendář" }, { label: "Pozvánka" }]}
 >
-  <div class="max-w-2xl">
+  <!-- Petr 2026-05-27 #22: max-w-2xl → max-w-4xl, ať pozvánky mají dech na
+       desktopu i mobilu (Shell sidebar lze sbalit). -->
+  <div class="max-w-4xl">
     <InviteCreator client:load />
   </div>
 </Shell>
