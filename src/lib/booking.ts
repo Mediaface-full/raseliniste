@@ -297,13 +297,41 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
     `— Vytvořeno z bookingu Rašeliniště`,
   ].filter(Boolean).join("\n");
 
+  // Petr 2026-05-27 #21: explicit reminders + location
+  // - Online schůzka: 10 min předem (push do mobilu)
+  // - Praha (prezenční): 60 min předem (Apple Maps Time to Leave ETA si
+  //   doplní samo pokud má event location s adresou; tohle je pojistka
+  //   pokud Apple Maps ETA nezná destinaci nebo Petr neměl Time to Leave
+  //   nastavený v iOS Settings → Calendar → Default Alerts)
+  // - U Petra doma: 30 min (kratší, jen aby měl čas se připravit)
+  const reminderMinutes = slot.type === "MEETING_ONLINE"
+    ? [10]
+    : slot.type === "MEETING_PRAGUE"
+      ? [60]
+      : slot.type === "MEETING_HOME"
+        ? [30]
+        : [15]; // default fallback
+
+  // Location pro Apple/Google Maps ETA. Konkrétní adresu Petr nemá v UI,
+  // posíláme jen indikativní text. Pro Time to Leave funkční je třeba
+  // explicit adresa — Petr ji případně doplní v Google Calendar appce.
+  const location = slot.type === "MEETING_ONLINE"
+    ? "Google Meet (online)"
+    : slot.type === "MEETING_PRAGUE"
+      ? "Praha"
+      : slot.type === "MEETING_HOME"
+        ? "U Petra doma"
+        : undefined;
+
   const result = await createGoogleEvent(ownerUserId, {
     summary,
     description,
+    location,
     startsAt,
     endsAt,
     attendeeEmails: invite.inviteeEmail ? [invite.inviteeEmail] : undefined,
     conferenceData: slot.type === "MEETING_ONLINE",
+    reminderMinutes,
   });
 
   // Petr 2026-05-25: persistuj meetLink + googleEventId, ať to má resend

@@ -292,6 +292,11 @@ export interface CreateEventInput {
   conferenceData?: boolean; // přidat Google Meet link
   allDay?: boolean;         // pro OOO události (celodenní range)
   outOfOffice?: boolean;    // Google native eventType=outOfOffice
+  // Petr 2026-05-27 #21: custom popup reminders (X min před). Pro booking
+  // prezenčních schůzek dává smysl 60 min (Apple Maps Time to Leave si
+  // ETA spočítá sám pokud má location adresu, tohle je pojistka). Pro
+  // online schůzky 10 min předem.
+  reminderMinutes?: number[];
 }
 
 export async function createGoogleEvent(
@@ -336,6 +341,20 @@ export async function createGoogleEvent(
         requestId: `rasel-${Date.now()}`,
         conferenceSolutionKey: { type: "hangoutsMeet" },
       },
+    };
+  }
+
+  // Petr 2026-05-27 #21: explicit popup reminders. Override useDefault aby
+  // se Apple/Google Calendar appce zobrazilo upozornění X min předem
+  // i pokud Petr nemá nastavené Default Alerts. Pro Time to Leave (ETA)
+  // potřebuje event location adresu, tohle je pojistka.
+  if (input.reminderMinutes && input.reminderMinutes.length > 0) {
+    requestBody.reminders = {
+      useDefault: false,
+      overrides: input.reminderMinutes.map((minutes) => ({
+        method: "popup" as const,
+        minutes,
+      })),
     };
   }
 
