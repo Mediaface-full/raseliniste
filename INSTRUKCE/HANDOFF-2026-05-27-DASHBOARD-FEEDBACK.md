@@ -189,3 +189,68 @@ UI tracking: `/settings/ai-usage` (denní/měsíční graf, per-module breakdown
 5. **Mobile UX patterns** — 44px touch targets (iOS minimum), grid-cols-3
    na mobilu pro 5-7 tilů, segmentové pill switchy s tinted active state,
    sekce empty state s positive hláškou („Nic nového. Klid.").
+
+## Audit po session (Petr: „pečlivě si projdi a hledej chyby")
+
+Commit `4583065` — 3 reálné bugy nalezené a opravené:
+
+### Bug 1: process-task-audio.ts userId leak
+
+`processTaskAudio({ batchId, audio, mimeType })` neměl userId v interface,
+ale řádek 94 volal `extractTaskProposals(transcript, { userId: params.userId })`.
+`params.userId === undefined` → AI extrakce dostala kontakty BEZ filtru.
+
+Single-user OK (vrátilo Petrovy), ale multi-user by leakovalo. Plus AI
+neměla správný seznam clientSlugy.
+
+Fix: `batch.userId` z DB.
+
+### Bug 2: InlineTitle race condition
+
+`useEffect(() => setDraft(value), [value])` přepsal draft i během editace.
+Pokud parent po patchTask udělal optimistic update + reload, value se
+změnila → draft přepsán mid-edit.
+
+Fix: `if (!editing) setDraft(value)`.
+
+### Bug 3: cron-schedule.ts type union
+
+`posta-fill-bodies` cron měl `minutes: 10` ale type byl
+`5 | 15 | 30 | 60`. Runtime OK (modulo 10 funguje), TS error.
+
+Fix: rozšířit union o `10`.
+
+### Audit checklist pro budoucí session
+
+1. `npx tsc --noEmit -p tsconfig.json` — projít všechny errors aspoň
+   triáží. Errors v dnes dotčených souborech jsou priority. Pre-existing
+   errors v ne-funkčních souborech skip.
+
+2. Pro každý nový endpoint:
+   - `readSession` + 401 fallback?
+   - Userownership check pro DB write (pokud multi-user-ready)?
+   - Input validation (zod schema)?
+
+3. Pro každou novou Prisma query:
+   - userId filter pokud model má userId field?
+   - NULL handling (`OR: [{ field: null }, ...]`) pokud filtrujeme NULL hodnoty?
+   - AND wraps OR conditions, ne top-level OR konflikty?
+
+4. Pro každý nový React component s controlled inputem:
+   - `useEffect(() => setLocal(parent), [parent])` chybí guard pro mid-edit?
+
+5. Pro každou novou migraci:
+   - SQL syntax validní?
+   - NOT NULL bez DEFAULT? (= produkční migration může failovat na
+     existujících rows). Vždy nullable nebo s default.
+
+6. Pro každý změněný prompt:
+   - Token limit dostatečný pro očekávaný output?
+   - Reasoning model (Gemini 2.5) má explicit `thinkingBudget`?
+   - JSON output tolerantní parser pro fallback truncation?
+
+7. Pro každé nové UI tlačítko:
+   - 44px+ touch target?
+   - Disabled state pendingu?
+   - Error banner po fail?
+   - Loading spinner?
