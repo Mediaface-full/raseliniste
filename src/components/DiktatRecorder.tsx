@@ -71,15 +71,12 @@ export default function DiktatRecorder() {
   useEffect(() => {
     const m = loadMode();
     setMode(m);
-    // Pokud URL má ?upload=1, automaticky otevři file picker — Petr přišel
-    // z /ukoly nebo /denik kliknutím "Nahrát soubor", chce hned zvolit soubor.
-    if (typeof window !== "undefined") {
-      const auto = new URLSearchParams(window.location.search).get("upload") === "1";
-      if (auto) {
-        // Krátký delay na hydration + render file inputu
-        setTimeout(() => fileInputRef.current?.click(), 250);
-      }
-    }
+    // Petr 2026-05-27: dříve setTimeout → fileInput.click() po ?upload=1, ale
+    // mobile Safari to tichu blokuje (anti-popup: programmatic click na file
+    // input bez user gesture). Auto-click vyhozen; tlačítka „Nahrát soubor"
+    // v /ukoly a /denik teď uploadují přímo z té stránky bez redirectu, takže
+    // tahle větev je obsoletní. /ozvena?upload=1 zůstává jako fallback —
+    // uživatel klikne tlačítko ručně.
   }, []);
 
   useEffect(() => {

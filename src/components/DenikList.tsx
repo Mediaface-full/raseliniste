@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Mic, Plus, Loader2, Calendar, Search, X, Users, Tag, BookOpen, ChevronDown } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -127,15 +127,59 @@ export default function DenikList() {
   const monthsSet = new Set(entries.map((e) => e.date.slice(0, 7)));
   const months = Array.from(monthsSet).sort().reverse().slice(0, 6);
 
+  // Petr 2026-05-27: nahrávat audio přímo z /denik bez redirectu (mobile
+  // Safari blokuje programmatic click po navigaci). Stejný pattern jako
+  // v UkolyList.
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function uploadAudioFile(file: File) {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("audio", file);
+      fd.append("durationSec", "0");
+      const res = await fetch("/api/denik/audio", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.entryId) {
+        setUploadError(data.error ?? `Upload selhal (HTTP ${res.status}).`);
+        return;
+      }
+      // Po uploadu redirect na detail zápisu (poll status)
+      window.location.href = `/denik/${data.entryId}`;
+    } catch (e) {
+      setUploadError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
         <a href="/ozvena?mode=journal">
           <Button><Mic /> Nadiktovat zápis</Button>
         </a>
-        <a href="/ozvena?mode=journal&upload=1">
-          <Button variant="outline">📎 Nahrát soubor</Button>
-        </a>
+        <input
+          ref={audioFileInputRef}
+          type="file"
+          accept="audio/*,video/mp4,.m4a,.mp3,.opus,.ogg,.wav,.webm"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void uploadAudioFile(f);
+            e.target.value = "";
+          }}
+        />
+        <Button
+          variant="outline"
+          disabled={uploading}
+          onClick={() => audioFileInputRef.current?.click()}
+        >
+          {uploading ? <><Loader2 className="animate-spin" /> Nahrávám…</> : <>📎 Nahrát soubor</>}
+        </Button>
         <Button variant="outline" onClick={() => setCreating(!creating)}>
           <Plus /> Textový zápis
         </Button>
@@ -167,6 +211,17 @@ export default function DenikList() {
           </div>
         )}
       </div>
+
+      {uploadError && (
+        <div className="rounded-lg border-2 border-destructive/60 bg-destructive/15 text-sm px-3 py-2 flex items-start gap-2">
+          <X className="size-4 shrink-0 mt-0.5 text-destructive" />
+          <div className="flex-1">
+            <strong className="text-destructive">Nahrání selhalo</strong>
+            <div className="mt-0.5">{uploadError}</div>
+          </div>
+          <button onClick={() => setUploadError(null)} className="text-muted-foreground"><X className="size-4" /></button>
+        </div>
+      )}
 
       {creating && (
         <div className="glass rounded-xl p-4 space-y-3" style={{ ["--c" as string]: "var(--tint-butter)" }}>
