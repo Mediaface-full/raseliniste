@@ -32,7 +32,11 @@ export function InlineTitle({
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setDraft(value); }, [value]);
+  // Petr 2026-05-27: jen sync draft z value když NEEDITUJEME, jinak by
+  // optimistic update / polling z parentu přepsal text co Petr právě píše.
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();

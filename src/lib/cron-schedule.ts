@@ -17,7 +17,7 @@
  */
 
 export type Schedule =
-  | { type: "every"; minutes: 5 | 15 | 30 | 60 }
+  | { type: "every"; minutes: 5 | 10 | 15 | 30 | 60 }
   | { type: "daily"; hour: number; minute: number }
   | { type: "monthly-last-day"; hour: number; minute: number };
 

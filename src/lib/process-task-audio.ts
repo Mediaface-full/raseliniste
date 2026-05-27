@@ -90,8 +90,12 @@ export async function processTaskAudio(params: {
       data: { rawTranscript: transcript },
     });
 
-    // Stage 2: extrakce — předáme userId aby AI dostala dynamické tagy/kontakty
-    const proposals = await extractTaskProposals(transcript, { userId: params.userId });
+    // Stage 2: extrakce — předáme userId aby AI dostala dynamické tagy/kontakty.
+    // Petr 2026-05-27: dříve `params.userId` (neexistovalo v interface!) →
+    // userId byl undefined → extractTaskProposals načítal kontakty BEZ
+    // userId filtru. Pro single-user fungovalo náhodou, multi-user by
+    // leakoval. Načítáme z batch.userId přímo.
+    const proposals = await extractTaskProposals(transcript, { userId: batch.userId });
 
     await prisma.taskAudioBatch.update({
       where: { id: params.batchId },
