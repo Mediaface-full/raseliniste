@@ -437,6 +437,9 @@ export default function DayView({ initial }: { initial: Initial }) {
 }
 
 function EventRow({ event }: { event: CalendarEvent }) {
+  const [hidden, setHidden] = useState(false);
+  const [hiding, setHiding] = useState(false);
+
   const start = new Date(event.startsAt);
   const end = new Date(event.endsAt);
   const time = event.allDay
@@ -445,6 +448,21 @@ function EventRow({ event }: { event: CalendarEvent }) {
 
   const tint = sourceTint(event.source);
   const label = sourceLabel(event.source);
+
+  // Petr 2026-05-27: lokálně schovat event pokud je smazaný v Google ale sweep
+  // ho ještě nestihl označit. Nezavolá Google API — jen DB flag.
+  async function hideEvent() {
+    if (!confirm(`Skrýt „${event.title}" z Rašeliniště?\n\nPokud je v Google pořád aktivní, příští sync ho vrátí.`)) return;
+    setHiding(true);
+    try {
+      const res = await fetch(`/api/calendar/events/${event.id}/hide`, { method: "POST" });
+      if (res.ok) setHidden(true);
+    } finally {
+      setHiding(false);
+    }
+  }
+
+  if (hidden) return null;
 
   return (
     <div className="rounded-md p-3 bg-black/15 border border-white/5">
@@ -464,7 +482,17 @@ function EventRow({ event }: { event: CalendarEvent }) {
             <div className="text-xs text-[var(--tint-butter)] mt-1">📝 {event.prepNote}</div>
           )}
         </div>
-        <span className={`text-xs font-mono ${tint}`}>{label}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-xs font-mono ${tint}`}>{label}</span>
+          <button
+            onClick={hideEvent}
+            disabled={hiding}
+            className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-[var(--tint-rose)] disabled:opacity-50"
+            title="Skrýt tento event z Rašeliniště (pokud je už smazaný v Google)"
+          >
+            {hiding ? <Loader2 className="size-3.5 animate-spin" /> : <XCircle className="size-3.5" />}
+          </button>
+        </div>
       </div>
     </div>
   );
