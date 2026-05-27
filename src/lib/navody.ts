@@ -45,8 +45,14 @@ export const NAVODY: Navod[] = [
 Todoist je primární tool, Rašeliniště je sběrna a smart router pro delegování.
       `,
       jak_to_ovladam: `
-- Manuálně: \`/ukoly\` → tlačítko **+ nový úkol** (titulek, popis, datum, tagy, kontakt)
-- Hlasově: \`/ozvena?mode=task\` → diktuju → AI extrahuje strukturované úkoly → review screen → schválit
+- Manuálně: \`/ukoly\` → tlačítko **+ Nový úkol** (titulek, popis, datum, tagy, kontakt)
+- Hlasově: \`/ukoly\` → **Nadiktovat úkoly** → AI extrahuje strukturované úkoly → review screen
+- **Audio soubor**: \`/ukoly\` → **📎 Nahrát soubor** → vyber mp3/m4a/wav přímo (mobile-friendly,
+  bez redirectu) → upload → auto-redirect na review \`/ukoly/audio/<id>/review\`
+- **Inline editace v listu**: klik na nadpis úkolu = okamžitý edit (Tab/Enter ukládá, Escape ruší)
+- **Review screen — vše inline**: datum (native picker), priorita (select), kontakt (select s týmem + klienty),
+  tagy (čárka), poznámka (textarea), trvání (t-* dropdown). Žádné rozkliknout edit panel.
+- **Chip „📁 Projekt / Sekce"** v review = preview kam úkol půjde v Todoistu (live podle změny kontaktu/tagů)
 - Edit/done/reopen/delete přímo v listu
 - VIP přes /call-log — když mi VIP pošle zprávu s termínem, vznikne úkol v projektu „Lidé"
       `,
@@ -68,6 +74,8 @@ Když delegování trvá víc než 30 sekund, neudělám ho — proto smart rout
 - **Auto-create projektu/sekce** při neexistenci, logované do RoutingAuditLog
 - **Routing audit log** v \`/settings/crons\` — tabulka 30 posledních push s pravidlem + auto-create flagy
 - **AI prompt** dostává distinct seznam clientSlugs z DB + pravidla proti halucinaci slugu (žádné fuzzy úpravy existujících)
+- **Dlouhé nahrávky 30+ min** (NOVÉ 05-27): žádný strop na počet úkolů, prompt instruuje „klidně 100, 200 úkolů, nekonsoliduj", token limit 60k + nízký thinkingBudget. Verified: 29min audio → 36 úkolů. Pojistka: tolerantní JSON parser sní přebytky a root array.
+- **Todoist responsible_uid** (NOVÉ 05-27): Contact.todoistUserId mapuje kontakty na Workspace usery. Při push se posílá assignment = člen týmu dostane reálnou notifikaci. ID najdeš na \`/api/integrations/todoist/collaborators\`.
 - Parent + children (subtasks)
 - Tagy: dynamicky z \`Task.tags\` + \`TodoistLabelMirror\`
 - Filtry: status (open/done/all), assignee (me/all/per kontakt), tagy
@@ -532,8 +540,10 @@ texty „Gíďo, máš misi", vokativ z DB. Cross-VIP průsak fyzicky nemožný 
 - VIP termín → Todoist \`due_date\` (od 2026-05-03 bez termínu = bez data, Today se neplní)
 - Mise na \`/call-log/thanks\` — VIP vidí co mu zbývá
 - Backfill tlačítko v \`/contacts\` pro existující VIP bez tokenu
-- **Smart routing fields (NOVÉ 05-10):** \`isTeam\` checkbox (kolega/dlouhodobý spolupracovník) + \`clientTag\` slug (kontaktní osoba klienta). Badges v listu: mint „tým", sky „klient-{slug}".
-- **Alias systém (NOVÉ 05-10):** \`aliases\` (synonyma jména v audiu — „Karel", „Kája") + \`clientTagAliases\` (synonyma klient slugu — „TK", „Tékáčko"). AI v extract promptu fuzzy match přes všechna synonyma, ale do JSON/tagu vždy KANONICKÁ hodnota. Comma-separated input s chip listem v edit modalu.
+- **Smart routing fields (05-10):** \`isTeam\` checkbox (kolega/dlouhodobý spolupracovník) + \`clientTag\` slug (kontaktní osoba klienta). Badges v listu: mint „tým", sky „klient-{slug}".
+- **Alias systém (05-10):** \`aliases\` (synonyma jména v audiu — „Karel", „Kája") + \`clientTagAliases\` (synonyma klient slugu — „TK", „Tékáčko"). AI v extract promptu fuzzy match přes všechna synonyma, ale do JSON/tagu vždy KANONICKÁ hodnota. Comma-separated input s chip listem v edit modalu.
+- **iCloud auto-sync (NOVÉ 05-27):** cron \`sync-contacts-icloud\` à 30 min pullne změny z mobilu + onMount \`/contacts\` tichu pullne (rate-limit 30s). Předtím byl iCloud sync jen manuální button v /contacts/tabulka. Google sync běží přes \`sync-contacts\` cron denně 4:00.
+- **Todoist user ID (NOVÉ 05-27):** \`todoistUserId\` pro členy týmu (isTeam=true). Když je vyplněné, push úkolů do Todoistu posílá \`responsible_uid\` = člen týmu dostane reálnou notifikaci v Todoistu. Bez ID se úkol jen vytvoří v sekci s jménem, ale asignovaný zůstává Petrovi. ID najdeš na \`/api/integrations/todoist/collaborators\`.
       `,
       co_neumi: `
 - Sdílení kontaktu mezi víc adresářů
@@ -638,39 +648,55 @@ Sleduju trendy (HRV, klid v noci, kondice) — bez auto-feedu bych to nevedl. AI
     title: "Booking pozvánka",
     icon: "lucide:send",
     tint: "sage",
-    oneLiner: "Vytvořím link s nabídkou termínů, klient zarezervuje, vznikne Google event + Meet.",
+    oneLiner: "Vytvořím link s nabídkou termínů, klient zarezervuje, vznikne Google event + Meet + mail s .ics.",
     href: "/calendar/invite",
     sections: {
       co_to_je: `
 Public booking flow. Vytvořím invite link \`/i/<token>\`, klient klikne, vidí volné sloty,
-zarezervuje. Auto-create Google Calendar event s Meet linkem + email confirmation.
+zarezervuje. Auto-create Google Calendar event s Meet linkem + dva potvrzovací maily
+(náš + Google nativní invite) + .ics příloha pro libovolný kalendář.
       `,
       jak_to_ovladam: `
-- \`/calendar/invite\` — vytvoření linku (volné termíny, doba schůzky, lokace)
-- Pošlu klientovi URL
-- Klient \`/i/<token>\` → vidí sloty → zarezervuje → confirmation email
-- Cold lead \`/schuzka\` — generic booking bez tokenu
+- \`/calendar/invite\` — vytvoření linku
+- Vyber kontakt nebo „univerzální" (cold lead zadá email při rezervaci)
+- Mode (klient/přítel), typ schůzky (Praha/online/u Petra), délka
+- Volitelně **„Sloty dostupné od"** (datum) — klient uvidí sloty až od něj
+- Volitelně **„Poznámka pro hosta"** — uvidí ji v rezervační stránce,
+  v Google eventu i v .ics
+- „Vygenerovat link" → URL + zelený box, zkopíruj a pošli klientovi
+- Klient \`/i/<token>\` → sloty (přísnější z globálního lead time + availableFrom)
+  → potvrdí → dorazí mail s Meet linkem + .ics + Google nativní invite
+- Pokud někomu mail nedorazil: tlačítko **„Poslat znovu"** u pozvánky v listu
+- Pro debug otevři \`/api/booking/<id>/diagnose\` — vrátí celý řetězec
+  (status, meetLink, contact email, MailLog záznamy, verdict)
       `,
       proc: `
 Když dohazuju termín mailem („máš čas v úterý nebo ve středu?"), trvá to 4 maily.
-Booking link = 1 mail, klient si vybere, hotovo.
+Booking link = 1 mail, klient si vybere, hotovo. Plus .ics si klient přidá do
+Apple/Outlook/jakéhokoli kalendáře bez ohledu na Google.
       `,
       co_umi: `
-- Smart slot listing (vyloučí kolize z Google + iCloud)
+- Smart slot listing (vyloučí kolize z Google + iCloud + aktivní RESERVED/CONFIRMED bookingy)
 - Verdict GREEN/YELLOW/RED podle commute checků
-- Auto-create Google event + Meet
-- Email confirmation/cancellation klientovi (podpis „Gideon")
-- Magic-link confirm (klient potvrdí přes email)
+- Per-invite „dostupné od" datum (přísnější z toho a globálního lead time vyhrává)
+- Veřejná poznámka pro hosta (picker + Google event + .ics + mail)
+- Auto-create Google event + Meet link (persistovaný v DB)
+- Náš confirmation mail přes SMTP2GO s .ics přílohou
+- Google nativní invite (sendUpdates: all)
+- „Poslat znovu" tlačítko pro CONFIRMED/RESERVED invites (s reálným Meet linkem)
+- Diagnose endpoint pro debug stížností „nepřišlo mi nic"
       `,
       co_neumi: `
 - Multi-time-slot offer (jen 1 termín volí)
 - Round-robin pro tým (single-user)
+- Magic-link confirm zrušen 2026-05-12 (přímý create Google eventu)
       `,
       napojeni: `
-- **Kalendář** — sloty z Google + iCloud
+- **Kalendář** — sloty z Google + iCloud + aktivní bookingy
 - **Locations** — commute checks
-- **Resend** — confirmation emails
-- **Google Calendar API** — create event + Meet
+- **SMTP2GO** — confirmation emails (DKIM aligned, lepší deliverability než Seznam)
+- **Google Calendar API** — create event + Meet + sendUpdates pro nativní invite
+- **MailLog** — audit trail odeslaných mailů (context: booking-confirm / booking-cancel / booking-confirm-resend)
       `,
     },
   },
