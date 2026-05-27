@@ -267,7 +267,7 @@ ${transcript}
 
   let parsed: { tasks?: unknown[] };
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = tolerantParseTasks(cleaned);
   } catch {
     // Pokus o opravu truncated JSON — když token limit byl vyčerpán
     // uprostřed úkolu, oříznou se neúplné konce a doplní zavírací
@@ -275,7 +275,7 @@ ${transcript}
     const repaired = repairTruncatedTasksJson(cleaned);
     if (repaired) {
       try {
-        parsed = JSON.parse(repaired);
+        parsed = tolerantParseTasks(repaired);
         console.warn(`[task-extract] truncated JSON opraven, obnoveno ${(parsed.tasks ?? []).length} úkolů`);
       } catch (e2) {
         throw new Error(`Extrakce úkolů: nelze parse JSON ani po pokusu o opravu — ${e2 instanceof Error ? e2.message : String(e2)}. Prvních 200 znaků: ${raw.slice(0, 200)}`);
@@ -339,6 +339,64 @@ ${transcript}
  * Vrátí opravený JSON string, nebo null pokud oprava není možná
  * (např. první úkol je useknutý).
  */
+/**
+ * Petr 2026-05-27: tolerantní parser pro Vertex output:
+ *   - akceptuje `{ "tasks": [...] }` (správný formát z promptu)
+ *   - akceptuje root array `[ {...}, {...} ]` (Vertex občas ignoruje wrap)
+ *   - sní přebytky za prvním validním JSON (Vertex občas přidá komentář
+ *     nebo druhý JSON object po skončení)
+ *
+ * Strategie: najdi první balanced [ ... ] nebo { ... } scanem se stack
+ * tracking, parse jen tu část. Pokud root array → wrap do { tasks }.
+ */
+function tolerantParseTasks(raw: string): { tasks?: unknown[] } {
+  // Najdi první { nebo [
+  const trimmed = raw.trim();
+  const firstBrace = trimmed.indexOf("{");
+  const firstBracket = trimmed.indexOf("[");
+  let start = -1;
+  let openChar: "{" | "[" = "{";
+  if (firstBrace === -1 && firstBracket === -1) {
+    throw new Error("No JSON object/array found");
+  }
+  if (firstBrace === -1) { start = firstBracket; openChar = "["; }
+  else if (firstBracket === -1) { start = firstBrace; openChar = "{"; }
+  else if (firstBrace < firstBracket) { start = firstBrace; openChar = "{"; }
+  else { start = firstBracket; openChar = "["; }
+
+  const closeChar = openChar === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let end = -1;
+  for (let i = start; i < trimmed.length; i++) {
+    const c = trimmed[i];
+    if (escape) { escape = false; continue; }
+    if (c === "\\") { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === openChar) depth++;
+    else if (c === closeChar) {
+      depth--;
+      if (depth === 0) { end = i + 1; break; }
+    }
+  }
+  if (end === -1) {
+    // Nelze najít balanced end — necháme parse padnout a repairTruncated to chytí
+    throw new Error("Unbalanced JSON");
+  }
+  const slice = trimmed.slice(start, end);
+  const obj = JSON.parse(slice);
+  if (Array.isArray(obj)) {
+    return { tasks: obj };
+  }
+  if (obj && typeof obj === "object" && Array.isArray((obj as { tasks?: unknown[] }).tasks)) {
+    return obj as { tasks?: unknown[] };
+  }
+  // Object bez tasks pole — vrátíme prázdný
+  return { tasks: [] };
+}
+
 function repairTruncatedTasksJson(raw: string): string | null {
   // Najdi poslední `},` (= konec úkolu kterému následuje další)
   // nebo poslední `}` (= konec úkolu uvnitř pole)
