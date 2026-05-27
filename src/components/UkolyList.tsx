@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Plus, Check, Trash2, Loader2, Mic, User, UserCheck, Clock, Tag,
   AlertTriangle, Send, ExternalLink, Edit3, X, ChevronDown,
@@ -47,6 +47,12 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createdBanner, setCreatedBanner] = useState<number | null>(null);
+  // Petr 2026-05-27: nahrát audio přímo z /ukoly, bez redirectu na /ozvena.
+  // Mobile Safari blokuje programmatic click na file input z setTimeout (anti-popup),
+  // takže předchozí flow „klik → redirect → setTimeout fileInput.click()" na mobilu
+  // tichu padal. Tady ho otevíráme přímo z user gesture (onClick handler).
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     void loadContacts();
@@ -147,6 +153,33 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
     }
   }
 
+  /**
+   * Petr 2026-05-27: upload audio přímo z /ukoly. File picker se otevře v
+   * reakci na user click (= reliable na mobile Safari). Po úspěšném uploadu
+   * přesměrovat na batch review.
+   */
+  async function uploadAudioFile(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("audio", file);
+      fd.append("durationSec", "0"); // server si spočítá z bufferu
+      const res = await fetch("/api/ukoly/audio", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.batchId) {
+        setError(data.error ?? `Upload selhal (HTTP ${res.status}).`);
+        return;
+      }
+      // Přesměrovat na review screen — UI tam pollne status batche
+      window.location.href = `/ukoly/audio/${data.batchId}`;
+    } catch (e) {
+      setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Hlavička s tlačítky */}
@@ -155,9 +188,26 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
         <a href="/ozvena?mode=task">
           <Button variant="outline"><Mic /> Nadiktovat úkoly</Button>
         </a>
-        <a href="/ozvena?mode=task&upload=1">
-          <Button variant="outline">📎 Nahrát soubor</Button>
-        </a>
+        {/* File input je hidden, tlačítko ho clickne v user gesture handleru */}
+        <input
+          ref={audioFileInputRef}
+          type="file"
+          accept="audio/*,video/mp4,.m4a,.mp3,.opus,.ogg,.wav,.webm"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void uploadAudioFile(f);
+            // Reset, ať lze ten samý soubor vybrat znovu
+            e.target.value = "";
+          }}
+        />
+        <Button
+          variant="outline"
+          disabled={uploading}
+          onClick={() => audioFileInputRef.current?.click()}
+        >
+          {uploading ? <><Loader2 className="animate-spin" /> Nahrávám…</> : <>📎 Nahrát soubor</>}
+        </Button>
       </div>
 
       {createdBanner !== null && (
