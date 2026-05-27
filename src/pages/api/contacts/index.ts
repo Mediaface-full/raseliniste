@@ -44,25 +44,33 @@ export const GET: APIRoute = async ({ cookies, url }) => {
   const q = url.searchParams.get("q")?.trim() ?? "";
   const vipOnly = url.searchParams.get("vip") === "1";
   // Petr 2026-05-25: filter „lidi se kterými spolupracuju" pro task assignment.
-  // Když je ?team=1, vrať jen Contact.isTeam=true. Memberé jsou kandidáty na
-  // přiřazení úkolu z review screenu (TaskAudioReview).
-  const teamOnly = url.searchParams.get("team") === "1";
+  // ?team=1 nebo ?taskAssignable=1 — vrátí kontakty s isTeam=true NEBO
+  // clientTag set (klienti). Petr 2026-05-27: rozšířeno o klienty, ať
+  // může z review dropdownu přiřadit úkol klientovi (Klomínek atp.).
+  const teamOnly = url.searchParams.get("team") === "1" || url.searchParams.get("taskAssignable") === "1";
+
+  // Petr 2026-05-27: OR na top-level by se kolidoval, když je zapnutý team
+  // filter i search query. Skládáme přes AND, ať se OR větve neztratí.
+  const andConditions: Array<Record<string, unknown>> = [];
+  if (teamOnly) {
+    andConditions.push({ OR: [{ isTeam: true }, { clientTag: { not: null } }] });
+  }
+  if (q) {
+    andConditions.push({
+      OR: [
+        { displayName: { contains: q, mode: "insensitive" } },
+        { firstName: { contains: q, mode: "insensitive" } },
+        { lastName: { contains: q, mode: "insensitive" } },
+        { phones: { some: { number: { contains: q } } } },
+      ],
+    });
+  }
 
   const contacts = await prisma.contact.findMany({
     where: {
       userId: session.uid,
       ...(vipOnly ? { isVip: true } : {}),
-      ...(teamOnly ? { isTeam: true } : {}),
-      ...(q
-        ? {
-            OR: [
-              { displayName: { contains: q, mode: "insensitive" } },
-              { firstName: { contains: q, mode: "insensitive" } },
-              { lastName: { contains: q, mode: "insensitive" } },
-              { phones: { some: { number: { contains: q } } } },
-            ],
-          }
-        : {}),
+      ...(andConditions.length > 0 ? { AND: andConditions } : {}),
     },
     include: {
       phones: true,

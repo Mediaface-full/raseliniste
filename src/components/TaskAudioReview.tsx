@@ -40,6 +40,51 @@ interface Contact {
   id: string;
   displayName: string;
   firstName: string | null;
+  // Petr 2026-05-27: potřebujeme pro routing preview chip
+  isTeam: boolean;
+  clientTag: string | null;
+}
+
+/**
+ * Petr 2026-05-27: client-side preview kam úkol půjde v Todoistu.
+ * Zrcadlí pravidla z task-todoist-push.ts resolveRoute (bez side effects,
+ * bez Todoist API call). Pro skutečné rozhodnutí Team vs Personal projekt
+ * server kompletní logika rozhodne při push — tady stačí name preview.
+ *
+ * Priorita pravidel (první match vyhrává):
+ *  1. tag `klient-<slug>` v proposal.tags → projekt podle slugu
+ *  2. assignedToContact.clientTag → projekt podle slugu
+ *  3. assignedToContact.isTeam → „Práce / FirstName"
+ *  4. assignedToContact (kdokoli jiný) → „Lidé / FirstName"
+ *  5. nic → „Moje úkoly"
+ */
+function humanizeSlug(slug: string): string {
+  return slug.split("-").map((w) => (w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1))).join(" ");
+}
+
+function computeRoutePreview(
+  proposal: { tags: string[]; assignedToContactId: string | null },
+  contacts: Contact[],
+): { project: string; section: string | null } {
+  const KLIENT = "klient-";
+  const klientTag = proposal.tags.find((t) => t.startsWith(KLIENT));
+  if (klientTag) {
+    const slug = klientTag.slice(KLIENT.length);
+    return { project: "Práce", section: humanizeSlug(slug) };
+  }
+  const contact = proposal.assignedToContactId
+    ? contacts.find((c) => c.id === proposal.assignedToContactId)
+    : null;
+  if (contact?.clientTag) {
+    return { project: "Práce", section: humanizeSlug(contact.clientTag) };
+  }
+  if (contact?.isTeam) {
+    return { project: "Práce", section: contact.firstName ?? contact.displayName };
+  }
+  if (contact) {
+    return { project: "Lidé", section: contact.firstName ?? contact.displayName };
+  }
+  return { project: "Moje úkoly", section: null };
 }
 
 interface Proposal {
@@ -507,6 +552,21 @@ function ProposalRow({
                 AI nabídla: {proposal.assignedToContactName} (vyber kontakt ↑)
               </span>
             )}
+
+            {/* Petr 2026-05-27: preview kam to půjde v Todoistu — chip vedle
+                ostatních polí. Sleduje contact + klient-* tagy, mění se live
+                podle změny dropdownu kontaktu / tagu. */}
+            {(() => {
+              const route = computeRoutePreview(proposal, contacts);
+              return (
+                <span
+                  className="flex items-center gap-1 font-mono text-sm px-2 py-1 rounded border border-[var(--tint-sky)]/30 bg-[var(--tint-sky)]/10 text-[var(--tint-sky)]"
+                  title="Kam úkol půjde v Todoistu — počítáno z kontaktu a klient-* tagů. Pokud nesedí, doplň kontakt nebo tag."
+                >
+                  📁 {route.project}{route.section ? ` / ${route.section}` : ""}
+                </span>
+              );
+            })()}
 
             {/* Tagy — inline input s čárkou. Zachovává t-* tag mimo. */}
             <label className="flex items-center gap-1 flex-1 min-w-[160px]" title="Tagy oddělené čárkou (bez #, bez t-*)">
