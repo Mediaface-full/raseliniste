@@ -104,13 +104,23 @@ export default function InviteCreator() {
           publicNote: publicNote.trim() || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Vytvoření selhalo.");
+      const text = await res.text();
+      let data: { error?: string; url?: string; invite?: { id: string } } | null = null;
+      try { data = JSON.parse(text); } catch { /* not json */ }
+      if (!res.ok || !data?.url) {
+        // Petr 2026-05-27: nezahodit chybu tichu. Detailní text + console.error,
+        // aby Petr přehlédnutý error mohl dohledat.
+        const detail = data?.error ?? text?.slice(0, 400) ?? `HTTP ${res.status}`;
+        setError(detail);
+        console.error("[booking.invite] create failed", res.status, data ?? text);
         return;
       }
       setCreatedUrl(data.url);
       void loadInvites();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(`Síťová chyba: ${msg}`);
+      console.error("[booking.invite] network error", e);
     } finally {
       setBusy(false);
     }
@@ -321,8 +331,23 @@ export default function InviteCreator() {
         </Button>
 
         {error && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
-            <AlertTriangle className="size-4 shrink-0 mt-0.5" /> {error}
+          <div
+            className="rounded-lg border-2 border-destructive/60 bg-destructive/15 text-base px-4 py-3 flex items-start gap-3"
+            role="alert"
+            ref={(el) => { if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }}
+          >
+            <AlertTriangle className="size-5 shrink-0 mt-0.5 text-destructive" />
+            <div className="flex-1">
+              <div className="font-semibold text-destructive">Vytvoření pozvánky selhalo</div>
+              <div className="mt-1 leading-relaxed">{error}</div>
+              {error.toLowerCase().includes("email") && (
+                <div className="mt-2 text-sm">
+                  <a href="/contacts/tabulka" className="underline text-[var(--tint-sky)]">
+                    → Otevřít kontakty a doplnit email
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
