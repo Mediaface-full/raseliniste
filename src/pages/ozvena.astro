@@ -21,9 +21,23 @@ if (!user) return Astro.redirect("/login");
   manifestPath="/manifest-ozvena.json"
 >
   <main class="min-h-screen flex flex-col">
+    <!-- Petr 2026-05-27 #9: lepší navigace zpět — větší touch target,
+         primárně na /start (mobile dashboard), Dashboard jako sekundární. -->
     <div class="border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <a href="/" class="text-xs font-mono text-muted-foreground hover:text-foreground">← Dashboard</a>
-      <span class="text-xs font-mono text-muted-foreground">{user.username}</span>
+      <a
+        href="/start"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-sm font-medium"
+      >
+        <span aria-hidden>←</span>
+        <span>Start</span>
+      </a>
+      <a
+        href="/"
+        class="text-xs font-mono text-muted-foreground hover:text-foreground"
+      >
+        Dashboard
+      </a>
+      <span class="ml-auto text-xs font-mono text-muted-foreground">{user.username}</span>
     </div>
 
     <!-- Petr 2026-05-25: max-w-2xl → max-w-5xl, ať tabulky úkolů a review
