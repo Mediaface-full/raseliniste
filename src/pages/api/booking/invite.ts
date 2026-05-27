@@ -81,8 +81,14 @@ export const GET: APIRoute = async ({ cookies }) => {
       // Schovej zrušené a expirované — Gideon je nepotřebuje vidět v listu.
       // Když chce historii, dohledá v DB. Aktivní jsou: PENDING/VIEWED/RESERVED/CONFIRMED.
       status: { notIn: ["CANCELED", "EXPIRED"] },
-      // Plus skryj EVERGREEN šablonu pro /schuzka — to je interní template, ne pozvánka
-      NOT: { internalNote: "schuzka-public-evergreen" },
+      // Petr 2026-05-27: BUG FIX — předtím `NOT: { internalNote: "schuzka-..." }`
+      // skrýval kvůli SQL NULL three-valued logic VŠECHNY invites kde
+      // internalNote IS NULL (drtivá většina). Petr vytvořil 10 invitů, viděl jen 3.
+      // Fix: explicit OR (NULL je OK, nebo != evergreen).
+      OR: [
+        { internalNote: null },
+        { internalNote: { not: "schuzka-public-evergreen" } },
+      ],
     },
     orderBy: { createdAt: "desc" },
     take: 100,
