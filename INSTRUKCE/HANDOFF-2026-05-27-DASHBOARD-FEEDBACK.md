@@ -124,3 +124,68 @@ big day, ~26 commitů `dbebe81` → `2931dc1`).
 **Petr's final ask z této session: „pokracuj" a „udelame postupne vse" =
 všechno z 26-bodového seznamu hotové buď kódově, nebo doc-route s plánem
 pro budoucí session.**
+
+---
+
+## Dotažené detaily po prvním passu
+
+Po Petrově pochybnosti („je něco nedotaženo?") jsem identifikoval 3 částečné
+body a 1 přetrvávající z předchozí session. Vše bylo dotaženo:
+
+| Bod | Stav | Commit |
+|---|---|---|
+| #10 Studánka↔Prskavka switch v cílových stránkách | ✅ | `933bb1d` |
+| #18 Test deníku — viditelnost AI metadata v UI | ✅ | `933bb1d` |
+| #21 reminders.overrides v Google + location field | ✅ | `bae9111` |
+| DKIM SMTP2GO | ✅ — Petr: „je to validovany" (SMTP2GO admin Verified) |
+| Pošta classify 49/50 errors | ✅ tolerantní parser + token limit | `c574722` |
+
+**SMTP2GO DKIM uznání**: Petr mě opravil — SMTP2GO admin sám doménu
+verifikuje, i když z mého stroje `dig CNAME` selectory nevrací. Interní
+validace SMTP2GO postačí. Mail-tester score by potvrdil, ale není nutné.
+
+## Token náklady (zdokumentováno Petrovi)
+
+Pro budoucí session reference:
+
+| Akce | Tokens | Cena |
+|---|---|---|
+| Diktát 29 min audio (verified: 36 úkolů) | ~16k | ~3 Kč |
+| Diktát 2 min audio (typická salva) | ~10k | ~0,70 Kč |
+| Zápis do deníku (5 min audio) | ~25k | ~1,50 Kč |
+| Pošta classify (1 email, Flash) | ~3,5k | ~0,025 Kč |
+| Pošta classify (50 emails/den) | ~175k | ~2,50 Kč/den |
+| Studánka 15 min audio | ~50k | ~5 Kč |
+| Večerní briefing (1× denně) | ~5k | ~2,40 Kč |
+| **Typický den celkově** | **~130k** | **~13 Kč** |
+| **Měsíčně** | **~4M** | **~400 Kč** |
+
+Intenzivní použití: 800-1200 Kč/měsíc.
+
+UI tracking: `/settings/ai-usage` (denní/měsíční graf, per-module breakdown).
+
+## Klíčové learnings pro budoucí session
+
+1. **SMTP2GO „Verified" v admin = funkční DKIM**. Důvěřovat SMTP2GO admin UI,
+   ne dig z lokálního stroje (může propagovat pomalu / mít specifický selector).
+
+2. **Tolerantní JSON parser pattern** — aplikovaný v 2 místech:
+   - `process-task-audio.ts` → `tolerantParseTasks()`
+   - `posta-classify.ts` → `extractFirstBalancedObject()`
+   Princip: brace-stack scan s string/escape awareness, fallback ořezání
+   na poslední validní `}` + doplnění chybějících závorek. Univerzální
+   pro Gemini structured output truncation.
+
+3. **Gemini reasoning + maxOutputTokens** — bez explicit `thinkingBudget`
+   si model bere tokeny z output kvóty. Pro structured JSON output vždy
+   nastavit nízký budget (4096 pro Pro, 1024 pro Flash classify).
+
+4. **Apple/Google ETA „kdy vyrazit"** je nativní feature kalendářové appky,
+   ne náš. Vyžaduje (a) zapnuté Default Alerts → Time to Leave v iOS
+   Settings, (b) event s konkrétní adresou v Location field. Pojistka:
+   explicit `reminders.overrides` v createGoogleEvent (10/30/60 min předem
+   per slot.type).
+
+5. **Mobile UX patterns** — 44px touch targets (iOS minimum), grid-cols-3
+   na mobilu pro 5-7 tilů, segmentové pill switchy s tinted active state,
+   sekce empty state s positive hláškou („Nic nového. Klid.").

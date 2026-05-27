@@ -651,6 +651,51 @@ Sleduju trendy (HRV, klid v noci, kondice) — bez auto-feedu bych to nevedl. AI
   },
 
   {
+    slug: "notifikace",
+    title: "Notifikace",
+    icon: "lucide:bell",
+    tint: "butter",
+    oneLiner: "Agregace urgentních věcí — urgent maily, nové Studánka záznamy, VIP zprávy.",
+    href: "/notifikace",
+    sections: {
+      co_to_je: `
+Tile na /start vede sem. Sbírá z 3 zdrojů co potřebuje akci, ne všechno
+napříč modulech. Petr nemusí scannovat 4 různá místa, aby viděl co je
+urgentní.
+      `,
+      jak_to_ovladam: `
+- \`/start\` → tile **Notifikace** (zvonek, butter tint) s badge počtu
+- \`/notifikace\` → list karet, klik proklikne na detail
+- Karty mají chip typu (Studánka/Pošta/VIP) + ago timestamp + rozkliknutelné summary
+- Empty state „Nic nového. Klid." pokud nic urgent
+      `,
+      proc: `
+Petr 2026-05-27 #7: na mobilním dashboardu chci vědět co potřebuje akci
+hned, ne procházet jednotlivé moduly. Notifikace = single point of urgency.
+      `,
+      co_umi: `
+- Pošta: EmailMessage s action_required + (urgency=high OR escalation=true), za 48 h
+- Studánka: ProjectRecording z posledních 24 h ve status=processed
+  (nový obsah ke kontrole — owner nebo host)
+- VIP: CallLog wasVip=true za 48 h
+- Sortováno DESC podle času — nejnovější nahoře
+- Žádný cron, vše live z DB při otevření
+      `,
+      co_neumi: `
+- Mark-as-read flow (zatím notifikace mizí jen časem 24-48 h)
+- Push notifikace přes Web Push při nové eskalaci (zatím není)
+- Filter v UI (jen pošta / jen VIP / …) — pokud bude potřeba, doplníme
+      `,
+      napojeni: `
+- **Pošta** — EmailClassification (action_required, urgency, escalation)
+- **Studánka** — ProjectRecording (status=processed)
+- **VIP firewall** — CallLog (wasVip=true)
+- **/start tile** — badge počtu aktivních notifikací (countNotifications)
+      `,
+    },
+  },
+
+  {
     slug: "booking",
     title: "Booking pozvánka",
     icon: "lucide:send",
