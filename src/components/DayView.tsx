@@ -161,7 +161,8 @@ export default function DayView({ initial }: { initial: Initial }) {
 
   return (
     <div className="space-y-4">
-      {/* Přepínač Den / Týden / Měsíc */}
+      {/* Petr 2026-05-27 #12: Měsíc je na mobilu nepřehledný — odstraněn.
+          Týden zůstává (pro desktop overview), na mobilu se sluší jen Den. */}
       <div className="flex items-center justify-center gap-1">
         <span className="px-3 py-1 rounded-md bg-white/10 text-xs font-mono">Den</span>
         <a
@@ -169,12 +170,6 @@ export default function DayView({ initial }: { initial: Initial }) {
           className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
         >
           Týden
-        </a>
-        <a
-          href={`/calendar/mesic/${date.slice(0, 7)}${qs}`}
-          className="px-3 py-1 rounded-md text-xs font-mono text-muted-foreground hover:bg-white/5 hover:text-foreground"
-        >
-          Měsíc
         </a>
       </div>
 
