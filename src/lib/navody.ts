@@ -315,17 +315,24 @@ AI strukturuje podle CPTSD/ADHD-aware promptu: METADATA + tělo + POZNÁMKY EDIT
 - \`/denik/review/YYYY-MM\` — měsíční review (Vertex Pro, jen METADATA + POZNÁMKY EDITORA)
 - Vyhledávání: fulltext (bodyMarkdown + transcript + title) + filtry (lidé z LIDÉ, tagy z TÉMATA, datum, mood)
 - Identifier \`denik_RRRR-MM-DD\` v UI + tlačítko Stáhnout \`.txt\`
+- **Surový přepis (rawTranscript)** je vždy zachován vedle editovaného bodyMarkdown — v detailu pod sekcí „Surový přepis" (collapsed). AI úpravy se NEPŘEPISUJÍ přes originál.
       `,
       proc: `
 Klasický deník je pro mě moc volný. CPTSD potřebuje strukturu — metadata, mood, lidé, tagy.
 Měsíční review mi ukáže vzorce co bych si sám neviděl (vývoj, nedořešené nitky, lidé co se opakují).
       `,
       co_umi: `
-- AI strukturace per zápis (Flash/Pro)
+- AI strukturace per zápis (Flash/Pro) — METADATA hlavička s DATUM, NÁLADA, LIDÉ, TÉMATA, UDÁLOSTI, KLÍČOVÉ MOMENTY, NÁPADY
+- **Auto-tagy z TÉMATA** — lowercase, bez háčků, max 8 (filtruje se v UI chip listu)
+- **Auto-lidé z LIDÉ** — zachovává původní case (Karel, Dominik), max 12, filter chips
+- **Auto-highlights z KLÍČOVÉ MOMENTY** — pro rychlou orientaci, max 5
+- **Auto-nálada (mood enum)** — heuristic mapping z NÁLADA řádku na enum hodnotu
+- Surový přepis (rawTranscript) zachovaný vedle editovaného textu — nikdy se nepřepíše
 - Měsíční review jen z METADATA + POZNÁMKY (tělo se nečte → nevidí privátní detaily)
 - Audio retention 7 dní (\`audioRetainForever\` toggle ho zachová navždy)
-- Filtry: lidé/tagy/datum/mood
+- Filtry: lidé/tagy/datum/mood (v UI chip listu vpravo)
 - Stahování \`.txt\`
+- Petr 2026-05-27: AI prompt explicitně **zachovává jazyk uživatele** (sarkasmus, vulgarismy, neologismy, přezdívky). Nikdy neformalizuje, necenzuruje, nepsychologizuje.
       `,
       co_neumi: `
 - E2E šifrování — záznamy jsou v plain DB
