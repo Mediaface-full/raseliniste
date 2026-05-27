@@ -130,6 +130,14 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchId]);
 
+  // Petr 2026-05-27: stopky tickají každou sekundu, ne jen při polling
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => {
+    if (!batch || batch.status !== "processing") return;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [batch?.status]);
+
   // Polling pokud processing
   useEffect(() => {
     if (!batch || (batch.status !== "processing")) return;
@@ -283,19 +291,64 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
     return <div className="text-center py-12 text-muted-foreground"><Loader2 className="size-6 animate-spin mx-auto" /></div>;
   }
 
-  // PROCESSING
+  // PROCESSING — Petr 2026-05-27: viditelné fáze + stopky + warning při >5 min
   if (batch.status === "processing") {
+    // Detekce fáze podle dat: pokud transcript existuje → už jsme ve Stage 2.
+    const inExtraction = (batch.rawTranscript?.length ?? 0) > 50;
+    const phaseTitle = inExtraction ? "Vytahuji úkoly z přepisu" : "Přepisuji audio";
+    const phaseDesc = inExtraction
+      ? "AI projíždí přepis a vytváří návrhy úkolů. Trvá to typicky 30-90 sekund."
+      : "AI poslouchá tvé audio a píše přepis. Pro 30 minut to trvá 2-4 minuty.";
+    // Stopky od createdAt (nowTick tickne každou sekundu z useEffect výše)
+    const elapsedSec = Math.floor((nowTick - new Date(batch.createdAt).getTime()) / 1000);
+    const elM = Math.floor(elapsedSec / 60);
+    const elS = (elapsedSec % 60).toString().padStart(2, "0");
+    const stuckWarning = elapsedSec > 5 * 60;
+
     return (
       <div className="space-y-4">
-        <div className="glass-strong rounded-xl p-8 text-center">
-          <Loader2 className="size-12 animate-spin text-[var(--tint-peach)] mx-auto mb-3" />
-          <h1 className="font-serif text-xl mb-1">AI extrahuje úkoly</h1>
-          <p className="text-sm text-muted-foreground">Trvá to typicky 15-60 s. Můžeš zatím dělat něco jiného, stránka se sama obnoví.</p>
-          {batch.audioDurationSec && (
-            <p className="text-xs font-mono text-muted-foreground mt-2">
-              Audio: {Math.round(batch.audioDurationSec)} s
-            </p>
+        <div className="glass-strong rounded-xl p-8 text-center space-y-3">
+          {/* Step indicator */}
+          <div className="flex items-center justify-center gap-3 text-xs font-mono text-muted-foreground">
+            <span className={inExtraction ? "text-foreground/40 line-through" : "text-[var(--tint-peach)] font-bold"}>
+              1. Přepis
+            </span>
+            <span className="text-foreground/30">→</span>
+            <span className={inExtraction ? "text-[var(--tint-peach)] font-bold" : "text-foreground/40"}>
+              2. Úkoly
+            </span>
+          </div>
+
+          <Loader2 className={`size-12 animate-spin mx-auto ${stuckWarning ? "text-[var(--tint-rose)]" : "text-[var(--tint-peach)]"}`} />
+
+          <h1 className="font-serif text-xl">{phaseTitle}</h1>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">{phaseDesc}</p>
+
+          {/* Stopky */}
+          <div className={`text-2xl font-mono ${stuckWarning ? "text-[var(--tint-rose)]" : "text-foreground/80"}`}>
+            {elM}:{elS}
+          </div>
+
+          {/* Meta info */}
+          <div className="text-xs font-mono text-muted-foreground space-y-1">
+            {batch.audioDurationSec && (
+              <div>Audio: {Math.floor(batch.audioDurationSec / 60)}:{Math.floor(batch.audioDurationSec % 60).toString().padStart(2, "0")} ({Math.round(batch.audioDurationSec)} s)</div>
+            )}
+            {inExtraction && batch.rawTranscript && (
+              <div>Přepis: {batch.rawTranscript.length.toLocaleString("cs-CZ")} znaků</div>
+            )}
+          </div>
+
+          {stuckWarning && (
+            <div className="mt-4 rounded-lg border-2 border-[var(--tint-rose)]/50 bg-[var(--tint-rose)]/10 px-4 py-3 text-sm">
+              <strong>Hm, trvá to déle než obvykle.</strong> Pro dlouhá audia (45+ min) to může být normální,
+              ale pokud stojí na místě 10+ minut, něco se zaseklo. Zkus refresh stránky nebo nahrát znovu.
+            </div>
           )}
+
+          <p className="text-xs text-muted-foreground/70 mt-2">
+            Stránka se obnovuje sama každé 3 sekundy. Můžeš zatím dělat něco jiného.
+          </p>
         </div>
       </div>
     );
