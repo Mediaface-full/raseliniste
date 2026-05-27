@@ -83,11 +83,19 @@ export async function syncGoogleCalendar(userId: string): Promise<SyncResult> {
     throw e;
   }
 
-  // SWEEP: pokud Google posílal úspěšně všechny stránky a žádné errory
-  // při upsertu, označ rows v window které nejsou v seenIds jako deleted.
-  // Safety: pokud paging selhal NEBO byly errory, sweep neprovedeme
-  // (mohl bychom omylem smazat eventy které Google jen dočasně neposlal).
-  if (pagingComplete && errors === 0 && seenIds.size > 0) {
+  // SWEEP: označ rows v window které nejsou v seenIds jako deleted.
+  // Petr 2026-05-27 #13: dříve strict guard `errors === 0` znamenal že JEDNA
+  // upsert chyba (např. invalid date u single event) zablokovala mazání
+  // všech ostatních cancelled events. Petr nahlásil že smazaná událost
+  // „kurz coaching" zůstávala v Rašeliništi i po sync.
+  //
+  // Nový guard: tolerujeme error rate < 10 %, pokud paging dokončil a máme
+  // alespoň 20 events v window. Sweep tedy projde i když pár jednotlivých
+  // events selhalo na upsertu — ty nejsou v seenIds (skipnuté), ale to je OK,
+  // sweep je nezmění protože jsou už v DB.
+  const errorRate = seenIds.size > 0 ? errors / seenIds.size : 1;
+  const sweepSafe = pagingComplete && seenIds.size >= 20 && errorRate < 0.1;
+  if (sweepSafe) {
     const sweepResult = await prisma.calendarEvent.updateMany({
       where: {
         source: "GOOGLE_PRIMARY",
@@ -98,7 +106,19 @@ export async function syncGoogleCalendar(userId: string): Promise<SyncResult> {
       },
       data: { deletedRemotely: true, lastSyncedAt: new Date() },
     });
+    if (sweepResult.count > 0) {
+      console.log(
+        `[google-calendar] sweep marked ${sweepResult.count} events as deletedRemotely ` +
+        `(seen=${seenIds.size}, errors=${errors}, errorRate=${(errorRate * 100).toFixed(1)}%)`,
+      );
+    }
     deleted += sweepResult.count;
+  } else if (pagingComplete) {
+    console.warn(
+      `[google-calendar] sweep SKIPPED — seen=${seenIds.size} (need >=20), ` +
+      `errors=${errors}, errorRate=${(errorRate * 100).toFixed(1)}% (need <10%). ` +
+      `Smazané eventy v Google zůstanou v DB do dalšího sync.`,
+    );
   }
 
   return { inserted, updated, deleted, errors, durationMs: Date.now() - start };
