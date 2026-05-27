@@ -1,0 +1,126 @@
+---
+import Base from "../layouts/Base.astro";
+import { Icon } from "astro-icon/components";
+import { readSession } from "../lib/session";
+import { loadNotifications } from "../lib/notifications";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const items = await loadNotifications(session.uid);
+
+// Formátování času „před X min/h/d"
+function ago(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "právě teď";
+  if (min < 60) return `před ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `před ${h} h`;
+  const d = Math.floor(h / 24);
+  return `před ${d} d`;
+}
+
+const typeMeta: Record<string, { label: string; icon: string; tint: string }> = {
+  studanka: { label: "Studánka", icon: "lucide:waves", tint: "mint" },
+  posta: { label: "Pošta", icon: "lucide:mail", tint: "sky" },
+  vip: { label: "VIP", icon: "lucide:star", tint: "rose" },
+};
+---
+
+<Base title="Notifikace · Rašeliniště" appleTitle="Notifikace" appleCapable={true}>
+  <main class="min-h-screen flex flex-col">
+    <div class="border-b border-white/5 px-4 py-3 flex items-center gap-3">
+      <a href="/start" class="text-xs font-mono text-muted-foreground hover:text-foreground">← Start</a>
+      <span class="text-xs font-mono text-muted-foreground">Notifikace</span>
+    </div>
+
+    <div class="flex-1 px-4 sm:px-6 pt-6 pb-8">
+      <div class="w-full max-w-2xl mx-auto space-y-3">
+        <header class="text-center mb-4">
+          <div class="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-1">
+            posledních 24-48 h
+          </div>
+          <h1 class="text-2xl tracking-tight">Notifikace</h1>
+          <p class="text-sm text-muted-foreground mt-1">
+            {items.length === 0
+              ? "Nic nového. Klid."
+              : `${items.length} ${items.length === 1 ? "položka" : items.length < 5 ? "položky" : "položek"} ke kontrole.`}
+          </p>
+        </header>
+
+        {items.length === 0 && (
+          <div class="glass rounded-2xl p-8 text-center text-muted-foreground">
+            <Icon name="lucide:check-circle-2" class="size-12 mx-auto mb-2 text-[var(--tint-sage)]" />
+            <div class="text-sm">Žádné urgentní e-maily, žádné nové nahrávky, žádné VIP zprávy.</div>
+          </div>
+        )}
+
+        {items.map((item) => {
+          const meta = typeMeta[item.type];
+          return (
+            <a
+              href={item.href}
+              class="block glass rounded-xl p-4 hover:bg-white/[0.03] transition"
+              style={`--c: var(--tint-${meta.tint});`}
+            >
+              <div class="flex items-start gap-3">
+                <div
+                  class="size-10 rounded-lg grid place-items-center shrink-0 [&>svg]:size-5"
+                  style="background: color-mix(in oklch, var(--c) 20%, transparent); color: var(--c);"
+                >
+                  <Icon name={meta.icon} class="size-5" />
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-baseline gap-2 mb-1">
+                    <span class="text-[10px] uppercase tracking-wider font-mono" style="color: var(--c);">
+                      {meta.label}
+                    </span>
+                    {item.type === "posta" && item.meta.escalation && (
+                      <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-[var(--tint-rose)]/20 text-[var(--tint-rose)]">
+                        eskalace
+                      </span>
+                    )}
+                    {item.type === "vip" && item.meta.isUrgent && (
+                      <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-[var(--tint-rose)]/20 text-[var(--tint-rose)]">
+                        urgent
+                      </span>
+                    )}
+                    <span class="ml-auto text-xs font-mono text-muted-foreground shrink-0">{ago(item.time)}</span>
+                  </div>
+
+                  <div class="text-base font-medium leading-snug mb-1">{item.title}</div>
+
+                  {item.type === "posta" && (
+                    <div class="text-xs text-muted-foreground mb-1.5">od {item.meta.from}</div>
+                  )}
+                  {item.type === "studanka" && (
+                    <div class="text-xs text-muted-foreground mb-1.5">
+                      autor {item.meta.authorName} · {item.meta.recordingType}
+                    </div>
+                  )}
+
+                  {item.summary && (
+                    <details class="text-sm text-foreground/80 leading-relaxed">
+                      <summary class="cursor-pointer text-xs text-muted-foreground hover:text-foreground transition">
+                        ▸ summary
+                      </summary>
+                      <div class="mt-2 whitespace-pre-wrap">{item.summary}</div>
+                    </details>
+                  )}
+
+                  {item.type === "posta" && item.meta.suggestedAction && (
+                    <div class="mt-2 text-xs italic text-[var(--tint-sky)]">
+                      → {item.meta.suggestedAction}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  </main>
+</Base>

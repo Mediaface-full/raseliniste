@@ -4,6 +4,7 @@ import { Icon } from "astro-icon/components";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 import { svatekDne } from "../lib/jmenny-kalendar";
+import { countNotifications } from "../lib/notifications";
 import SchedulerStatus from "../components/SchedulerStatus.astro";
 import bwMysSvg from "../assets/icons/bw-mys.svg?raw";
 import miseRaketaSvg from "../assets/icons/mise-raketa.svg?raw";
@@ -53,6 +54,9 @@ const [user, contactsWithBirthday, anniversaries, upcomingEvents] = await Promis
     take: 2,
   }),
 ]);
+
+// Petr 2026-05-27 #7: počet notifikací pro badge na tile
+const notificationCount = await countNotifications(session.uid);
 if (!user) return Astro.redirect("/login");
 
 type Tile = {
@@ -70,10 +74,12 @@ type Tile = {
 //  #10 — sloučit Studánka + Prskavka → Záznamy (přepínač uvnitř)
 //  #11 — odstranit Týden tile
 const tilesPrimary: Tile[] = [
-  { href: "/dnes",         title: "Mise",       icon: "custom:mise-raketa",             tint: "sky" },
-  { href: "/ozvena",       title: "Ozvěna",     icon: "lucide:mic",                     tint: "peach" },
-  { href: "/zeptat-se",    title: "Zeptat se",  icon: "lucide:message-circle-question", tint: "sage" },
-  { href: "/zijes/novy",   title: "ŽIJEŠ?",     icon: "lucide:heart-pulse",             tint: "pink" },
+  { href: "/dnes",         title: "Mise",         icon: "custom:mise-raketa",             tint: "sky" },
+  { href: "/notifikace",   title: "Notifikace",   icon: "lucide:bell",                    tint: "butter",
+    badge: notificationCount > 0 ? String(notificationCount) : undefined },
+  { href: "/ozvena",       title: "Ozvěna",       icon: "lucide:mic",                     tint: "peach" },
+  { href: "/zeptat-se",    title: "Zeptat se",    icon: "lucide:message-circle-question", tint: "sage" },
+  { href: "/zijes/novy",   title: "ŽIJEŠ?",       icon: "lucide:heart-pulse",             tint: "pink" },
 ];
 
 const tilesAudio: Tile[] = [
