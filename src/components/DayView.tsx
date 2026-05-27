@@ -214,7 +214,7 @@ export default function DayView({ initial }: { initial: Initial }) {
         </div>
       )}
 
-      {/* Při cestě / errands */}
+      {/* Při cestě — manuální DayNote per den (úkoly k vyřízení cestou) */}
       <section className="glass rounded-xl p-5" style={{ ["--c" as string]: "var(--tint-peach)" }}>
         <div className="flex items-center gap-2 mb-3">
           <MapPin className="size-4" style={{ color: "var(--c)" }} />
@@ -226,7 +226,7 @@ export default function DayView({ initial }: { initial: Initial }) {
 
         <div className="space-y-2">
           {dayNotes.length === 0 && (
-            <div className="text-sm text-muted-foreground italic">Žádné errands. Přidej co potřebuješ stihnout cestou.</div>
+            <div className="text-sm text-muted-foreground italic">Žádné pochůzky. Přidej co potřebuješ stihnout cestou.</div>
           )}
           {dayNotes.map((n) => (
             <div
@@ -259,20 +259,29 @@ export default function DayView({ initial }: { initial: Initial }) {
           ))}
         </div>
 
-        {/* Add new */}
+        {/* Petr 2026-05-27: hint nad inputem — Petr nevěděl kam zadat „co vzít
+            s sebou". Tady je to manuální cesta (DayNote per konkrétní den).
+            AI itemsToBring (z Google event description) je automatická vrstva,
+            tohle je „přidej ručně co tě napadlo". */}
         <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
+          <div className="text-xs text-muted-foreground leading-relaxed">
+            Sem napiš co vzít s sebou nebo kam zajet po cestě k dnešním
+            schůzkám. Např. „vzít projektovou složku", „vyzvednout balíček
+            v AlzaBoxu Smíchov".
+          </div>
           <Input
-            placeholder="Co stihnout cestou (např. AlzaBox Smíchov)"
+            placeholder="Co stihnout cestou nebo vzít s sebou"
             value={newText}
             onChange={(e) => setNewText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) addNote(); }}
           />
           <div className="flex gap-2">
             <Input
-              placeholder="Oblast (volitelně)"
+              placeholder="Oblast / lokalita (volitelně, např. Smíchov)"
               value={newArea}
               onChange={(e) => setNewArea(e.target.value)}
               className="flex-1"
+              title="Oblast je jen vizuální štítek vpravo u položky — pomáhá zorientovat se kam to zajet. Není povinné."
             />
             <Button onClick={addNote} disabled={Boolean(busy) || !newText.trim()}>
               {busy === "add" ? <Loader2 className="animate-spin" /> : <Plus />} Přidat
