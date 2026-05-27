@@ -246,11 +246,12 @@ ${transcript}
       contents: prompt,
       config: {
         temperature: 0.2,
-        // Petr 2026-05-27: 12 000 selhalo na truncation pro 29min audio s
-        // 30+ úkoly (AI midway useknul + chybělo zavírací `]`). Zvednuto
-        // na 30 000 tokenů ≈ ~22 000 slov / 80-100 úkolů s detaily a notes.
-        // Gemini 2.5 Pro stále drží v output budgetu.
-        maxOutputTokens: 30_000,
+        // Petr 2026-05-27: Gemini 2.5 Pro output limit je 65 535 tokenů,
+        // ALE zahrnuje thinking tokens. Pro extrakci 100+ úkolů potřebujeme
+        // co nejvíc output budgetu, ne thinking. Explicit nízký thinking
+        // budget + velký output.
+        thinkingConfig: { thinkingBudget: 4096 },
+        maxOutputTokens: 60_000,
         responseMimeType: "application/json",
       },
     }),
