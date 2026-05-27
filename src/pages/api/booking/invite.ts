@@ -25,13 +25,23 @@ const schema = z.object({
  */
 export const POST: APIRoute = async ({ request, cookies }) => {
   const session = await readSession(cookies);
-  if (!session) return Response.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+  if (!session) {
+    console.warn("[booking.invite] POST 401 — UNAUTHENTICATED (cookies expired?)");
+    return Response.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
+    console.warn("[booking.invite] POST 400 — invalid input:", parsed.error.issues);
     return Response.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 400 });
   }
+  // Petr 2026-05-27: log každý pokus o vytvoření, ať máme stopu když Petr
+  // nahlásí „pozvánky se neuložily". Předtím Astro logoval jen errors a 401 ne.
+  console.log(
+    `[booking.invite] POST — contactId=${parsed.data.contactId ?? "null"} mode=${parsed.data.mode} ` +
+    `meetingType=${parsed.data.meetingType} availableFrom=${parsed.data.availableFrom ?? "none"}`,
+  );
 
   try {
     // availableFrom: YYYY-MM-DD nebo plný ISO. Parse → Date, nebo null pokud
@@ -50,9 +60,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       }
     }
     const result = await createInvite({ ...parsed.data, availableFrom });
+    console.log(`[booking.invite] CREATED id=${result.invite.id} token=${result.invite.token.slice(0, 8)}…`);
     return Response.json(result);
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[booking.invite] POST 500 — createInvite failed:`, msg);
+    return Response.json({ error: msg }, { status: 500 });
   }
 };
 
