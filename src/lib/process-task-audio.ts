@@ -246,10 +246,11 @@ ${transcript}
       contents: prompt,
       config: {
         temperature: 0.2,
-        // 12 000 tokenů ≈ ~9 000 slov / cca 50 úkolů s detaily.
-        // Pro Petrovu salvu (10-30 úkolů) bohatě stačí. Předtím 4 000
-        // selhávalo na truncated JSON u dlouhých diktátů.
-        maxOutputTokens: 12_000,
+        // Petr 2026-05-27: 12 000 selhalo na truncation pro 29min audio s
+        // 30+ úkoly (AI midway useknul + chybělo zavírací `]`). Zvednuto
+        // na 30 000 tokenů ≈ ~22 000 slov / 80-100 úkolů s detaily a notes.
+        // Gemini 2.5 Pro stále drží v output budgetu.
+        maxOutputTokens: 30_000,
         responseMimeType: "application/json",
       },
     }),

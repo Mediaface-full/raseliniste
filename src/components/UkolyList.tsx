@@ -171,8 +171,9 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
         setError(data.error ?? `Upload selhal (HTTP ${res.status}).`);
         return;
       }
-      // Přesměrovat na review screen — UI tam pollne status batche
-      window.location.href = `/ukoly/audio/${data.batchId}`;
+      // Přesměrovat na review screen — Petr 2026-05-27: route je
+      // /ukoly/audio/<id>/review (review.astro), ne bez suffixu.
+      window.location.href = `/ukoly/audio/${data.batchId}/review`;
     } catch (e) {
       setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
