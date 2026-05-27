@@ -64,25 +64,25 @@ type Tile = {
   badge?: string;
 };
 
-// Petr 2026-05-25: dvě sekce — hlavní (denní akce) + audio cluster (Studánka,
-// Nahrát audio, Prskavka, Myši) je teď pod fold, ať na první obrazovce nesvítí.
-// Také prohozeno pořadí Deník<->Úkoly.
+// Petr 2026-05-27 zpětná vazba mobilní dashboard:
+//  #6 — ikonky menší, 3 do řádku (grid-cols-3)
+//  #8 — sloučit Úkoly + Deník → Ozvěna (jeden tile na /ozvena)
+//  #10 — sloučit Studánka + Prskavka → Záznamy (přepínač uvnitř)
+//  #11 — odstranit Týden tile
 const tilesPrimary: Tile[] = [
-  { href: "/dnes",                title: "Mise",       icon: "custom:mise-raketa",             tint: "sky" },
-  { href: "/calendar/tyden",      title: "Týden",      icon: "lucide:calendar-days",           tint: "lavender" },
-  { href: "/ozvena?mode=task",    title: "Úkoly",      icon: "lucide:check-square",            tint: "peach" },
-  { href: "/ozvena?mode=journal", title: "Deník",      icon: "lucide:book-open",               tint: "butter" },
-  { href: "/zeptat-se",           title: "Zeptat se",  icon: "lucide:message-circle-question", tint: "sage" },
-  { href: "/zijes/novy",          title: "ŽIJEŠ?",     icon: "lucide:heart-pulse",             tint: "pink" },
+  { href: "/dnes",         title: "Mise",       icon: "custom:mise-raketa",             tint: "sky" },
+  { href: "/ozvena",       title: "Ozvěna",     icon: "lucide:mic",                     tint: "peach" },
+  { href: "/zeptat-se",    title: "Zeptat se",  icon: "lucide:message-circle-question", tint: "sage" },
+  { href: "/zijes/novy",   title: "ŽIJEŠ?",     icon: "lucide:heart-pulse",             tint: "pink" },
 ];
 
 const tilesAudio: Tile[] = [
-  { href: "/studna/nahravka",          title: "Studánka",      icon: "lucide:waves",     tint: "mint" },
-  // ?upload=1 auto-otevře upload card hned po načtení (stejný pattern jako
-  // /ozvena?upload=1 pro úkoly+deník).
-  { href: "/studna/nahravka?upload=1", title: "Nahrát audio",  icon: "lucide:upload",    tint: "lavender" },
-  { href: "/prskavka/nahravka",        title: "Prskavka",      icon: "lucide:sparkles",  tint: "rose" },
-  { href: "/bwmys",                    title: "Myši",          icon: "custom:bw-mys",    tint: "sage" },
+  // Záznamy = sloučená Studánka + Prskavka. Default /studna/nahravka,
+  // přepínač Studánka↔Prskavka uvnitř té stránky (dodělá se v dalším kroku).
+  { href: "/studna/nahravka",          title: "Záznamy",      icon: "lucide:waves",     tint: "mint" },
+  // ?upload=1 auto-otevře upload card hned po načtení
+  { href: "/studna/nahravka?upload=1", title: "Nahrát audio", icon: "lucide:upload",    tint: "lavender" },
+  { href: "/bwmys",                    title: "Myši",         icon: "custom:bw-mys",    tint: "rose" },
 ];
 
 const today = new Date();
@@ -237,11 +237,11 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
         )}
 
         {/* Hlavní sekce — denní akce */}
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-3 gap-2.5">
           {tilesPrimary.map((tile) => (
             <a
               href={tile.href}
-              class="glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition hover:bg-white/5 active:scale-[0.98]"
+              class="glass rounded-2xl p-3 relative overflow-hidden flex flex-col items-start gap-1.5 min-h-[80px] transition hover:bg-white/5 active:scale-[0.98]"
               style={`--c: var(--tint-${tile.tint});`}
             >
               <div
@@ -249,7 +249,7 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
                 style="background: color-mix(in oklch, var(--c) 28%, transparent);"
               ></div>
               <div
-                class="size-10 rounded-xl grid place-items-center [&>svg]:size-5"
+                class="size-8 rounded-lg grid place-items-center [&>svg]:size-4"
                 style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
               >
                 {tile.icon === "custom:bw-mys" ? (
@@ -257,10 +257,10 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
                 ) : tile.icon === "custom:mise-raketa" ? (
                   <Fragment set:html={miseRaketaSvg} />
                 ) : (
-                  <Icon name={tile.icon} class="size-5" />
+                  <Icon name={tile.icon} class="size-4" />
                 )}
               </div>
-              <div class="relative mt-auto text-base font-semibold tracking-tight flex items-center gap-2">
+              <div class="relative mt-auto text-sm font-semibold tracking-tight flex items-center gap-2">
                 {tile.title}
                 {tile.badge && (
                   <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">
@@ -277,11 +277,11 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
           <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground/70 px-1">
             Nahrávání
           </div>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-3 gap-2.5">
             {tilesAudio.map((tile) => (
               <a
                 href={tile.href}
-                class="glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[88px] transition hover:bg-white/5 active:scale-[0.98]"
+                class="glass rounded-2xl p-3 relative overflow-hidden flex flex-col items-start gap-1.5 min-h-[72px] transition hover:bg-white/5 active:scale-[0.98]"
                 style={`--c: var(--tint-${tile.tint});`}
               >
                 <div
@@ -289,16 +289,16 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
                   style="background: color-mix(in oklch, var(--c) 22%, transparent);"
                 ></div>
                 <div
-                  class="size-9 rounded-xl grid place-items-center [&>svg]:size-5"
+                  class="size-8 rounded-lg grid place-items-center [&>svg]:size-4"
                   style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
                 >
                   {tile.icon === "custom:bw-mys" ? (
                     <Fragment set:html={bwMysSvg} />
                   ) : (
-                    <Icon name={tile.icon} class="size-5" />
+                    <Icon name={tile.icon} class="size-4" />
                   )}
                 </div>
-                <div class="relative mt-auto text-sm font-semibold tracking-tight">
+                <div class="relative mt-auto text-xs font-semibold tracking-tight">
                   {tile.title}
                 </div>
               </a>
