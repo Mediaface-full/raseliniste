@@ -31,6 +31,8 @@ interface Task {
   completedAt: string | null;
   createdAt: string;
   assignedToContact: { id: string; displayName: string } | null;
+  // Petr 2026-05-27: pomocné pole pro patchování (API endpoint ho akceptuje)
+  assignedToContactId?: string | null;
 }
 
 interface TagCount { tag: string; count: number; }
@@ -93,7 +95,8 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
   }
 
   async function loadContacts() {
-    const res = await fetch("/api/contacts");
+    // Petr 2026-05-27 #16: jen tým + klienti, ne celý adresář (stejně jako review screen)
+    const res = await fetch("/api/contacts?team=1");
     if (res.ok) {
       const data = await res.json();
       setContacts(data.contacts ?? data);
@@ -596,45 +599,69 @@ function EditInline({
   const [priority, setPriority] = useState(task.priority);
   const [assigned, setAssigned] = useState(task.assignedToContact?.id ?? "");
 
+  // Petr 2026-05-27 #16+#17: mobile-friendly grid — místo 3 kolony se na
+  // mobilu pole zalomí pod sebe (sm:grid-cols-3). Větší touch targets +
+  // labely u inputů, ať Petr ví co je co.
   return (
-    <div className="mt-3 pt-3 border-t border-white/5 space-y-2">
-      <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-      <textarea
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={2}
-        placeholder="Poznámka"
-        className="w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm resize-none"
-      />
-      <div className="grid grid-cols-3 gap-2">
-        <input
-          type="date"
-          value={dueAt}
-          onChange={(e) => setDueAt(e.target.value)}
-          className="px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm"
-        />
-        <select
-          value={priority}
-          onChange={(e) => setPriority(e.target.value as "low" | "normal" | "high")}
-          className="px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm"
-        >
-          <option value="low">Low</option>
-          <option value="normal">Normal</option>
-          <option value="high">High</option>
-        </select>
-        <select
-          value={assigned}
-          onChange={(e) => setAssigned(e.target.value)}
-          className="px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm"
-        >
-          <option value="">Já</option>
-          {contacts.map((c) => <option key={c.id} value={c.id}>{c.displayName}</option>)}
-        </select>
+    <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+      <div>
+        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Název</label>
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" />
       </div>
-      <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="tagy (čárkou)" />
-      <div className="flex gap-2">
+
+      <div>
+        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Poznámka</label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          placeholder="Kontext, detaily, odkazy…"
+          className="w-full mt-1 rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm resize-y"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Datum</span>
+          <input
+            type="date"
+            value={dueAt}
+            onChange={(e) => setDueAt(e.target.value)}
+            className="w-full mt-1 px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Priorita</span>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value as "low" | "normal" | "high")}
+            className="w-full mt-1 px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
+          >
+            <option value="low">↓ Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">! Priorita</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Komu</span>
+          <select
+            value={assigned}
+            onChange={(e) => setAssigned(e.target.value)}
+            className="w-full mt-1 px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
+          >
+            <option value="">Já</option>
+            {contacts.map((c) => <option key={c.id} value={c.id}>{c.displayName}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div>
+        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">Tagy (čárkou)</label>
+        <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="firma, dum, t-1h" className="mt-1" />
+      </div>
+
+      <div className="flex gap-2 pt-1">
         <Button
-          size="sm"
           onClick={() => onSave({
             title,
             notes: notes || null,
@@ -644,7 +671,7 @@ function EditInline({
             assignedToContactId: assigned || null,
           })}
         ><Check /> Uložit</Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}><X /> Zrušit</Button>
+        <Button variant="ghost" onClick={onCancel}><X /> Zrušit</Button>
       </div>
     </div>
   );
