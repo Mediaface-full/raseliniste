@@ -18,6 +18,7 @@ interface Entry {
   rawTranscript: string | null;
   mood: Mood | null;
   tags: string[];
+  people: string[];
   highlights: string[];
   audioPath: string | null;
   audioRetainForever: boolean;
@@ -218,13 +219,34 @@ export default function JournalEntryView({ entryId }: { entryId: string }) {
           <div className="prose prose-invert max-w-none text-sm whitespace-pre-wrap leading-relaxed">
             {entry.bodyMarkdown}
           </div>
-          {entry.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-3 border-t border-white/5">
-              {entry.tags.map((t) => (
-                <span key={t} className="text-xs font-mono px-2 py-0.5 rounded bg-white/5 text-muted-foreground">
-                  #{t}
-                </span>
-              ))}
+          {/* Petr 2026-05-27 #18+#19: explicitně zobrazit AI-extracted metadata
+              (tags + people), ať Petr vidí že auto-tagging funguje a může
+              ověřit kvalitu extrakce. */}
+          {(entry.tags.length > 0 || entry.people.length > 0) && (
+            <div className="pt-3 border-t border-white/5 space-y-2">
+              <div className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground">
+                AI extrakce z hlavičky METADATA
+              </div>
+              {entry.people.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-mono text-muted-foreground">Lidé:</span>
+                  {entry.people.map((p) => (
+                    <span key={p} className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--tint-lavender)]/15 text-[var(--tint-lavender)]">
+                      @{p}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {entry.tags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-mono text-muted-foreground">Tagy:</span>
+                  {entry.tags.map((t) => (
+                    <span key={t} className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--tint-sky)]/15 text-[var(--tint-sky)]">
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </article>
