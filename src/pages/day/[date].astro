@@ -24,7 +24,12 @@ if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
 const dayStart = new Date(`${dateStr}T00:00:00`);
 const dayEnd = new Date(`${dateStr}T23:59:59.999`);
 
-const [events, dayNotes, briefingDigest, ruleViolations] = await Promise.all([
+// Petr 2026-05-27: druhý briefing pro ZÍTŘEK (z perspektivy zobrazovaného dne).
+// Petr chce v /dnes vidět briefing co se chystá zítra, ne jen pro dnes.
+const tomorrowStart = new Date(dayStart);
+tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+const [events, dayNotes, briefingDigest, briefingDigestTomorrow, ruleViolations] = await Promise.all([
   prisma.calendarEvent.findMany({
     where: {
       deletedRemotely: false,
@@ -39,6 +44,7 @@ const [events, dayNotes, briefingDigest, ruleViolations] = await Promise.all([
     orderBy: [{ done: "asc" }, { createdAt: "asc" }],
   }),
   prisma.briefingDigest.findUnique({ where: { forDate: dayStart } }),
+  prisma.briefingDigest.findUnique({ where: { forDate: tomorrowStart } }),
   prisma.ruleViolation.findMany({
     where: { forDate: dayStart },
     orderBy: { createdAt: "asc" },
@@ -133,6 +139,15 @@ const initial = {
         forDate: briefingDigest.forDate.toISOString(),
         generatedAt: briefingDigest.generatedAt.toISOString(),
         pushedAt: briefingDigest.pushedAt?.toISOString() ?? null,
+      }
+    : null,
+  // Petr 2026-05-27: druhý briefing pro zítřek (z perspektivy zobrazovaného dne)
+  briefingDigestTomorrow: briefingDigestTomorrow
+    ? {
+        ...briefingDigestTomorrow,
+        forDate: briefingDigestTomorrow.forDate.toISOString(),
+        generatedAt: briefingDigestTomorrow.generatedAt.toISOString(),
+        pushedAt: briefingDigestTomorrow.pushedAt?.toISOString() ?? null,
       }
     : null,
   ruleViolations,

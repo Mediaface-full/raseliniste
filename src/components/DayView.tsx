@@ -48,6 +48,8 @@ interface Initial {
   events: CalendarEvent[];
   dayNotes: DayNote[];
   briefingDigest: BriefingDigest | null;
+  // Petr 2026-05-27: druhý briefing pro zítřek
+  briefingDigestTomorrow?: BriefingDigest | null;
   ruleViolations: RuleViolation[];
 }
 
@@ -57,6 +59,12 @@ export default function DayView({ initial }: { initial: Initial }) {
   const [dayNotes, setDayNotes] = useState<DayNote[]>(initial.dayNotes);
   const [violations] = useState<RuleViolation[]>(initial.ruleViolations);
   const [briefing, setBriefing] = useState<BriefingDigest | null>(initial.briefingDigest);
+  // Petr 2026-05-27: druhý briefing pro zítřek + tab switch
+  const [briefingTomorrow, setBriefingTomorrow] = useState<BriefingDigest | null>(initial.briefingDigestTomorrow ?? null);
+  const [briefingTab, setBriefingTab] = useState<"today" | "tomorrow">(
+    // Default: zítřek pokud existuje, jinak dnes
+    initial.briefingDigestTomorrow ? "tomorrow" : "today"
+  );
 
   const [newText, setNewText] = useState("");
   const [newArea, setNewArea] = useState("");
@@ -136,11 +144,19 @@ export default function DayView({ initial }: { initial: Initial }) {
     }
   }
 
-  async function generateBriefing(force: boolean) {
+  // Pomocný: spočítá YYYY-MM-DD pro zítřek z `date`
+  function tomorrowDate(): string {
+    const d = new Date(`${date}T00:00:00`);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  async function generateBriefing(force: boolean, target: "today" | "tomorrow" = "today") {
     setBusy("brief");
     setError(null);
     try {
-      const res = await fetch(`/api/day/${date}/briefing`, {
+      const targetDate = target === "today" ? date : tomorrowDate();
+      const res = await fetch(`/api/day/${targetDate}/briefing`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ force, push: true }),
@@ -150,10 +166,15 @@ export default function DayView({ initial }: { initial: Initial }) {
         setError(data.error ?? "Generování selhalo.");
         return;
       }
-      // Reload briefing data
-      const dayRes = await fetch(`/api/day/${date}`);
+      // Reload obou briefingů
+      const [dayRes, tomorrowRes] = await Promise.all([
+        fetch(`/api/day/${date}`),
+        fetch(`/api/day/${tomorrowDate()}`),
+      ]);
       const dayData = await dayRes.json();
+      const tomorrowData = await tomorrowRes.json().catch(() => null);
       setBriefing(dayData.briefingDigest);
+      if (tomorrowData) setBriefingTomorrow(tomorrowData.briefingDigest ?? null);
     } finally {
       setBusy(null);
     }
@@ -354,39 +375,62 @@ export default function DayView({ initial }: { initial: Initial }) {
       <section className="glass rounded-xl p-5" style={{ ["--c" as string]: "var(--tint-rose)" }}>
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="size-4" style={{ color: "var(--c)" }} />
-          <h2 className="font-serif text-lg">Večerní briefing</h2>
-          {briefing && (
-            <span className="ml-auto text-xs font-mono text-muted-foreground">
-              vygenerováno {new Date(briefing.generatedAt).toLocaleString("cs-CZ")}
-            </span>
-          )}
+          <h2 className="font-serif text-lg">Briefing</h2>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={() => setBriefingTab("today")}
+              className={`px-3 py-1 rounded-md text-xs font-mono ${
+                briefingTab === "today" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:bg-white/5"
+              }`}
+            >
+              Tento den
+            </button>
+            <button
+              onClick={() => setBriefingTab("tomorrow")}
+              className={`px-3 py-1 rounded-md text-xs font-mono ${
+                briefingTab === "tomorrow" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:bg-white/5"
+              }`}
+            >
+              Zítřek
+            </button>
+          </div>
         </div>
 
-        {!briefing ? (
-          <>
-            <p className="text-sm text-muted-foreground mb-3">
-              Briefing pro tento den ještě neexistuje. Cron generuje denně ve 22:00 pro zítřek.
-              Můžeš ho ale generovat manuálně.
-            </p>
-            <Button onClick={() => generateBriefing(false)} disabled={Boolean(busy)}>
-              {busy === "brief" ? <><Loader2 className="animate-spin" /> Generuji…</> : <><Sparkles /> Vygenerovat teď</>}
-            </Button>
-          </>
-        ) : (
-          <>
+        {/* Petr 2026-05-27: tab switch — default Zítřek pokud existuje (Petr
+            chce vidět co se chystá, ne co se právě stalo). */}
+        {(() => {
+          const activeBriefing = briefingTab === "today" ? briefing : briefingTomorrow;
+          const activeLabel = briefingTab === "today" ? "tento den" : "zítřek";
+          if (!activeBriefing) {
+            return (
+              <>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Briefing pro {activeLabel} ještě neexistuje. Cron generuje denně
+                  ve 22:00 pro následující den. Můžeš ho ale vygenerovat ručně teď.
+                </p>
+                <Button onClick={() => generateBriefing(false, briefingTab)} disabled={Boolean(busy)}>
+                  {busy === "brief" ? <><Loader2 className="animate-spin" /> Generuji…</> : <><Sparkles /> Vygenerovat teď</>}
+                </Button>
+              </>
+            );
+          }
+          return <>
             <div className="text-sm text-muted-foreground mb-3 flex items-center gap-3 flex-wrap">
-              {briefing.todoistTaskId ? (
+              <span className="text-xs font-mono">
+                vygenerováno {new Date(activeBriefing.generatedAt).toLocaleString("cs-CZ")}
+              </span>
+              {activeBriefing.todoistTaskId ? (
                 <span className="text-[var(--tint-sage)]">✓ Pushnuto do Todoistu</span>
               ) : (
                 <span className="text-[var(--tint-butter)]">⚠ Todoist push se nepodařil</span>
               )}
-              <Button variant="outline" size="sm" onClick={() => generateBriefing(true)} disabled={Boolean(busy)}>
+              <Button variant="outline" size="sm" onClick={() => generateBriefing(true, briefingTab)} disabled={Boolean(busy)}>
                 {busy === "brief" ? <Loader2 className="animate-spin" /> : <Sparkles />} Přegenerovat
               </Button>
             </div>
-            <BriefingPreview content={briefing.content as unknown as Record<string, unknown>} />
-          </>
-        )}
+            <BriefingPreview content={activeBriefing.content as unknown as Record<string, unknown>} />
+          </>;
+        })()}
       </section>
     </div>
   );
