@@ -11,8 +11,16 @@ import miseRaketaSvg from "../assets/icons/mise-raketa.svg?raw";
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
 
-// User + kontakty s narozeninami + výročí paralelně (3× round-trip → 1)
-const [user, contactsWithBirthday, anniversaries] = await Promise.all([
+// Petr 2026-05-27 #5: nahoře dvě následující události dnešního dne pro
+// orientaci „co mě čeká" + „musím přejíždět?".
+const startOfToday = new Date();
+startOfToday.setHours(0, 0, 0, 0);
+const endOfToday = new Date(startOfToday);
+endOfToday.setDate(endOfToday.getDate() + 1);
+const nowDate = new Date();
+
+// User + kontakty s narozeninami + výročí + nadcházející eventy dneška (4× → 1)
+const [user, contactsWithBirthday, anniversaries, upcomingEvents] = await Promise.all([
   prisma.user.findUnique({
     where: { id: session.uid },
     select: { username: true },
@@ -30,6 +38,19 @@ const [user, contactsWithBirthday, anniversaries] = await Promise.all([
   prisma.anniversary.findMany({
     where: { userId: session.uid },
     select: { id: true, title: true, month: true, day: true, year: true },
+  }),
+  // Eventy dneška od teď, řazené chronologicky, max 2
+  prisma.calendarEvent.findMany({
+    where: {
+      deletedRemotely: false,
+      // Pouze události dnešního dne (i celodenní)
+      startsAt: { gte: startOfToday, lt: endOfToday },
+      // Skryj eventy které už skončily
+      endsAt: { gte: nowDate },
+    },
+    select: { id: true, title: true, startsAt: true, endsAt: true, allDay: true, locationText: true, type: true },
+    orderBy: { startsAt: "asc" },
+    take: 2,
   }),
 ]);
 if (!user) return Astro.redirect("/login");
@@ -186,6 +207,34 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
             </div>
           )}
         </header>
+
+        {/* Petr 2026-05-27 #5: dvě nadcházející události dnešního dne nad
+            dlaždicemi — kontext „co mě čeká, musím přejíždět?". */}
+        {upcomingEvents.length > 0 && (
+          <a href="/dnes" class="block glass rounded-2xl p-3 space-y-2 hover:bg-white/5 transition" style="--c: var(--tint-sky);">
+            <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground/70 px-1">
+              Dnes nadchází
+            </div>
+            {upcomingEvents.map((ev) => {
+              const start = ev.startsAt;
+              const end = ev.endsAt;
+              const timeStr = ev.allDay
+                ? "celý den"
+                : `${start.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Prague" })}–${end.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Prague" })}`;
+              return (
+                <div class="flex items-baseline gap-3 text-sm">
+                  <span class="font-mono text-xs text-[var(--tint-sky)] shrink-0 min-w-[88px]">{timeStr}</span>
+                  <span class="flex-1 min-w-0 truncate">{ev.title}</span>
+                  {ev.locationText && (
+                    <span class="text-xs text-muted-foreground truncate max-w-[40%]" title={ev.locationText}>
+                      📍 {ev.locationText}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </a>
+        )}
 
         {/* Hlavní sekce — denní akce */}
         <div class="grid grid-cols-2 gap-3">
