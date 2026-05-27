@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Plus, Trash2, Check, Loader2, Sparkles, AlertTriangle, Info, XCircle,
-  ChevronLeft, ChevronRight, Calendar as CalIcon, MapPin, Clock,
+  ChevronLeft, ChevronRight, Calendar as CalIcon, MapPin, Clock, RotateCw,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -182,12 +182,12 @@ export default function DayView({ initial }: { initial: Initial }) {
       <div className="flex items-center justify-between gap-3">
         <a
           href={dayHref(-1)}
-          className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center"
+          className="size-11 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center"
           title="Předchozí den"
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-5" />
         </a>
-        <div className="text-center">
+        <div className="text-center flex-1">
           <div className="text-xs uppercase tracking-widest font-mono text-muted-foreground">
             {date}
           </div>
@@ -199,12 +199,36 @@ export default function DayView({ initial }: { initial: Initial }) {
             ↻ dnes
           </a>
         </div>
+        {/* Petr 2026-05-27 #3 + #14: Sync tlačítko + zvětšené ikony v header */}
+        <button
+          onClick={async () => {
+            setBusy("sync");
+            setError(null);
+            try {
+              const res = await fetch("/api/integrations/google/sync", { method: "POST" });
+              if (res.ok) window.location.reload();
+              else {
+                const data = await res.json().catch(() => ({}));
+                setError(`Sync selhal: ${data.error ?? `HTTP ${res.status}`}`);
+              }
+            } catch (e) {
+              setError(`Sync selhal: ${e instanceof Error ? e.message : String(e)}`);
+            } finally {
+              setBusy(null);
+            }
+          }}
+          disabled={busy === "sync"}
+          className="size-11 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center disabled:opacity-50"
+          title="Stáhnout změny z Google Calendar (jinak za max 5 min)"
+        >
+          {busy === "sync" ? <Loader2 className="size-5 animate-spin" /> : <RotateCw className="size-5" />}
+        </button>
         <a
           href={dayHref(1)}
-          className="size-9 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center"
+          className="size-11 rounded-md bg-white/5 hover:bg-white/10 grid place-items-center"
           title="Následující den"
         >
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-5" />
         </a>
       </div>
 
