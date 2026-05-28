@@ -33,7 +33,15 @@ export const POST: APIRoute = async ({ request }) => {
   const MAX_PER_USER_PER_TICK = 20;
 
   const users = await prisma.user.findMany({
-    select: { id: true, pushLastCheckedAt: true },
+    select: {
+      id: true,
+      pushLastCheckedAt: true,
+      // Petr 2026-05-27: per-source filtry
+      pushVip: true,
+      pushUrgentEmail: true,
+      pushStudankaGuest: true,
+      pushBookingConfirmed: true,
+    },
   });
 
   const now = new Date();
@@ -60,9 +68,10 @@ export const POST: APIRoute = async ({ request }) => {
 
     const since = u.pushLastCheckedAt;
 
-    // Load všechny nové items paralelně
+    // Petr 2026-05-27: respektovat per-source filtry — pokud user vypl
+    // konkrétní zdroj, neload to vůbec (úspora query + nezbytné push)
     const [vipLogs, urgentEmails, newRecordings, newBookings] = await Promise.all([
-      prisma.callLog.findMany({
+      u.pushVip ? prisma.callLog.findMany({
         where: { userId: u.id, createdAt: { gt: since }, wasVip: true },
         select: {
           id: true,
@@ -74,8 +83,8 @@ export const POST: APIRoute = async ({ request }) => {
         },
         orderBy: { createdAt: "asc" },
         take: MAX_PER_USER_PER_TICK,
-      }),
-      prisma.emailMessage.findMany({
+      }) : Promise.resolve([]),
+      u.pushUrgentEmail ? prisma.emailMessage.findMany({
         where: {
           userId: u.id,
           receivedAt: { gt: since },
@@ -87,8 +96,8 @@ export const POST: APIRoute = async ({ request }) => {
         select: { id: true, subject: true, fromName: true, fromAddress: true, receivedAt: true },
         orderBy: { receivedAt: "asc" },
         take: MAX_PER_USER_PER_TICK,
-      }),
-      prisma.projectRecording.findMany({
+      }) : Promise.resolve([]),
+      u.pushStudankaGuest ? prisma.projectRecording.findMany({
         where: {
           createdAt: { gt: since },
           status: "processed",
@@ -104,8 +113,8 @@ export const POST: APIRoute = async ({ request }) => {
         },
         orderBy: { createdAt: "asc" },
         take: MAX_PER_USER_PER_TICK,
-      }),
-      prisma.bookingInvite.findMany({
+      }) : Promise.resolve([]),
+      u.pushBookingConfirmed ? prisma.bookingInvite.findMany({
         where: {
           status: "CONFIRMED",
           confirmedAt: { gt: since },
@@ -118,7 +127,7 @@ export const POST: APIRoute = async ({ request }) => {
         },
         orderBy: { confirmedAt: "asc" },
         take: MAX_PER_USER_PER_TICK,
-      }),
+      }) : Promise.resolve([]),
     ]);
 
     let pushed = 0;

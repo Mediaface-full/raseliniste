@@ -31,6 +31,13 @@ export default function PushSettings() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [label, setLabel] = useState("");
+  // Petr 2026-05-27: per-source filters
+  const [filters, setFilters] = useState<{
+    pushVip: boolean;
+    pushUrgentEmail: boolean;
+    pushStudankaGuest: boolean;
+    pushBookingConfirmed: boolean;
+  }>({ pushVip: true, pushUrgentEmail: true, pushStudankaGuest: true, pushBookingConfirmed: true });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -46,14 +53,41 @@ export default function PushSettings() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/push/subscribe");
-      const data = await res.json();
-      if (res.ok) {
-        setVapidPublicKey(data.vapidPublicKey);
-        setSubs(data.subscriptions);
+      // Paralelně subscriptions + per-source filtry
+      const [subRes, filterRes] = await Promise.all([
+        fetch("/api/push/subscribe"),
+        fetch("/api/push/filters"),
+      ]);
+      const subData = await subRes.json();
+      if (subRes.ok) {
+        setVapidPublicKey(subData.vapidPublicKey);
+        setSubs(subData.subscriptions);
+      }
+      const filterData = await filterRes.json();
+      if (filterRes.ok) {
+        setFilters(filterData);
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function updateFilter(key: keyof typeof filters, value: boolean) {
+    // Optimistic UI
+    setFilters((prev) => ({ ...prev, [key]: value }));
+    try {
+      const res = await fetch("/api/push/filters", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+      if (!res.ok) {
+        // Rollback při fail
+        setFilters((prev) => ({ ...prev, [key]: !value }));
+        setErr("Změna filtru selhala.");
+      }
+    } catch {
+      setFilters((prev) => ({ ...prev, [key]: !value }));
     }
   }
 
@@ -214,6 +248,41 @@ export default function PushSettings() {
         </ol>
       </div>
 
+      {/* Petr 2026-05-27: per-source filtry — vybereš co chceš dostávat. */}
+      {hasSub && (
+        <div className="space-y-2">
+          <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+            Co posílat
+          </div>
+          <div className="glass rounded-xl p-4 space-y-3">
+            <FilterToggle
+              label="⭐ VIP zprávy"
+              hint="Z firewall, urgent přes /call-log"
+              checked={filters.pushVip}
+              onChange={(v) => updateFilter("pushVip", v)}
+            />
+            <FilterToggle
+              label="📧 Urgent maily"
+              hint="action_required + high/eskalace (AI klasifikace)"
+              checked={filters.pushUrgentEmail}
+              onChange={(v) => updateFilter("pushUrgentEmail", v)}
+            />
+            <FilterToggle
+              label="🌊 Nové nahrávky ve Studánce"
+              hint="Od hostů (vlastní nahrávky sám sobě neposíláme)"
+              checked={filters.pushStudankaGuest}
+              onChange={(v) => updateFilter("pushStudankaGuest", v)}
+            />
+            <FilterToggle
+              label="📅 Potvrzené rezervace"
+              hint="Klient si vybral slot v /calendar/invite"
+              checked={filters.pushBookingConfirmed}
+              onChange={(v) => updateFilter("pushBookingConfirmed", v)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Seznam zaregistrovaných zařízení */}
       {hasSub && (
         <div className="space-y-2">
@@ -251,6 +320,37 @@ export default function PushSettings() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Petr 2026-05-27: per-source filter toggle pro push notifikace.
+ * Velký checkbox + label + hint, mobile-friendly touch target.
+ */
+function FilterToggle({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-3 cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-1 size-5 rounded border-white/30 bg-black/30 accent-[var(--tint-sky)]"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium">{label}</div>
+        <div className="text-xs text-muted-foreground">{hint}</div>
+      </div>
+    </label>
   );
 }
 

@@ -58,6 +58,13 @@ model User {
   // Petr 2026-05-27: tracking timestamp pro push-notifications cron.
   // Items s createdAt > pushLastCheckedAt → pošle push, update timestamp.
   pushLastCheckedAt DateTime?
+
+  // Petr 2026-05-27: per-source push filters. Default true (každý dostane
+  // vše dokud si v /settings/push nevypne).
+  pushVip              Boolean @default(true)
+  pushUrgentEmail      Boolean @default(true)
+  pushStudankaGuest    Boolean @default(true)
+  pushBookingConfirmed Boolean @default(true)
   decisions        Decision[]
   todoistProjects  TodoistProjectMirror[]
   todoistLabels    TodoistLabelMirror[]
