@@ -54,6 +54,10 @@ model User {
   sharedFiles      SharedFile[]
   sharedTimelines  SharedTimeline[]
   pushSubscriptions WebPushSubscription[]
+
+  // Petr 2026-05-27: tracking timestamp pro push-notifications cron.
+  // Items s createdAt > pushLastCheckedAt → pošle push, update timestamp.
+  pushLastCheckedAt DateTime?
   decisions        Decision[]
   todoistProjects  TodoistProjectMirror[]
   todoistLabels    TodoistLabelMirror[]

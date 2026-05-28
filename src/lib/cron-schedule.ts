@@ -61,6 +61,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pull iCloud Contacts (CardDAV) + auto-merge duplicit",
   },
   {
+    name: "push-notifications",
+    endpoint: "/api/cron/push-notifications",
+    schedule: { type: "every", minutes: 5 },
+    description: "Web Push notifikace — VIP, urgent mail, Studánka, booking",
+  },
+  {
     name: "nightly-briefing",
     endpoint: "/api/cron/nightly-briefing",
     schedule: { type: "daily", hour: 22, minute: 0 },
