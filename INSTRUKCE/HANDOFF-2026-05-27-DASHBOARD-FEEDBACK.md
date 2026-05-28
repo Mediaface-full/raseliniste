@@ -190,6 +190,49 @@ UI tracking: `/settings/ai-usage` (denní/měsíční graf, per-module breakdown
    na mobilu pro 5-7 tilů, segmentové pill switchy s tinted active state,
    sekce empty state s positive hláškou („Nic nového. Klid.").
 
+## Push notifikace cron (večer)
+
+Petr: „resili jsme tu, ze nejdou notifikace pro me". Audit odhalil že
+infrastruktura **už existovala** (webpush.ts + sw.js + subscribe endpoint +
+PushSettings UI + WebPushSubscription model), ale `sendPushToUser()` měl
+**0 call sites** v aplikaci = push fyzicky nikomu nikdy nepřišly.
+
+### Implementace
+- 2 nové migrace: `User.pushLastCheckedAt` + 4 boolean filtry
+  (`pushVip`/`pushUrgentEmail`/`pushStudankaGuest`/`pushBookingConfirmed`,
+  default true)
+- `/api/cron/push-notifications` à 5 min — paralelní load 4 zdrojů
+  s `createdAt > pushLastCheckedAt`, sendPushToUser pro každou položku
+- `/api/push/filters` GET/PATCH endpoint
+- PushSettings UI sekce „Co posílat" s 4 toggles (optimistic UI + rollback)
+- Max 20 items per source per tick (anti-spam strop)
+- První tick baseline = pushLastCheckedAt=NOW, žádný retroaktivní spam
+
+Commits: `f494ec8` (cron), `b2b996c` (filtry).
+
+### Setup po deployi (jednorázově)
+
+1. **VAPID klíče** generovat z kontejneru:
+   ```
+   docker exec raseliniste_app node -e "
+   const wp = require('web-push');
+   const k = wp.generateVAPIDKeys();
+   console.log('VAPID_PUBLIC_KEY=' + k.publicKey);
+   console.log('VAPID_PRIVATE_KEY=' + k.privateKey);
+   console.log('VAPID_SUBJECT=mailto:gideon@raseliniste.cz');
+   "
+   ```
+   → vlož 3 řádky do `/volume1/docker/raseliniste/.env` → DSM Recreate.
+
+2. **iPhone**: Safari → raseliniste.cz → Sdílet → Přidat na plochu (PWA).
+   Otevři z plochy → /settings/push → Povolit push → Allow.
+
+3. **Filtry**: v /settings/push sekce „Co posílat" zaškrtni jen co chceš.
+
+iOS push vyžaduje PWA + iOS 16.4+. V běžném Safari NEFUNGUJE.
+
+---
+
 ## Audit po session (Petr: „pečlivě si projdi a hledej chyby")
 
 Commit `4583065` — 3 reálné bugy nalezené a opravené:

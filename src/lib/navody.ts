@@ -679,12 +679,16 @@ hned, ne procházet jednotlivé moduly. Notifikace = single point of urgency.
   (nový obsah ke kontrole — owner nebo host)
 - VIP: CallLog wasVip=true za 48 h
 - Sortováno DESC podle času — nejnovější nahoře
-- Žádný cron, vše live z DB při otevření
+- Žádný cron pro list, vše live z DB při otevření
+- **Web Push notifikace** (NOVÉ 2026-05-27): cron \`push-notifications\` à 5 min
+  pošle Web Push na mobilní device pro 4 zdroje (VIP / urgent mail / nová Studánka
+  od hosta / confirmed booking). Petr si v /settings/push vybere které posílat.
+  iOS push vyžaduje PWA mode + iOS 16.4+. VAPID klíče v .env.
       `,
       co_neumi: `
-- Mark-as-read flow (zatím notifikace mizí jen časem 24-48 h)
-- Push notifikace přes Web Push při nové eskalaci (zatím není)
-- Filter v UI (jen pošta / jen VIP / …) — pokud bude potřeba, doplníme
+- Mark-as-read flow v /notifikace listu (zatím notifikace mizí jen časem 24-48 h)
+- Filter v UI listu (jen pošta / jen VIP / …) — push má per-source filtry,
+  /notifikace list zatím ne
       `,
       napojeni: `
 - **Pošta** — EmailClassification (action_required, urgency, escalation)
