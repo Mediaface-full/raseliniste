@@ -58,10 +58,11 @@ const rawEvents = await prisma.calendarEvent.findMany({
   orderBy: { startsAt: "asc" },
 });
 
-// Dedup
+// Petr 2026-05-27: dedup bez source — Google duplikáty se stejným title+čas
+// (recurring expansion s různým externalId) se nyní sebraly jako jediný řádek.
 const seen = new Set<string>();
 const events = rawEvents.filter((e) => {
-  const key = `${e.source}|${e.title}|${e.startsAt.getTime()}|${e.endsAt.getTime()}`;
+  const key = `${e.title}|${e.startsAt.getTime()}|${e.endsAt.getTime()}`;
   if (seen.has(key)) return false;
   seen.add(key);
   return true;

@@ -21,7 +21,7 @@ endOfToday.setDate(endOfToday.getDate() + 1);
 const nowDate = new Date();
 
 // User + kontakty s narozeninami + výročí + nadcházející eventy dneška (4× → 1)
-const [user, contactsWithBirthday, anniversaries, upcomingEvents] = await Promise.all([
+const [user, contactsWithBirthday, anniversaries, upcomingEventsRaw] = await Promise.all([
   prisma.user.findUnique({
     where: { id: session.uid },
     select: { username: true },
@@ -40,7 +40,9 @@ const [user, contactsWithBirthday, anniversaries, upcomingEvents] = await Promis
     where: { userId: session.uid },
     select: { id: true, title: true, month: true, day: true, year: true },
   }),
-  // Eventy dneška od teď, řazené chronologicky, max 2
+  // Eventy dneška od teď, řazené chronologicky.
+  // Petr 2026-05-27: take 6 a po dedup vezmu 2 — Google/iCloud duplikáty
+  // se stejným title+čas se sloučí.
   prisma.calendarEvent.findMany({
     where: {
       deletedRemotely: false,
@@ -51,9 +53,18 @@ const [user, contactsWithBirthday, anniversaries, upcomingEvents] = await Promis
     },
     select: { id: true, title: true, startsAt: true, endsAt: true, allDay: true, locationText: true, type: true },
     orderBy: { startsAt: "asc" },
-    take: 2,
+    take: 6,
   }),
 ]);
+
+// Petr 2026-05-27: dedup duplicit (title + start + end)
+const seenEventKeys = new Set<string>();
+const upcomingEvents = upcomingEventsRaw.filter((e) => {
+  const key = `${e.title}|${e.startsAt.getTime()}|${e.endsAt.getTime()}`;
+  if (seenEventKeys.has(key)) return false;
+  seenEventKeys.add(key);
+  return true;
+}).slice(0, 2);
 
 // Petr 2026-05-27 #7: počet notifikací pro badge na tile
 const notificationCount = await countNotifications(session.uid);
