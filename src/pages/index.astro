@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 import { Icon } from "astro-icon/components";
 import SchedulerStatus from "../components/SchedulerStatus.astro";
+import { loadNotifications } from "../lib/notifications";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -83,6 +84,10 @@ const activeViolations = await prisma.ruleViolation.findMany({
   orderBy: [{ severity: "desc" }, { forDate: "asc" }],
   take: 10,
 });
+
+// Petr 2026-05-27: Notifikace na dashboardu místo Pravidla widgetu.
+// Stejné jako na mobilu (/notifikace) — VIP, urgent mail, Studánka host, booking.
+const notifications = await loadNotifications(session.uid);
 
 // Výročí — propsání na desktop dashboard (paralelní query)
 const anniversaries = await prisma.anniversary.findMany({
@@ -189,8 +194,8 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
       </div>
     </div>
 
-    {/* Plán — nejbližší eventy + porušení pravidel */}
-    {(upcomingEvents.length > 0 || activeViolations.length > 0) && (
+    {/* Plán — nejbližší eventy + Notifikace (místo Pravidla, viz Petr 2026-05-27) */}
+    {(upcomingEvents.length > 0 || notifications.length > 0) && (
       <section class="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div class="glass rounded-xl p-4 lg:col-span-2" style="--c: var(--tint-sky);">
           <div class="flex items-center gap-2 mb-3">
@@ -246,34 +251,46 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
           )}
         </div>
 
-        {activeViolations.length > 0 ? (
-          <div class="glass rounded-xl p-4" style="--c: var(--tint-rose);">
+        {/* Petr 2026-05-27: Notifikace místo Pravidla — stejný zdroj jako
+            mobilní /notifikace. Compact verze, max 5 položek + link na detail.
+            Pravidla zůstávají dostupná přes /settings nebo /dnes detail view. */}
+        {notifications.length > 0 ? (
+          <a href="/notifikace" class="glass rounded-xl p-4 block hover:bg-white/[0.03] transition" style="--c: var(--tint-butter);">
             <div class="flex items-center gap-2 mb-3">
-              <Icon name="lucide:alert-triangle" class="size-4" style="color: var(--c);" />
-              <h2 class="font-serif text-lg">Pravidla</h2>
+              <Icon name="lucide:bell" class="size-4" style="color: var(--c);" />
+              <h2 class="font-serif text-lg">Notifikace</h2>
+              <span class="ml-auto text-xs font-mono text-muted-foreground">
+                {notifications.length}
+              </span>
             </div>
             <div class="space-y-2">
-              {activeViolations.map((v) => {
-                const tint = v.severity === "ERROR" ? "rose" : v.severity === "WARNING" ? "butter" : "sky";
+              {notifications.slice(0, 5).map((n) => {
+                const tint = n.type === "studanka" ? "mint" : n.type === "posta" ? "sky" : "rose";
+                const label = n.type === "studanka" ? "🌊 Studánka" : n.type === "posta" ? "📧 Pošta" : "⭐ VIP";
                 return (
                   <div class={`text-sm rounded-md p-2 border border-[var(--tint-${tint})]/30 bg-[var(--tint-${tint})]/10`}>
-                    <div class="text-xs font-mono text-muted-foreground mb-0.5">
-                      {fmtDay(new Date(v.forDate))} · {v.ruleName}
+                    <div class="text-[10px] uppercase tracking-wider font-mono mb-0.5" style={`color: var(--tint-${tint});`}>
+                      {label}
                     </div>
-                    <div>{v.message}</div>
+                    <div class="line-clamp-2">{n.title}</div>
                   </div>
                 );
               })}
+              {notifications.length > 5 && (
+                <div class="text-xs text-muted-foreground text-center pt-1">
+                  + {notifications.length - 5} dalších v /notifikace
+                </div>
+              )}
             </div>
-          </div>
+          </a>
         ) : (
-          <div class="glass rounded-xl p-4" style="--c: var(--tint-sage);">
+          <a href="/notifikace" class="glass rounded-xl p-4 block hover:bg-white/[0.03] transition" style="--c: var(--tint-sage);">
             <div class="flex items-center gap-2 mb-2">
               <Icon name="lucide:check-circle-2" class="size-4" style="color: var(--c);" />
-              <h2 class="font-serif text-lg">Pravidla</h2>
+              <h2 class="font-serif text-lg">Notifikace</h2>
             </div>
-            <div class="text-sm text-muted-foreground">Žádná aktivní varování. ✓</div>
-          </div>
+            <div class="text-sm text-muted-foreground">Nic nového. Klid. ✓</div>
+          </a>
         )}
       </section>
     )}
