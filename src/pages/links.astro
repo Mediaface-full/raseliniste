@@ -27,6 +27,23 @@ function prettyDomain(url: string): string {
     return url.slice(0, 40);
   }
 }
+
+// Petr 2026-05-27: validace lucide icon name. Pokud Petr zadal něco co
+// není v lucide-icons (např. „Immich", „PhotoPrism" = brand names), fallback
+// na generic „globe". Bez tohoto guardu Astro při buildu/SSR padl protože
+// `lucide:Immich` neexistuje → stránka prázdná.
+//
+// Heuristika: lucide names jsou kebab-case lowercase. Pokud icon obsahuje
+// velké písmeno (capital), je to brand jméno → fallback. Jinak věřit.
+function safeIconName(icon: string | null): string {
+  if (!icon || !icon.trim()) return "lucide:globe";
+  const trimmed = icon.trim();
+  // Brand jména (Immich/Video/PhotoPrism) mají capital nebo nejsou kebab-case
+  if (/[A-Z]/.test(trimmed) || !/^[a-z][a-z0-9-]*$/.test(trimmed)) {
+    return "lucide:globe";
+  }
+  return `lucide:${trimmed}`;
+}
 ---
 
 <Shell
@@ -69,7 +86,7 @@ function prettyDomain(url: string): string {
                 class="size-10 rounded-xl grid place-items-center"
                 style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
               >
-                <Icon name={link.icon ? `lucide:${link.icon}` : "lucide:globe"} class="size-5" />
+                <Icon name={safeIconName(link.icon)} class="size-5" />
               </div>
               <div class="relative mt-auto">
                 <div class="text-base font-semibold tracking-tight">{link.name}</div>

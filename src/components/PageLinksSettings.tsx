@@ -132,9 +132,15 @@ export default function PageLinksSettings() {
           </div>
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-              Ikona (volitelně, jméno z lucide.dev — např. „building", „book", „mail")
+              Ikona (volitelně) — lowercase, kebab-case z{" "}
+              <a href="https://lucide.dev/icons" target="_blank" rel="noopener" className="underline text-[var(--tint-sky)]">
+                lucide.dev/icons
+              </a>
             </label>
-            <Input value={newIcon} onChange={(e) => setNewIcon(e.target.value)} placeholder="globe (default)" className="mt-1" />
+            <Input value={newIcon} onChange={(e) => setNewIcon(e.target.value)} placeholder="např. camera, image, video, globe" className="mt-1" />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Pokud nezadáš nebo zadáš neplatný název (např. „Immich"), použije se 🌐 globe.
+            </p>
           </div>
           <div className="flex gap-2">
             <Button onClick={create} disabled={busy === "create"}>
