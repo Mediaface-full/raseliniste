@@ -651,6 +651,54 @@ Sleduju trendy (HRV, klid v noci, kondice) — bez auto-feedu bych to nevedl. AI
   },
 
   {
+    slug: "page-links",
+    title: "Page Links",
+    icon: "lucide:link",
+    tint: "sky",
+    oneLiner: "Vlastní odkazy v sidebaru — name + barva + URL, otevírá v novém okně.",
+    href: "/links",
+    sections: {
+      co_to_je: `
+User-defined web shortcuts. Místo browser bookmarks mít v Rašeliništi
+panel oblíbených webů (ARES, banka, klientovy weby, dashboardy serverů,
+Plex, Immich, atd.). Boxíky jak na /start, klik = nové okno.
+      `,
+      jak_to_ovladam: `
+- \`/links\` — grid boxíků (target="_blank", rel="noopener noreferrer")
+- \`/settings/page-links\` — CRUD UI
+- Sidebar entry „Page Links" pod Dashboard
+- Form: NÁZEV + URL + TintPicker (8 barev) + volitelně ikona
+- Ikona — lowercase kebab-case z **lucide.dev/icons** (např. \`camera\`, \`image\`, \`video\`, \`mail\`, \`globe\`)
+- Brand jména typu „Immich" / „PhotoPrism" NEFUNGUJÍ — fallback na globe
+      `,
+      proc: `
+Petr 2026-05-27: chce z Rašeliniště přistupovat k externím webům bez
+přepínání do browser bookmarks. Jednoduché shortcut grid.
+      `,
+      co_umi: `
+- 8 tints (peach/mint/lavender/sky/sage/butter/rose/pink) per link
+- Volitelná lucide icon (kebab-case lowercase)
+- Order field (manipulable přes API PATCH, UI drag-and-drop zatím není)
+- Per-user ownership (ne shared)
+- Empty state s tlačítkem „+ Přidat první odkaz"
+- safeIconName guard — neplatná ikona = fallback globe (nepadne SSR)
+      `,
+      co_neumi: `
+- Drag-and-drop reorder v UI (manuálně přes PATCH order field)
+- Skupiny / kategorie (zatím flat list)
+- Sdílení mezi uživateli (z designu — single-user)
+- Auto-generated icony z URL favicon (možný future feature)
+      `,
+      napojeni: `
+- **Sidebar** — Shell.astro nav „Page Links" v sekci Přehled
+- **Settings index** — /settings/page-links link mezi integrations
+- **Lucide icons** — kebab-case names z lucide.dev/icons (validate přes
+  safeIconName helper v /links.astro)
+      `,
+    },
+  },
+
+  {
     slug: "notifikace",
     title: "Notifikace",
     icon: "lucide:bell",

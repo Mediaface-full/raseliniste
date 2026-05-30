@@ -190,6 +190,46 @@ UI tracking: `/settings/ai-usage` (denní/měsíční graf, per-module breakdown
    na mobilu pro 5-7 tilů, segmentové pill switchy s tinted active state,
    sekce empty state s positive hláškou („Nic nového. Klid.").
 
+## Page Links modul (večer)
+
+Petr chtěl v sidebaru pod Dashboard záložku „Page Links" + stránku
+plnou boxíků jak na /start. Klik = otevře web v novém okně. Settings
+NÁZEV, BARVA, URL.
+
+### Implementace (`1d2f2e2`)
+
+- Migrace `20260527170000_page_links` + `PageLink` model
+- 4 API endpointy CRUD (GET/POST + PATCH/DELETE per id) s ownership check
+- `/links` stránka — grid boxíků target="_blank", styl /start tiles
+- `/settings/page-links` + `PageLinksSettings.tsx` — form + TintPicker (8 kruhů)
+- Sidebar entry „Page Links" pod Dashboard
+
+### Astro-icon SSR fail (`9f2438f`)
+
+Petr uložil ikony „Immich", „PhotoPrism", „Video" = brand jména, ne lucide
+kebab-case. `<Icon name="lucide:Immich" />` na neexistující sprite ID →
+SSR throw → `/links` prázdná. Settings ukládala správně, data v DB OK,
+API vrátilo JSON s 3 řádky — ale render fail.
+
+Fix: `safeIconName()` helper validuje kebab-case lowercase regex, fallback
+na `lucide:globe`. UI hint v PageLinksSettings obohacen o link na
+lucide.dev/icons + warning o brand jménech.
+
+Detailní pattern v `~/.claude/projects/.../memory/feedback_astro_icon_validation.md`.
+
+### Klíčové učení
+
+1. **astro-icon na neexistující sprite ID rozbije SSR celé stránky.**
+   Nejde jen o tu ikonu — stránka spadne s prázdným responsem nebo build
+   error. Pro user-input icon names vždy validate před `<Icon>` render.
+
+2. **Diagnostický postup když UI prázdná**:
+   - Browser GET `/api/...` (vidíme data?) — render-side vs server-side
+   - DB query (`docker exec ... psql`) — rows existují?
+   - Astro logy (`docker logs`) — SSR errory?
+
+---
+
 ## Push notifikace cron (večer)
 
 Petr: „resili jsme tu, ze nejdou notifikace pro me". Audit odhalil že
