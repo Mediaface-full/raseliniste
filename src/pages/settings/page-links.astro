@@ -1,0 +1,30 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import PageLinksSettings from "../../components/PageLinksSettings";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Page Links — nastavení · Rašeliniště"
+  username={user.username}
+  heading="Page Links — nastavení"
+  breadcrumb={[{ label: "Nastavení", href: "/settings" }, { label: "Page Links" }]}
+>
+  <div class="max-w-3xl space-y-3">
+    <p class="text-sm text-muted-foreground leading-relaxed">
+      Odkazy na webové stránky co používáš (ARES, banka, klientovy weby, dashboardy).
+      Otevřou se v novém okně po kliknutí.
+    </p>
+    <PageLinksSettings client:load />
+  </div>
+</Shell>

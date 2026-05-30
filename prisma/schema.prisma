@@ -54,6 +54,7 @@ model User {
   sharedFiles      SharedFile[]
   sharedTimelines  SharedTimeline[]
   pushSubscriptions WebPushSubscription[]
+  pageLinks         PageLink[]
 
   // Petr 2026-05-27: tracking timestamp pro push-notifications cron.
   // Items s createdAt > pushLastCheckedAt → pošle push, update timestamp.
@@ -1708,6 +1709,27 @@ model CheckIn {
 
 /// Jeden device subscription (browser/PWA na konkrétním zařízení).
 /// Petr může mít víc — iPhone, iPad, desktop Chrome — každý je separátní subscription.
+// Petr 2026-05-27: user-defined web shortcuts. Sidebar sekce „Page Links"
+// + /links stránka renderuje boxy jako /start, /settings/page-links CRUD.
+model PageLink {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  url       String
+  // Tint name z palety: peach/mint/lavender/sky/sage/butter/rose/pink
+  tint      String   @default("sky")
+  // Volitelná lucide icon name (např. "globe", "book"); default null = generic globe
+  icon      String?
+  order     Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, order])
+}
+
 model WebPushSubscription {
   id          String   @id @default(cuid())
   userId      String
