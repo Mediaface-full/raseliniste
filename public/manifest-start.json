@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0E0E10",
-  "theme_color": "#0E0E10",
+  "background_color": "#FF5C2C",
+  "theme_color": "#FF5C2C",
   "icons": [
     {
       "src": "/icons/gide-on/apple-touch-icon.png",

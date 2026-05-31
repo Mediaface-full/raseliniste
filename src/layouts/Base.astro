@@ -44,8 +44,15 @@ const ogImageUrl = ogImagePath.startsWith("http") ? ogImagePath : `${baseUrl}${o
     <meta name="description" content={description} />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0a0920" />
+    {/* Petr 2026-05-27: favicon priority order — PNG první, SVG jako enhanced
+        fallback. iOS Safari pro Add to Home Screen občas preferuje SVG před
+        apple-touch-icon → dříve vidělo tmavý SVG. PNG sizes v order brání tomu. */}
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href={appleIconPath} />
+    {/* Legacy iOS Safari (pre-iOS 11) sahá pro „-precomposed" verzi. */}
+    <link rel="apple-touch-icon-precomposed" sizes="180x180" href={appleIconPath} />
     {appleTitle && <meta name="apple-mobile-web-app-title" content={appleTitle} />}
     {appleCapable && <meta name="apple-mobile-web-app-capable" content="yes" />}
     {appleCapable && <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />}
