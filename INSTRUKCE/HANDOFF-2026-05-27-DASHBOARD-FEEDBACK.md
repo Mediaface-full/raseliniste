@@ -190,6 +190,69 @@ UI tracking: `/settings/ai-usage` (denní/měsíční graf, per-module breakdown
    na mobilu pro 5-7 tilů, segmentové pill switchy s tinted active state,
    sekce empty state s positive hláškou („Nic nového. Klid.").
 
+## Pošta blacklist rules + PWA ikona (návazná session 31.5./1.6.)
+
+Petr se ptal „je nejake nastaveni pro notifikace? Kde bych mohl zadat
+co ignorovat?". Plus chtěl nasadit vlastní PWA ikonu Gide-on pro /start.
+
+### Pošta blacklist (commit `93d0e82`)
+
+- Migrace `20260601000000_posta_ignore_rules` + PostaIgnoreRule model
+  (userId + pattern + matchType + label + enabled, index userId+enabled)
+- API `/api/posta/ignore-rules/` GET/POST + PATCH/DELETE per id
+- Helper `emailMatchesIgnoreRule(fromAddress, fromName, rule)` v
+  `notifications.ts`, exportováno pro reuse:
+  - contains: substring v from address NEBO name (case insensitive)
+  - domain: fromAddress končí `@<pattern>`
+  - exact: fromAddress === pattern
+- Filter aplikovan ve 3 místech: loadNotifications, countNotifications
+  (refactored z .count() na findMany+filter), cron push-notifications
+- UI v PushSettings.tsx nová sekce „Ignorovat odesílatele (e-mail)" —
+  matchType dropdown + pattern input + label + Přidat, list s ☑ toggle
+
+### PWA ikona Gide-on (~5 iterací)
+
+Petr poslal ZIP s 16 ikonami (orange/cream/ink variants). Trvalo 5 iterací:
+
+1. Orange `apple-touch-icon` do `/icons/gide-on/` → „je tmavá"
+2. Nahradit i root `/apple-touch-icon.png` (iOS sahá pro root URL) → „před
+   sdílením oranžová, po uložení černá"
+3. Identifikoval `favicon.svg` má tmavé pozadí — iOS Safari ho preferuje
+   pro Add to Home Screen. Přepsal SVG na orange + manifest bg #FF5C2C →
+   „je to na mobilu furt stejne"
+4. Cache-bust manifest `id` + `start_url ?icon=gide-on-v2` + `?v=2` →
+   screenshot pořád tmavá G
+5. Identifikace **iOS 18 Dark/Tinted home screen mode** auto-tintuje
+   PWA ikony. Petr poslal `icon-ink-512.png` (dark-by-design) → použito
+   jako primary. iOS auto-tint nemá co rozhasit, konzistentně vypadá.
+
+Reusable PWA pitfalls doc: `feedback_ios_pwa_icons.md` v projects memory.
+
+### VAPID rotation
+
+Petr přepsal staré VAPID klíče v .env za nové. Konsekvence: staré
+subscriptions v `WebPushSubscription` přestávají fungovat (Web Push váže
+endpoint na public key). Naše `sendPushToUser()` na 410/404 automaticky
+smaže subscription. Petr musí re-Povolit push na všech zařízeních.
+
+Lesson: VAPID je **one-time setup**, ne pravidelně rotovat. Pokud máš
+klíče v produkci, neměnit dokud nejsou skutečné security důvody.
+
+### Co Petr musí udělat po deployi
+
+1. **VAPID** v `.env` (pokud ještě nejsou) → DSM Recreate
+2. **Migrace 20260601000000** apply automaticky při container startu
+3. **iPhone PWA** fresh install:
+   - Smaž starou ikonu z plochy
+   - Settings → Safari → Website Data → smazat
+   - **Restart iPhone** (Springboard cache flush)
+   - Safari → /start → Sdílet → Přidat na plochu (ink Gide-on)
+   - Otevřít PWA → /settings/push → Povolit push
+4. `/settings/push` → „Ignorovat odesílatele" — přidej noreply / newsletter
+   patterns
+
+---
+
 ## Page Links modul (večer)
 
 Petr chtěl v sidebaru pod Dashboard záložku „Page Links" + stránku

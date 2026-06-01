@@ -732,6 +732,10 @@ hned, ne procházet jednotlivé moduly. Notifikace = single point of urgency.
   pošle Web Push na mobilní device pro 4 zdroje (VIP / urgent mail / nová Studánka
   od hosta / confirmed booking). Petr si v /settings/push vybere které posílat.
   iOS push vyžaduje PWA mode + iOS 16.4+. VAPID klíče v .env.
+- **Pošta blacklist rules** (NOVÉ 2026-06-01): v /settings/push sekce „Ignorovat
+  odesílatele" — patterns pro contains/domain/exact match na fromAddress/fromName.
+  Matchnuté emaily vypadnou z /notifikace + push + dashboard widgetu. Per-user,
+  enable/disable bez smazání. Skvělé pro newsletter, noreply, marketing domény.
       `,
       co_neumi: `
 - Mark-as-read flow v /notifikace listu (zatím notifikace mizí jen časem 24-48 h)
