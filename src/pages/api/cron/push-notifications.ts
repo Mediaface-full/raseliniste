@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendPushToUser } from "@/lib/webpush";
+import { emailMatchesIgnoreRule } from "@/lib/notifications";
 
 export const prerender = false;
 
@@ -68,9 +69,15 @@ export const POST: APIRoute = async ({ request }) => {
 
     const since = u.pushLastCheckedAt;
 
-    // Petr 2026-05-27: respektovat per-source filtry — pokud user vypl
-    // konkrétní zdroj, neload to vůbec (úspora query + nezbytné push)
-    const [vipLogs, urgentEmails, newRecordings, newBookings] = await Promise.all([
+    // Petr 2026-05-27: per-source filtry + email blacklist rules
+    const ignoreRules = u.pushUrgentEmail
+      ? await prisma.postaIgnoreRule.findMany({
+          where: { userId: u.id, enabled: true },
+          select: { pattern: true, matchType: true },
+        })
+      : [];
+
+    const [vipLogs, urgentEmailsRaw, newRecordings, newBookings] = await Promise.all([
       u.pushVip ? prisma.callLog.findMany({
         where: { userId: u.id, createdAt: { gt: since }, wasVip: true },
         select: {
@@ -132,6 +139,11 @@ export const POST: APIRoute = async ({ request }) => {
 
     let pushed = 0;
     let failed = 0;
+
+    // Petr 2026-05-27: aplikuj blacklist na emaily
+    const urgentEmails = ignoreRules.length === 0
+      ? urgentEmailsRaw
+      : urgentEmailsRaw.filter((e) => !ignoreRules.some((r) => emailMatchesIgnoreRule(e.fromAddress, e.fromName, r)));
 
     // 1. VIP CallLog — nejdůležitější (rose/urgent tone)
     for (const v of vipLogs) {

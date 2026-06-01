@@ -55,6 +55,7 @@ model User {
   sharedTimelines  SharedTimeline[]
   pushSubscriptions WebPushSubscription[]
   pageLinks         PageLink[]
+  postaIgnoreRules  PostaIgnoreRule[]
 
   // Petr 2026-05-27: tracking timestamp pro push-notifications cron.
   // Items s createdAt > pushLastCheckedAt → pošle push, update timestamp.
@@ -1728,6 +1729,28 @@ model PageLink {
   updatedAt DateTime @updatedAt
 
   @@index([userId, order])
+}
+
+// Petr 2026-05-27: blacklist emailových odesílatelů/domén pro /notifikace
+// a push cron. Per-user. Matchuje fromAddress / fromName podle matchType.
+model PostaIgnoreRule {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Pattern dle matchType:
+  //  - contains: substring v fromAddress nebo fromName (case insensitive)
+  //  - domain: fromAddress končí "@<pattern>" (pattern bez @, např. "newsletter.cz")
+  //  - exact:  fromAddress přesně = pattern
+  pattern   String
+  matchType String   @default("contains")
+  // Volitelný human-readable popis k čemu rule slouží
+  label     String?
+  enabled   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, enabled])
 }
 
 model WebPushSubscription {

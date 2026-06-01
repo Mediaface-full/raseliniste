@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Bell, Smartphone, Trash2, Send, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, Bell, Smartphone, Trash2, Send, AlertTriangle, CheckCircle2, Plus } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
@@ -38,6 +38,12 @@ export default function PushSettings() {
     pushStudankaGuest: boolean;
     pushBookingConfirmed: boolean;
   }>({ pushVip: true, pushUrgentEmail: true, pushStudankaGuest: true, pushBookingConfirmed: true });
+  // Petr 2026-05-27: email blacklist rules (ignore senders/domains)
+  type IgnoreRule = { id: string; pattern: string; matchType: string; label: string | null; enabled: boolean };
+  const [ignoreRules, setIgnoreRules] = useState<IgnoreRule[]>([]);
+  const [newPattern, setNewPattern] = useState("");
+  const [newMatchType, setNewMatchType] = useState<"contains" | "domain" | "exact">("contains");
+  const [newLabel, setNewLabel] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -53,10 +59,11 @@ export default function PushSettings() {
   async function load() {
     setLoading(true);
     try {
-      // Paralelně subscriptions + per-source filtry
-      const [subRes, filterRes] = await Promise.all([
+      // Paralelně subscriptions + per-source filtry + ignore rules
+      const [subRes, filterRes, rulesRes] = await Promise.all([
         fetch("/api/push/subscribe"),
         fetch("/api/push/filters"),
+        fetch("/api/posta/ignore-rules"),
       ]);
       const subData = await subRes.json();
       if (subRes.ok) {
@@ -67,9 +74,45 @@ export default function PushSettings() {
       if (filterRes.ok) {
         setFilters(filterData);
       }
+      const rulesData = await rulesRes.json();
+      if (rulesRes.ok) setIgnoreRules(rulesData.rules);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function addIgnoreRule() {
+    if (!newPattern.trim()) return;
+    const res = await fetch("/api/posta/ignore-rules", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        pattern: newPattern.trim(),
+        matchType: newMatchType,
+        label: newLabel.trim() || null,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setIgnoreRules((prev) => [...prev, data.rule]);
+      setNewPattern("");
+      setNewLabel("");
+      setNewMatchType("contains");
+    }
+  }
+
+  async function removeIgnoreRule(id: string) {
+    setIgnoreRules((prev) => prev.filter((r) => r.id !== id));
+    await fetch(`/api/posta/ignore-rules/${id}`, { method: "DELETE" });
+  }
+
+  async function toggleIgnoreRule(id: string, enabled: boolean) {
+    setIgnoreRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled } : r)));
+    await fetch(`/api/posta/ignore-rules/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
   }
 
   async function updateFilter(key: keyof typeof filters, value: boolean) {
@@ -282,6 +325,94 @@ export default function PushSettings() {
           </div>
         </div>
       )}
+
+      {/* Petr 2026-05-27: blacklist odesílatelů/domén pošty.
+          Funguje i pokud Petr push nemá zapnutý — filter se aplikuje
+          v /notifikace listu + widgetu na dashboardu. */}
+      <div className="space-y-2">
+        <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+          Ignorovat odesílatele (e-mail)
+        </div>
+        <div className="glass rounded-xl p-4 space-y-3">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            E-maily co matchují pravidlo vypadnou z /notifikace + push. Pomáhá
+            ztišit newslettery, noreply odesílatele, marketing domény, atd.
+          </p>
+          <div className="space-y-2">
+            <div className="flex gap-2 flex-wrap">
+              <select
+                value={newMatchType}
+                onChange={(e) => setNewMatchType(e.target.value as "contains" | "domain" | "exact")}
+                className="bg-black/30 border border-white/10 rounded-md px-3 py-2 text-sm font-mono"
+              >
+                <option value="contains">obsahuje</option>
+                <option value="domain">doména =</option>
+                <option value="exact">přesně =</option>
+              </select>
+              <Input
+                value={newPattern}
+                onChange={(e) => setNewPattern(e.target.value)}
+                placeholder={
+                  newMatchType === "domain"
+                    ? "newsletter.cz"
+                    : newMatchType === "exact"
+                      ? "noreply@firma.cz"
+                      : "noreply, marketing, …"
+                }
+                className="flex-1 min-w-[160px]"
+              />
+              <Input
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                placeholder="poznámka (volitelně)"
+                className="flex-1 min-w-[140px]"
+              />
+              <Button onClick={addIgnoreRule} disabled={!newPattern.trim()}>
+                <Plus /> Přidat
+              </Button>
+            </div>
+          </div>
+
+          {ignoreRules.length > 0 ? (
+            <div className="space-y-1.5 pt-2 border-t border-white/5">
+              {ignoreRules.map((rule) => (
+                <div
+                  key={rule.id}
+                  className={`flex items-center gap-3 text-sm rounded-md px-3 py-2 bg-black/15 ${
+                    rule.enabled ? "" : "opacity-50"
+                  }`}
+                >
+                  <label className="cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rule.enabled}
+                      onChange={(e) => toggleIgnoreRule(rule.id, e.target.checked)}
+                      className="size-4 accent-[var(--tint-sky)]"
+                    />
+                  </label>
+                  <span className="text-xs font-mono text-muted-foreground shrink-0">
+                    {rule.matchType === "domain" ? "@" : rule.matchType === "exact" ? "=" : "~"}
+                  </span>
+                  <span className="font-mono text-sm flex-1 truncate">{rule.pattern}</span>
+                  {rule.label && (
+                    <span className="text-xs text-muted-foreground truncate max-w-[40%]">{rule.label}</span>
+                  )}
+                  <button
+                    onClick={() => removeIgnoreRule(rule.id)}
+                    className="p-1 text-muted-foreground hover:text-[var(--tint-rose)]"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground italic pt-1">
+              Žádná pravidla zatím. Přidej výše.
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Seznam zaregistrovaných zařízení */}
       {hasSub && (

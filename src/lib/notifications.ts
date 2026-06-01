@@ -56,13 +56,35 @@ export type NotificationItem =
       };
     };
 
+/**
+ * Petr 2026-05-27: blacklist match — vrátí true pokud email má být IGNOROVÁN.
+ * Aplikuje se na fromAddress + fromName (case insensitive).
+ *
+ * matchType:
+ *  - contains: substring v from address NEBO from name
+ *  - domain:   fromAddress končí "@<pattern>"
+ *  - exact:    fromAddress === pattern
+ */
+export function emailMatchesIgnoreRule(
+  fromAddress: string | null,
+  fromName: string | null,
+  rule: { pattern: string; matchType: string },
+): boolean {
+  const addr = (fromAddress ?? "").toLowerCase();
+  const name = (fromName ?? "").toLowerCase();
+  const p = rule.pattern.toLowerCase();
+  if (rule.matchType === "domain") return addr.endsWith(`@${p}`);
+  if (rule.matchType === "exact") return addr === p;
+  return addr.includes(p) || name.includes(p);
+}
+
 export async function loadNotifications(userId: string): Promise<NotificationItem[]> {
   const now = new Date();
   const ago24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const ago48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-  // Paralelně 3 zdroje
-  const [recordings, emails, vipLogs] = await Promise.all([
+  // Paralelně 3 zdroje + ignore rules
+  const [recordings, rawEmails, vipLogs, ignoreRules] = await Promise.all([
     // Studánka — nové ProjectRecording (status=processed za 24h, pouze projects ownerova)
     prisma.projectRecording.findMany({
       where: {
@@ -134,7 +156,18 @@ export async function loadNotifications(userId: string): Promise<NotificationIte
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
+
+    // Petr 2026-05-27: blacklist rules pro filter emailů
+    prisma.postaIgnoreRule.findMany({
+      where: { userId, enabled: true },
+      select: { pattern: true, matchType: true },
+    }),
   ]);
+
+  // Aplikuj ignore rules na emaily před tím než půjdou do items
+  const emails = ignoreRules.length === 0
+    ? rawEmails
+    : rawEmails.filter((e) => !ignoreRules.some((r) => emailMatchesIgnoreRule(e.fromAddress, e.fromName, r)));
 
   const items: NotificationItem[] = [];
 
@@ -202,7 +235,11 @@ export async function countNotifications(userId: string): Promise<number> {
   const ago24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const ago48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-  const [recordings, emails, vipLogs] = await Promise.all([
+  // Petr 2026-05-27: count musí taky respektovat blacklist, jinak badge
+  // tile na /start ukazuje vyšší číslo než /notifikace list.
+  // Pro count fetchneme email metadata (fromAddress/Name) místo .count(),
+  // jinak nedokážeme filter aplikovat.
+  const [recordings, rawEmails, vipLogs, ignoreRules] = await Promise.all([
     prisma.projectRecording.count({
       where: {
         createdAt: { gte: ago24h },
@@ -210,7 +247,7 @@ export async function countNotifications(userId: string): Promise<number> {
         project: { userId },
       },
     }),
-    prisma.emailMessage.count({
+    prisma.emailMessage.findMany({
       where: {
         userId,
         receivedAt: { gte: ago48h },
@@ -219,6 +256,7 @@ export async function countNotifications(userId: string): Promise<number> {
           OR: [{ urgency: "high" }, { escalation: true }],
         },
       },
+      select: { fromAddress: true, fromName: true },
     }),
     prisma.callLog.count({
       where: {
@@ -227,7 +265,15 @@ export async function countNotifications(userId: string): Promise<number> {
         wasVip: true,
       },
     }),
+    prisma.postaIgnoreRule.findMany({
+      where: { userId, enabled: true },
+      select: { pattern: true, matchType: true },
+    }),
   ]);
+
+  const emails = ignoreRules.length === 0
+    ? rawEmails.length
+    : rawEmails.filter((e) => !ignoreRules.some((r) => emailMatchesIgnoreRule(e.fromAddress, e.fromName, r))).length;
 
   return recordings + emails + vipLogs;
 }
