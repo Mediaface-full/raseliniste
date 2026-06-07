@@ -24,6 +24,32 @@ Memory: `feedback_completeness_lesson.md` — Petr 2026-05-13 vytkl právě tohl
 
 ---
 
+## 📚 STRUKTUROVANÁ DOKUMENTACE (od 2026-06-07)
+
+Pokud máš málo času, čti **v tomto pořadí**:
+
+1. **`docs/PROGRESS.md`** — co je hotové, kde jsme skončili, další kroky
+2. **`docs/ARCHITECTURE.md`** — technický overview (datový model, API, klíčové soubory)
+3. **`docs/DECISIONS.md`** — proč jsou věci tak jak jsou (NEPŘEPISOVAT bez čtení!)
+4. **`docs/GOTCHAS.md`** — pasti, šetří hodiny debugu (číst před změnami)
+
+Tyto 4 soubory **agregují** to co je rozsypané v `INSTRUKCE/` + memory.
+Existující `INSTRUKCE/HANDOFF-*.md` zůstávají jako detail per session.
+
+---
+
+## ✅ STAV PRODUKCE (2026-06-07)
+
+- **Push notifikace LIVE** — iPhone PWA Gide-on dostává push (VAPID + Web Push + per-source filtry + blacklist rules)
+- **Pošta blacklist** — `PostaIgnoreRule` model + UI v `/settings/push`
+- **PWA ikona Gide-on** — ink variant (dark-by-design, iOS 18 tinted-mode friendly)
+- **`/notifikace`** — agregace urgent emailů + Studánka recordings + VIP CallLog + blacklist filter
+- **20+ funkčních modulů** — viz `docs/PROGRESS.md`
+
+**Pre-existing TS errors** v `PushSettings.tsx`, `seed.ts`, `audio-transcribe.ts`, `contacts-export.ts` — runtime OK, ne moje regrese.
+
+---
+
 ## ⚠️ ČTI NEJDŘÍV (v tomto pořadí):
 
 0. **`INSTRUKCE/HANDOFF-2026-05-27-DASHBOARD-FEEDBACK.md`** ← **NEJNOVĚJŠÍ HANDOFF** — Dashboard feedback session, 26 bodů + ~20 commitů, navazuje na ranní big day. Hlavní bloky: **/start redesign** (grid-cols-3, sloučení Úkoly+Deník→Ozvěna, Studánka+Prskavka→Záznamy, smazat Týden, „Dnes nadchází" karta), **/notifikace** nový modul (agregace urgent mail + Studánka recordings + VIP CallLog), **briefing tab Dnes/Zítřek** v DayView (default Zítřek), **manual Sync + Hide event** v DayView, **Google sweep guard tolerantní** (errorRate<10%), **VIP kdy vyrazit** = reminders.overrides + location field per slot.type, **pošta classify tolerantní parser** (extractFirstBalancedObject, 49/50 errors → 0-5), **mobile EditInline panel**, **Studánka↔Prskavka switch** v cílových stránkách, **AI metadata viditelná v deníku** (@lidé + #tagy chip listy). **SMTP2GO „Verified" = funkční DKIM** (i když dig z lokálu CNAME nezobrazuje — Petr opravil můj omyl). Token náklady zdokumentované: typicky ~13 Kč/den, 400 Kč/měsíc. Nové docs: `UKOLY-WORKFLOW.md`, `POSTA-PHASE-7-PLAN.md`. TODO: POSTA fáze 7 (mobile inbox + AI reply Petrovým jazykem).
