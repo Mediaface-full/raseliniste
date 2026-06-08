@@ -74,7 +74,8 @@ function safeIconName(icon: string | null): string {
             <a
               href={link.url}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener noreferrer external"
+              data-external-link
               class="glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition hover:bg-white/5 active:scale-[0.98]"
               style={`--c: var(--tint-${link.tint});`}
             >
@@ -110,3 +111,16 @@ function safeIconName(icon: string | null): string {
     )}
   </div>
 </Shell>
+
+<script>
+  // Force external links to open in browser window (not PWA scope).
+  // Chrome PWA / iOS PWA default behavior pro target="_blank" je otevřít
+  // link v in-app browser uvnitř PWA okna. window.open() s noopener
+  // přesměruje na hlavní browser okno (Chrome tab / Safari).
+  document.querySelectorAll<HTMLAnchorElement>('a[data-external-link]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.open(a.href, '_blank', 'noopener,noreferrer');
+    });
+  });
+</script>
