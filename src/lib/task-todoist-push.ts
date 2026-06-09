@@ -483,6 +483,12 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
   if (todoistParentId) {
     projectId = parentRoutedProjectId;
     routedHow = "inherited from parent";
+  } else if (task.manualTodoistProjectId) {
+    // Manuální override z Triage UI — Petr klikl na chip 📁 a vybral
+    // projekt sám. Preferujeme jeho volbu před Smart routingem.
+    projectId = task.manualTodoistProjectId;
+    sectionId = task.manualTodoistSectionId ?? undefined;
+    routedHow = "manual override (Triage picker)";
   } else {
     const ctx: RouteContext = {
       token,
@@ -498,7 +504,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
         assignedToContact: task.assignedToContact ?? null,
       });
       projectId = routeMeta.projectId;
-      sectionId = routeMeta.sectionId;
+      sectionId = routeMeta.sectionId ?? undefined;
       routedHow = routeMeta.routedHow;
     } catch (e) {
       console.warn("[task-todoist-push] resolveRoute failed:", e);

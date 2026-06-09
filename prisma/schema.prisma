@@ -1307,6 +1307,12 @@ model Task {
   pushedAt          DateTime?
   pushError         String?      @db.Text
 
+  // Manuální override Smart routingu (Petr 2026-06-09). Pokud nastavené,
+  // task-todoist-push.ts je preferuje před resolveRoute(). Petr klikl na
+  // chip 📁 v Triage a vybral projekt sám.
+  manualTodoistProjectId  String?
+  manualTodoistSectionId  String?
+
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   completedAt       DateTime?

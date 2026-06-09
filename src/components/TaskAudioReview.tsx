@@ -104,6 +104,20 @@ interface Proposal {
   _editing: boolean;
   // Po vyřešení assignedToContactName na ID
   assignedToContactId: string | null;
+  // Manuální override Smart routingu — Petr klikl na chip 📁 a vybral
+  // projekt sám. Pokud nastaveno, posíláme na server místo auto-routingu.
+  manualTodoistProjectId?: string | null;
+  manualTodoistSectionId?: string | null;
+  manualTodoistProjectName?: string | null; // jen pro UI preview
+  manualTodoistSectionName?: string | null;
+}
+
+interface TodoistProjectOption {
+  id: string;
+  name: string;
+  isInbox: boolean;
+  isTeam: boolean;
+  sections?: { id: string; name: string }[];
 }
 
 interface Batch {
@@ -120,15 +134,30 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
   const [batch, setBatch] = useState<Batch | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [todoistProjects, setTodoistProjects] = useState<TodoistProjectOption[]>([]);
   const [showRaw, setShowRaw] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void loadContacts();
+    void loadTodoistProjects();
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchId]);
+
+  async function loadTodoistProjects() {
+    try {
+      // S sekcemi — chce to víc requests, ale Petr potřebuje plný picker
+      const res = await fetch("/api/todoist/projects-list?withSections=1");
+      if (res.ok) {
+        const data = await res.json();
+        setTodoistProjects(data.projects ?? []);
+      }
+    } catch (e) {
+      console.warn("[TaskAudioReview] loadTodoistProjects failed:", e);
+    }
+  }
 
   // Petr 2026-05-27: stopky tickají každou sekundu, ne jen při polling
   const [nowTick, setNowTick] = useState(Date.now());
@@ -254,6 +283,8 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
           priority: p.priority,
           rawSnippet: p.rawSnippet,
           assignedToContactId: p.assignedToContactId,
+          manualTodoistProjectId: p.manualTodoistProjectId ?? null,
+          manualTodoistSectionId: p.manualTodoistSectionId ?? null,
         };
       }
       const payload = {
@@ -449,6 +480,7 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
               <ProposalRow
                 proposal={p}
                 contacts={contacts}
+                todoistProjects={todoistProjects}
                 onChange={(patch) => setProposals((prev) => prev.map((q, i) => (i === idx ? { ...q, ...patch } : q)))}
                 onRemove={() => setProposals((prev) => prev.filter((_, i) => i !== idx))}
               />
@@ -459,6 +491,7 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
                       key={sub._id}
                       proposal={sub}
                       contacts={contacts}
+                      todoistProjects={todoistProjects}
                       isSubtask
                       // Pokud rodič odškrtnut, sub se vizuálně tmaví ale dál edituje
                       onChange={(patch) =>
@@ -506,10 +539,11 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
 }
 
 function ProposalRow({
-  proposal, contacts, onChange, onRemove, isSubtask = false,
+  proposal, contacts, todoistProjects, onChange, onRemove, isSubtask = false,
 }: {
   proposal: Proposal;
   contacts: Contact[];
+  todoistProjects: TodoistProjectOption[];
   onChange: (patch: Partial<Proposal>) => void;
   onRemove: () => void;
   isSubtask?: boolean;
@@ -606,20 +640,16 @@ function ProposalRow({
               </span>
             )}
 
-            {/* Petr 2026-05-27: preview kam to půjde v Todoistu — chip vedle
-                ostatních polí. Sleduje contact + klient-* tagy, mění se live
-                podle změny dropdownu kontaktu / tagu. */}
-            {(() => {
-              const route = computeRoutePreview(proposal, contacts);
-              return (
-                <span
-                  className="flex items-center gap-1 font-mono text-sm px-2 py-1 rounded border border-[var(--tint-sky)]/30 bg-[var(--tint-sky)]/10 text-[var(--tint-sky)]"
-                  title="Kam úkol půjde v Todoistu — počítáno z kontaktu a klient-* tagů. Pokud nesedí, doplň kontakt nebo tag."
-                >
-                  📁 {route.project}{route.section ? ` / ${route.section}` : ""}
-                </span>
-              );
-            })()}
+            {/* Petr 2026-05-27: chip = preview kam to půjde v Todoistu.
+                Petr 2026-06-09: chip je teď klikatelný dropdown — manual
+                override Smart routingu. Výběr „🤖 Automaticky" = auto routing.
+                Pokud Petr zvolí konkrétní projekt/sekci, override. */}
+            <ProjectPicker
+              proposal={proposal}
+              contacts={contacts}
+              todoistProjects={todoistProjects}
+              onChange={onChange}
+            />
 
             {/* Tagy — inline input s čárkou. Zachovává t-* tag mimo. */}
             <label className="flex items-center gap-1 flex-1 min-w-[160px]" title="Tagy oddělené čárkou (bez #, bez t-*)">
@@ -730,6 +760,135 @@ function ProposalEdit({
         })}><Check /> OK</Button>
         <Button size="sm" variant="ghost" onClick={onCancel}><X /></Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * ProjectPicker — chip 📁 který je klikatelný dropdown.
+ *
+ * Default = "🤖 Automaticky" (computeRoutePreview). Po výběru konkrétního
+ * project/section uloží do proposal.manualTodoist*Id. Pro re-clearnutí
+ * stačí znovu zvolit „🤖 Automaticky".
+ *
+ * Petr 2026-06-09: tohle byla missing feature — Smart routing někdy
+ * rozhodne špatně (např. „Dominik zajistit X" → Moje úkoly místo Práce/Dominik)
+ * a Petr musí mít možnost override jedním kliknutím.
+ */
+function ProjectPicker({
+  proposal, contacts, todoistProjects, onChange,
+}: {
+  proposal: Proposal;
+  contacts: Contact[];
+  todoistProjects: TodoistProjectOption[];
+  onChange: (patch: Partial<Proposal>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const route = computeRoutePreview(proposal, contacts);
+  const isManual = !!proposal.manualTodoistProjectId;
+
+  // Label co se zobrazí na chipu
+  const label = isManual
+    ? `${proposal.manualTodoistProjectName ?? "Projekt"}${proposal.manualTodoistSectionName ? ` / ${proposal.manualTodoistSectionName}` : ""}`
+    : `${route.project}${route.section ? ` / ${route.section}` : ""}`;
+
+  function clearManual() {
+    onChange({
+      manualTodoistProjectId: null,
+      manualTodoistSectionId: null,
+      manualTodoistProjectName: null,
+      manualTodoistSectionName: null,
+    });
+    setOpen(false);
+  }
+
+  function pick(projectId: string, projectName: string, sectionId: string | null, sectionName: string | null) {
+    onChange({
+      manualTodoistProjectId: projectId,
+      manualTodoistSectionId: sectionId,
+      manualTodoistProjectName: projectName,
+      manualTodoistSectionName: sectionName,
+    });
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1 font-mono text-sm px-2 py-1 rounded border cursor-pointer transition ${
+          isManual
+            ? "border-[var(--tint-sage)]/50 bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] hover:bg-[var(--tint-sage)]/25"
+            : "border-[var(--tint-sky)]/30 bg-[var(--tint-sky)]/10 text-[var(--tint-sky)] hover:bg-[var(--tint-sky)]/20"
+        }`}
+        title={isManual ? "Manuálně vybráno — klikni pro změnu" : "Auto routing — klikni pro override"}
+      >
+        📁 {label} <ChevronDown className="size-3" />
+      </button>
+
+      {open && (
+        <>
+          {/* Backdrop ke zavření kliknutím mimo */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute top-full left-0 mt-1 z-50 min-w-[280px] max-h-[400px] overflow-y-auto rounded-lg border border-white/20 bg-black/95 backdrop-blur-md shadow-2xl p-1">
+            {/* Auto option */}
+            <button
+              type="button"
+              onClick={clearManual}
+              className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-white/10 ${!isManual ? "bg-white/5" : ""}`}
+            >
+              🤖 <strong>Automaticky</strong>{" "}
+              <span className="text-muted-foreground">
+                ({route.project}{route.section ? ` / ${route.section}` : ""})
+              </span>
+            </button>
+            <div className="my-1 border-t border-white/10" />
+
+            {todoistProjects.length === 0 && (
+              <div className="px-3 py-2 text-sm text-muted-foreground italic">
+                Načítám projekty…
+              </div>
+            )}
+
+            {todoistProjects.map((proj) => (
+              <div key={proj.id}>
+                {/* Projekt jako item bez sekce */}
+                <button
+                  type="button"
+                  onClick={() => pick(proj.id, proj.name, null, null)}
+                  className={`w-full text-left px-3 py-1.5 rounded text-sm hover:bg-white/10 ${
+                    isManual && proposal.manualTodoistProjectId === proj.id && !proposal.manualTodoistSectionId
+                      ? "bg-[var(--tint-sage)]/20"
+                      : ""
+                  }`}
+                >
+                  📁 <strong>{proj.name}</strong>
+                  {proj.isTeam && <span className="text-xs text-muted-foreground ml-1">(tým)</span>}
+                </button>
+                {/* Sekce pod projektem */}
+                {proj.sections?.map((sec) => (
+                  <button
+                    key={sec.id}
+                    type="button"
+                    onClick={() => pick(proj.id, proj.name, sec.id, sec.name)}
+                    className={`w-full text-left pl-8 pr-3 py-1 rounded text-sm hover:bg-white/10 ${
+                      isManual && proposal.manualTodoistSectionId === sec.id
+                        ? "bg-[var(--tint-sage)]/20"
+                        : ""
+                    }`}
+                  >
+                    <span className="text-muted-foreground">└</span> {sec.name}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

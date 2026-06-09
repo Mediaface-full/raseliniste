@@ -16,6 +16,10 @@ const subProposalSchema = z.object({
   priority: z.enum(["low", "normal", "high"]).optional(),
   rawSnippet: z.string().nullable().optional(),
   assignedToContactId: z.string().nullable().optional(),
+  // Manuální override Smart routingu — Petr v UI klikl na chip 📁 a vybral
+  // projekt sám. Pokud nastaveno, task-todoist-push.ts to preferuje před resolveRoute.
+  manualTodoistProjectId: z.string().nullable().optional(),
+  manualTodoistSectionId: z.string().nullable().optional(),
 });
 
 const proposalSchema = subProposalSchema.extend({
@@ -67,6 +71,8 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
         tags: p.tags ?? [],
         priority: p.priority ?? "normal",
         assignedToContactId: p.assignedToContactId ?? null,
+        manualTodoistProjectId: p.manualTodoistProjectId ?? null,
+        manualTodoistSectionId: p.manualTodoistSectionId ?? null,
         source: "audio",
         sourceBatchId: batch.id,
         rawSnippet: p.rawSnippet ?? null,
