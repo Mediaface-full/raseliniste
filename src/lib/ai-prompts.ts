@@ -107,7 +107,13 @@ PRAVIDLA:
 6. **priority** — defaultně "normal". "high" jen pokud Gideon explicitně řekl "důležité" / "urgent" / "rychle". "low" jen pokud "kdykoliv" / "není to spěch".
 7. **notes** — pokud Gideon řekl ke konkrétnímu úkolu KONTEXT, ÚVAHY, ZDŮVODNĚNÍ nebo prostě dlouze povídal (klidně 1-3 minuty), vlož sem CELÝ ten kontext v ucelených větách. Petr to chce v poznámkách úkolu, ne v "rawSnippet" (ten je jen 5-15 slov pro orientaci). Nezkracovat agresivně — max 1500 znaků. Pokud Gideon řekl jen příkaz bez kontextu, dej null.
 8. **rawSnippet** — doslovný úryvek z přepisu (5-15 slov), ze kterého úkol vznikl. Gideonovi pomáhá v review.
-9. **assignedToContactName** — pokud Gideon řekl "Karel ať udělá X" / "pro Karla" / "Karlovi přiřadit", vyplň jméno z následujícího seznamu kontaktů (přesně jak je tam napsáno). Jinak null.
+9. **assignedToContactName** — VYPLNIT pokud Gideon přiřadil úkol konkrétnímu člověku ze seznamu kontaktů níže. Vzory které musíš poznat:
+   - **Vazby s předložkou**: "pro Karla", "Karlovi přiřadit", "po Karlovi chci", "dej Karlovi"
+   - **Imperativ + jméno**: "Karel ať udělá X", "Karel udělá X", "Karel to vyřídí", "Karel musí X"
+   - **Subjektová pozice na začátku úkolu** (DŮLEŽITÉ — Gideon často diktuje takto): "**Karel zajistit** X", "**Karel připravit** X", "**Karel poslat** X", "**Karel zavolat** X". Tady je Karel TEN KDO MÁ ÚKOL VYŘÍDIT, nikoli příjemce. Vyplň "Karel".
+   - **Vyjmenované akce s lidmi** ("Karel — koupit chleba" / "Karel: zavolat Petrovi"): vyplň "Karel".
+   Jméno vyplň PŘESNĚ jak je v následujícím seznamu kontaktů (kanonická forma, ne alias). Jinak null.
+   **Pozor na false positives**: pokud je člověk zmíněn jen jako téma nebo objekt úkolu ("zavolat Karlovi" = úkol pro tebe, ne pro Karla → null; "koupit dárek pro Karla" = null; "Karel mi řekl X" = null), nech null.
 10. **Pořadí** = pořadí, v jakém Gideon úkoly zmínil. U rodiče = pořadí prvního výskytu tématu.
 
 Vrať POUZE JSON tohoto tvaru, žádný markdown wrapper, žádný úvod:
