@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Loader2, Check, X, Edit3, Trash2, AlertTriangle, RotateCw, Clock, UserCheck, Tag, ChevronDown, Hourglass,
 } from "lucide-react";
@@ -784,6 +785,8 @@ function ProjectPicker({
   onChange: (patch: Partial<Proposal>) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const route = computeRoutePreview(proposal, contacts);
   const isManual = !!proposal.manualTodoistProjectId;
 
@@ -791,6 +794,22 @@ function ProjectPicker({
   const label = isManual
     ? `${proposal.manualTodoistProjectName ?? "Projekt"}${proposal.manualTodoistSectionName ? ` / ${proposal.manualTodoistSectionName}` : ""}`
     : `${route.project}${route.section ? ` / ${route.section}` : ""}`;
+
+  // Před otevřením dropdownu spočítej pozici z buttonu — dropdown jde do Portalu
+  // (mimo glass parent stacking context). Pattern z calendar/Timeline View.
+  function handleOpen() {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const dropdownWidth = 320;
+    const viewportWidth = window.innerWidth;
+    // Vpravo by mohl utéct mimo viewport — clamp na 8px padding
+    const left = Math.min(rect.left, viewportWidth - dropdownWidth - 8);
+    setPosition({
+      top: rect.bottom + 4,
+      left: Math.max(8, left),
+    });
+    setOpen(true);
+  }
 
   function clearManual() {
     onChange({
@@ -813,10 +832,11 @@ function ProjectPicker({
   }
 
   return (
-    <div className="relative">
+    <>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : handleOpen())}
         className={`flex items-center gap-1 font-mono text-sm px-2 py-1 rounded border cursor-pointer transition ${
           isManual
             ? "border-[var(--tint-sage)]/50 bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] hover:bg-[var(--tint-sage)]/25"
@@ -827,14 +847,17 @@ function ProjectPicker({
         📁 {label} <ChevronDown className="size-3" />
       </button>
 
-      {open && (
+      {open && position && typeof document !== "undefined" && createPortal(
         <>
-          {/* Backdrop ke zavření kliknutím mimo */}
+          {/* Backdrop přes celý viewport — klik mimo zavře */}
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-[100]"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute top-full left-0 mt-1 z-50 min-w-[280px] max-h-[400px] overflow-y-auto rounded-lg border border-white/20 bg-black/95 backdrop-blur-md shadow-2xl p-1">
+          <div
+            className="fixed z-[101] min-w-[320px] max-w-[420px] max-h-[400px] overflow-y-auto rounded-lg border border-white/20 bg-black/95 backdrop-blur-md shadow-2xl p-1"
+            style={{ top: position.top, left: position.left }}
+          >
             {/* Auto option */}
             <button
               type="button"
@@ -887,8 +910,9 @@ function ProjectPicker({
               </div>
             ))}
           </div>
-        </>
+        </>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
