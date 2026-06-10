@@ -364,7 +364,7 @@ interface EditorProps {
   onClose: (reload: boolean) => void;
 }
 
-function ContactEditor({ contact, onClose }: EditorProps) {
+export function ContactEditor({ contact, onClose }: EditorProps) {
   const [displayName, setDisplayName] = useState(contact?.displayName ?? "");
   const [firstName, setFirstName] = useState(contact?.firstName ?? "");
   const [firstNameVocative, setFirstNameVocative] = useState(contact?.firstNameVocative ?? "");

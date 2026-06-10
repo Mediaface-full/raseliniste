@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { ContactEditor } from "./ContactsManager";
 import {
   Search, Save, RefreshCw, Loader2, AlertTriangle, Check, Cloud, CloudUpload,
   Users, Phone, Mail, Filter, X, ChevronLeft, ChevronRight, Trash2,
@@ -106,6 +107,10 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
   const syncing = syncingIcloud || syncingGoogle; // jen pro celkovou pojistku (např. disable Save tlačítka)
   const [pushingId, setPushingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Petr 2026-06-10: „+ Nový kontakt" otevírá ContactEditor modal
+  // (z ContactsManager.tsx). Předchozí UX vytvořilo placeholder řádek
+  // v tabulce — Petr ho hledal a frustroval se.
+  const [newContactModalOpen, setNewContactModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   // Real-time sync progress (Petr 2026-05-16) — polluje à 2s pokud syncing
@@ -618,9 +623,9 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         </button>
 
         <button
-          onClick={createNewContact}
+          onClick={() => setNewContactModalOpen(true)}
           className="px-3 py-1.5 rounded-md bg-[var(--tint-mint)]/20 text-[var(--tint-mint)] border border-[var(--tint-mint)]/40 text-sm font-medium flex items-center gap-1.5"
-          title="Vytvořit nový kontakt"
+          title="Otevřít formulář nového kontaktu"
         >
           + Nový kontakt
         </button>
@@ -840,6 +845,22 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
             <ChevronRight className="size-4" />
           </button>
         </div>
+      )}
+
+      {/* Petr 2026-06-10: „+ Nový kontakt" modal s plným formulářem.
+          ContactEditor je z ContactsManager.tsx (exportovaný). */}
+      {newContactModalOpen && (
+        <ContactEditor
+          contact={null}
+          onClose={(reload) => {
+            setNewContactModalOpen(false);
+            if (reload) {
+              void load();
+              setMessage("✓ Kontakt přidán. Pokud chceš push do iCloudu/Google, klikni Uložit (iCloud) / Uložit + Google.");
+              setTimeout(() => setMessage(null), 6000);
+            }
+          }}
+        />
       )}
     </div>
   );
