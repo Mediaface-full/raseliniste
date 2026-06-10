@@ -204,6 +204,34 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
 
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  // Petr 2026-06-10: auto-link Todoist collaborators s Contacts podle e-mailu.
+  // Aby task push posílal responsible_uid (notifikace pro člena týmu).
+  const [linkingCollaborators, setLinkingCollaborators] = useState(false);
+  const [linkResult, setLinkResult] = useState<string | null>(null);
+  async function autoLinkCollaborators() {
+    setLinkingCollaborators(true);
+    setError(null);
+    setLinkResult(null);
+    try {
+      const res = await fetch("/api/integrations/todoist/auto-link-collaborators", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Auto-link selhal.");
+        return;
+      }
+      const s = data.summary ?? {};
+      let msg = `✓ Propojeno ${s.matched ?? 0} kontaktů s Todoist (přeskočeno ${s.skipped ?? 0} už nastavených, ${s.noEmail ?? 0} bez e-mailu).`;
+      if (s.unmatchedCollaborators > 0) {
+        msg += ` Pozor: ${s.unmatchedCollaborators} Todoist collaborators nemá odpovídající kontakt — přidej je do /contacts.`;
+      }
+      setLinkResult(msg);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLinkingCollaborators(false);
+    }
+  }
   async function syncProjects(fullReset = false) {
     if (fullReset && !confirm("Plný reset: smaže lokální mirror Todoist projektů + labelů a načte vše čerstvě z Todoistu. Pro vyřešení starých/přejmenovaných projektů co se neprománou. Pokračovat?")) {
       return;
@@ -322,12 +350,23 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
               <Button variant="ghost" onClick={() => syncProjects(true)} disabled={syncing}>
                 Full reset mirroru
               </Button>
+              <Button
+                variant="outline"
+                onClick={autoLinkCollaborators}
+                disabled={linkingCollaborators}
+                title="Spáruje Todoist Workspace členy s kontakty podle emailu. Bez toho task push neposílá responsible_uid (=úkoly nedostávají notifikaci členům)."
+              >
+                {linkingCollaborators ? <><Loader2 className="animate-spin" /> Propojuji…</> : "Propojit členy týmu"}
+              </Button>
               <Button variant="ghost" onClick={removeToken} disabled={saving}>
                 <Trash2 /> Smazat
               </Button>
             </div>
             {syncResult && (
               <div className="text-xs text-emerald-400 font-mono pt-1">{syncResult}</div>
+            )}
+            {linkResult && (
+              <div className="text-xs text-emerald-400 font-mono pt-1">{linkResult}</div>
             )}
           </div>
         )}
