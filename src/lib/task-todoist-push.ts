@@ -8,7 +8,7 @@ import {
   createSection as todoistCreateSection,
   taskPriorityToTodoist,
 } from "./todoist";
-import { resolveClientProject } from "./todoist-workspace";
+import { resolveClientProject, resolveTeamMemberProject } from "./todoist-workspace";
 
 /**
  * Push standalone Task (modul Úkoly /ukoly) do Todoistu.
@@ -235,6 +235,7 @@ async function resolveRoute(
       firstName: string | null;
       isTeam: boolean;
       clientTag: string | null;
+      aliases?: string[];
     } | null;
   },
 ): Promise<RouteResolution> {
@@ -316,15 +317,40 @@ async function resolveRoute(
     };
   }
 
-  // ---- #3 assignedToContact.isTeam → Práce / sekce <jméno> ----
+  // ---- #3 assignedToContact.isTeam → Team Workspace projekt s jménem člena ----
+  // Petr 2026-06-09: členové týmu mají vlastní top-level projekty v Team
+  // Workspace (např. „Dominik", „Gáťa"). Routing je tam pošle přímo,
+  // ne do hardcoded „Práce" / sekce <jméno>. Pokud TWS projekt s odpovídajícím
+  // jménem neexistuje, fallback na původní Práce-pattern (#3b).
   if (task.assignedToContact?.isTeam) {
+    const teamMemberProject = await resolveTeamMemberProject(ctx.userId, {
+      firstName: task.assignedToContact.firstName,
+      displayName: task.assignedToContact.displayName,
+      aliases: task.assignedToContact.aliases ?? [],
+    });
+
+    if (teamMemberProject) {
+      return {
+        projectId: teamMemberProject.todoistId,
+        sectionId: undefined,
+        routedHow: `[team → workspace project] "${teamMemberProject.name}" (workspace ${teamMemberProject.workspaceId})`,
+        rule: "team",
+        matchedValue: teamMemberProject.name,
+        projectName: teamMemberProject.name,
+        sectionName: null,
+        ...audit,
+      };
+    }
+
+    // Fallback #3b: hardcoded Práce / sekce <jméno> (původní chování pro
+    // backwards compat, když TWS projekt pro člena neexistuje)
     const sectionName = task.assignedToContact.firstName ?? task.assignedToContact.displayName;
     const project = await ensureProject(ctx.token, ctx.praceProjectName, audit);
     const section = await ensureSection(ctx.token, project.id, sectionName, audit);
     return {
       projectId: project.id,
       sectionId: section.id,
-      routedHow: `[team] "${ctx.praceProjectName}" → "${section.name}"`,
+      routedHow: `[team → personal-fallback] "${ctx.praceProjectName}" → "${section.name}"`,
       rule: "team",
       matchedValue: sectionName,
       projectName: project.name,
@@ -433,7 +459,7 @@ export async function pushTaskToTodoist(taskId: string): Promise<{ taskId: strin
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: {
-      assignedToContact: { select: { displayName: true, firstName: true, isTeam: true, clientTag: true, todoistUserId: true } },
+      assignedToContact: { select: { displayName: true, firstName: true, isTeam: true, clientTag: true, todoistUserId: true, aliases: true } },
       parent: { select: { id: true, todoistTaskId: true, todoistProjectId: true } },
     },
   });

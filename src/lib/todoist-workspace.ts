@@ -144,3 +144,60 @@ export async function resolveClientProject(
     workspaceId: match.workspaceId!,
   };
 }
+
+/**
+ * Najde Team Workspace projekt podle jména člena týmu (Petr 2026-06-09).
+ *
+ * Petrův setup: každý člen týmu = vlastní top-level Team Workspace projekt
+ * (např. „Dominik", „Gáťa", „Honza"). Když `assignedToContact.isTeam=true`,
+ * úkol má jít do tohoto projektu, NE do hardcoded „Práce" / sekce <jméno>.
+ *
+ * Match strategie (první match vyhrává):
+ *   1. project.name === firstName (case-insensitive)
+ *   2. project.name === displayName (case-insensitive)
+ *   3. slugify(project.name) === slugify(firstName)
+ *   4. Kontakt má alias matching project.name
+ *
+ * Vrátí null pokud žádný match — caller pak fallne na hardcoded „Práce" pattern.
+ */
+export async function resolveTeamMemberProject(
+  userId: string,
+  contact: {
+    firstName: string | null;
+    displayName: string;
+    aliases?: string[];
+  },
+): Promise<ResolvedClientProject | null> {
+  const teamId = getTeamWorkspaceId();
+  if (!teamId) return null;
+
+  const candidates = await prisma.todoistProjectMirror.findMany({
+    where: { userId, workspaceId: teamId, isTeamProject: true },
+    select: { todoistId: true, name: true, workspaceId: true },
+  });
+  if (candidates.length === 0) return null;
+
+  const names = [contact.firstName, contact.displayName, ...(contact.aliases ?? [])]
+    .filter((n): n is string => !!n && n.trim().length > 0)
+    .map((n) => n.trim());
+
+  // 1+2+4. Přesný match (case-insensitive) na firstName / displayName / aliases
+  for (const name of names) {
+    const lower = name.toLowerCase();
+    const exact = candidates.find((c) => c.name.toLowerCase() === lower);
+    if (exact) {
+      return { todoistId: exact.todoistId, name: exact.name, workspaceId: exact.workspaceId! };
+    }
+  }
+
+  // 3. Slug match (fallback pro diakritiku / mezery)
+  for (const name of names) {
+    const slug = slugify(name);
+    const fuzzy = candidates.find((c) => slugify(c.name) === slug);
+    if (fuzzy) {
+      return { todoistId: fuzzy.todoistId, name: fuzzy.name, workspaceId: fuzzy.workspaceId! };
+    }
+  }
+
+  return null;
+}

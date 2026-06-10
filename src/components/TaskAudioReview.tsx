@@ -63,23 +63,69 @@ function humanizeSlug(slug: string): string {
   return slug.split("-").map((w) => (w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1))).join(" ");
 }
 
+function slugifyClient(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Najde Team Workspace projekt v seznamu podle jména (exact ci nebo slug match).
+ * Vrátí název projektu nebo null. Client-side mirror funkce
+ * `resolveTeamMemberProject` ze server-side `todoist-workspace.ts`.
+ */
+function findTeamProjectByName(
+  todoistProjects: TodoistProjectOption[],
+  names: (string | null | undefined)[],
+): string | null {
+  const teamProjects = todoistProjects.filter((p) => p.isTeam);
+  if (teamProjects.length === 0) return null;
+  const cleanNames = names.filter((n): n is string => !!n && n.trim().length > 0);
+  // 1. Exact case-insensitive match
+  for (const name of cleanNames) {
+    const lower = name.toLowerCase();
+    const exact = teamProjects.find((p) => p.name.toLowerCase() === lower);
+    if (exact) return exact.name;
+  }
+  // 2. Slug match (diakritika / mezery)
+  for (const name of cleanNames) {
+    const slug = slugifyClient(name);
+    const fuzzy = teamProjects.find((p) => slugifyClient(p.name) === slug);
+    if (fuzzy) return fuzzy.name;
+  }
+  return null;
+}
+
 function computeRoutePreview(
   proposal: { tags: string[]; assignedToContactId: string | null },
   contacts: Contact[],
+  todoistProjects: TodoistProjectOption[] = [],
 ): { project: string; section: string | null } {
   const KLIENT = "klient-";
   const klientTag = proposal.tags.find((t) => t.startsWith(KLIENT));
   if (klientTag) {
     const slug = klientTag.slice(KLIENT.length);
+    // Najdi Team Workspace projekt podle slug (humanized jméno)
+    const teamMatch = findTeamProjectByName(todoistProjects, [humanizeSlug(slug), slug]);
+    if (teamMatch) return { project: teamMatch, section: null };
     return { project: "Práce", section: humanizeSlug(slug) };
   }
   const contact = proposal.assignedToContactId
     ? contacts.find((c) => c.id === proposal.assignedToContactId)
     : null;
   if (contact?.clientTag) {
+    const teamMatch = findTeamProjectByName(todoistProjects, [humanizeSlug(contact.clientTag), contact.clientTag]);
+    if (teamMatch) return { project: teamMatch, section: null };
     return { project: "Práce", section: humanizeSlug(contact.clientTag) };
   }
   if (contact?.isTeam) {
+    // Petr 2026-06-09: členové týmu mají vlastní top-level Team projekty
+    // (např. „Dominik", „Gáťa"). Najdi a vrať přímo projekt bez sekce.
+    const teamMatch = findTeamProjectByName(todoistProjects, [contact.firstName, contact.displayName]);
+    if (teamMatch) return { project: teamMatch, section: null };
     return { project: "Práce", section: contact.firstName ?? contact.displayName };
   }
   if (contact) {
@@ -787,7 +833,7 @@ function ProjectPicker({
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const route = computeRoutePreview(proposal, contacts);
+  const route = computeRoutePreview(proposal, contacts, todoistProjects);
   const isManual = !!proposal.manualTodoistProjectId;
 
   // Label co se zobrazí na chipu
