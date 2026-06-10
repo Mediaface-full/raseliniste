@@ -236,3 +236,46 @@ Petr opravil můj omyl 2026-05-27.
 | 2026-05-27 | Big day (~26 commitů): booking polish, /ukoly Triage, audio žádný strop, push notifikace cron, 26-bodový dashboard feedback | Konsolidace |
 | 2026-05-27 | Page Links modul | User-defined sidebar shortcuts |
 | 2026-06-01 | Pošta blacklist + PWA Gide-on ikona + VAPID rotation + push notifikace live | Iterace na detailech |
+| 2026-06-09 | Triage picker projektu (manuální override Smart routing) + Team Workspace routing pravidlo #3 + Portal pattern audit | Petr právem vytkl že tyto měly být hotové dřív (2026-05-10 Smart routing, 2026-05-18 Cesta B, 2026-05-05 Portal pattern) |
+
+## Nová pravidla od 2026-06-09
+
+### Každý AI-driven decisioning krok MUSÍ mít UI override
+
+Z `feedback_smart_routing_needs_escape.md`:
+
+> Pro **každý AI-driven automatický rozhodovací krok** musí být v UI
+> možnost manuálního overridu. **Žádné výjimky.** Nejde o vzájemnou
+> nedůvěru — jde o respekt k uživateli který zná kontext lépe než AI.
+
+Aplikace pravidla:
+- Task Triage projekt → ✅ ProjectPicker chip 📁 (2026-06-09)
+- Task Triage kontakt → ✅ kontakt dropdown (2026-05-27)
+- Pošta urgent/normal klasifikace → ⏳ AUDIT
+- Booking slot AI suggestion → ⏳ AUDIT
+- Studánka AI summary → ⏳ AUDIT
+- Deník @lidé + #tagy extract → ⏳ AUDIT
+
+### Routing pravidla refaktor = projít VŠECHNA pravidla
+
+Z `feedback_team_workspace_routing_gap.md`:
+
+> Když refaktoruju routing logiku (např. Cesta B Team Workspace), MUSÍM
+> projet VŠECHNA pravidla, ne jen ta která se zjevně týkají nového featuru.
+
+Cesta B (2026-05-18) updatovala pravidla #1 a #2 (klient-* tag). Pravidlo
+#3 (`isTeam`) zůstalo hardcoded, fixed až 2026-06-09. Tento gap stál
+3 týdny živé bug v produkci.
+
+### Memory čtení **PŘED** kódem, ne po
+
+Z `feedback_smart_routing_needs_escape.md`:
+
+> Před každou změnou v UI / routing / AI prompt: **grep memory soubory
+> aktivně** na téma (`portal`, `dropdown`, `workspace`, `routing`,
+> `prompt`, `transcript`).
+
+Důvod: 2026-06-09 jsem 3× porušil pravidlo:
+- Portal pattern v memory od 2026-05-05 → ignoroval při ProjectPicker
+- Team Workspace routing #3 gap v memory implicit → nepřipomněl si
+- AI prompt z reálných transkriptů → psal anglickou logikou ze stolu

@@ -4,6 +4,108 @@
 > a ví kde se skončilo. Detail jednotlivých session bloků v
 > `INSTRUKCE/HANDOFF-*.md` a v memory souborech.
 
+## Session 2026-06-09 (večer) — Triage picker, Team Workspace routing, Portal audit
+
+**8+ hodin práce, ~10 commitů. Petr právem frustrovaný že většina toho
+mělo být hotové dřív (Cesta B z 2026-05-18, Portal pattern z 2026-05-05).**
+
+### Co bylo uděláno
+
+1. **VAPID push notifikace deploy** (dopoledne, ~4 h debugging)
+   - Petr přepsal `.env` na NASce, kontejner je neviděl
+   - Root cause: `docker-compose.yml` neměl `VAPID_*: ${VAPID_*:-}` řádky
+   - 6 Synology pitfallů (DSM ACL read-only, busybox sed/awk, awk match 2× → YAML duplicate keys, .env ≠ automatic inject, HTTP 000 timeout)
+   - Po dořešení: subscription Mobil v DB, test push doručen ✅
+   - Memory: `session_2026_06_01_blacklist_pwa.md` sekce 4
+
+2. **Page Links — otevřít v Chromu** (commit `1b8dcd6`)
+   - target="_blank" v PWA otevíral v in-app browser
+   - Fix: data-external-link + inline script s window.open(url, '_blank', 'noopener')
+
+3. **AI prompt subjektová pozice** (commit `5dfa2de`, **neúplný**)
+   - „Dominik zajistit X" nezachycen jako přiřazení Dominikovi
+   - Rozšíření patterns o subjektovou pozici v `ai-prompts.ts:110`
+   - Po deployi STÁLE nepomohlo — Gemini interpretoval „Dominik zajistit Y" jako „zajistit u Dominika Y"
+
+4. **Manuální picker projektu/sekce v Triage** (commit `fdbc9dd`, klíčový)
+   - Petr právem: „je mi to k ničemu, když nepřiřadí projekt"
+   - **Tato feature měla být součástí Smart routing release (2026-05-10)**
+   - Migrace `20260609180000_task_manual_routing` — 2 nullable pole Task
+   - API endpoint `/api/todoist/projects-list` (cached projekty + sekce on-demand)
+   - UI `ProjectPicker` — chip 📁 klikatelný dropdown
+   - commit endpoint accepts manualTodoistProjectId/SectionId
+   - `task-todoist-push.ts` skip resolveRoute když manual set
+   - AI prompt posílen 5 few-shot examples + explicit anti-pattern
+
+5. **Portal fix pro picker dropdown** (commit `c8f6bf2`)
+   - Dropdown byl za další kartou kvůli glass parent backdrop-filter
+   - **Pattern byl v memory `feedback_calendar_fixed_positioning.md` od 2026-05-05** — měl jsem ho aplikovat hned
+   - Fix: createPortal + position:fixed + getBoundingClientRect
+
+6. **Team Workspace routing pro členy týmu** (commit `67c806a`)
+   - Routing pravidlo #3 (`isTeam=true`) mělo hardcoded „Práce" / sekce
+   - Petrův setup: každý člen = vlastní top-level Team Workspace projekt
+   - **Tento gap měl být fixován při Cestě B (2026-05-18)** — pravidla #1 a #2 jsem aktualizoval, #3 jsem přehlídnul
+   - Nová `resolveTeamMemberProject()` v `todoist-workspace.ts`
+   - Match strategie: exact ci match firstName/displayName/aliases → slug match
+   - Fallback na hardcoded „Práce" pokud TWS projekt neexistuje
+   - Client-side `computeRoutePreview` zrcadlí logiku
+
+7. **TriageList Portal fix** (audit nález)
+   - „Změnit typ" dropdown měl stejný z-20 bug
+   - Stejný pattern fix: createPortal + getBoundingClientRect
+
+### Audit dnes — co se našlo
+
+- ✅ **`task-todoist-push.ts`** routing #3 fixed
+- ✅ **`TaskAudioReview.tsx`** computeRoutePreview fixed
+- ✅ **`TriageList.tsx:528`** „Změnit typ" dropdown — fixed (Portal)
+- ⚠️ **`posta-commitment-sync.ts`** — vytváří Todoist task **bez project_id/section_id** → končí v Inboxu. Není to bug nutně (Petr možná chce centrální inbox závazků), ale stojí za pozornost — pokud chce, použít stejný routing pattern jako Task
+- ✅ **timeline/data-loader.ts** — používá `workspaceId` properly
+- 📋 **15 React komponent** s `absolute` pozicí bez `createPortal` — většina ne dropdown (search ikony, decorative blobs), ale **doporučuji audit při příští session**:
+  - `BwMysDetail.tsx` action buttons (asi OK, ne dropdown)
+  - `ContactsTable.tsx` search ikona (OK)
+  - `IntegrationsSettings.tsx` Key ikona (OK)
+  - Zbývá grep verify pro NotesList, DenikList, QuickAdd, IngestSetupGuide, ContactsManager, LettersArchive, ShortcutsGuide, BwMysDetail, MailSettings, ReportsSettings, JournalFeed
+
+### Lesson — proč to bylo dnes špatné
+
+Petr právem: „procti si co jsme vsechno resili to uz je podruhy."
+
+Konkrétní opakování dnes:
+- **Portal pattern** byl v memory od 2026-05-05 (5 týdnů). Ignoroval jsem ho při psaní ProjectPickeru.
+- **Team Workspace routing #3** byl gap od Cesty B (3 týdny). Pravidla #1/#2 jsem aktualizoval, #3 ne.
+- **Manuální picker projektu** měl být součástí Smart routing od dne 1 (4 týdny zpět). Petr neměl escape pro AI chybu.
+- **AI prompt z reálných transkriptů** — psal jsem ho ze stolu, anglickou logikou, místo abych si vytáhl 10 reálných Petrových diktátů z `TaskAudioBatch.rawTranscript`.
+
+**Změna workflow** (zapsaná v `feedback_smart_routing_needs_escape.md` + tento PROGRESS.md):
+- Před každou změnou v UI / routing / AI prompt: **grep memory soubory aktivně** na téma (`portal`, `dropdown`, `workspace`, `routing`, `prompt`, `transcript`)
+- Před implementací nové feature s AI-driven decisionem: **manuální override checklist**
+- Před commitem audit: projít memory za poslední měsíc (dnes proběhlo až ex-post)
+
+### Stav po dnešku
+
+Commitnuto v worktree, 7 commitů čeká na push do origin:
+1. `00118ae` docs strukturovaná dokumentace
+2. `1b8dcd6` Page Links Chrome
+3. `5dfa2de` AI prompt subjektová pozice
+4. `fdbc9dd` Triage picker + posílený prompt
+5. `c8f6bf2` Picker přes Portal
+6. `67c806a` Team Workspace routing pro členy
+7. (nový) TriageList Portal fix
+
+Petr pushne přes GH Desktop → build → DSM Pull + Recreate.
+
+### Další kroky
+
+- Verify že po deploy „Dominik zajistit Petě X" → Triage chip 📁 ukáže **„Dominik"** (Team project) → Todoist task v Team WS projektu Dominik ✓
+- Audit zbylých Portal kandidátů (12 komponent)
+- Audit posta-commitment-sync zda má jít do projektu (ne Inboxu)
+- POSTA fáze 7 (mobile inbox + AI reply) — naplánováno
+- WebAuthn passkey UI dokončit
+
+---
+
 ## Aktuální stav (2026-06-07)
 
 **Produkce běží** na `https://www.raseliniste.cz` (Synology DS718+).

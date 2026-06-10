@@ -38,15 +38,36 @@ Existující `INSTRUKCE/HANDOFF-*.md` zůstávají jako detail per session.
 
 ---
 
-## ✅ STAV PRODUKCE (2026-06-07)
+## ✅ STAV PRODUKCE (2026-06-09)
 
 - **Push notifikace LIVE** — iPhone PWA Gide-on dostává push (VAPID + Web Push + per-source filtry + blacklist rules)
+- **Triage manual picker projektu** — chip 📁 v `TaskAudioReview.tsx` je teď klikatelný dropdown se seznamem Todoist projektů (override Smart routing)
+- **Team Workspace routing** — pravidlo #3 (`isTeam`) najde TWS projekt s jménem člena (Dominik, Gáťa) místo hardcoded „Práce" / sekce
+- **AI prompt subjektová pozice** — „Karel zajistit Y" zachyceno jako přiřazení Karlovi (5 few-shot examples)
 - **Pošta blacklist** — `PostaIgnoreRule` model + UI v `/settings/push`
 - **PWA ikona Gide-on** — ink variant (dark-by-design, iOS 18 tinted-mode friendly)
 - **`/notifikace`** — agregace urgent emailů + Studánka recordings + VIP CallLog + blacklist filter
 - **20+ funkčních modulů** — viz `docs/PROGRESS.md`
 
-**Pre-existing TS errors** v `PushSettings.tsx`, `seed.ts`, `audio-transcribe.ts`, `contacts-export.ts` — runtime OK, ne moje regrese.
+**Pre-existing TS errors** v `PushSettings.tsx`, `seed.ts`, `audio-transcribe.ts`, `contacts-export.ts`, `task-todoist-push.ts:611 section_id` — runtime OK, ne moje regrese.
+
+## ⚠️ Před implementací nové feature ČTI MEMORY AKTIVNĚ
+
+Petr 2026-06-09 právem vytkl 3 opakovaná chyby v jedné session
+(Portal pattern, Team Workspace #3, manuální picker). Memory soubory
+existují, ale nečtu je předem.
+
+**Před každou změnou v UI / routing / AI prompt**:
+```bash
+ls ~/.claude/projects/-Users-petrperina-CLOUDS-CLOUDE-PROJECTS-raseliniste/memory/ | grep -i "<téma>"
+grep -ri "<klíčové slovo>" ~/.claude/projects/-Users-petrperina-CLOUDS-CLOUDE-PROJECTS-raseliniste/memory/
+```
+
+Témata která bývají ignorovaná:
+- `portal` / `dropdown` / `fixed` → Portal pattern (memory `feedback_calendar_fixed_positioning.md`)
+- `routing` / `workspace` / `team` → Team Workspace logika
+- `prompt` / `transcript` → AI prompt z reálných dat (memory `feedback_ai_prompt_real_transcripts.md`)
+- `smart routing` / `escape` → manuální override (memory `feedback_smart_routing_needs_escape.md`)
 
 ---
 

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BookOpen,
   Check,
@@ -267,6 +268,8 @@ function EntryCard({
     (entry.knowledgeTags ?? []).join(", ")
   );
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+  const [typeMenuPos, setTypeMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const typeMenuBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setText(entry.text);
@@ -513,20 +516,37 @@ function EntryCard({
               Potvrdit
             </Button>
 
-            {/* Změnit typ — všech 5 typů */}
-            <div className="relative">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setTypeMenuOpen((v) => !v)}
-                disabled={pending}
-              >
-                <Pencil /> Změnit typ
-              </Button>
-              {typeMenuOpen && (
+            {/* Změnit typ — všech 5 typů. Portal nutný kvůli glass parent
+                stacking context (backdrop-filter láme z-index). Pattern z
+                memory feedback_calendar_fixed_positioning.md. */}
+            <Button
+              ref={typeMenuBtnRef}
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (typeMenuOpen) {
+                  setTypeMenuOpen(false);
+                  return;
+                }
+                const rect = typeMenuBtnRef.current?.getBoundingClientRect();
+                if (rect) {
+                  setTypeMenuPos({
+                    top: rect.bottom + 4,
+                    left: Math.max(8, Math.min(rect.left, window.innerWidth - 180 - 8)),
+                  });
+                }
+                setTypeMenuOpen(true);
+              }}
+              disabled={pending}
+            >
+              <Pencil /> Změnit typ
+            </Button>
+            {typeMenuOpen && typeMenuPos && typeof document !== "undefined" && createPortal(
+              <>
+                <div className="fixed inset-0 z-[100]" onClick={() => setTypeMenuOpen(false)} />
                 <div
-                  className="absolute top-full left-0 mt-1 glass-strong rounded-md py-1 z-20 min-w-[160px]"
-                  onMouseLeave={() => setTypeMenuOpen(false)}
+                  className="fixed z-[101] glass-strong rounded-md py-1 min-w-[160px]"
+                  style={{ top: typeMenuPos.top, left: typeMenuPos.left }}
                 >
                   {(Object.keys(TYPE_META) as EntryType[]).map((t) => {
                     const M = TYPE_META[t];
@@ -548,8 +568,9 @@ function EntryCard({
                     );
                   })}
                 </div>
-              )}
-            </div>
+              </>,
+              document.body,
+            )}
 
             {editing && (
               <Button

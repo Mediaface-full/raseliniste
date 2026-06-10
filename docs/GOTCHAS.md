@@ -118,21 +118,124 @@ Když 1✓ 2✓ 3✓ 4✗ → recreate kontejneru
 
 ## Frontend / UI
 
-### Calendar fixed-positioning vyžaduje React Portal
+### Calendar fixed-positioning vyžaduje React Portal — PLATÍ PRO VŠECHNY DROPDOWNY
 
-**Problém**: Modaly/tooltipy v `/calendar` vyletěly daleko od kurzoru
-nebo úplně dolů ze stránky.
+**Problém**: Modaly/tooltipy/dropdowny v komponentě s glass parent
+vyletěly daleko od kurzoru, schovaly se za jiné karty, nebo padly dolů.
 
-**Příčina**: Glass utility (`.glass`) má `backdrop-filter`, který vytváří
-nový containing block pro `position: fixed`. Modal-uvnitř-glass je
-positioned vůči glass kontejneru, ne vůči viewportu.
+**Příčina**: Glass utility (`.glass`, `.glass-strong`, `.glass-subtle`)
+má `backdrop-filter`, což vytváří **nový containing block** pro
+`position: fixed` a nový **stacking context** pro `z-index`. Modal nebo
+dropdown uvnitř glass parent je positioned vůči glass kontejneru, ne
+vůči viewportu, a jeho z-index funguje jen lokálně.
 
-**Řešení**: Vždy `createPortal(modalElement, document.body)`. Plus:
+**Řešení**: Vždy `createPortal(content, document.body)` + `position: fixed`
++ vypočtená pozice z `buttonRef.current.getBoundingClientRect()`:
+
+```tsx
+const buttonRef = useRef<HTMLButtonElement>(null);
+const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+function handleOpen() {
+  const rect = buttonRef.current?.getBoundingClientRect();
+  if (rect) {
+    setPos({
+      top: rect.bottom + 4,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - dropdownWidth - 8)),
+    });
+  }
+  setOpen(true);
+}
+
+// V render:
+{open && pos && typeof document !== "undefined" && createPortal(
+  <>
+    <div className="fixed inset-0 z-[100]" onClick={() => setOpen(false)} />
+    <div className="fixed z-[101] glass-strong rounded-md ..." style={{ top: pos.top, left: pos.left }}>
+      ...
+    </div>
+  </>,
+  document.body,
+)}
+```
+
+Plus:
 - Hover delay max **80ms** (nad to UX zlobí)
-- z-index **100** (nad sidebar i sticky headers)
+- z-index **100** backdrop, **101** content
+- Clamp `left` aby nevyletěl mimo viewport
 
-**Soubor**: `src/components/calendar/*`, memory
+**Komponenty kde to bylo aplikováno** (chronologicky):
+- Calendar modaly/tooltipy (commit `38ccc62`, 2026-05-05)
+- Timeline View multi-select (commit `e117385`, 2026-05-20)
+- TaskAudioReview ProjectPicker (commit `c8f6bf2`, 2026-06-09)
+- TriageList „Změnit typ" dropdown (commit pending, 2026-06-09)
+
+**Audit checklist před PR**: pokud přidáváš dropdown/popover/modal
+uvnitř glass kontejneru, **MUSÍ** jít přes Portal. `position: absolute z-50`
+NESTAČÍ.
+
+**Soubor**: `src/components/calendar/*`, `src/components/TaskAudioReview.tsx`
+(ProjectPicker), `src/components/TriageList.tsx` (typeMenu). Memory
 `feedback_calendar_fixed_positioning.md`.
+
+### Smart routing pravidlo #3 — Team Workspace projekty pro členy
+
+**Problém**: Úkoly přiřazené kontaktu s `isTeam=true` šly do hardcoded
+„Práce" / sekce <jméno>, ale Petrův setup je jiný — každý člen týmu má
+**vlastní top-level Team Workspace projekt** (např. „Dominik", „Gáťa").
+
+**Příčina**: 2026-05-18 (Cesta B — Todoist Team Workspace) byla
+implementace `resolveClientProject` pro klient-* tagy (pravidla #1 a #2),
+ale pravidlo #3 (`assignedToContact.isTeam`) zůstalo s původním
+`ensureProject(ctx.praceProjectName, ...)`. Hardcoded „Práce" / sekce.
+
+**Řešení**: `resolveTeamMemberProject(userId, contact)` v
+`src/lib/todoist-workspace.ts` najde TWS projekt podle:
+1. Exact case-insensitive match contact.firstName / displayName / aliases
+2. Slug match (diakritika / mezery)
+3. Pokud nic → null = fallback na původní pattern
+
+Pravidlo #3 v `resolveRoute()` (`src/lib/task-todoist-push.ts:319`)
+zavolá `resolveTeamMemberProject` nejdřív, jen pokud null → hardcoded
+fallback (zachová compatibility).
+
+Plus client-side `computeRoutePreview` v `TaskAudioReview.tsx` zrcadlí
+logiku (potřebuje seznam todoistProjects z `/api/todoist/projects-list`).
+
+**Lesson**: Když refaktoruju routing, musím projít **VŠECHNA pravidla**,
+ne jen ta která se zjevně týkají nové feature. Tabulka pravidel v
+memory `feedback_team_workspace_routing_gap.md`.
+
+**Soubor**: `src/lib/task-todoist-push.ts:319-360`,
+`src/lib/todoist-workspace.ts:resolveTeamMemberProject`,
+`src/components/TaskAudioReview.tsx:computeRoutePreview`.
+
+### Manuální picker projektu — escape hatch pro AI rozhodnutí
+
+**Problém**: Smart routing 6-úrovňový (2026-05-10) byl bez manuálního
+overridu. Když AI rozhodla špatně (např. „Dominik zajistit X" →
+Moje úkoly), Petr neměl jak override.
+
+**Příčina**: Design choice „ať AI/routing rozhodne, ať Petr nemusí klikat".
+Bez fallback UI pro AI chybu.
+
+**Řešení**: Migrace `20260609180000_task_manual_routing` přidává 2 nullable
+pole na Task (`manualTodoistProjectId`, `manualTodoistSectionId`). UI
+`ProjectPicker` v `TaskAudioReview.tsx` umožňuje kliknout chip 📁 →
+dropdown se seznamem Todoist projektů + sekcí → výběr override Smart routing.
+
+`task-todoist-push.ts` skip resolveRoute když `task.manualTodoistProjectId`
+set → použij manual hodnotu, `routedHow: "manual override (Triage picker)"`.
+
+**Pravidlo do budoucna**: Pro **každý AI-driven automatický rozhodovací krok**
+musí být v UI možnost manuálního overridu. Žádné výjimky. Memory
+`feedback_smart_routing_needs_escape.md` má audit list pro ostatní moduly
+(`/posta`, `/calendar/invite`, `/notifikace`, `/studna`, `/denik`).
+
+**Soubor**: `src/components/TaskAudioReview.tsx:ProjectPicker`,
+`src/pages/api/todoist/projects-list.ts`,
+`src/pages/api/ukoly/audio/[batchId]/commit.ts`,
+`src/lib/task-todoist-push.ts:486-491`.
 
 ### Multi-select dropdown přes Portal (z-index fix)
 
