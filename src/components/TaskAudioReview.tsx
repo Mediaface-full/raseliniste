@@ -243,6 +243,14 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
     // Pokud máme proposals a ještě jsme je nezprocesovali, naplň state
     if (data.batch.status === "review" && Array.isArray(data.batch.proposalsJson)) {
       const cs = await ensureContacts();
+      // Petr 2026-06-10: default datum = dnes 09:00 pokud AI nezachytí.
+      // (Petr explicitně chce A — „nemít datum" je horší než dnes default;
+      // Petr může v Triage UI změnit/smazat.)
+      const todayDefaultIso = (() => {
+        const d = new Date();
+        d.setHours(9, 0, 0, 0);
+        return d.toISOString();
+      })();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       function hydrate(p: any, idPrefix: string): Proposal {
         // Doplň t-? tag pokud chybí — ať je dropdown vždy něčím vybraný.
@@ -254,6 +262,7 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
           : [...incomingTags, "t-?"];
         return {
           ...p,
+          dueAt: p.dueAt ?? todayDefaultIso,
           tags: tagsWithT,
           _checked: true,
           _id: idPrefix,
