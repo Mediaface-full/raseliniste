@@ -28,6 +28,8 @@ export default function OwnerUploadAudio({ projects }: Props) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // Petr 2026-06-10: ukázat jméno + velikost souboru po úspěšném upload.
+  const [doneFile, setDoneFile] = useState<{ name: string; size: number } | null>(null);
 
   // Petr 2026-05-14: ?upload=1 v URL → auto-otevři kartu (vstupní bod ze /start).
   useEffect(() => {
@@ -73,10 +75,11 @@ export default function OwnerUploadAudio({ projects }: Props) {
       });
       await result;
       setDone(true);
+      setDoneFile({ name: file.name, size: file.size });
       setTimeout(() => {
         // Po úspěšném uploadu redirect na detail projektu — tam vidí processing status
         window.location.href = `/studna/${selectedId}`;
-      }, 1200);
+      }, 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -182,8 +185,17 @@ export default function OwnerUploadAudio({ projects }: Props) {
       )}
 
       {done && (
-        <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 text-sm px-3 py-2 flex items-center gap-2">
-          <Check className="size-4 text-[var(--tint-sage)]" /> Nahráno. Otevírám detail projektu…
+        <div className="rounded-lg border-2 border-[var(--tint-sage)]/50 bg-[var(--tint-sage)]/15 text-sm px-4 py-3 flex items-center gap-3 animate-in fade-in">
+          <Check className="size-5 text-[var(--tint-sage)] shrink-0" />
+          <div className="flex-1">
+            <div className="font-semibold text-[var(--tint-sage)]">✓ Úspěšně nahráno</div>
+            {doneFile && (
+              <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                {doneFile.name} ({(doneFile.size / 1024 / 1024).toFixed(1)} MB)
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground mt-0.5">Otevírám detail projektu…</div>
+          </div>
         </div>
       )}
 

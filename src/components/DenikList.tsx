@@ -133,10 +133,13 @@ export default function DenikList() {
   const audioFileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // Petr 2026-06-10: viditelný ✓ feedback po upload (před redirect).
+  const [uploadDone, setUploadDone] = useState<string | null>(null);
 
   async function uploadAudioFile(file: File) {
     setUploading(true);
     setUploadError(null);
+    setUploadDone(null);
     try {
       const fd = new FormData();
       fd.append("audio", file);
@@ -147,8 +150,11 @@ export default function DenikList() {
         setUploadError(data.error ?? `Upload selhal (HTTP ${res.status}).`);
         return;
       }
-      // Po uploadu redirect na detail zápisu (poll status)
-      window.location.href = `/denik/${data.entryId}`;
+      // Viditelný ✓ feedback (1.2s) → pak redirect na detail (poll status)
+      setUploadDone(`✓ Nahráno: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+      setTimeout(() => {
+        window.location.href = `/denik/${data.entryId}`;
+      }, 1200);
     } catch (e) {
       setUploadError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -220,6 +226,13 @@ export default function DenikList() {
             <div className="mt-0.5">{uploadError}</div>
           </div>
           <button onClick={() => setUploadError(null)} className="text-muted-foreground"><X className="size-4" /></button>
+        </div>
+      )}
+
+      {uploadDone && (
+        <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 text-sm px-3 py-2 flex items-center gap-2 animate-in fade-in">
+          <span className="text-[var(--tint-sage)] text-base">✓</span>
+          <span>{uploadDone} — přesměrovávám…</span>
         </div>
       )}
 

@@ -55,6 +55,9 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
   // tichu padal. Tady ho otevíráme přímo z user gesture (onClick handler).
   const audioFileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  // Petr 2026-06-10: viditelný ✓ feedback po úspěšném uploadu (před redirect).
+  // Bez tohoto uživatel nevidí jestli upload prošel — redirect byl tichý.
+  const [uploadDone, setUploadDone] = useState<string | null>(null);
 
   useEffect(() => {
     void loadContacts();
@@ -164,6 +167,7 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
   async function uploadAudioFile(file: File) {
     setUploading(true);
     setError(null);
+    setUploadDone(null);
     try {
       const fd = new FormData();
       fd.append("audio", file);
@@ -174,9 +178,12 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
         setError(data.error ?? `Upload selhal (HTTP ${res.status}).`);
         return;
       }
-      // Přesměrovat na review screen — Petr 2026-05-27: route je
-      // /ukoly/audio/<id>/review (review.astro), ne bez suffixu.
-      window.location.href = `/ukoly/audio/${data.batchId}/review`;
+      // Viditelný ✓ feedback (1.2s) → pak redirect na review.
+      setUploadDone(`✓ Nahráno: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+      setTimeout(() => {
+        // Petr 2026-05-27: route je /ukoly/audio/<id>/review (review.astro)
+        window.location.href = `/ukoly/audio/${data.batchId}/review`;
+      }, 1200);
     } catch (e) {
       setError(`Upload selhal: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -219,6 +226,13 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
           <Check className="size-4 text-[var(--tint-sage)]" />
           <span>Vytvořeno {createdBanner} {createdBanner === 1 ? "úkol" : createdBanner < 5 ? "úkoly" : "úkolů"} z diktátu.</span>
           <button onClick={() => setCreatedBanner(null)} className="ml-auto text-muted-foreground"><X className="size-4" /></button>
+        </div>
+      )}
+
+      {uploadDone && (
+        <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/10 text-sm px-3 py-2 flex items-center gap-2 animate-in fade-in">
+          <Check className="size-4 text-[var(--tint-sage)]" />
+          <span>{uploadDone} — přesměrovávám na review…</span>
         </div>
       )}
 
