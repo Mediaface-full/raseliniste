@@ -142,6 +142,43 @@ export default function InviteCreator() {
   // neměl email v Contacts při create — Petr ho mezi tím doplnil, klikne
   // "Poslat znovu" → backend sáhne pro aktuální Contact.emails[0] nebo
   // si Petr v dialogu zadá email ručně.
+  // Petr 2026-06-10: diagnostika proč mail nedorazil. Volá existující
+  // /api/booking/:id/diagnose endpoint a vypíše čistý summary.
+  async function diagnoseInvite(inviteId: string) {
+    try {
+      const res = await fetch(`/api/booking/${inviteId}/diagnose`);
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Diagnostika selhala: ${data.error ?? `HTTP ${res.status}`}`);
+        return;
+      }
+      const lines: string[] = [];
+      lines.push(`Stav pozvánky: ${data.summary?.status ?? "?"}`);
+      lines.push(`E-mail hosta: ${data.summary?.inviteeEmail ?? "(žádný)"}`);
+      if (data.summary?.confirmedAt) {
+        lines.push(`Potvrzeno: ${new Date(data.summary.confirmedAt).toLocaleString("cs-CZ")}`);
+      }
+      lines.push("");
+      lines.push("Verdikt:");
+      const verdict = Array.isArray(data.verdict) ? data.verdict : [data.verdict].filter(Boolean);
+      verdict.forEach((v: string) => lines.push(`  ${v}`));
+      lines.push("");
+      const mailLogs = Array.isArray(data.mailLogs) ? data.mailLogs : [];
+      if (mailLogs.length === 0) {
+        lines.push("Mail log: žádný záznam (mail nikdy nešel)");
+      } else {
+        lines.push(`Mail log (${mailLogs.length} záznamů):`);
+        mailLogs.slice(0, 5).forEach((l: { ok: boolean; context?: string; provider?: string; error?: string; createdAt?: string }) => {
+          const time = l.createdAt ? new Date(l.createdAt).toLocaleString("cs-CZ") : "?";
+          lines.push(`  ${l.ok ? "✓" : "✗"} ${time} · ${l.context ?? ""}${l.error ? ` · ${l.error}` : ""}`);
+        });
+      }
+      alert(lines.join("\n"));
+    } catch (e) {
+      alert(`Diagnostika selhala: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   async function resend(inviteId: string, existingEmail: string | null) {
     let override: string | null = null;
     if (!existingEmail) {
@@ -428,6 +465,14 @@ export default function InviteCreator() {
                         <Mail className="size-4" /> Poslat mail
                       </button>
                     )}
+                    {/* Petr 2026-06-10: Diagnostika — proč mail nedorazil */}
+                    <button
+                      onClick={() => diagnoseInvite(inv.id)}
+                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground"
+                      title="Proč mail nedorazil? Stav invite + mail log + verdict"
+                    >
+                      🔍 Diagnostika
+                    </button>
                     {isActive && (
                       <button
                         onClick={() => cancel(inv.id)}
