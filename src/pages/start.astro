@@ -160,11 +160,11 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
 >
   <main class="min-h-screen flex flex-col">
     <!-- Topbar -->
-    <div class="border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <a href="/" class="text-xs font-mono text-muted-foreground hover:text-foreground">← Dashboard</a>
-      <span class="text-xs font-mono text-muted-foreground">{user.username}</span>
-      <a href="/settings" class="ml-auto text-xs font-mono text-muted-foreground hover:text-foreground" aria-label="Nastavení">
-        <Icon name="lucide:settings" class="size-4" />
+    <div class="border-b border-border px-4 py-3 flex items-center gap-3">
+      <a href="/" class="text-sm font-mono text-muted-foreground hover:text-foreground transition-colors">← Dashboard</a>
+      <span class="text-sm font-mono text-muted-foreground">{user.username}</span>
+      <a href="/settings" class="ml-auto size-9 rounded-md hover:bg-accent grid place-items-center text-muted-foreground hover:text-foreground transition-colors" aria-label="Nastavení">
+        <Icon name="lucide:settings" class="size-[18px]" />
       </a>
     </div>
 
@@ -179,8 +179,8 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
               Dnes
             </div>
             {anniversariesToday.map((a) => (
-              <div class="text-lg font-serif">
-                🕯 {a.label}
+              <div class="text-lg font-bold tracking-tight">
+                {a.label}
               </div>
             ))}
           </div>
@@ -196,7 +196,7 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
             )}
             {birthdayToday.length > 0 && (
               <span class="text-[var(--tint-rose)]">
-                🎂 <strong>{birthdayToday.map((b) => b.name).join(", ")}</strong>
+                <strong>{birthdayToday.map((b) => b.name).join(", ")}</strong>
                 {" má dnes narozeniny"}
               </span>
             )}
@@ -205,19 +205,19 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
           <div class="text-xs uppercase tracking-widest font-mono text-muted-foreground">
             {todayStr}
           </div>
-          <h1 class="text-3xl tracking-tight">Co teď?</h1>
+          <h1 class="text-4xl font-bold tracking-[-0.04em] leading-tight">Co teď?</h1>
 
           {(birthdayUpcoming.length > 0 || anniversariesUpcoming.length > 0) && (
             <div class="text-xs text-foreground/80 space-y-0.5 pt-1">
               {anniversariesUpcoming.length > 0 && (
                 <div>
-                  <span class="text-[var(--tint-rose)]">🕯 Nadchází:</span>{" "}
+                  <span class="text-[var(--tint-rose)] font-mono uppercase tracking-wider text-[10px]">↳ Nadchází:</span>{" "}
                   {anniversariesUpcoming.map((a) => `${a.label} (${a.day}.${a.month}., za ${a.days} ${a.days === 1 ? "den" : a.days < 5 ? "dny" : "dní"})`).join(" · ")}
                 </div>
               )}
               {birthdayUpcoming.length > 0 && (
                 <div>
-                  <span class="text-muted-foreground">🎂 Tento týden:</span>{" "}
+                  <span class="text-muted-foreground font-mono uppercase tracking-wider text-[10px]">↳ Tento týden:</span>{" "}
                   {birthdayUpcoming.map((b) => `${b.name} (${b.day}.${b.month}.)`).join(" · ")}
                 </div>
               )}
