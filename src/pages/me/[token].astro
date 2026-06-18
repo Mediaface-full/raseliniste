@@ -3,6 +3,7 @@ import Base from "../../layouts/Base.astro";
 import GuestRecorder from "../../components/GuestRecorder";
 import GuestGuide from "../../components/GuestGuide";
 import GuestRecordings from "../../components/GuestRecordings";
+import GideonWordmark from "../../components/GideonWordmark";
 import { prisma } from "../../lib/db";
 
 const token = Astro.params.token;
@@ -116,13 +117,9 @@ const guideVariant: "standard" | "brief" =
     <div class="w-full max-w-md mx-auto">
       {!guest ? (
         <div class="glass-strong rounded-xl p-8 text-center">
-          <img
-            src="/apple-touch-icon.png"
-            alt="Gideon"
-            width="64"
-            height="64"
-            class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
-          />
+          <div class="mb-4 flex justify-center">
+            <GideonWordmark size="md" />
+          </div>
           <h1 class="font-serif text-2xl tracking-tight mb-3">Odkaz nefunguje</h1>
           <p class="text-sm text-muted-foreground leading-relaxed">
             Tenhle odkaz neexistuje nebo byl zrušen. Zkontaktuj prosím Gideona,
@@ -135,13 +132,12 @@ const guideVariant: "standard" | "brief" =
             <div class="absolute right-0 top-0">
               <GuestGuide client:load variant={guideVariant} guestName={guest.name} />
             </div>
-            <img
-              src="/apple-touch-icon.png"
-              alt="Studánka"
-              width="64"
-              height="64"
-              class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
-            />
+            <div class="mb-3 flex flex-col items-center gap-2">
+              <GideonWordmark size="md" />
+              <span class="text-[11px] uppercase tracking-[0.22em] text-muted-foreground font-mono">
+                ↳ studánka
+              </span>
+            </div>
             <h1 class="font-serif text-3xl tracking-tight">Studánka</h1>
             <p class="mt-2 text-sm text-muted-foreground leading-relaxed">
               Nahrávárna pro projekty, do kterých tě Gideon pozval.

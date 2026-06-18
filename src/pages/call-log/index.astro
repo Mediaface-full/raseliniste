@@ -1,6 +1,6 @@
 ---
 import Base from "../../layouts/Base.astro";
-import AnimatedG from "../../components/AnimatedG.astro";
+import GideonWordmark from "../../components/GideonWordmark";
 import { prisma } from "../../lib/db";
 import { normalizePhone } from "../../lib/phone";
 import { vokativ } from "../../lib/vokativ";
@@ -172,18 +172,13 @@ const T = matchedIsVip ? VIP_TEXTS : NONVIP_TEXTS;
 >
   <div class="min-h-screen px-4 pt-10 sm:pt-16 pb-10 relative z-10">
     <div class="w-full max-w-md mx-auto">
+      <div class="mb-6 flex flex-col items-center gap-3">
+        <GideonWordmark size="md" />
+        <span class="text-[11px] uppercase tracking-[0.22em] text-muted-foreground font-mono">
+          ↳ průvodce zapnutý
+        </span>
+      </div>
       <div class="mb-6 text-center">
-        {matchedIsVip ? (
-          <AnimatedG size={72} />
-        ) : (
-          <img
-            src="/apple-touch-icon.png"
-            alt="Gideon"
-            width="64"
-            height="64"
-            class="mx-auto mb-4 rounded-[14px] shadow-lg shadow-black/40"
-          />
-        )}
 
         {matchedIsVip && (customGreeting || greetingName) && (
           <div class="text-xs uppercase tracking-[0.22em] text-[var(--tint-rose)] font-mono mb-2">
