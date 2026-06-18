@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  Loader2, Check, X, Edit3, Trash2, AlertTriangle, RotateCw, Clock, UserCheck, Tag, ChevronDown, Hourglass,
+  Loader2, Check, X, Edit3, Trash2, AlertTriangle, RotateCw, Clock, UserCheck, Tag, ChevronDown, Hourglass, Folder,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -899,7 +899,7 @@ function ProjectPicker({
         }`}
         title={isManual ? "Manuálně vybráno — klikni pro změnu" : "Auto routing — klikni pro override"}
       >
-        {label} <ChevronDown className="size-3" />
+        <Folder className="size-3.5 shrink-0" /> {label} <ChevronDown className="size-3" />
       </button>
 
       {open && position && typeof document !== "undefined" && createPortal(
@@ -910,7 +910,7 @@ function ProjectPicker({
             onClick={() => setOpen(false)}
           />
           <div
-            className="fixed z-[101] min-w-[320px] max-w-[420px] max-h-[400px] overflow-y-auto rounded-lg border border-white/20 bg-black/95 backdrop-blur-md shadow-2xl p-1"
+            className="fixed z-[101] min-w-[320px] max-w-[420px] max-h-[400px] overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-2xl p-1"
             style={{ top: position.top, left: position.left }}
           >
             {/* Auto option */}
