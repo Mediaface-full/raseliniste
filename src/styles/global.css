@@ -72,7 +72,7 @@
   --destructive-foreground: var(--c-cream);
 
   --border: var(--g-200);
-  --input: var(--g-100);
+  --input: var(--g-50);
   --ring: var(--c-signal);
 
   /* Surface elevations — světlejší / tmavší než background pro hierarchii */
@@ -311,6 +311,36 @@ h1 { letter-spacing: -0.045em; }
 .glass-hover:hover {
   background: var(--surface-3);
   border-color: var(--g-300);
+}
+
+/* ---- Page content width — Gide-on redesign Petr 2026-06-18 ----
+   44+ stránek má `max-w-2xl/3xl/4xl/5xl/6xl/7xl` constraint na hlavní wrapper.
+   Petr: „obsahy stránek kde to není na celou šířku okna, to je takové slabší".
+   Override: do main rozšíříme na plnou šířku se zdravým ultrawide capem.
+
+   Fáze D systémově: revize per-stránka (forms vs. lists). Pro teď globální. */
+main > .max-w-2xl,
+main > .max-w-3xl,
+main > .max-w-4xl,
+main > .max-w-5xl,
+main > .max-w-6xl,
+main > .max-w-7xl {
+  max-width: 100% !important;
+  width: 100%;
+}
+
+/* ---- Legacy hardcoded `bg-black/N` override pro light theme ----
+   Komponenty (~134 výskytů) používaly bg-black/20, bg-black/30, bg-black/40
+   pro form inputy a dropdown podklady — v dark theme to dávalo subtle dark
+   panel, v light theme to vypadá jako sytá šedá. Override mapuje na neutral
+   input bg. Fáze C postupně refactor inputy na <Input> primitivu. */
+:root[data-theme="light"] [class*="bg-black/20"],
+:root[data-theme="light"] [class*="bg-black/30"],
+:root[data-theme="light"] [class*="bg-black/40"] {
+  background-color: var(--input) !important;
+}
+:root[data-theme="light"] [class*="bg-black/60"] {
+  background-color: var(--surface-2) !important;
 }
 
 /* Dark theme variant: shadowy box-shadow nedává smysl, použij subtle outline. */
