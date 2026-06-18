@@ -25,11 +25,11 @@ export default function GuestGuide({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="size-9 rounded-full bg-[var(--tint-sky)]/15 border border-[var(--tint-sky)]/40 hover:bg-[var(--tint-sky)]/25 flex items-center justify-center text-[var(--tint-sky)] transition shadow-sm"
+        className="size-8 rounded-full border border-border bg-transparent hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
         aria-label="Otevřít návod"
         title="Návod — jak Studánku používat"
       >
-        <Info className="size-5" />
+        <Info className="size-4" />
       </button>
 
       {open && (
