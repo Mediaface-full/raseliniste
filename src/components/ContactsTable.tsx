@@ -623,9 +623,9 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         </button>
 
         <button
-          onClick={() => setNewContactModalOpen(true)}
+          onClick={createNewContact}
           className="px-3 py-1.5 rounded-md bg-[var(--tint-mint)]/20 text-[var(--tint-mint)] border border-[var(--tint-mint)]/40 text-sm font-medium flex items-center gap-1.5"
-          title="Otevřít formulář nového kontaktu"
+          title="Vytvořit prázdný řádek v tabulce + scroll + autofocus"
         >
           + Nový kontakt
         </button>
