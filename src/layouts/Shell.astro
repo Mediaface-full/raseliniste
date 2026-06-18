@@ -154,10 +154,10 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
                       aria-disabled={disabled}
                       style={`--c: var(--tint-${item.tint});`}
                       class:list={[
-                        "relative flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-all",
+                        "relative flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors",
                         active
-                          ? "bg-[color-mix(in_oklch,var(--c)_16%,transparent)] text-foreground"
-                          : "text-foreground/75 hover:bg-white/5 hover:text-foreground",
+                          ? "bg-accent text-foreground"
+                          : "text-foreground/75 hover:bg-accent hover:text-foreground",
                         disabled && "opacity-45 cursor-not-allowed pointer-events-none",
                       ]}
                     >
@@ -189,12 +189,12 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
         ))}
       </nav>
 
-      <div class="border-t border-white/5 p-3 flex items-center gap-2.5">
-        <div class="size-8 rounded-md bg-white/10 flex items-center justify-center font-serif text-foreground/90">
+      <div class="border-t border-border p-3 flex items-center gap-2.5">
+        <div class="size-8 rounded-md bg-foreground text-background flex items-center justify-center font-sans font-bold text-sm">
           {username.slice(0, 1).toUpperCase()}
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-sm truncate">{username}</div>
+          <div class="text-sm truncate text-foreground">{username}</div>
           <div class="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
             online
           </div>
@@ -241,7 +241,7 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
           {/* Rychlé přepínače pohledů kalendáře — Petr je chce v topbaru */}
           <a
             href="/dnes"
-            class="h-8 px-2.5 rounded-md hover:bg-white/5 text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            class="h-8 px-2.5 rounded-md hover:bg-accent text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
             title="Dnešní den"
           >
             <Icon name="lucide:calendar-clock" class="size-3.5" />
@@ -249,7 +249,7 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
           </a>
           <a
             href="/calendar/tyden"
-            class="h-8 px-2.5 rounded-md hover:bg-white/5 text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            class="h-8 px-2.5 rounded-md hover:bg-accent text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
             title="Týdenní pohled"
           >
             <Icon name="lucide:calendar-days" class="size-3.5" />
@@ -257,18 +257,18 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
           </a>
           <a
             href="/calendar/mesic"
-            class="h-8 px-2.5 rounded-md hover:bg-white/5 text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            class="h-8 px-2.5 rounded-md hover:bg-accent text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
             title="Měsíční pohled"
           >
             <Icon name="lucide:calendar" class="size-3.5" />
             <span class="hidden sm:inline">Měsíc</span>
           </a>
-          <span class="hidden md:inline-block w-px h-5 bg-white/10 mx-1" />
-          <button type="button" class="h-8 px-3 rounded-md hover:bg-white/5 text-sm text-muted-foreground flex items-center gap-2 transition-colors" aria-label="Hledat">
+          <span class="hidden md:inline-block w-px h-5 bg-border mx-1" />
+          <button type="button" class="h-8 px-3 rounded-md hover:bg-accent text-sm text-muted-foreground flex items-center gap-2 transition-colors" aria-label="Hledat">
             <Icon name="lucide:search" class="size-4" />
             <span class="hidden md:inline font-mono text-xs">⌘K</span>
           </button>
-          <a href="/settings" class="size-8 rounded-md hover:bg-white/5 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label="Nastavení">
+          <a href="/settings" class="size-8 rounded-md hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label="Nastavení">
             <Icon name="lucide:settings" class="size-4" />
           </a>
         </div>
