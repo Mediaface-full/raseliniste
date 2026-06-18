@@ -156,7 +156,7 @@ export default function ContactsDuplicates() {
 
       {clusters !== null && clusters.length === 0 && (
         <div className="text-sm text-muted-foreground italic text-center py-4">
-          🎉 Žádné duplicity nebyly nalezeny.
+          Žádné duplicity nebyly nalezeny.
         </div>
       )}
 
@@ -212,9 +212,9 @@ export default function ContactsDuplicates() {
                             {c.icloudUid && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--tint-mint)]/15 text-[var(--tint-mint)]">iCloud</span>}
                             {c.syncSource && c.syncSource !== "icloud" && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-muted-foreground">{c.syncSource}</span>}
                           </div>
-                          {c.company && <div className="text-xs text-muted-foreground">🏢 {c.company}</div>}
+                          {c.company && <div className="text-xs text-muted-foreground">{c.company}</div>}
                           {c.phones.length > 0 && (
-                            <div className="text-xs text-muted-foreground font-mono mt-0.5">📞 {c.phones.join(", ")}</div>
+                            <div className="text-xs text-muted-foreground font-mono mt-0.5">{c.phones.join(", ")}</div>
                           )}
                           {c.emails.length > 0 && (
                             <div className="text-xs text-muted-foreground font-mono mt-0.5">✉ {c.emails.join(", ")}</div>

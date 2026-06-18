@@ -125,7 +125,7 @@ export const GET: APIRoute = async ({ cookies, url }) => {
     assignedToContactId: c.contactId,
     assignedToContact: c.contact ? {
       id: c.contactId,
-      displayName: `${c.contact.firstName ?? c.contact.displayName} ⭐`,
+      displayName: `${c.contact.firstName ?? c.contact.displayName} `,
     } : null,
   }));
 

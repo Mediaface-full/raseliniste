@@ -132,7 +132,7 @@ function htmlError(msg: string): Response {
 
 function htmlAlreadyConfirmed(): Response {
   return htmlPage("Termín potvrzen",
-    `<div class="icon" style="color:var(--sage)">✓</div>
+    `<div class="icon" style="color:var(--sage)"></div>
 <h1>Termín je už potvrzen</h1>
 <p>Pozvánka byla zaslaná mailem z Google Kalendáře.</p>
 <p class="hint">Tuto stránku lze zavřít.</p>`,
@@ -140,7 +140,7 @@ function htmlAlreadyConfirmed(): Response {
 }
 
 function htmlSuccess(meetLink: string | null): string {
-  return `<div class="icon" style="color:var(--sage)">✓</div>
+  return `<div class="icon" style="color:var(--sage)"></div>
 <h1>Termín potvrzen</h1>
 <p>Pozvánka přijde mailem z Google Kalendáře.</p>
 ${meetLink ? `<p><a class="btn" href="${escapeHtml(meetLink)}">Otevřít Google Meet</a></p>` : ""}

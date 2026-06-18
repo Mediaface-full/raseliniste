@@ -49,8 +49,8 @@ export const GET: APIRoute = async ({ cookies, url }) => {
     env: { TODOIST_TEAM_WORKSPACE_ID: envTeamId },
     syncResult,
     verdict: team > 0
-      ? "✓ Sync persist proběhl — Team projekty mají workspaceId"
-      : "✗ Žádný Team projekt v mirroru s isTeamProject=true",
+      ? "Sync persist proběhl — Team projekty mají workspaceId"
+      : "Žádný Team projekt v mirroru s isTeamProject=true",
     usage: "Přidej ?action=sync abys spustil sync synchronně před count.",
   });
 };

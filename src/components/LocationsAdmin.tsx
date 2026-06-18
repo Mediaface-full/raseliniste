@@ -188,7 +188,7 @@ export default function LocationsAdmin({ initial }: { initial: Location[] }) {
                 </td>
                 <td className="px-4 py-3 text-right font-mono tabular-nums">{l.commuteMinPeak} min</td>
                 <td className="px-4 py-3 text-right font-mono tabular-nums">{l.commuteMinOff} min</td>
-                <td className="px-4 py-3 text-center">{l.isLocal ? "✓" : "—"}</td>
+                <td className="px-4 py-3 text-center">{l.isLocal ? "" : "—"}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-1">
                     <button onClick={() => startEdit(l)} className="p-1.5 rounded hover:bg-white/10 text-muted-foreground" title="Upravit">

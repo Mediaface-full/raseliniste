@@ -149,7 +149,7 @@ export const POST: APIRoute = async ({ request }) => {
     for (const v of vipLogs) {
       const name = v.contact?.displayName?.trim() || v.contact?.firstName || v.phoneNumber;
       const r = await sendPushToUser(u.id, {
-        title: v.isUrgent ? `⭐ URGENT VIP — ${name}` : `⭐ VIP — ${name}`,
+        title: v.isUrgent ? `URGENT VIP — ${name}` : `VIP — ${name}`,
         body: v.message.slice(0, 200),
         url: `/call-log#log-${v.id}`,
         tag: `vip-${v.id}`,
@@ -162,7 +162,7 @@ export const POST: APIRoute = async ({ request }) => {
     for (const e of urgentEmails) {
       const from = e.fromName?.trim() || e.fromAddress;
       const r = await sendPushToUser(u.id, {
-        title: `📧 Urgent — ${from}`,
+        title: `Urgent — ${from}`,
         body: e.subject?.slice(0, 200) ?? "(bez předmětu)",
         url: `/posta/${e.id}`,
         tag: `posta-${e.id}`,
@@ -197,7 +197,7 @@ export const POST: APIRoute = async ({ request }) => {
           })
         : "?";
       const r = await sendPushToUser(u.id, {
-        title: `📅 ${b.inviteeName ?? "Host"} potvrdil schůzku`,
+        title: `${b.inviteeName ?? "Host"} potvrdil schůzku`,
         body: dateStr,
         url: "/calendar/invite",
         tag: `booking-${b.id}`,

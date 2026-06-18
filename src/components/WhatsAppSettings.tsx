@@ -96,7 +96,7 @@ export default function WhatsAppSettings() {
         setErr(`Test selhal: ${data.error}`);
         return;
       }
-      setMsg(`✓ Zpráva odeslaná (Twilio SID: ${data.sid}). Mrkni do WhatsApp.`);
+      setMsg(`Zpráva odeslaná (Twilio SID: ${data.sid}). Mrkni do WhatsApp.`);
     } finally {
       setTesting(false);
     }

@@ -335,7 +335,7 @@ Petr Gideon Peřina"
         </div>
 
         {pdfPath && (
-          <div className="text-xs font-mono text-muted-foreground">PDF cache: ✓ čerstvé</div>
+          <div className="text-xs font-mono text-muted-foreground">PDF cache: čerstvé</div>
         )}
       </div>
 

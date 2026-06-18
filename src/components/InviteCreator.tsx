@@ -170,7 +170,7 @@ export default function InviteCreator() {
         lines.push(`Mail log (${mailLogs.length} záznamů):`);
         mailLogs.slice(0, 5).forEach((l: { ok: boolean; context?: string; provider?: string; error?: string; createdAt?: string }) => {
           const time = l.createdAt ? new Date(l.createdAt).toLocaleString("cs-CZ") : "?";
-          lines.push(`  ${l.ok ? "✓" : "✗"} ${time} · ${l.context ?? ""}${l.error ? ` · ${l.error}` : ""}`);
+          lines.push(`  ${l.ok ? "" : ""} ${time} · ${l.context ?? ""}${l.error ? ` · ${l.error}` : ""}`);
         });
       }
       alert(lines.join("\n"));
@@ -205,7 +205,7 @@ export default function InviteCreator() {
       console.error("[booking.resend] fail", res.status, data ?? text);
       return;
     }
-    alert(`✓ Mail odeslán na ${data.sentTo} (${data.provider}${data.providerId ? ` · ${data.providerId}` : ""})`);
+    alert(`Mail odeslán na ${data.sentTo} (${data.provider}${data.providerId ? ` · ${data.providerId}` : ""})`);
     void loadInvites();
   }
 
@@ -471,7 +471,7 @@ export default function InviteCreator() {
                       className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground"
                       title="Proč mail nedorazil? Stav invite + mail log + verdict"
                     >
-                      🔍 Diagnostika
+                      Diagnostika
                     </button>
                     {isActive && (
                       <button

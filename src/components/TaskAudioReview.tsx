@@ -151,7 +151,7 @@ interface Proposal {
   _editing: boolean;
   // Po vyřešení assignedToContactName na ID
   assignedToContactId: string | null;
-  // Manuální override Smart routingu — Petr klikl na chip 📁 a vybral
+  // Manuální override Smart routingu — Petr klikl na chip a vybral
   // projekt sám. Pokud nastaveno, posíláme na server místo auto-routingu.
   manualTodoistProjectId?: string | null;
   manualTodoistSectionId?: string | null;
@@ -698,7 +698,7 @@ function ProposalRow({
 
             {/* Petr 2026-05-27: chip = preview kam to půjde v Todoistu.
                 Petr 2026-06-09: chip je teď klikatelný dropdown — manual
-                override Smart routingu. Výběr „🤖 Automaticky" = auto routing.
+                override Smart routingu. Výběr „Automaticky" = auto routing.
                 Pokud Petr zvolí konkrétní projekt/sekci, override. */}
             <ProjectPicker
               proposal={proposal}
@@ -821,11 +821,11 @@ function ProposalEdit({
 }
 
 /**
- * ProjectPicker — chip 📁 který je klikatelný dropdown.
+ * ProjectPicker — chip který je klikatelný dropdown.
  *
- * Default = "🤖 Automaticky" (computeRoutePreview). Po výběru konkrétního
+ * Default = "Automaticky" (computeRoutePreview). Po výběru konkrétního
  * project/section uloží do proposal.manualTodoist*Id. Pro re-clearnutí
- * stačí znovu zvolit „🤖 Automaticky".
+ * stačí znovu zvolit „Automaticky".
  *
  * Petr 2026-06-09: tohle byla missing feature — Smart routing někdy
  * rozhodne špatně (např. „Dominik zajistit X" → Moje úkoly místo Práce/Dominik)
@@ -899,7 +899,7 @@ function ProjectPicker({
         }`}
         title={isManual ? "Manuálně vybráno — klikni pro změnu" : "Auto routing — klikni pro override"}
       >
-        📁 {label} <ChevronDown className="size-3" />
+        {label} <ChevronDown className="size-3" />
       </button>
 
       {open && position && typeof document !== "undefined" && createPortal(
@@ -919,7 +919,7 @@ function ProjectPicker({
               onClick={clearManual}
               className={`w-full text-left px-3 py-2 rounded text-sm hover:bg-white/10 ${!isManual ? "bg-white/5" : ""}`}
             >
-              🤖 <strong>Automaticky</strong>{" "}
+              <strong>Automaticky</strong>{" "}
               <span className="text-muted-foreground">
                 ({route.project}{route.section ? ` / ${route.section}` : ""})
               </span>
@@ -944,7 +944,7 @@ function ProjectPicker({
                       : ""
                   }`}
                 >
-                  📁 <strong>{proj.name}</strong>
+                  <strong>{proj.name}</strong>
                   {proj.isTeam && <span className="text-xs text-muted-foreground ml-1">(tým)</span>}
                 </button>
                 {/* Sekce pod projektem */}

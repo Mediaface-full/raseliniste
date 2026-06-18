@@ -30,14 +30,14 @@ export const POST: APIRoute = async ({ request }) => {
   // Mail při fail (info-level success do logu stačí)
   const to = env.NOTIFICATION_EMAIL;
   if (!result.ok && to) {
-    const subject = `⚠️ Rašeliniště — backup selhal`;
+    const subject = `Rašeliniště — backup selhal`;
     const lines: string[] = [
       `Backup ${result.startedAt} → ${result.finishedAt} (${(result.durationMs / 1000).toFixed(1)}s)`,
       ``,
-      `pg_dump:  ${result.steps.pgDump.ok ? "✓" : "✗ " + (result.steps.pgDump.error ?? "")}`,
-      `uploads:  ${result.steps.uploadsTar.ok ? "✓" : "✗ " + (result.steps.uploadsTar.error ?? "")}`,
-      `rsync:    ${result.steps.rsync.ok ? (result.steps.rsync.skipped ? "skipped (remote nenastaven)" : "✓") : "✗ " + (result.steps.rsync.error ?? "")}`,
-      `retention:${result.steps.retention.ok ? `✓ smazáno ${result.steps.retention.deleted}` : "✗ " + (result.steps.retention.error ?? "")}`,
+      `pg_dump:  ${result.steps.pgDump.ok ? "" : "" + (result.steps.pgDump.error ?? "")}`,
+      `uploads:  ${result.steps.uploadsTar.ok ? "" : "" + (result.steps.uploadsTar.error ?? "")}`,
+      `rsync:    ${result.steps.rsync.ok ? (result.steps.rsync.skipped ? "skipped (remote nenastaven)" : "") : "" + (result.steps.rsync.error ?? "")}`,
+      `retention:${result.steps.retention.ok ? `smazáno ${result.steps.retention.deleted}` : "" + (result.steps.retention.error ?? "")}`,
     ];
     await sendMail({
       to,

@@ -427,7 +427,7 @@ export default function DayView({ initial }: { initial: Initial }) {
                 vygenerováno {new Date(activeBriefing.generatedAt).toLocaleString("cs-CZ")}
               </span>
               {activeBriefing.todoistTaskId ? (
-                <span className="text-[var(--tint-sage)]">✓ Pushnuto do Todoistu</span>
+                <span className="text-[var(--tint-sage)]">Pushnuto do Todoistu</span>
               ) : (
                 <span className="text-[var(--tint-butter)]">⚠ Todoist push se nepodařil</span>
               )}
@@ -527,7 +527,7 @@ function BriefingPreview({ content }: { content: Record<string, unknown> }) {
       )}
       {warnings.length > 0 && (
         <div>
-          <div className="text-xs uppercase tracking-widest text-muted-foreground font-mono mb-1.5">💡 Kontext</div>
+          <div className="text-xs uppercase tracking-widest text-muted-foreground font-mono mb-1.5">Kontext</div>
           <ul className="space-y-1 text-muted-foreground">
             {warnings.map((w, i) => <li key={i}>• {w}</li>)}
           </ul>

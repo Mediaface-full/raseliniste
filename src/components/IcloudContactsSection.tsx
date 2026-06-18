@@ -107,7 +107,7 @@ export default function IcloudContactsSection({
       <div className="flex items-center gap-2">
         <Users className="size-4" style={{ color: "var(--c)" }} />
         <h3 className="font-serif text-lg">Kontakty</h3>
-        <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">✓ aktivní</span>
+        <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">aktivní</span>
       </div>
 
       <p className="text-sm text-muted-foreground leading-relaxed">

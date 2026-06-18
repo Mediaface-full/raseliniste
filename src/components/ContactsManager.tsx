@@ -176,7 +176,7 @@ export default function ContactsManager() {
     }
 
     const errSuffix = allErrors.length > 0 ? ` · ${allErrors.length} chyb` : "";
-    setImportMsg(`✓ Hotovo: ${created} nových, ${updated} aktualizováno, ${skipped} přeskočeno${errSuffix}`);
+    setImportMsg(`Hotovo: ${created} nových, ${updated} aktualizováno, ${skipped} přeskočeno${errSuffix}`);
     load();
     setTimeout(() => setImportMsg(null), 10000);
   }
@@ -308,7 +308,7 @@ export default function ContactsManager() {
                       title="Zkopírovat osobní call-log link"
                     >
                       {copied === c.id ? (
-                        <span className="text-[10px] font-mono text-[var(--tint-sage)]">✓</span>
+                        <span className="text-[10px] font-mono text-[var(--tint-sage)]"></span>
                       ) : (
                         <LinkIcon className="size-4 text-muted-foreground" />
                       )}
@@ -818,7 +818,7 @@ function VipLinkSection({ contactId, initialToken }: { contactId: string; initia
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={copy} disabled={loading}>
-              {copied ? "✓ Zkopírováno" : "Kopírovat link"}
+              {copied ? "Zkopírováno" : "Kopírovat link"}
             </Button>
             <Button variant="ghost" onClick={regenerate} disabled={loading}>
               {loading ? <Loader2 className="size-3 animate-spin" /> : "Regenerovat"}
@@ -872,7 +872,7 @@ function BackfillTokensButton({ onDone }: { onDone: () => void }) {
       </Button>
       {result && (
         <span className="text-xs font-mono text-[var(--tint-sage)]">
-          ✓ {result.generated} nových{result.failed > 0 && `, ${result.failed} chyb`}
+          {result.generated} nových{result.failed > 0 && `, ${result.failed} chyb`}
         </span>
       )}
     </div>

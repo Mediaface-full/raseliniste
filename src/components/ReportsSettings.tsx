@@ -174,7 +174,7 @@ export default function ReportsSettings() {
           <Button onClick={save} disabled={saving || !dirty}>
             {saving ? <><Loader2 className="animate-spin" /> Ukládám…</> : <><Check /> Uložit</>}
           </Button>
-          {saved && <span className="text-xs text-[var(--tint-sage)] font-mono">Uloženo ✓</span>}
+          {saved && <span className="text-xs text-[var(--tint-sage)] font-mono">Uloženo </span>}
         </div>
       </div>
 

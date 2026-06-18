@@ -81,7 +81,7 @@ export const GET: APIRoute = async ({ cookies, params }) => {
     lines.push("_Projekt zatím neobsahuje žádné zpracované záznamy._");
   } else {
     for (const r of recordings) {
-      const type = r.type === "BRIEF" ? "📋 Brief" : "🎙 Standard";
+      const type = r.type === "BRIEF" ? "📋 Brief" : "Standard";
       const dur = fmtDuration(r.audioDurationSec);
       const date = r.createdAt.toLocaleString("cs-CZ", {
         timeZone: "Europe/Prague",

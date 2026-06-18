@@ -189,7 +189,7 @@ export default function TaskAudioRecorder() {
                 }}
               >
                 <Upload className="size-4" />
-                📎 Nahrát hotový audio soubor (MP3/M4A/...)
+                Nahrát hotový audio soubor (MP3/M4A/...)
               </button>
               <a
                 href="/help/upload-audio"

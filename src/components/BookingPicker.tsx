@@ -29,7 +29,7 @@ export default function BookingPicker({ token }: { token: string }) {
   const [chosenSlot, setChosenSlot] = useState<Slot | null>(null);
   // Petr 2026-06-10: rozdělit jméno na 2 pole pro celé jméno v Calendar event title.
   // Předchozí UX: jedno pole „Jméno *" → host často zadal jen křestní, Google
-  // event title pak „🤝 Karel" místo „🤝 Karel Novák".
+  // event title pak „Karel" místo „Karel Novák".
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   // Kombinované celé jméno pro submit
@@ -145,7 +145,7 @@ export default function BookingPicker({ token }: { token: string }) {
 
   // Stavy invite
   if (invite.status === "CONFIRMED") {
-    return centerCard("✓", "Termín už je potvrzený", "Zkontroluj e-mail nebo Google Calendar.");
+    return centerCard("", "Termín už je potvrzený", "Zkontroluj e-mail nebo Google Calendar.");
   }
   if (invite.status === "CANCELED") {
     return centerCard("⊘", "Pozvánka byla zrušena", "Pošlu ti novou.");

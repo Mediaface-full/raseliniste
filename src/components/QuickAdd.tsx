@@ -110,7 +110,7 @@ export default function QuickAdd() {
         }
         return;
       }
-      setSuccess(`Zapsáno do Google ✓ ${json.meetLink ? `(Meet: ${json.meetLink})` : ""}`);
+      setSuccess(`Zapsáno do Google ${json.meetLink ? `(Meet: ${json.meetLink})` : ""}`);
       setInput("");
       setData(null);
     } catch (e) {
@@ -298,9 +298,9 @@ function ParsedSummary({ parsed, verdict }: { parsed: ParsedEvent; verdict: Verd
 function VerdictBadge({ verdict }: { verdict: Verdict | null }) {
   if (!verdict) return null;
   const map = {
-    GREEN: { icon: <CheckCircle2 />, label: "🟢", color: "var(--tint-sage)" },
-    YELLOW: { icon: <AlertTriangle />, label: "🟡", color: "var(--tint-butter)" },
-    RED: { icon: <XCircle />, label: "🔴", color: "var(--tint-rose)" },
+    GREEN: { icon: <CheckCircle2 />, label: "", color: "var(--tint-sage)" },
+    YELLOW: { icon: <AlertTriangle />, label: "", color: "var(--tint-butter)" },
+    RED: { icon: <XCircle />, label: "", color: "var(--tint-rose)" },
   } as const;
   const item = map[verdict];
   return (

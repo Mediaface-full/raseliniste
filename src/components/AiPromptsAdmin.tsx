@@ -66,7 +66,7 @@ export default function AiPromptsAdmin() {
         setError(data.error ?? "Uložení selhalo.");
         return;
       }
-      setSuccess(`✓ Uloženo: ${module}`);
+      setSuccess(`Uloženo: ${module}`);
       setTimeout(() => setSuccess(null), 4000);
       cancelEdit();
       void load();

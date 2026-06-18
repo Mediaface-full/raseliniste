@@ -175,19 +175,19 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       const priority: 1 | 2 | 3 | 4 = wasVip ? 4 : body.isUrgent ? 3 : 2;
 
       // Title úkolu v Todoistu:
-      //   - VIP   = mise/úkol → "⭐ Karel: <obsah zprávy zhuštěný>"
+      //   - VIP   = mise/úkol → "Karel: <obsah zprávy zhuštěný>"
       //             Petr v Todoist liste vidí O ČEM úkol je, ne koho volat.
-      //   - NeVIP = klasický callback → "Zavolat zpět X" (případně ⚠️ pro urgent).
+      //   - NeVIP = klasický callback → "Zavolat zpět X" (případně pro urgent).
       const content = wasVip
-        ? `⭐ ${who}: ${truncateForTitle(body.message.trim(), 80)}`
-        : `${body.isUrgent ? "⚠️ " : ""}Zavolat zpět ${who}`;
+        ? `${who}: ${truncateForTitle(body.message.trim(), 80)}`
+        : `${body.isUrgent ? "" : ""}Zavolat zpět ${who}`;
       const description = [
         `**${body.message.trim()}**`,
         "",
         `Číslo: ${prettyPhone}`,
         contact ? `Kontakt: ${contact.displayName}${wasVip ? " (VIP)" : ""}` : "Neznámé číslo",
-        requestedDueAt ? `📅 **Termín požadovaný od VIP:** ${requestedDueAt.toLocaleDateString("cs-CZ", { timeZone: "Europe/Prague" })}` : "",
-        body.isUrgent ? "⚠️ Označeno jako **urgentní**" : "",
+        requestedDueAt ? `**Termín požadovaný od VIP:** ${requestedDueAt.toLocaleDateString("cs-CZ", { timeZone: "Europe/Prague" })}` : "",
+        body.isUrgent ? "Označeno jako **urgentní**" : "",
         `Přijato: ${new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague" })}`,
         `Firewall: https://www.raseliniste.cz/firewall`,
       ]
@@ -249,8 +249,8 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       const prettyPhone = formatPhone(normalized);
       const who = contact?.displayName ?? "Neznámé číslo";
       const subject = wasVip
-        ? `⭐ VIP vzkaz od ${who}`
-        : `⚠️ Urgentní vzkaz od ${who}`;
+        ? `VIP vzkaz od ${who}`
+        : `Urgentní vzkaz od ${who}`;
 
       const html = `<!doctype html>
 <html><head><meta charset="utf-8"></head>

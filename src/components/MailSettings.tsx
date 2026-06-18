@@ -231,7 +231,7 @@ export default function MailSettings({ initialReportEmail, envNotificationEmail 
           <Server className="size-4" style={{ color: "var(--c)" }} />
           <h3 className="font-serif text-lg">Odchozí SMTP server</h3>
           {configured && (
-            <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">✓ aktivní</span>
+            <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">aktivní</span>
           )}
         </div>
 

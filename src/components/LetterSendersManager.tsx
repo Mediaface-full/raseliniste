@@ -381,7 +381,7 @@ function SenderEditor({ sender, onChanged }: { sender: Sender; onChanged: () => 
           {saving ? <><Loader2 className="animate-spin" /> Ukládám…</> : <><Save /> Uložit</>}
         </Button>
         {savedAt && Date.now() - savedAt < 3000 && (
-          <span className="self-center text-xs font-mono text-[var(--tint-sage)]">Uloženo ✓</span>
+          <span className="self-center text-xs font-mono text-[var(--tint-sage)]">Uloženo </span>
         )}
         <Button variant="ghost" onClick={deleteSender} className="ml-auto">
           <Trash2 /> Smazat odesílatele

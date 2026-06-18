@@ -110,7 +110,7 @@ function CleanupEntitiesBanner() {
         setError(data.error ?? "Reset selhal.");
         return;
       }
-      setResult(`✓ Smazáno ${data.deleted} kontaktů. Zachováno ${data.keptOverlay} (VIP/tým/clientTag/aliases). V DB zbývá ${data.finalCount}. Teď klikni 'Synchronizovat s iCloudem'.`);
+      setResult(`Smazáno ${data.deleted} kontaktů. Zachováno ${data.keptOverlay} (VIP/tým/clientTag/aliases). V DB zbývá ${data.finalCount}. Teď klikni 'Synchronizovat s iCloudem'.`);
       setDone(true);
       setTimeout(() => window.location.reload(), 4000);
     } catch (e) {
@@ -132,7 +132,7 @@ function CleanupEntitiesBanner() {
         return;
       }
       const s = data.stats;
-      setResult(`✓ Vyčištěno ${s.contactsUpdated} kontaktů, ${s.phonesUpdated} tel, ${s.emailsUpdated} emailů, ${s.duplicatesDeleted} duplikátů uvnitř kontaktů, ${s.emptyContactsDeleted ?? 0} prázdných kontaktů smazáno.`);
+      setResult(`Vyčištěno ${s.contactsUpdated} kontaktů, ${s.phonesUpdated} tel, ${s.emailsUpdated} emailů, ${s.duplicatesDeleted} duplikátů uvnitř kontaktů, ${s.emptyContactsDeleted ?? 0} prázdných kontaktů smazáno.`);
       setDone(true);
       setTimeout(() => window.location.reload(), 3000);
     } catch (e) {
@@ -161,7 +161,7 @@ function CleanupEntitiesBanner() {
         setError(data.error ?? "Auto-merge selhal.");
         return;
       }
-      setResult(`✓ Sloučeno ${data.mergedClusters} clusterů, smazáno ${data.contactsRemoved} duplicitních kontaktů. Chyby: ${data.errors}.`);
+      setResult(`Sloučeno ${data.mergedClusters} clusterů, smazáno ${data.contactsRemoved} duplicitních kontaktů. Chyby: ${data.errors}.`);
       setDone(true);
       setTimeout(() => window.location.reload(), 3000);
     } catch (e) {
@@ -292,7 +292,7 @@ function DiagnoseSection() {
                     {ex.contacts.map((c, j) => (
                       <div key={j} className="ml-2 text-muted-foreground">
                         • {c.displayName} <span className="font-mono opacity-60">[{c.syncSource ?? "?"}]</span>
-                        {c.phones.length > 0 && <span className="ml-2">📞 {c.phones.join(", ")}</span>}
+                        {c.phones.length > 0 && <span className="ml-2">{c.phones.join(", ")}</span>}
                       </div>
                     ))}
                   </div>
@@ -431,7 +431,7 @@ function FindReplaceSection() {
         setError(data.error ?? "Apply selhal.");
         return;
       }
-      setSuccess(`✓ ${data.updated} změn aplikováno.`);
+      setSuccess(`${data.updated} změn aplikováno.`);
       setPreview(null);
     } finally {
       setLoading(false);
@@ -538,7 +538,7 @@ function PhonesNormalizationSection() {
         setError(data.error ?? "Selhalo.");
         return;
       }
-      setSuccess(`✓ ${data.updated} telefonů normalizováno.`);
+      setSuccess(`${data.updated} telefonů normalizováno.`);
       setCandidates(null);
       setSelected(new Set());
     } finally {
@@ -550,7 +550,7 @@ function PhonesNormalizationSection() {
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
         Detekuje 9místné domácí telefony a navrhne formát <code>+420 XXX XXX XXX</code>. Mezinárodní (s <code>+</code> nebo <code>00</code>) se přeskakují.
-        🟢 <strong>CZ likely</strong> = CZ rozsahy (mobile 60[1-8], 70[2-9], 72-77x, 79x; pevné 2x-5x). 🟡 <strong>ambiguous</strong> = 9 číslic ale ne CZ.
+        <strong>CZ likely</strong> = CZ rozsahy (mobile 60[1-8], 70[2-9], 72-77x, 79x; pevné 2x-5x). <strong>ambiguous</strong> = 9 číslic ale ne CZ.
       </p>
       <Button onClick={findCandidates} disabled={loading}>
         {loading ? <Loader2 className="size-4 animate-spin" /> : <Phone className="size-4" />} Najít kandidáty
@@ -573,7 +573,7 @@ function PhonesNormalizationSection() {
                   }}
                 />
                 <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${c.confidence === "high" ? "bg-[var(--tint-sage)]/15 text-[var(--tint-sage)]" : "bg-[var(--tint-butter)]/15 text-[var(--tint-butter)]"}`}>
-                  {c.confidence === "high" ? "🟢" : "🟡"}
+                  {c.confidence === "high" ? "" : ""}
                 </span>
                 <span className="flex-1 truncate">{c.contactName}</span>
                 <span className="text-xs text-muted-foreground font-mono"><span className="opacity-60">{c.original}</span> → <span className="text-[var(--tint-sage)]">{c.normalized}</span></span>
@@ -715,7 +715,7 @@ function BackupsSection() {
         setError(data.error ?? "Restore selhal.");
         return;
       }
-      setSuccess("✓ Záloha obnovena.");
+      setSuccess("Záloha obnovena.");
       void load();
     } finally {
       setRestoring(null);
@@ -795,7 +795,7 @@ function GoogleSection() {
         return;
       }
       setResult(
-        `✓ Sync hotov (${(data.durationMs / 1000).toFixed(1)} s).\n` +
+        `Sync hotov (${(data.durationMs / 1000).toFixed(1)} s).\n` +
         `Z Google → DB: vytvořeno ${data.pulledCreated}, update ${data.pulledUpdated}.\n` +
         `DB → Google: vytvořeno ${data.created}, update ${data.updated}, skipped ${data.skipped}.\n` +
         `Chyby: ${data.errors}.`,
@@ -866,7 +866,7 @@ function GoogleSection() {
         setError(data.error ?? "Selhalo.");
         return;
       }
-      setResult(`✓ Nahráno ${data.created} kontaktů z Googlu, chyby ${data.errors}.`);
+      setResult(`Nahráno ${data.created} kontaktů z Googlu, chyby ${data.errors}.`);
       setPullBackCandidates(null);
     } finally {
       setPullingBack(false);
@@ -901,7 +901,7 @@ function GoogleSection() {
             <div key={c.resourceName} className="px-3 py-2 text-sm border-b border-white/5 last:border-0">
               <div className="font-medium">{c.fn}</div>
               <div className="text-xs text-muted-foreground font-mono">
-                {c.phones.length > 0 ? `📞 ${c.phones.length}` : ""}{c.emails.length > 0 ? ` ✉ ${c.emails.length}` : ""}
+                {c.phones.length > 0 ? `${c.phones.length}` : ""}{c.emails.length > 0 ? ` ✉ ${c.emails.length}` : ""}
               </div>
             </div>
           ))}
@@ -943,14 +943,14 @@ function ExportSection({ groupNames, companyNames }: { groupNames: string[]; com
           {companyNames.length > 0 && (
             <optgroup label="Podle firmy">
               {companyNames.map((c) => (
-                <option key={`company:${c}`} value={`company:${c}`}>🏢 {c}</option>
+                <option key={`company:${c}`} value={`company:${c}`}>{c}</option>
               ))}
             </optgroup>
           )}
           {groupNames.length > 0 && (
             <optgroup label="Podle skupiny">
               {groupNames.map((g) => (
-                <option key={`group:${g}`} value={`group:${g}`}>📁 {g}</option>
+                <option key={`group:${g}`} value={`group:${g}`}>{g}</option>
               ))}
             </optgroup>
           )}
@@ -962,7 +962,7 @@ function ExportSection({ groupNames, companyNames }: { groupNames: string[]; com
       </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" checked={firemni} onChange={(e) => setFiremni(e.target.checked)} />
-        <span>🏢 Firemní export (jen Jméno, Příjmení, Firma, Telefon, Druhý telefon, Narozeniny, E-mail)</span>
+        <span>Firemní export (jen Jméno, Příjmení, Firma, Telefon, Druhý telefon, Narozeniny, E-mail)</span>
       </label>
       <a href={buildUrl()} download className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[var(--tint-sage)]/20 text-[var(--tint-sage)] border border-[var(--tint-sage)]/40 text-sm font-medium hover:bg-[var(--tint-sage)]/30">
         <Download className="size-4" /> Stáhnout {format.toUpperCase()}

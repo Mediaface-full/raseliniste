@@ -233,7 +233,7 @@ export default function IcloudIntegration({ initial }: { initial: Initial }) {
             <div className="flex items-center gap-2">
               <Cloud className="size-4" style={{ color: "var(--c)" }} />
               <h3 className="font-serif text-lg">Stav</h3>
-              <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">✓ připojeno</span>
+              <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">připojeno</span>
             </div>
             <div className="text-sm text-muted-foreground font-mono">{appleId}</div>
             {lastUsed && (

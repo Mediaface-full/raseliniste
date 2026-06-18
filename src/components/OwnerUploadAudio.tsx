@@ -188,7 +188,7 @@ export default function OwnerUploadAudio({ projects }: Props) {
         <div className="rounded-lg border-2 border-[var(--tint-sage)]/50 bg-[var(--tint-sage)]/15 text-sm px-4 py-3 flex items-center gap-3 animate-in fade-in">
           <Check className="size-5 text-[var(--tint-sage)] shrink-0" />
           <div className="flex-1">
-            <div className="font-semibold text-[var(--tint-sage)]">✓ Úspěšně nahráno</div>
+            <div className="font-semibold text-[var(--tint-sage)]">Úspěšně nahráno</div>
             {doneFile && (
               <div className="text-xs text-muted-foreground font-mono mt-0.5">
                 {doneFile.name} ({(doneFile.size / 1024 / 1024).toFixed(1)} MB)

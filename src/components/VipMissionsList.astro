@@ -51,13 +51,13 @@ const hasAny = open.length > 0 || done.length > 0;
     {done.length > 0 && (
       <details class="glass rounded-xl">
         <summary class="cursor-pointer p-3 text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
-          ✓ Hotové ({done.length}) — posledních {daysWindow} dní
+          Hotové ({done.length}) — posledních {daysWindow} dní
         </summary>
         <div class="px-3 pb-3 space-y-2">
           {done.map((m) => (
             <div class="rounded-md p-2.5 bg-white/[0.02] opacity-60">
               <div class="flex items-center gap-2 text-[10px] font-mono text-muted-foreground mb-1">
-                <span class="text-[var(--tint-sage)]">✓</span>
+                <span class="text-[var(--tint-sage)]"></span>
                 <span>{relativeTime(m.createdAt)}</span>
                 {m.seenAt && (
                   <span>· vyřízeno {relativeTime(m.seenAt)}</span>

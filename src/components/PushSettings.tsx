@@ -177,7 +177,7 @@ export default function PushSettings() {
         setErr(data.error ?? "Subscribe na server selhal.");
         return;
       }
-      setMsg(`✓ Zařízení „${autoLabel}" zaregistrované.`);
+      setMsg(`Zařízení „${autoLabel}" zaregistrované.`);
       setLabel("");
       load();
     } catch (e) {
@@ -198,7 +198,7 @@ export default function PushSettings() {
         setErr(`Test selhal: sent=${data.sent} failed=${data.failed} ${data.errors?.join(" · ") ?? ""}`);
         return;
       }
-      setMsg(`✓ Test odeslán na ${data.sent} zařízení. Zkontroluj telefon/mobil.`);
+      setMsg(`Test odeslán na ${data.sent} zařízení. Zkontroluj telefon/mobil.`);
     } finally {
       setBusy(false);
     }
@@ -299,13 +299,13 @@ export default function PushSettings() {
           </div>
           <div className="glass rounded-xl p-4 space-y-3">
             <FilterToggle
-              label="⭐ VIP zprávy"
+              label="VIP zprávy"
               hint="Z firewall, urgent přes /call-log"
               checked={filters.pushVip}
               onChange={(v) => updateFilter("pushVip", v)}
             />
             <FilterToggle
-              label="📧 Urgent maily"
+              label="Urgent maily"
               hint="action_required + high/eskalace (AI klasifikace)"
               checked={filters.pushUrgentEmail}
               onChange={(v) => updateFilter("pushUrgentEmail", v)}
@@ -317,7 +317,7 @@ export default function PushSettings() {
               onChange={(v) => updateFilter("pushStudankaGuest", v)}
             />
             <FilterToggle
-              label="📅 Potvrzené rezervace"
+              label="Potvrzené rezervace"
               hint="Klient si vybral slot v /calendar/invite"
               checked={filters.pushBookingConfirmed}
               onChange={(v) => updateFilter("pushBookingConfirmed", v)}

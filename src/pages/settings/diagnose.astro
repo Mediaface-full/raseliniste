@@ -103,9 +103,9 @@ if (!user) return Astro.redirect("/login");
           <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-2">Migrace</div>
           ${missing
             ? `<div class="text-sm text-[var(--tint-rose)] mb-2">⚠ Chybí: ${m.missing.map(escapeHtml).join(", ")}</div>`
-            : `<div class="text-sm text-[var(--tint-sage)]">✓ Všechny očekávané migrace aplikované</div>`}
+            : `<div class="text-sm text-[var(--tint-sage)]">Všechny očekávané migrace aplikované</div>`}
           <ul class="mt-2 text-xs font-mono space-y-0.5 text-muted-foreground">
-            ${m.applied.map((a) => `<li>✓ ${escapeHtml(a.migration_name)} <span class="opacity-60">${a.finished_at ? fmtDate(a.finished_at) : "—"}</span></li>`).join("")}
+            ${m.applied.map((a) => `<li>${escapeHtml(a.migration_name)} <span class="opacity-60">${a.finished_at ? fmtDate(a.finished_at) : "—"}</span></li>`).join("")}
           </ul>
         </section>
       `;
@@ -138,7 +138,7 @@ if (!user) return Astro.redirect("/login");
                   <div class="flex items-center gap-2 flex-wrap text-sm">
                     <span class="font-mono text-[10px] uppercase tracking-wider" style="color: ${color}">${escapeHtml(it.kind)}</span>
                     <span>${escapeHtml(it.name)}</span>
-                    <span class="ml-auto text-xs font-mono text-muted-foreground">${it.age} min ${stale ? "🟡 stuck" : ""}</span>
+                    <span class="ml-auto text-xs font-mono text-muted-foreground">${it.age} min ${stale ? "stuck" : ""}</span>
                   </div>
                   ${it.extra ? `<div class="text-xs text-muted-foreground mt-1 truncate">${escapeHtml(it.extra)}</div>` : ""}
                 </a>

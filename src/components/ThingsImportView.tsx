@@ -340,10 +340,10 @@ export default function ThingsImportView() {
                           {decisionBadge(it.decision)}
                         </td>
                         <td className="px-3 py-1.5 font-mono text-[11px]">
-                          {it.pushResult === "ok" && <span className="text-[var(--tint-sage)]">✓ ok</span>}
-                          {it.pushResult?.startsWith("ok (") && <span className="text-[var(--tint-sage)]">✓ ok+sub</span>}
+                          {it.pushResult === "ok" && <span className="text-[var(--tint-sage)]">ok</span>}
+                          {it.pushResult?.startsWith("ok (") && <span className="text-[var(--tint-sage)]">ok+sub</span>}
                           {it.pushResult === "skipped" && <span className="text-muted-foreground">— skipped</span>}
-                          {it.pushResult?.startsWith("error:") && <span className="text-destructive">✗ error</span>}
+                          {it.pushResult?.startsWith("error:") && <span className="text-destructive">error</span>}
                           {it.pushResult?.startsWith("partial:") && <span className="text-[var(--tint-butter)]">⚠ partial</span>}
                           {it.pushResult === null && <span className="text-muted-foreground">…</span>}
                         </td>
@@ -362,7 +362,7 @@ export default function ThingsImportView() {
             <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/[0.05]">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-destructive/20">
                 <span className="text-xs font-mono text-destructive font-semibold flex-1">
-                  ✗ ErrorLog — {(active.import.errorLog as unknown[]).length} chyb
+                  ErrorLog — {(active.import.errorLog as unknown[]).length} chyb
                 </span>
                 <button
                   type="button"
@@ -546,7 +546,7 @@ function RemigrateToTodoistButton({ importId, onDone }: { importId: string; onDo
       {result && (
         <div className="rounded-md border border-[var(--tint-sage)]/30 bg-[var(--tint-sage)]/[0.08] p-3 text-xs space-y-1">
           <div className="text-[var(--tint-sage)] font-medium">
-            ✓ Hotovo
+            Hotovo
             {result.todoistProject.created && " · projekt Wishlist vytvořen v Todoistu"}
           </div>
           <div>

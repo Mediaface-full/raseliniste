@@ -1013,7 +1013,7 @@ function Canvas(props: {
                   fill="var(--tv-milestone-check)"
                   style={{ pointerEvents: "none" }}
                 >
-                  ✓
+                  
                 </text>
               </g>
             );
@@ -1055,7 +1055,7 @@ function Detail(props: {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tv-h3" style={{ marginBottom: 4 }}>{props.task.title}</div>
           <div className="tv-caption">
-            {sub?.name} · {member?.name} · {props.task.completed ? "✓ hotovo" : "otevřené"}
+            {sub?.name} · {member?.name} · {props.task.completed ? "hotovo" : "otevřené"}
           </div>
         </div>
         <button

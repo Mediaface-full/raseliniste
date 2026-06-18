@@ -169,7 +169,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
         return;
       }
       setDigestMessage(
-        `✓ Digest vygenerován (${data.stats.totalActiveEmails} aktivních mailů, ${(data.stats.durationMs / 1000).toFixed(1)} s). Otevři /posta.`,
+        `Digest vygenerován (${data.stats.totalActiveEmails} aktivních mailů, ${(data.stats.durationMs / 1000).toFixed(1)} s). Otevři /posta.`,
       );
       setTimeout(() => setDigestMessage(null), 8000);
     } catch {
@@ -414,10 +414,10 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
             Klasifikace hotová
           </div>
           <div className="font-mono text-xs text-muted-foreground space-y-0.5">
-            <div>✓ Klasifikováno: {classifyResult.classified}</div>
+            <div>Klasifikováno: {classifyResult.classified}</div>
             <div>↺ Přeskočeno (už klasifikováno): {classifyResult.skipped}</div>
             {classifyResult.errors > 0 && (
-              <div className="text-red-400">✗ Chyb: {classifyResult.errors}</div>
+              <div className="text-red-400">Chyb: {classifyResult.errors}</div>
             )}
             {classifyResult.durationMs && (
               <div>⏱ Doba: {(classifyResult.durationMs / 1000).toFixed(1)} s</div>
@@ -453,11 +453,11 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
             Hotovo ({result.mode === "init" ? "první import" : "incremental"})
           </div>
           <div className="font-mono text-xs text-muted-foreground space-y-0.5">
-            <div>✓ Naimportováno: {result.imported}</div>
+            <div>Naimportováno: {result.imported}</div>
             <div>↺ Přeskočeno (už v DB): {result.skipped}</div>
-            {result.errors > 0 && <div className="text-red-400">✗ Chyb: {result.errors}</div>}
+            {result.errors > 0 && <div className="text-red-400">Chyb: {result.errors}</div>}
             <div>⏱ Doba: {(result.durationMs / 1000).toFixed(1)} s</div>
-            {result.emailAddress && <div>📧 {result.emailAddress}</div>}
+            {result.emailAddress && <div>{result.emailAddress}</div>}
           </div>
           {result.errorDetails.length > 0 && (
             <details className="mt-2">

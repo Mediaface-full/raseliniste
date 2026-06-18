@@ -266,7 +266,7 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
             <div class="space-y-2">
               {notifications.slice(0, 5).map((n) => {
                 const tint = n.type === "studanka" ? "mint" : n.type === "posta" ? "sky" : "rose";
-                const label = n.type === "studanka" ? "🌊 Studánka" : n.type === "posta" ? "📧 Pošta" : "⭐ VIP";
+                const label = n.type === "studanka" ? "🌊 Studánka" : n.type === "posta" ? "Pošta" : "VIP";
                 return (
                   <div class={`text-sm rounded-md p-2 border border-[var(--tint-${tint})]/30 bg-[var(--tint-${tint})]/10`}>
                     <div class="text-[10px] uppercase tracking-wider font-mono mb-0.5" style={`color: var(--tint-${tint});`}>
@@ -289,7 +289,7 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
               <Icon name="lucide:check-circle-2" class="size-4" style="color: var(--c);" />
               <h2 class="font-serif text-lg">Notifikace</h2>
             </div>
-            <div class="text-sm text-muted-foreground">Nic nového. Klid. ✓</div>
+            <div class="text-sm text-muted-foreground">Nic nového. Klid. </div>
           </a>
         )}
       </section>

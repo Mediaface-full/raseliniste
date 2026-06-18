@@ -132,41 +132,41 @@ const TRIGGERED_LABEL: Record<string, string> = {
                 </td>
                 <td class="px-3 py-2">
                   {r.ok ? (
-                    <span class="text-[var(--tint-sage)] font-mono text-xs">✓ OK</span>
+                    <span class="text-[var(--tint-sage)] font-mono text-xs">OK</span>
                   ) : (
-                    <span class="text-destructive font-mono text-xs">✗ FAIL</span>
+                    <span class="text-destructive font-mono text-xs">FAIL</span>
                   )}
                 </td>
                 <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">{TRIGGERED_LABEL[r.triggeredBy] ?? r.triggeredBy}</td>
                 <td class="px-3 py-2 font-mono text-xs">{fmtDuration(r.durationMs)}</td>
                 <td class="px-3 py-2 text-xs">
                   {r.pgDumpOk ? (
-                    <span class="text-[var(--tint-sage)] font-mono">✓ {fmtBytes(r.pgDumpBytes)}</span>
+                    <span class="text-[var(--tint-sage)] font-mono">{fmtBytes(r.pgDumpBytes)}</span>
                   ) : (
-                    <span class="text-destructive font-mono" title={r.pgDumpError ?? ""}>✗ {(r.pgDumpError ?? "fail").slice(0, 30)}</span>
+                    <span class="text-destructive font-mono" title={r.pgDumpError ?? ""}>{(r.pgDumpError ?? "fail").slice(0, 30)}</span>
                   )}
                 </td>
                 <td class="px-3 py-2 text-xs">
                   {r.uploadsTarOk ? (
-                    <span class="text-[var(--tint-sage)] font-mono">✓ {fmtBytes(r.uploadsTarBytes)}</span>
+                    <span class="text-[var(--tint-sage)] font-mono">{fmtBytes(r.uploadsTarBytes)}</span>
                   ) : (
-                    <span class="text-destructive font-mono" title={r.uploadsTarError ?? ""}>✗ {(r.uploadsTarError ?? "fail").slice(0, 30)}</span>
+                    <span class="text-destructive font-mono" title={r.uploadsTarError ?? ""}>{(r.uploadsTarError ?? "fail").slice(0, 30)}</span>
                   )}
                 </td>
                 <td class="px-3 py-2 text-xs">
                   {r.rsyncSkipped ? (
                     <span class="text-muted-foreground font-mono">— skipped</span>
                   ) : r.rsyncOk ? (
-                    <span class="text-[var(--tint-sage)] font-mono">✓</span>
+                    <span class="text-[var(--tint-sage)] font-mono"></span>
                   ) : (
-                    <span class="text-destructive font-mono" title={r.rsyncError ?? ""}>✗</span>
+                    <span class="text-destructive font-mono" title={r.rsyncError ?? ""}></span>
                   )}
                 </td>
                 <td class="px-3 py-2 text-xs">
                   {r.retentionOk ? (
-                    <span class="text-[var(--tint-sage)] font-mono">✓ {r.retentionDeleted ?? 0} smazáno</span>
+                    <span class="text-[var(--tint-sage)] font-mono">{r.retentionDeleted ?? 0} smazáno</span>
                   ) : (
-                    <span class="text-destructive font-mono" title={r.retentionError ?? ""}>✗</span>
+                    <span class="text-destructive font-mono" title={r.retentionError ?? ""}></span>
                   )}
                 </td>
               </tr>

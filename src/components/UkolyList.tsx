@@ -55,7 +55,7 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
   // tichu padal. Tady ho otevíráme přímo z user gesture (onClick handler).
   const audioFileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
-  // Petr 2026-06-10: viditelný ✓ feedback po úspěšném uploadu (před redirect).
+  // Petr 2026-06-10: viditelný feedback po úspěšném uploadu (před redirect).
   // Bez tohoto uživatel nevidí jestli upload prošel — redirect byl tichý.
   const [uploadDone, setUploadDone] = useState<string | null>(null);
 
@@ -178,8 +178,8 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
         setError(data.error ?? `Upload selhal (HTTP ${res.status}).`);
         return;
       }
-      // Viditelný ✓ feedback (1.2s) → pak redirect na review.
-      setUploadDone(`✓ Nahráno: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+      // Viditelný feedback (1.2s) → pak redirect na review.
+      setUploadDone(`Nahráno: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
       setTimeout(() => {
         // Petr 2026-05-27: route je /ukoly/audio/<id>/review (review.astro)
         window.location.href = `/ukoly/audio/${data.batchId}/review`;
@@ -312,7 +312,7 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
         </div>
       ) : tasks.length === 0 ? (
         <div className="glass rounded-xl p-8 text-center text-muted-foreground">
-          {statusFilter === "open" ? "Žádné otevřené úkoly. ✓" : "Nic tady."}
+          {statusFilter === "open" ? "Žádné otevřené úkoly. " : "Nic tady."}
         </div>
       ) : (
         <div className="space-y-2">
@@ -525,13 +525,13 @@ function TaskRow({
               </span>
             )}
             {task.todoistProjectName && (
-              <span className="font-mono text-[var(--tint-sky)]">📁 {task.todoistProjectName}</span>
+              <span className="font-mono text-[var(--tint-sky)]">{task.todoistProjectName}</span>
             )}
             {task.todoistTaskId && !task.todoistProjectName && (
-              <span className="text-[var(--tint-sage)] font-mono">✓ Todoist</span>
+              <span className="text-[var(--tint-sage)] font-mono">Todoist</span>
             )}
             {task.source === "vip_call_log" && (
-              <span className="font-mono text-[var(--tint-rose)]">⭐ VIP firewall</span>
+              <span className="font-mono text-[var(--tint-rose)]">VIP firewall</span>
             )}
             {task.source !== "manual" && task.source !== "vip_call_log" && (
               <span className="text-muted-foreground font-mono text-xs">[{task.source}]</span>

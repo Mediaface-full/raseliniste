@@ -84,7 +84,7 @@ export const GET: APIRoute = async ({ cookies, params }) => {
     lines.push(`## Znovuotevření (${d.reopenings.length})`);
     lines.push("");
     d.reopenings.forEach((r) => {
-      lines.push(`- **${r.datum.toLocaleString("cs-CZ")}** ${r.schvaleno ? "✓" : "✗"} — ${r.popisNovehoFaktu}`);
+      lines.push(`- **${r.datum.toLocaleString("cs-CZ")}** ${r.schvaleno ? "" : ""} — ${r.popisNovehoFaktu}`);
     });
     lines.push("");
   }

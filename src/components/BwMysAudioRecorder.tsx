@@ -179,7 +179,7 @@ export default function BwMysAudioRecorder({
           {phase === "done" && (
             <>
               <CheckCircle2 className="size-12 text-[var(--tint-sage)]" />
-              <div className="text-sm">Zápis vytvořen ✓</div>
+              <div className="text-sm">Zápis vytvořen </div>
             </>
           )}
 

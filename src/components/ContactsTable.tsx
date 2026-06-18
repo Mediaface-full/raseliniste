@@ -261,7 +261,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
       if (failed.length > 0) {
         setError(`${failed.length} změn selhalo: ${failed.map((f) => f.error).join("; ")}`);
       } else {
-        setMessage(`✓ Uloženo ${changes.length} změn.`);
+        setMessage(`Uloženo ${changes.length} změn.`);
         setTimeout(() => setMessage(null), 3000);
       }
       setDirty(new Map());
@@ -289,7 +289,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
       const am = s.autoMerge;
       const fc = s.finalContactCount;
       const parts = [
-        `✓ iCloud sync OK`,
+        `iCloud sync OK`,
         `staženo ${s.pulled}`,
         s.created > 0 ? `vytvořeno ${s.created}` : null,
         s.matched > 0 ? `spárováno ${s.matched}` : null,
@@ -325,7 +325,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         setError(data.error ?? "Google sync selhal. Pravděpodobně chybí Google scope `contacts` — reauth v /settings/integrations/google.");
         return;
       }
-      setMessage(`✓ Google sync hotový. Z Google: vytvořeno ${data.pulledCreated}, update ${data.pulledUpdated}. Do Google: vytvořeno ${data.created}, update ${data.updated}. Chyb ${data.errors}.`);
+      setMessage(`Google sync hotový. Z Google: vytvořeno ${data.pulledCreated}, update ${data.pulledUpdated}. Do Google: vytvořeno ${data.created}, update ${data.updated}. Chyb ${data.errors}.`);
       setTimeout(() => setMessage(null), 8000);
       await load();
     } catch (e) {
@@ -350,7 +350,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         setError(data.error ?? "Push selhal.");
         return;
       }
-      setMessage("✓ Posláno do iCloudu.");
+      setMessage("Posláno do iCloudu.");
       setTimeout(() => setMessage(null), 2000);
       await load();
     } catch (e) {
@@ -377,10 +377,10 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         return;
       }
       const parts = [
-        "✓ Smazáno",
-        data.deletedFromIcloud ? "iCloud ✓" : data.icloudError ? `iCloud ✗ (${data.icloudError})` : null,
-        data.deletedFromGoogle ? "Google ✓" : data.googleError ? `Google ✗ (${data.googleError})` : null,
-        "z DB ✓",
+        "Smazáno",
+        data.deletedFromIcloud ? "iCloud " : data.icloudError ? `iCloud (${data.icloudError})` : null,
+        data.deletedFromGoogle ? "Google " : data.googleError ? `Google (${data.googleError})` : null,
+        "z DB ",
       ].filter(Boolean).join(" · ");
       setMessage(parts);
       setTimeout(() => setMessage(null), 6000);
@@ -400,7 +400,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
     if (!confirm(`Zahodit ${dirty.size} neuložených změn?`)) return;
     setLocalEdits(new Map());
     setDirty(new Map());
-    setMessage("✓ Změny zahozeny.");
+    setMessage("Změny zahozeny.");
     setTimeout(() => setMessage(null), 2000);
   }
 
@@ -428,7 +428,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         if (res.ok) pushed++; else pushFailed++;
       } catch { pushFailed++; }
     }
-    setMessage(`✓ Uloženo do DB a iCloudu (${pushed} push, ${pushFailed} selhalo).`);
+    setMessage(`Uloženo do DB a iCloudu (${pushed} push, ${pushFailed} selhalo).`);
     setTimeout(() => setMessage(null), 5000);
     await load();
   }
@@ -459,7 +459,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         setError(data.error ?? "Vytvoření selhalo.");
         return;
       }
-      setMessage(`✓ Prázdný kontakt přidán. Přepiš jméno v prvním sloupci a klikni Uložit.`);
+      setMessage(`Prázdný kontakt přidán. Přepiš jméno v prvním sloupci a klikni Uložit.`);
       setTimeout(() => setMessage(null), 5000);
       await load();
       // Scroll + focus na nový řádek (pokud máme ID v response)
@@ -498,7 +498,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
         setError(data.error ?? "Vytvoření skupiny selhalo.");
         return;
       }
-      setMessage(data.existed ? `Skupina "${name}" už existuje.` : `✓ Skupina "${name}" vytvořena.`);
+      setMessage(data.existed ? `Skupina "${name}" už existuje.` : `Skupina "${name}" vytvořena.`);
       setTimeout(() => setMessage(null), 3000);
       await load();
     } catch (e) {
@@ -521,12 +521,12 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {icloudStatus.connected ? (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">🟢 iCloud {icloudStatus.username}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">iCloud {icloudStatus.username}</span>
           ) : (
             <a href="/settings/integrations/icloud" className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-rose)]/15 text-[var(--tint-rose)] font-mono hover:underline">⚠ iCloud nepřipojen</a>
           )}
           {googleStatus.connected && googleStatus.hasContactsScope ? (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">🟢 Google {googleStatus.username ?? ""}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-sage)]/15 text-[var(--tint-sage)] font-mono">Google {googleStatus.username ?? ""}</span>
           ) : googleStatus.connected ? (
             <a href="/settings/integrations/google" className="text-xs px-2 py-0.5 rounded-full bg-[var(--tint-butter)]/15 text-[var(--tint-butter)] font-mono hover:underline">⚠ Google reauth</a>
           ) : (
@@ -738,7 +738,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
               <th className="px-2 py-2 text-left w-[100px]">Narozeniny</th>
               <th className="px-2 py-2 text-center w-[60px]" title="VIP/Team flagy z Rašeliniště (overlay)">Flag</th>
               <th className="px-2 py-2 text-center w-[40px]" title="Push do iCloudu">⤴</th>
-              <th className="px-2 py-2 text-center w-[40px]" title="Smazat kontakt (DB + iCloud + Google)">🗑</th>
+              <th className="px-2 py-2 text-center w-[40px]" title="Smazat kontakt (DB + iCloud + Google)"></th>
             </tr>
           </thead>
           <tbody>
@@ -856,7 +856,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
             setNewContactModalOpen(false);
             if (reload) {
               void load();
-              setMessage("✓ Kontakt přidán. Pokud chceš push do iCloudu/Google, klikni Uložit (iCloud) / Uložit + Google.");
+              setMessage("Kontakt přidán. Pokud chceš push do iCloudu/Google, klikni Uložit (iCloud) / Uložit + Google.");
               setTimeout(() => setMessage(null), 6000);
             }
           }}

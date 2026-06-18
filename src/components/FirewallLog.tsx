@@ -77,7 +77,7 @@ export default function FirewallLog() {
         </div>
       ) : logs.length === 0 ? (
         <div className="glass rounded-xl p-8 text-center text-muted-foreground">
-          {showSeen ? "Zatím žádné vzkazy ve firewallu." : "Žádné nevyřízené vzkazy. 🎯"}
+          {showSeen ? "Zatím žádné vzkazy ve firewallu." : "Žádné nevyřízené vzkazy. "}
         </div>
       ) : (
         <div className="space-y-2">
@@ -121,7 +121,7 @@ export default function FirewallLog() {
                       )}
                       {l.requestedDueAt && (
                         <span className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded bg-[var(--tint-rose)]/20 text-[var(--tint-rose)]">
-                          📅 do {new Date(l.requestedDueAt).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" })}
+                          do {new Date(l.requestedDueAt).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" })}
                         </span>
                       )}
                     </div>

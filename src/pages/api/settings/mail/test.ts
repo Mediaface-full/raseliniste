@@ -39,7 +39,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   </div>
   <h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px 0;color:#fff;">Testovací e-mail</h1>
   <p style="font-size:14px;line-height:1.5;">
-    Pokud tohle vidíš, SMTP funguje správně. ✓
+    Pokud tohle vidíš, SMTP funguje správně. 
   </p>
   <div style="margin-top:16px;font-size:11px;color:#6b665f;font-family:ui-monospace,monospace;">
     Odesláno ${new Date().toLocaleString("cs-CZ", { timeZone: "Europe/Prague" })}

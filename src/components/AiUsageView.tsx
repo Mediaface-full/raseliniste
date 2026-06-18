@@ -241,8 +241,8 @@ export default function AiUsageView() {
                 <td className="text-right px-3 py-1.5 font-mono tabular-nums text-muted-foreground">{c.durationMs}</td>
                 <td className="px-3 py-1.5">
                   {c.success
-                    ? <span className="text-[var(--tint-sage)]">✓</span>
-                    : <span className="text-[var(--tint-rose)]" title={c.errorMsg ?? ""}>✗</span>}
+                    ? <span className="text-[var(--tint-sage)]"></span>
+                    : <span className="text-[var(--tint-rose)]" title={c.errorMsg ?? ""}></span>}
                 </td>
               </tr>
             ))}

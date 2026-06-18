@@ -154,16 +154,16 @@ export const GET: APIRoute = async ({ cookies }) => {
 
   if (missingMigrations.length > 0) {
     conclusions.push(
-      `🔴 CHYBÍ MIGRACE: ${missingMigrations.join(", ")}. Bez nich endpointy padají při create. Spusť rebuild kontejneru.`,
+      `CHYBÍ MIGRACE: ${missingMigrations.join(", ")}. Bez nich endpointy padají při create. Spusť rebuild kontejneru.`,
     );
   } else {
-    conclusions.push("🟢 Všechny očekávané migrace aplikovány.");
+    conclusions.push("Všechny očekávané migrace aplikovány.");
   }
 
   if (!hasGcpKey && !hasApiKey) {
-    conclusions.push("🔴 Žádné AI credentials — chybí GOOGLE_APPLICATION_CREDENTIALS i GEMINI_API_KEY.");
+    conclusions.push("Žádné AI credentials — chybí GOOGLE_APPLICATION_CREDENTIALS i GEMINI_API_KEY.");
   } else {
-    conclusions.push(`🟢 Gemini mode: ${geminiMode} (Vertex=${hasGcpKey ? "✓" : "✗"}, API key=${hasApiKey ? "✓" : "✗"})`);
+    conclusions.push(`Gemini mode: ${geminiMode} (Vertex=${hasGcpKey ? "" : ""}, API key=${hasApiKey ? "" : ""})`);
   }
 
   // Stuck rows
@@ -175,23 +175,23 @@ export const GET: APIRoute = async ({ cookies }) => {
 
   if (stuckTotal > 0) {
     conclusions.push(
-      `🟡 ${stuckTotal} stuck row(s) starších 5 min (${stuckEntries.length} entry, ${stuckEvals.length} eval, ${stuckHealth.length} health, ${stuckSummary.length} summary). Otevři detail nebo refreshni — lazy cleanup je překlopí na error.`,
+      `${stuckTotal} stuck row(s) starších 5 min (${stuckEntries.length} entry, ${stuckEvals.length} eval, ${stuckHealth.length} health, ${stuckSummary.length} summary). Otevři detail nebo refreshni — lazy cleanup je překlopí na error.`,
     );
   }
 
   if (decisionEntriesProcessing.length === 0 && decisionEvalsProcessing.length === 0 && healthProcessing.length === 0 && summaryProcessing.length === 0) {
-    conclusions.push("🟢 Žádné aktivní processing joby — vše dokončeno nebo nic neběží.");
+    conclusions.push("Žádné aktivní processing joby — vše dokončeno nebo nic neběží.");
   } else {
     const young = decisionEntriesProcessing.length + decisionEvalsProcessing.length + healthProcessing.length + summaryProcessing.length - stuckTotal;
-    if (young > 0) conclusions.push(`🟢 ${young} aktivní AI job(y) běží na pozadí (mladší 5 min).`);
+    if (young > 0) conclusions.push(`${young} aktivní AI job(y) běží na pozadí (mladší 5 min).`);
   }
 
   // Errory
   const totalErrors = decisionEvalErrors.length + decisionEntryErrors.length + healthErrors.length + summaryErrors.length;
   if (totalErrors > 0) {
-    conclusions.push(`🟡 ${totalErrors} AI selhání za posledních 24 h. Detail v poli "errors24h" — typicky Gemini timeout, JSON parse, nebo rate limit.`);
+    conclusions.push(`${totalErrors} AI selhání za posledních 24 h. Detail v poli "errors24h" — typicky Gemini timeout, JSON parse, nebo rate limit.`);
   } else {
-    conclusions.push("🟢 Žádné AI selhání za posledních 24 h.");
+    conclusions.push("Žádné AI selhání za posledních 24 h.");
   }
 
   return Response.json({

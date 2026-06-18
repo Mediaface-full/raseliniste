@@ -178,7 +178,7 @@ function RecordSection({ variant }: { variant: "standard" | "brief" }) {
         <li>Telefon se zeptá, jestli smí používat mikrofon — klepni <strong>Povolit</strong>.</li>
         <li>Začne se nahrávat. Mluv normálně. Vidíš odpočet, kolik času ti zbývá.</li>
         <li>Až skončíš, klepni <strong>Stop</strong>. Maximální délka rychlého záznamu je 10 minut.</li>
-        <li>Za pár vteřin uvidíš <strong>„Záznam uložen ✓"</strong>. Hotovo.</li>
+        <li>Za pár vteřin uvidíš <strong>„Záznam uložen "</strong>. Hotovo.</li>
       </ol>
 
       {variant === "brief" && (
@@ -199,7 +199,7 @@ function RecordSection({ variant }: { variant: "standard" | "brief" }) {
             <li>Vrať se sem, klepni pod mikrofonem na malý odkaz <strong>„Klíčový brief — nahrát soubor"</strong>.</li>
             <li>Klepni <strong>Vybrat soubor</strong> a najdi nahrávku.</li>
             <li>Klepni <strong>Odeslat brief</strong>. Vydrž 2–5 minut, AI ho zpracovává.</li>
-            <li>Až uvidíš <strong>„Záznam uložen ✓"</strong>, máš hotovo.</li>
+            <li>Až uvidíš <strong>„Záznam uložen "</strong>, máš hotovo.</li>
           </ol>
         </>
       )}

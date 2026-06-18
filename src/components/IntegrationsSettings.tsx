@@ -221,7 +221,7 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
         return;
       }
       const s = data.summary ?? {};
-      let msg = `✓ Propojeno ${s.matched ?? 0} kontaktů s Todoist (přeskočeno ${s.skipped ?? 0} už nastavených, ${s.noEmail ?? 0} bez e-mailu).`;
+      let msg = `Propojeno ${s.matched ?? 0} kontaktů s Todoist (přeskočeno ${s.skipped ?? 0} už nastavených, ${s.noEmail ?? 0} bez e-mailu).`;
       if (s.unmatchedCollaborators > 0) {
         msg += ` Pozor: ${s.unmatchedCollaborators} Todoist collaborators nemá odpovídající kontakt — přidej je do /contacts.`;
       }
@@ -252,7 +252,7 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
       }
       const s = data.stats ?? {};
       setSyncResult(
-        (fullReset ? "✓ FULL RESET — " : "✓ ") +
+        (fullReset ? "FULL RESET — " : "") +
           `Projekty: ${s.projectsReceived ?? 0} (${s.projectsUpserted ?? 0} updated), ` +
           `labels: ${s.labelsReceived ?? 0}, úkoly: ${s.itemsReceived ?? 0}`,
       );
@@ -296,7 +296,7 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
         <div className="flex items-center gap-2">
           <Plug className="size-4" style={{ color: "var(--c)" }} />
           <h3 className="font-serif text-lg">Todoist API token</h3>
-          {hasToken && <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">✓ uložen</span>}
+          {hasToken && <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">uložen</span>}
         </div>
 
         {!hasToken ? (
@@ -592,7 +592,7 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
         </div>
       )}
       {saved && (
-        <div className="text-xs text-[var(--tint-sage)] font-mono">Uloženo ✓</div>
+        <div className="text-xs text-[var(--tint-sage)] font-mono">Uloženo </div>
       )}
     </div>
   );

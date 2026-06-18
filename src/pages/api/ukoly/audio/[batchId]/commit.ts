@@ -16,7 +16,7 @@ const subProposalSchema = z.object({
   priority: z.enum(["low", "normal", "high"]).optional(),
   rawSnippet: z.string().nullable().optional(),
   assignedToContactId: z.string().nullable().optional(),
-  // Manuální override Smart routingu — Petr v UI klikl na chip 📁 a vybral
+  // Manuální override Smart routingu — Petr v UI klikl na chip a vybral
   // projekt sám. Pokud nastaveno, task-todoist-push.ts to preferuje před resolveRoute.
   manualTodoistProjectId: z.string().nullable().optional(),
   manualTodoistSectionId: z.string().nullable().optional(),

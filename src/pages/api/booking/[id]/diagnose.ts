@@ -103,7 +103,7 @@ export const GET: APIRoute = async ({ params, cookies }) => {
   }
   const okLogs = confirmLogs.filter((l) => l.ok);
   if (okLogs.length > 0 && verdict.length === 0) {
-    verdict.push(`✓ ${okLogs.length} mail úspěšně odešel přes ${okLogs.map((l) => l.provider).join(",")} — pokud host tvrdí že nedostal, problém je u něj (spam, server filtr)`);
+    verdict.push(`${okLogs.length} mail úspěšně odešel přes ${okLogs.map((l) => l.provider).join(",")} — pokud host tvrdí že nedostal, problém je u něj (spam, server filtr)`);
   }
 
   return Response.json({

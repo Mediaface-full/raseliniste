@@ -753,7 +753,7 @@ export default function DayTimeline({
                   )}
                   {ev.prepNote && (
                     <div className="text-xs text-[var(--tint-butter)] mt-1.5 px-2 py-1.5 rounded bg-black/20">
-                      📝 {ev.prepNote}
+                      {ev.prepNote}
                     </div>
                   )}
                   {ev.description && (

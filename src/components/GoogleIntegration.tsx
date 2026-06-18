@@ -22,7 +22,7 @@ export default function GoogleIntegration({ initial }: { initial: Initial }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(initial.lastError);
   const [message, setMessage] = useState<string | null>(
-    initial.justConnected ? "✓ Google je připojený. První sync běží na pozadí." : null,
+    initial.justConnected ? "Google je připojený. První sync běží na pozadí." : null,
   );
   const lastUsed = initial.lastUsedAt ? new Date(initial.lastUsedAt) : null;
 
@@ -127,7 +127,7 @@ export default function GoogleIntegration({ initial }: { initial: Initial }) {
           <Link2 className="size-4" style={{ color: "var(--c)" }} />
           <h3 className="font-serif text-lg">Stav připojení</h3>
           {connected ? (
-            <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">✓ připojeno</span>
+            <span className="ml-auto text-xs font-mono text-[var(--tint-sage)]">připojeno</span>
           ) : (
             <span className="ml-auto text-xs font-mono text-muted-foreground">— nepřipojeno</span>
           )}

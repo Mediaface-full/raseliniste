@@ -58,7 +58,7 @@ function buildContext(project: { name: string; description: string | null }, rec
   for (let i = 0; i < recordings.length; i++) {
     const r = recordings[i];
     const date = r.createdAt.toLocaleString("cs-CZ", { timeZone: "Europe/Prague" });
-    lines.push(`## [${i + 1}] ${r.type === "BRIEF" ? "📋 Brief" : "🎙 Standard"} · ${date} · ${r.authorName}`);
+    lines.push(`## [${i + 1}] ${r.type === "BRIEF" ? "📋 Brief" : "Standard"} · ${date} · ${r.authorName}`);
     lines.push("");
     if (r.analysis?.summary) {
       lines.push(`Souhrn: ${r.analysis.summary}`);

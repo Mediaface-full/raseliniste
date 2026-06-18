@@ -395,10 +395,10 @@ export default function BwMysDetail({ id }: { id: string }) {
               {ev.typ === "finalni" && d.status === "aktivni" && !isProcessing && !isError && (
                 <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-2">
                   <Button onClick={() => setCloseDialog("jdu")}>
-                    ✓ Jdu do toho
+                    Jdu do toho
                   </Button>
                   <Button variant="outline" onClick={() => setCloseDialog("nejdu")}>
-                    ✗ Nejdu
+                    Nejdu
                   </Button>
                   <Button variant="outline" onClick={() => setCloseDialog("odlozit")}>
                     ⏸ Odložit
@@ -729,12 +729,12 @@ function FinalEvalRender({
       </Section>
 
       <Section letter="B" title="Six Hats">
-        <HatsBlock label="⚪ Bílý — fakta" items={d.B_sixHats?.bily_fakta} />
-        <HatsBlock label="🔴 Červený — emoce" items={d.B_sixHats?.cerveny_emoce} />
-        <HatsBlock label="⚫ Černý — rizika" items={d.B_sixHats?.cerny_rizika} />
-        <HatsBlock label="🟡 Žlutý — přínosy" items={d.B_sixHats?.zluty_prinosy} />
-        <HatsBlock label="🟢 Zelený — alternativy" items={d.B_sixHats?.zeleny_alternativy} />
-        <HatsBlock label="🔵 Modrý — meta" items={d.B_sixHats?.modry_meta} />
+        <HatsBlock label="Bílý — fakta" items={d.B_sixHats?.bily_fakta} />
+        <HatsBlock label="Červený — emoce" items={d.B_sixHats?.cerveny_emoce} />
+        <HatsBlock label="Černý — rizika" items={d.B_sixHats?.cerny_rizika} />
+        <HatsBlock label="Žlutý — přínosy" items={d.B_sixHats?.zluty_prinosy} />
+        <HatsBlock label="Zelený — alternativy" items={d.B_sixHats?.zeleny_alternativy} />
+        <HatsBlock label="Modrý — meta" items={d.B_sixHats?.modry_meta} />
       </Section>
 
       <Section letter="C" title="Signál vs. šum">
@@ -927,8 +927,8 @@ function CloseDecisionDialog({ decision, onClose, mode }: { decision: Decision; 
   }
 
   const titleMap = {
-    "jdu": "✓ Uzavřít: Jdu do toho",
-    "nejdu": "✗ Uzavřít: Nejdu",
+    "jdu": "Uzavřít: Jdu do toho",
+    "nejdu": "Uzavřít: Nejdu",
     "odlozit": "⏸ Odložit rozhodnutí",
     "vic-dat": "Potřebuji víc dat — prodloužit",
   };

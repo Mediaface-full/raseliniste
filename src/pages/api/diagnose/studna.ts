@@ -118,14 +118,14 @@ export const GET: APIRoute = async ({ cookies }) => {
     );
   }
   if (envHealth.geminiMode === "unconfigured") {
-    conclusions.push("🔴 AI klient není nakonfigurovaný — žádné Vertex ani API klíč.");
+    conclusions.push("AI klient není nakonfigurovaný — žádné Vertex ani API klíč.");
   }
 
   for (const r of stuckAudioCheck) {
     if (r.ageMin > 10 && !r.audioOnDisk) {
-      conclusions.push(`🔴 Recording ${r.id} stuck ${r.ageMin} min v processing, audio na disku CHYBÍ — auto-retry cron nemůže pomoct.`);
+      conclusions.push(`Recording ${r.id} stuck ${r.ageMin} min v processing, audio na disku CHYBÍ — auto-retry cron nemůže pomoct.`);
     } else if (r.ageMin > 10 && r.audioOnDisk) {
-      conclusions.push(`🟡 Recording ${r.id} stuck ${r.ageMin} min v processing, audio na disku JE — auto-retry cron by měl chytnout.`);
+      conclusions.push(`Recording ${r.id} stuck ${r.ageMin} min v processing, audio na disku JE — auto-retry cron by měl chytnout.`);
     } else if (r.ageMin <= 10) {
       conclusions.push(`ℹ Recording ${r.id} v processing ${r.ageMin} min — normální.`);
     }
@@ -133,7 +133,7 @@ export const GET: APIRoute = async ({ cookies }) => {
 
   if (inFlightStudna.length === 0 && stuckStudna.length > 0) {
     conclusions.push(
-      `🔴 ${stuckStudna.length} Studna recordings v "processing", ale žádný není v in-flight Set Node procesu = Promise umřela. Po deployi by inFlight Set měl držet aktivní AI runs.`,
+      `${stuckStudna.length} Studna recordings v "processing", ale žádný není v in-flight Set Node procesu = Promise umřela. Po deployi by inFlight Set měl držet aktivní AI runs.`,
     );
   }
 
@@ -144,7 +144,7 @@ export const GET: APIRoute = async ({ cookies }) => {
   }
 
   if (conclusions.length === 0) {
-    conclusions.push("✓ Žádné akutní problémy detekované.");
+    conclusions.push("Žádné akutní problémy detekované.");
   }
 
   return Response.json({

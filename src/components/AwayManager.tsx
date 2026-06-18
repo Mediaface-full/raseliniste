@@ -79,7 +79,7 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
       if (data.google?.warning) {
         setError(`⚠ ${data.google.warning}`);
       } else {
-        setSuccess("✓ Upraveno (Google + Rašeliniště).");
+        setSuccess("Upraveno (Google + Rašeliniště).");
       }
       cancelEdit();
       const refreshRes = await fetch("/api/calendar/away");
@@ -104,7 +104,7 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
         setError(data.error ?? "Smazání selhalo.");
         return;
       }
-      setSuccess("✓ Smazáno.");
+      setSuccess("Smazáno.");
       setEvents((prev) => prev.filter((e) => e.id !== id));
     } finally {
       setBusy(false);
@@ -126,7 +126,7 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
         setError(data.error ?? "Nepodařilo se vytvořit.");
         return;
       }
-      setSuccess("✓ Vytvořeno v Google. Sync à 5 min stáhne k nám.");
+      setSuccess("Vytvořeno v Google. Sync à 5 min stáhne k nám.");
       setFromDate("");
       setToDate("");
       setTitle("");

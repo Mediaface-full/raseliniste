@@ -125,7 +125,7 @@ export default function StudnaDetail({ projectId, ownerName }: { projectId: stri
           onClick={() => setTab("settings")}
           title="Tento projekt má vlastní AI prompty pro analýzu — klikni pro úpravu"
         >
-          ⚙ Tento projekt používá vlastní AI prompty (Studna Standard{project.studnaStandardPrompt ? " ✓" : ""}{project.studnaBriefPrompt ? ", Brief ✓" : ""})
+          ⚙ Tento projekt používá vlastní AI prompty (Studna Standard{project.studnaStandardPrompt ? " " : ""}{project.studnaBriefPrompt ? ", Brief " : ""})
         </div>
       )}
 
@@ -585,7 +585,7 @@ function RecordingCard({
               {hasCustomExtract && (
                 <div className="rounded-md border border-[var(--tint-mint)]/25 bg-[var(--tint-mint)]/[0.05] p-3">
                   <div className="text-[10px] uppercase tracking-wider text-[var(--tint-mint)] font-mono mb-2">
-                    🎯 Vlastní extrakt
+                    Vlastní extrakt
                   </div>
                   <div className="text-sm leading-relaxed whitespace-pre-wrap">{a.customExtract}</div>
                 </div>
@@ -1434,7 +1434,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             className="flex items-center justify-between w-full text-left"
           >
             <span className="text-[11px] uppercase tracking-wider text-[var(--tint-mint)] font-mono font-semibold">
-              🎯 Vlastní AI prompt pro analýzu nahrávek {(project.studnaStandardPrompt || project.studnaBriefPrompt) && "· AKTIVNÍ ✓"}
+              Vlastní AI prompt pro analýzu nahrávek {(project.studnaStandardPrompt || project.studnaBriefPrompt) && "· AKTIVNÍ "}
             </span>
             <span className="text-[10px] font-mono text-muted-foreground">
               {showCustomPrompts ? "skrýt" : "zobrazit"}
@@ -1445,7 +1445,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
               <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
                 <strong className="text-foreground">Volný extrakt z přepisu.</strong> Sem napiš co konkrétně chceš
                 z každé nahrávky vytáhnout — Stage 2 (analýza) vrátí <strong>volný markdown</strong> přesně dle tvých instrukcí,
-                NE strukturované summary/themes. Výstup se zobrazí jako „🎯 Vlastní extrakt" v detailu záznamu.
+                NE strukturované summary/themes. Výstup se zobrazí jako „Vlastní extrakt" v detailu záznamu.
                 <br /><br />
                 Příklady:
                 <br />• <code className="text-xs">„Vytáhni seznam úkolů co z toho vyplynou: kdo, co, dokdy. Bullet list."</code>
@@ -1539,7 +1539,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
             {saving ? <Loader2 className="animate-spin" /> : <Check />} Uložit
           </Button>
           {savedAt && Date.now() - savedAt < 3000 && (
-            <span className="self-center text-xs font-mono text-[var(--tint-sage)]">Uloženo ✓</span>
+            <span className="self-center text-xs font-mono text-[var(--tint-sage)]">Uloženo </span>
           )}
           <Button variant="ghost" onClick={deleteProject} className="ml-auto">
             <Trash2 /> Smazat projekt
@@ -1656,7 +1656,7 @@ function TextInputCard({ projectId, onSuccess }: { projectId: string; onSuccess:
       />
       <div className="flex items-center gap-3 text-[11px] font-mono text-muted-foreground">
         <span>{text.length.toLocaleString("cs-CZ")} znaků</span>
-        {text.length >= 20 && <span className="text-[var(--tint-sage)]">✓ připraveno</span>}
+        {text.length >= 20 && <span className="text-[var(--tint-sage)]">připraveno</span>}
       </div>
 
       {error && (

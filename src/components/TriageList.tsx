@@ -137,7 +137,7 @@ export default function TriageList() {
     if (result) {
       setEntries((prev) => prev.filter((e) => e.id !== id));
       if (result.todoist?.ok) {
-        setToast({ type: "ok", text: "Úkol odeslán do Todoistu ✓" });
+        setToast({ type: "ok", text: "Úkol odeslán do Todoistu " });
       } else if (result.todoist && !result.todoist.ok) {
         setToast({ type: "err", text: `Todoist: ${result.todoist.error}` });
       }
@@ -157,7 +157,7 @@ export default function TriageList() {
         )
       );
       if (result.todoist?.ok) {
-        setToast({ type: "ok", text: "Úkol odeslán do Todoistu ✓" });
+        setToast({ type: "ok", text: "Úkol odeslán do Todoistu " });
       } else if (result.todoist && !result.todoist.ok) {
         setToast({ type: "err", text: `Todoist: ${result.todoist.error}` });
       }

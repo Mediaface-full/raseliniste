@@ -189,7 +189,7 @@ export default function SchedulerRunButton() {
                 {result.results.filter((r: any) => r.matched).map((r: any) => (
                   <li key={r.name} className="font-mono text-[11px]">
                     <span className={r.ranNow ? (r.error ? "text-destructive" : "text-[var(--tint-sage)]") : "text-muted-foreground"}>
-                      {r.ranNow ? (r.error ? "✗" : "✓") : "○"}
+                      {r.ranNow ? (r.error ? "" : "") : "○"}
                     </span>{" "}
                     {r.name}
                     {r.skippedReason && <span className="text-muted-foreground"> — {r.skippedReason}</span>}
