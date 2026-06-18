@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, X, Lock, EyeOff, Send } from "lucide-react";
+import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, X, Lock, EyeOff, Send, Paperclip, Pencil } from "lucide-react";
 import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 interface Project {
@@ -344,7 +344,7 @@ export default function GuestRecorder({
                     color: "color-mix(in oklch, var(--tint-lavender) 90%, white)",
                   }}
                 >
-                  ✏️ Napsat text k projektu (i bez nahrávky)
+                  <Pencil className="size-3.5 shrink-0" /> Napsat text k projektu (i bez nahrávky)
                 </button>
               ) : (
                 <div
@@ -359,7 +359,7 @@ export default function GuestRecorder({
                     className="text-[10px] uppercase tracking-wider font-mono font-semibold flex items-center justify-between"
                     style={{ color: "color-mix(in oklch, var(--tint-lavender) 92%, white)" }}
                   >
-                    <span>✏️ Textové info k projektu</span>
+                    <span className="inline-flex items-center gap-1.5"><Pencil className="size-3 shrink-0" /> Textové info k projektu</span>
                     <button
                       type="button"
                       onClick={() => { setGuestNote(""); setNoteOpen(false); }}
@@ -639,7 +639,11 @@ function UploadAudioGuestButton({
         }}
       >
         <Upload className="size-4 inline mr-2" />
-        {uploading ? `Nahrávám soubor… ${progress}%` : "📎 Nahrát audio soubor (MP3/M4A/...)"}
+        {uploading ? (
+          `Nahrávám soubor… ${progress}%`
+        ) : (
+          <span className="inline-flex items-center gap-2"><Paperclip className="size-4" /> Nahrát audio soubor (MP3/M4A/...)</span>
+        )}
         <input
           type="file"
           accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.webm,.mp4,.flac"

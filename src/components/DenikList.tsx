@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Mic, Plus, Loader2, Calendar, Search, X, Users, Tag, BookOpen, ChevronDown } from "lucide-react";
+import { Mic, Plus, Loader2, Calendar, Search, X, Users, Tag, BookOpen, ChevronDown, Paperclip } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
@@ -184,7 +184,7 @@ export default function DenikList() {
           disabled={uploading}
           onClick={() => audioFileInputRef.current?.click()}
         >
-          {uploading ? <><Loader2 className="animate-spin" /> Nahrávám…</> : <>📎 Nahrát soubor</>}
+          {uploading ? <><Loader2 className="animate-spin" /> Nahrávám…</> : <><Paperclip className="size-4" /> Nahrát soubor</>}
         </Button>
         <Button variant="outline" onClick={() => setCreating(!creating)}>
           <Plus /> Textový zápis

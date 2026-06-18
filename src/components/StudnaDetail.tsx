@@ -501,7 +501,7 @@ function RecordingCard({
               className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded"
               style={{ background: "color-mix(in oklch, var(--c) 20%, transparent)", color: "var(--c)" }}
             >
-              {recording.type === "BRIEF" ? "Brief" : isUpload ? "📎 Upload" : "Záznam"}
+              {recording.type === "BRIEF" ? "Brief" : isUpload ? (<><Paperclip className="inline size-3 mr-1" />Upload</>) : "Záznam"}
             </span>
             {recording.isPinned && (
               <span className="text-[10px] uppercase font-mono tracking-wider text-[var(--tint-peach)] flex items-center gap-1">
@@ -1094,7 +1094,7 @@ function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: 
                     disabled={busy === inv.guestUser.id}
                     className="size-3.5"
                   />
-                  📎 Upload audio
+                  <Paperclip className="inline size-3.5 mr-1" /> Upload audio
                 </label>
                 <div className="flex gap-1">
                   <Button size="sm" variant="outline" onClick={() => copyLink(inv.guestUser.guestToken)}>
@@ -1189,7 +1189,7 @@ function InviteForm({
       </label>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" checked={canUploadAudio} onChange={(e) => setCanUploadAudio(e.target.checked)} className="size-4" />
-        📎 <strong>Upload audio</strong> (host smí nahrávat hotové audio soubory MP3/M4A/... — jen přepis, žádná AI analýza, audio se uchovává)
+        <Paperclip className="size-4 shrink-0" /> <strong>Upload audio</strong> (host smí nahrávat hotové audio soubory MP3/M4A/... — jen přepis, žádná AI analýza, audio se uchovává)
       </label>
       {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">{error}</div>}
       <div className="flex gap-2">

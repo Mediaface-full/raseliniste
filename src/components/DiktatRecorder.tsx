@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, Square, Loader2, AlertTriangle, Upload, CheckSquare, BookOpen, Lock, Eye, EyeOff } from "lucide-react";
+import { Mic, Square, Loader2, AlertTriangle, Upload, CheckSquare, BookOpen, Lock, Eye, EyeOff, Paperclip } from "lucide-react";
 import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 const TICK_MS = 250;
@@ -269,8 +269,8 @@ export default function DiktatRecorder() {
                   color: "color-mix(in oklch, var(--tint-lavender) 92%, white)",
                 }}
               >
-                <Upload className="size-4" />
-                📎 Nahrát hotový audio soubor (MP3/M4A/...)
+                <Paperclip className="size-4" />
+                Nahrát hotový audio soubor (MP3/M4A/...)
               </button>
               <a
                 href="/help/upload-audio"

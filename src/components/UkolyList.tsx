@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Check, Trash2, Loader2, Mic, User, UserCheck, Clock, Tag,
-  AlertTriangle, Send, ExternalLink, Edit3, X, ChevronDown,
+  AlertTriangle, Send, ExternalLink, Edit3, X, ChevronDown, Paperclip,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -217,7 +217,7 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
           disabled={uploading}
           onClick={() => audioFileInputRef.current?.click()}
         >
-          {uploading ? <><Loader2 className="animate-spin" /> Nahrávám…</> : <>📎 Nahrát soubor</>}
+          {uploading ? <><Loader2 className="animate-spin" /> Nahrávám…</> : <><Paperclip className="size-4" /> Nahrát soubor</>}
         </Button>
       </div>
 

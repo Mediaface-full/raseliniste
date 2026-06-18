@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Plus, Trash2, Check, Loader2, Sparkles, AlertTriangle, Info, XCircle,
   ChevronLeft, ChevronRight, Calendar as CalIcon, MapPin, Clock, RotateCw,
+  StickyNote,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -485,7 +486,7 @@ function EventRow({ event }: { event: CalendarEvent }) {
             </div>
           )}
           {event.prepNote && (
-            <div className="text-xs text-[var(--tint-butter)] mt-1">📝 {event.prepNote}</div>
+            <div className="text-xs text-[var(--tint-butter)] mt-1 inline-flex items-center gap-1.5"><StickyNote className="size-3 shrink-0" /> {event.prepNote}</div>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
