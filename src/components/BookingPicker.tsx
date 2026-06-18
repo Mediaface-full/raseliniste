@@ -27,7 +27,24 @@ export default function BookingPicker({ token }: { token: string }) {
   const [filter, setFilter] = useState<string>("ALL");
 
   const [chosenSlot, setChosenSlot] = useState<Slot | null>(null);
-  const [name, setName] = useState("");
+  // Petr 2026-06-10: rozdělit jméno na 2 pole pro celé jméno v Calendar event title.
+  // Předchozí UX: jedno pole „Jméno *" → host často zadal jen křestní, Google
+  // event title pak „🤝 Karel" místo „🤝 Karel Novák".
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  // Kombinované celé jméno pro submit
+  const name = `${firstName.trim()} ${lastName.trim()}`.trim();
+  function setName(v: string) {
+    // Když API vrátí existující inviteeName (pre-fill), rozdělit na první/zbytek
+    const parts = v.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      setFirstName(parts[0]);
+      setLastName(parts.slice(1).join(" "));
+    } else {
+      setFirstName(v);
+      setLastName("");
+    }
+  }
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [subject, setSubject] = useState("");
@@ -391,10 +408,19 @@ export default function BookingPicker({ token }: { token: string }) {
 
           {invite.requiresIdentification && (
             <div className="space-y-2 pt-2 border-t border-white/5">
-              <div>
-                <label className="text-xs font-mono uppercase text-muted-foreground">Jméno *</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} required
-                  className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-mono uppercase text-muted-foreground">Jméno *</label>
+                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} required
+                    placeholder="Karel"
+                    className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-mono uppercase text-muted-foreground">Příjmení *</label>
+                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} required
+                    placeholder="Novák"
+                    className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
+                </div>
               </div>
               <div>
                 <label className="text-xs font-mono uppercase text-muted-foreground">E-mail *</label>
