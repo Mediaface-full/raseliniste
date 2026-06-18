@@ -1,6 +1,13 @@
-/* Service Worker pro web push notifikace.
+/* Service Worker pro web push notifikace + auto-update (Petr 2026-06-18).
    Registruje se z klienta při zapnutí push (PushSettings.tsx).
-   iOS PWA vyžaduje aby SW byl na same-origin a v root scope. */
+   iOS PWA vyžaduje aby SW byl na same-origin a v root scope.
+
+   Cache verze: při změně VERSION se po deployi nová SW aktivuje hned
+   (skipWaiting + clients.claim) a pošle klientům zprávu "SW_UPDATED" →
+   ClientReloader.tsx ukáže banner „Nová verze připravena, klikni pro restart". */
+
+const VERSION = "gide-on-v1";
+const RUNTIME_CACHE = `raseliniste-${VERSION}`;
 
 self.addEventListener("install", (event) => {
   // Aktivuj se hned, neček na reload tabu
@@ -8,8 +15,27 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  // Převezmi kontrolu nad všemi otevřenými klienty bez reload
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    Promise.all([
+      // Smaž staré cache verze (jen ty co mají náš prefix, žádné cross-app)
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k.startsWith("raseliniste-") && k !== RUNTIME_CACHE)
+            .map((k) => caches.delete(k)),
+        ),
+      ),
+      // Převezmi kontrolu nad všemi otevřenými klienty bez reload
+      self.clients.claim(),
+    ]).then(() => {
+      // Notifikuj všechny klienty že je nová verze aktivní
+      return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) {
+          client.postMessage({ type: "SW_UPDATED", version: VERSION });
+        }
+      });
+    }),
+  );
 });
 
 self.addEventListener("push", (event) => {
@@ -61,4 +87,11 @@ self.addEventListener("notificationclick", (event) => {
       }
     }),
   );
+});
+
+// Listener pro manuální skip-waiting z klienta (button „Restartovat appku")
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });

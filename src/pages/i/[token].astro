@@ -1,13 +1,20 @@
 ---
 import Base from "../../layouts/Base.astro";
 import BookingPicker from "../../components/BookingPicker";
+import GideonWordmark from "../../components/GideonWordmark";
 
 const token = Astro.params.token as string;
 ---
 
-<Base title="Rezervace termínu schůzky | Gideon">
-  <main class="min-h-screen flex items-start justify-center py-8 px-4">
+<Base title="Rezervace termínu schůzky | Gide-on">
+  <main class="min-h-screen flex flex-col items-center justify-start py-8 px-4">
     <div class="w-full max-w-2xl">
+      <div class="mb-6 flex flex-col items-center gap-2">
+        <GideonWordmark size="sm" />
+        <span class="text-[11px] uppercase tracking-[0.22em] text-muted-foreground font-mono">
+          ↳ rezervace termínu
+        </span>
+      </div>
       <BookingPicker client:load token={token} />
     </div>
   </main>

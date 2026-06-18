@@ -6,6 +6,7 @@ import { readSession } from "../lib/session";
 import { svatekDne } from "../lib/jmenny-kalendar";
 import { countNotifications } from "../lib/notifications";
 import SchedulerStatus from "../components/SchedulerStatus.astro";
+import SwUpdateBanner from "../components/SwUpdateBanner";
 import bwMysSvg from "../assets/icons/bw-mys.svg?raw";
 import miseRaketaSvg from "../assets/icons/mise-raketa.svg?raw";
 
@@ -341,4 +342,5 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
       </div>
     </div>
   </main>
+  <SwUpdateBanner client:load />
 </Base>

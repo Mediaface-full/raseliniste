@@ -4,6 +4,7 @@ import LogoutButton from "@/components/LogoutButton";
 import SidebarToggle from "@/components/SidebarToggle";
 import ThemeToggle from "@/components/ThemeToggle";
 import GideonWordmark from "@/components/GideonWordmark";
+import SwUpdateBanner from "@/components/SwUpdateBanner";
 import { Icon } from "astro-icon/components";
 import { readSession } from "@/lib/session";
 import { getPostaBadgeCount } from "@/lib/posta-badge";
@@ -280,4 +281,5 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
       </main>
     </div>
   </div>
+  <SwUpdateBanner client:load />
 </Base>

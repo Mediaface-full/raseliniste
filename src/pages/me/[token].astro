@@ -4,6 +4,7 @@ import GuestRecorder from "../../components/GuestRecorder";
 import GuestGuide from "../../components/GuestGuide";
 import GuestRecordings from "../../components/GuestRecordings";
 import GideonWordmark from "../../components/GideonWordmark";
+import SwUpdateBanner from "../../components/SwUpdateBanner";
 import { prisma } from "../../lib/db";
 
 const token = Astro.params.token;
@@ -120,7 +121,7 @@ const guideVariant: "standard" | "brief" =
           <div class="mb-4 flex justify-center">
             <GideonWordmark size="sm" />
           </div>
-          <h1 class="font-serif text-2xl tracking-tight mb-3">Odkaz nefunguje</h1>
+          <h1 class="text-2xl font-bold tracking-[-0.03em] leading-tight mb-3">Odkaz nefunguje</h1>
           <p class="text-sm text-muted-foreground leading-relaxed">
             Tenhle odkaz neexistuje nebo byl zrušen. Zkontaktuj prosím Gideona,
             aby ti poslal nový.
@@ -138,7 +139,7 @@ const guideVariant: "standard" | "brief" =
                 ↳ studánka
               </span>
             </div>
-            <h1 class="font-serif text-3xl tracking-tight">Studánka</h1>
+            <h1 class="text-4xl font-bold tracking-[-0.04em] leading-tight">Studánka</h1>
             <p class="mt-2 text-sm text-muted-foreground leading-relaxed">
               Nahrávárna pro projekty, do kterých tě Gideon pozval.
             </p>
@@ -165,4 +166,5 @@ const guideVariant: "standard" | "brief" =
       )}
     </div>
   </div>
+  <SwUpdateBanner client:load />
 </Base>

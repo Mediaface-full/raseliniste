@@ -72,7 +72,7 @@ const latestTrigger = runs.reduce<Date | null>((acc, r) => {
 >
   <div class="max-w-3xl space-y-4">
     <div class="glass-strong rounded-xl p-4 space-y-3">
-      <h1 class="font-serif text-2xl">Cron scheduler</h1>
+      <h1 class="text-2xl font-bold tracking-[-0.03em] leading-tight">Cron scheduler</h1>
       <p class="text-sm text-muted-foreground">
         Jeden externí DSM Task Scheduler entry volá <code class="font-mono text-xs">/api/cron/scheduler</code>
         každých 5 min. Dispatcher pak interně spouští {jobs.length} úloh dle jejich rozvrhu.
