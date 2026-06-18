@@ -159,10 +159,11 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
             <button
               type="button"
               onClick={() => setMode("FULL")}
-              className={`rounded-lg border p-3 text-left transition ${
+              aria-pressed={mode === "FULL"}
+              className={`rounded-lg border-2 p-3 text-left transition-colors ${
                 mode === "FULL"
-                  ? "border-[var(--tint-rose)] bg-[var(--tint-rose)]/10"
-                  : "border-white/10 hover:bg-white/5"
+                  ? "border-[var(--tint-rose)] bg-[var(--tint-rose)]/10 ring-2 ring-[var(--tint-rose)]/30 ring-offset-1 ring-offset-background"
+                  : "border-border bg-secondary/30 hover:border-[var(--tint-rose)]/40 hover:bg-[var(--tint-rose)]/5"
               }`}
             >
               <div className="flex items-center gap-2 mb-1"><Plane className="size-4 text-[var(--tint-rose)]" /> <strong>Dovolená</strong></div>
@@ -171,10 +172,11 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
             <button
               type="button"
               onClick={() => setMode("TRAVEL_WORKING")}
-              className={`rounded-lg border p-3 text-left transition ${
+              aria-pressed={mode === "TRAVEL_WORKING"}
+              className={`rounded-lg border-2 p-3 text-left transition-colors ${
                 mode === "TRAVEL_WORKING"
-                  ? "border-[var(--tint-mint)] bg-[var(--tint-mint)]/10"
-                  : "border-white/10 hover:bg-white/5"
+                  ? "border-[var(--tint-mint)] bg-[var(--tint-mint)]/10 ring-2 ring-[var(--tint-mint)]/30 ring-offset-1 ring-offset-background"
+                  : "border-border bg-secondary/30 hover:border-[var(--tint-mint)]/40 hover:bg-[var(--tint-mint)]/5"
               }`}
             >
               <div className="flex items-center gap-2 mb-1"><Laptop className="size-4 text-[var(--tint-mint)]" /> <strong>Nomád</strong></div>

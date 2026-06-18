@@ -42,7 +42,10 @@
   --g-900: #0E0E10;
 }
 
-/* ---- LIGHT theme (default) ---- */
+/* ---- LIGHT theme (default) ----
+   Petr 2026-06-18: sjednoceno do 2 úrovní namísto 4 (cream / white / g-50 / g-100).
+   Karty splývají s pozadím (subtle elevation, ne kontrast), inputy stejný odstín.
+   Vizuální hierarchie přes BORDER, ne přes background swap. */
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
@@ -50,7 +53,9 @@
   --background: var(--c-cream);
   --foreground: var(--c-ink);
 
-  --card: #FFFFFF;
+  /* Karta = stejný cream jako pozadí, hierarchii drží jen border.
+     Pokud by někde potřeba zvýraznění, použij `var(--surface-elevated)`. */
+  --card: var(--c-cream);
   --card-foreground: var(--c-ink);
 
   --popover: #FFFFFF;
@@ -59,7 +64,7 @@
   --primary: var(--c-signal);
   --primary-foreground: var(--c-ink);
 
-  --secondary: var(--g-100);
+  --secondary: var(--g-50);
   --secondary-foreground: var(--c-ink);
 
   --muted: var(--g-50);
@@ -72,13 +77,18 @@
   --destructive-foreground: var(--c-cream);
 
   --border: var(--g-200);
-  --input: var(--g-50);
+  --input: var(--c-cream);        /* input = cream stejně jako bg, jen border odlišuje */
   --ring: var(--c-signal);
 
-  /* Surface elevations — světlejší / tmavší než background pro hierarchii */
-  --surface-1: #FFFFFF;        /* hlavní karty */
-  --surface-2: var(--g-50);    /* hluboko vnořené */
-  --surface-3: var(--g-100);   /* hover state */
+  /* Surface tier — splývající s pozadím, hierarchie přes border:
+     surface-1 = card (= background) → bez vizuální karty, jen border + padding
+     surface-elevated = jemně světlejší (skutečná elevation, pro modaly/popovery)
+     surface-sunken = mírně tmavší (sekundární sekce uvnitř karty) */
+  --surface-1: var(--c-cream);
+  --surface-elevated: #FFFFFF;
+  --surface-sunken: var(--g-50);
+  --surface-2: var(--g-50);        /* legacy alias — vnořené sekce */
+  --surface-3: var(--g-100);       /* legacy alias — hover state */
 
   /* Per-modul tinty — mapování staré peach/mint/butter palety na brand barvy.
      Light theme: tinty jsou tmavší (lepší kontrast na cream pozadí). */
@@ -99,14 +109,15 @@
   --chart-5: var(--tint-butter);
 }
 
-/* ---- DARK theme ---- */
+/* ---- DARK theme ----
+   Stejná logika jako light: 1 background tier, karty splývají, hierarchie přes border. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
   --background: var(--c-ink);
   --foreground: var(--c-cream);
 
-  --card: var(--g-800);
+  --card: var(--c-ink);              /* karta = ink stejně jako bg */
   --card-foreground: var(--c-cream);
 
   --popover: var(--g-800);
@@ -115,25 +126,27 @@
   --primary: var(--c-signal);
   --primary-foreground: var(--c-ink);
 
-  --secondary: var(--g-700);
+  --secondary: var(--g-800);
   --secondary-foreground: var(--c-cream);
 
   --muted: var(--g-800);
   --muted-foreground: var(--g-300);
 
-  --accent: var(--g-700);
+  --accent: var(--g-800);
   --accent-foreground: var(--c-cream);
 
   --destructive: #FF7257;
   --destructive-foreground: var(--c-ink);
 
   --border: rgba(244, 239, 230, 0.12);
-  --input: rgba(244, 239, 230, 0.08);
+  --input: var(--c-ink);             /* input = ink stejně jako bg, border odliší */
   --ring: var(--c-signal);
 
-  --surface-1: var(--g-800);
-  --surface-2: var(--g-700);
-  --surface-3: var(--g-600);
+  --surface-1: var(--c-ink);
+  --surface-elevated: var(--g-800);
+  --surface-sunken: var(--g-800);
+  --surface-2: var(--g-800);          /* legacy alias */
+  --surface-3: var(--g-700);          /* legacy alias hover */
 
   /* Per-modul tinty — dark theme: světlejší pastel verze pro kontrast na ink */
   --tint-peach:     var(--c-signal);
@@ -286,22 +299,23 @@ h1 { letter-spacing: -0.045em; }
    `glass-subtle`. Místo abychom je teď všechny refactorovali, mapujeme je
    na čistou card surface. Fáze C postupně nahradí explicitní `card` třídou. */
 
+/* Glass utility — karta SPLÝVÁ s pozadím, hierarchie přes border + padding.
+   Žádný background shift, žádný shadow → cleanest, brand-aligned. */
 @utility glass {
-  background: var(--surface-1);
+  background: transparent;
   border: 1px solid var(--border);
-  box-shadow: 0 1px 2px 0 rgba(14, 14, 16, 0.04);
 }
 
 @utility glass-strong {
-  background: var(--surface-1);
+  background: var(--surface-elevated);
   border: 1px solid var(--border);
   box-shadow:
-    0 2px 4px -1px rgba(14, 14, 16, 0.06),
-    0 4px 12px -2px rgba(14, 14, 16, 0.08);
+    0 2px 4px -1px rgba(14, 14, 16, 0.04),
+    0 4px 12px -2px rgba(14, 14, 16, 0.06);
 }
 
 @utility glass-subtle {
-  background: var(--surface-2);
+  background: transparent;
   border: 1px solid var(--border);
 }
 
@@ -341,6 +355,25 @@ main > .max-w-7xl {
 }
 :root[data-theme="light"] [class*="bg-black/60"] {
   background-color: var(--surface-2) !important;
+}
+
+/* border-white/N v light theme = neviditelné (border-color: rgb(255 255 255 / 0.05)
+   na cream pozadí). Předefinujeme na border-border token (g-200) — vždy viditelné. */
+:root[data-theme="light"] [class*="border-white/5"],
+:root[data-theme="light"] [class*="border-white/10"],
+:root[data-theme="light"] [class*="border-white/20"] {
+  border-color: var(--border) !important;
+}
+/* hover stavy s bg-white/N v light = subtle accent */
+:root[data-theme="light"] [class*="hover:bg-white/5"]:hover,
+:root[data-theme="light"] [class*="hover:bg-white/10"]:hover {
+  background-color: var(--accent) !important;
+}
+/* Solid bg-white/N (ne hover) v light = secondary surface */
+:root[data-theme="light"] [class*="bg-white/5"],
+:root[data-theme="light"] [class*="bg-white/10"],
+:root[data-theme="light"] [class*="bg-white/20"] {
+  background-color: var(--secondary) !important;
 }
 
 /* Dark theme variant: shadowy box-shadow nedává smysl, použij subtle outline. */

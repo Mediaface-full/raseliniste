@@ -164,7 +164,7 @@ export default function QuickAdd() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Co a kdy? Třeba: úterý 11 ČSOB Praha"
             rows={3}
-            className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 pr-14 text-base focus:outline-none focus:ring-2 focus:ring-[var(--tint-sky)]/50 resize-none"
+            className="w-full rounded-lg border border-border bg-input px-4 py-3 pr-14 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background resize-none transition-colors"
           />
           {speechSupported && (
             <button
