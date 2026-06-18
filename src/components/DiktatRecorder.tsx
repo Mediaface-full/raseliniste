@@ -11,7 +11,7 @@ const MODES = {
     id: "task" as const,
     label: "Úkoly",
     Icon: CheckSquare,
-    color: "var(--tint-peach)",
+    color: "var(--c-signal)",
     description: "Salva úkolů → AI je rozdělí, ty schválíš v review.",
     endpoint: "/api/ukoly/audio",
     successPath: (id: string) => `/ukoly/audio/${id}/review`,
@@ -22,7 +22,7 @@ const MODES = {
     id: "journal" as const,
     label: "Deník",
     Icon: BookOpen,
-    color: "var(--tint-butter)",
+    color: "var(--c-signal)",
     description: "Volný proud myšlenek → AI vyrobí strukturovaný zápis.",
     endpoint: "/api/denik/audio",
     successPath: (id: string) => `/denik/${id}/edit`,
@@ -259,15 +259,10 @@ export default function DiktatRecorder() {
             </div>
             {/* Prominentní upload card — Petr 2026-05-07: stejný flow jako mikrofon,
                 ale vstup je hotový soubor (Voice Recorder, Plaud, podcast atd.) */}
-            <div className="w-full max-w-sm mt-4 pt-4 border-t border-white/10">
+            <div className="w-full max-w-sm mt-4 pt-4 border-t border-border">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full px-4 py-3 rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
-                style={{
-                  background: "color-mix(in oklch, var(--tint-lavender) 14%, transparent)",
-                  border: "1px dashed color-mix(in oklch, var(--tint-lavender) 40%, transparent)",
-                  color: "color-mix(in oklch, var(--tint-lavender) 92%, white)",
-                }}
+                className="w-full px-4 py-3 rounded-md text-sm flex items-center justify-center gap-2 transition-colors border border-dashed border-border bg-secondary/30 text-foreground hover:border-foreground hover:bg-secondary/50"
               >
                 <Paperclip className="size-4" />
                 Nahrát hotový audio soubor (MP3/M4A/...)

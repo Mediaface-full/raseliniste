@@ -288,7 +288,7 @@ export default function GuestRecorder({
           <>
             <button
               onClick={startRecording}
-              className="size-24 rounded-full bg-[var(--tint-peach)] text-black grid place-items-center shadow-xl shadow-black/30 hover:scale-105 transition-transform active:scale-95"
+              className="size-24 rounded-full bg-[var(--c-signal)] text-black grid place-items-center shadow-xl shadow-black/30 hover:scale-105 transition-transform active:scale-95"
               aria-label="Začít nahrávat"
             >
               <Mic className="size-10" />
@@ -302,7 +302,7 @@ export default function GuestRecorder({
             </div>
 
             {micPermission === "prompt" && (
-              <div className="rounded-md border border-[var(--tint-butter)]/40 bg-[var(--tint-butter)]/10 text-xs px-3 py-2 max-w-sm leading-relaxed text-left">
+              <div className="rounded-md border border-[var(--c-signal)]/40 bg-[var(--c-signal)]/10 text-xs px-3 py-2 max-w-sm leading-relaxed text-left">
                 <strong>Než klikneš:</strong> prohlížeč se zeptá na povolení mikrofonu. Zvol{" "}
                 <strong>„Povolit při každé návštěvě"</strong> (Android) nebo povol v Nastavení Safari → Webové stránky → Mikrofon (iOS), ať se neptá pokaždé.
               </div>
@@ -339,9 +339,9 @@ export default function GuestRecorder({
                   onClick={() => setNoteOpen(true)}
                   className="w-full px-3 py-2 rounded-md text-xs font-mono flex items-center justify-center gap-2 transition-colors"
                   style={{
-                    background: "color-mix(in oklch, var(--tint-lavender) 12%, transparent)",
-                    border: "1px dashed color-mix(in oklch, var(--tint-lavender) 40%, transparent)",
-                    color: "color-mix(in oklch, var(--tint-lavender) 90%, white)",
+                    background: "color-mix(in oklch, var(--foreground) 12%, transparent)",
+                    border: "1px dashed color-mix(in oklch, var(--foreground) 40%, transparent)",
+                    color: "color-mix(in oklch, var(--foreground) 90%, white)",
                   }}
                 >
                   <Pencil className="size-3.5 shrink-0" /> Napsat text k projektu (i bez nahrávky)
@@ -350,14 +350,14 @@ export default function GuestRecorder({
                 <div
                   className="rounded-lg p-3 space-y-2"
                   style={{
-                    background: "color-mix(in oklch, var(--tint-lavender) 10%, transparent)",
-                    border: "1px solid color-mix(in oklch, var(--tint-lavender) 40%, transparent)",
-                    borderLeft: "3px solid var(--tint-lavender)",
+                    background: "color-mix(in oklch, var(--foreground) 10%, transparent)",
+                    border: "1px solid color-mix(in oklch, var(--foreground) 40%, transparent)",
+                    borderLeft: "3px solid var(--foreground)",
                   }}
                 >
                   <div
                     className="text-[10px] uppercase tracking-wider font-mono font-semibold flex items-center justify-between"
-                    style={{ color: "color-mix(in oklch, var(--tint-lavender) 92%, white)" }}
+                    style={{ color: "color-mix(in oklch, var(--foreground) 92%, white)" }}
                   >
                     <span className="inline-flex items-center gap-1.5"><Pencil className="size-3 shrink-0" /> Textové info k projektu</span>
                     <button
@@ -376,7 +376,7 @@ export default function GuestRecorder({
                     placeholder="Sem napiš co potřebuješ — odkaz, jméno, číslo, zprávu. Můžeš to poslat samostatně (bez nahrávky), nebo to půjde k nahrávce. AI text neanalyzuje."
                     className="w-full px-3 py-2 rounded-md bg-background/40 text-sm leading-relaxed resize-y focus:outline-none"
                     style={{
-                      border: "1px solid color-mix(in oklch, var(--tint-lavender) 30%, transparent)",
+                      border: "1px solid color-mix(in oklch, var(--foreground) 30%, transparent)",
                     }}
                   />
                   <div className="flex items-center justify-between gap-2">
@@ -389,7 +389,7 @@ export default function GuestRecorder({
                       onClick={sendTextOnly}
                       className="px-4 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{
-                        background: "var(--tint-lavender)",
+                        background: "var(--foreground)",
                         color: "oklch(15% 0.02 280)",
                       }}
                     >
@@ -506,7 +506,7 @@ export default function GuestRecorder({
 
         {phase === "uploading" && (
           <>
-            <Loader2 className="size-12 animate-spin text-[var(--tint-peach)]" />
+            <Loader2 className="size-12 animate-spin text-[var(--c-signal)]" />
             <div className="text-base font-medium">Nahrávám záznam…</div>
             <div className="text-xs text-muted-foreground">vydrž chvilku</div>
           </>
@@ -630,12 +630,12 @@ function UploadAudioGuestButton({
     <div className="w-full max-w-md mt-3">
       <label
         className={`block w-full text-center py-3 rounded-md cursor-pointer transition-colors text-sm ${
-          uploading ? "cursor-not-allowed opacity-60" : "hover:bg-[var(--tint-lavender)]/[0.08]"
+          uploading ? "cursor-not-allowed opacity-60" : "hover:bg-[var(--foreground)]/[0.08]"
         }`}
         style={{
-          border: "1px dashed color-mix(in oklch, var(--tint-lavender) 40%, transparent)",
-          background: "color-mix(in oklch, var(--tint-lavender) 6%, transparent)",
-          color: "color-mix(in oklch, var(--tint-lavender) 92%, white)",
+          border: "1px dashed color-mix(in oklch, var(--foreground) 40%, transparent)",
+          background: "color-mix(in oklch, var(--foreground) 6%, transparent)",
+          color: "color-mix(in oklch, var(--foreground) 92%, white)",
         }}
       >
         {uploading ? (
@@ -657,7 +657,7 @@ function UploadAudioGuestButton({
       </label>
       {uploading && (
         <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mt-2">
-          <div className="h-full bg-[var(--tint-lavender)] transition-all" style={{ width: `${progress}%` }} />
+          <div className="h-full bg-[var(--foreground)] transition-all" style={{ width: `${progress}%` }} />
         </div>
       )}
       {error && (
