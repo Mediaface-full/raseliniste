@@ -2,71 +2,155 @@
 @import "tw-animate-css";
 
 /* ========================================================================
-   Rašeliniště — Liquid Glass theme
-   - Dark-only, shadcn/ui token layout, OKLCH colors
-   - Background: fixed deep-navy + pastel mesh blobs
-   - Surfaces: frosted glass panels (backdrop-blur + low-opacity tint)
-   - Typography: Fraunces (display serif), Geist (body), Geist Mono (data)
+   Gide-on · The Switch · Brand Tokens v1 (Petr 2026-06-18 redesign)
+
+   - Light + dark theme via [data-theme="light|dark"] (default = dark)
+   - Paleta: Ink + Cream + Signal Coral (akcent, max 10% plochy), Teal, Sand
+   - Fonty: Space Grotesk (display + body) + JetBrains Mono (eyebrow, čísla)
+   - Glass utility → mapping na plain card style (žádný backdrop blur)
+     [glass je legacy alias — fáze C postupně nahradí za .card / .panel]
+
+   Zdroj: New design/brandbook.css + New design/docs/04-COLORS.md
    ======================================================================== */
 
 @theme {
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Fraunces Variable", ui-serif, Georgia, serif;
-  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
-  --radius: 0.75rem;
+  --font-sans: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --font-serif: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif; /* legacy alias */
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", "SF Mono", Menlo, monospace;
+  --radius: 0.5rem;
 }
 
-/* ---- shadcn-style design tokens (dark, OKLCH) ---- */
+/* ---- Brand paleta (sdílená oběma themes) ---- */
 :root {
-  /* povrchy */
-  --background: oklch(14% 0.025 260);            /* hluboká modrá — pozadí celé appky */
-  --foreground: oklch(98% 0.01 240);             /* téměř bílý text */
+  /* Core */
+  --c-ink:    #0E0E10;
+  --c-cream:  #F4EFE6;
+  --c-signal: #FF5C2E;
+  --c-teal:   #1B4E50;
+  --c-sand:   #EAC9A2;
 
-  /* glass card tokens — transparentní tint přes blur */
-  --card: oklch(100% 0 0 / 0.045);                /* 4.5 % white wash na skle */
-  --card-foreground: oklch(98% 0.01 240);
+  /* Warm grayscale ramp — biased k ink, žádná pure neutral */
+  --g-50:  #F4F3F0;
+  --g-100: #E6E4DE;
+  --g-200: #CFCDC6;
+  --g-300: #B0AEA6;
+  --g-400: #8A8881;
+  --g-500: #6A6862;
+  --g-600: #4F4D48;
+  --g-700: #383631;
+  --g-800: #221F1C;
+  --g-900: #0E0E10;
+}
 
-  --popover: oklch(22% 0.04 255 / 0.85);
-  --popover-foreground: oklch(98% 0.01 240);
+/* ---- LIGHT theme (default) ---- */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
 
-  /* akcenty — pastelová duha */
-  --primary: oklch(82% 0.12 45);                  /* peach */
-  --primary-foreground: oklch(22% 0.05 45);
-  --secondary: oklch(100% 0 0 / 0.06);
-  --secondary-foreground: oklch(98% 0.01 240);
-  --muted: oklch(100% 0 0 / 0.05);
-  --muted-foreground: oklch(78% 0.02 240);
-  --accent: oklch(100% 0 0 / 0.08);
-  --accent-foreground: oklch(98% 0.01 240);
-  --destructive: oklch(72% 0.18 20);
-  --destructive-foreground: oklch(98% 0.01 20);
+  --background: var(--c-cream);
+  --foreground: var(--c-ink);
 
-  /* border / input — bílé alfa, sklo tak získá obrys */
-  --border: oklch(100% 0 0 / 0.1);
-  --input: oklch(100% 0 0 / 0.08);
-  --ring: oklch(82% 0.12 45);
+  --card: #FFFFFF;
+  --card-foreground: var(--c-ink);
 
-  /* pastelové tinty — chart colors, badge, KPI ikony */
-  --tint-peach:    oklch(82% 0.12 45);
-  --tint-mint:     oklch(84% 0.10 165);
-  --tint-lavender: oklch(80% 0.11 290);
-  --tint-sky:      oklch(82% 0.11 225);
-  --tint-sage:     oklch(84% 0.09 145);
-  --tint-butter:   oklch(88% 0.12 92);
-  --tint-rose:     oklch(82% 0.11 15);
-  --tint-pink:     oklch(82% 0.11 345);
-  /* Pošta — fáze 1 (2026-05-12). Chladnější modrá než `sky`, distinct od kalendáře. */
-  --tint-cool-blue: oklch(75% 0.10 250);
+  --popover: #FFFFFF;
+  --popover-foreground: var(--c-ink);
+
+  --primary: var(--c-signal);
+  --primary-foreground: var(--c-ink);
+
+  --secondary: var(--g-100);
+  --secondary-foreground: var(--c-ink);
+
+  --muted: var(--g-50);
+  --muted-foreground: var(--g-600);
+
+  --accent: var(--g-100);
+  --accent-foreground: var(--c-ink);
+
+  --destructive: #C2360C;
+  --destructive-foreground: var(--c-cream);
+
+  --border: var(--g-200);
+  --input: var(--g-100);
+  --ring: var(--c-signal);
+
+  /* Surface elevations — světlejší / tmavší než background pro hierarchii */
+  --surface-1: #FFFFFF;        /* hlavní karty */
+  --surface-2: var(--g-50);    /* hluboko vnořené */
+  --surface-3: var(--g-100);   /* hover state */
+
+  /* Per-modul tinty — mapování staré peach/mint/butter palety na brand barvy.
+     Light theme: tinty jsou tmavší (lepší kontrast na cream pozadí). */
+  --tint-peach:     var(--c-signal);     /* úkoly = signal coral */
+  --tint-mint:      var(--c-teal);       /* poznámky = teal */
+  --tint-lavender:  #5B3F7D;             /* kontakty = deep plum */
+  --tint-sky:       #1E5E8A;             /* kalendář = deep blue */
+  --tint-sage:      #2D5F3F;             /* finance = forest */
+  --tint-butter:    #8A6A1F;             /* deník = warm ochre */
+  --tint-rose:      #A82E2E;             /* AI / VIP = deep rose */
+  --tint-pink:      #8E2F62;             /* soubory = deep magenta */
+  --tint-cool-blue: #244E7A;             /* pošta = navy */
 
   --chart-1: var(--tint-peach);
   --chart-2: var(--tint-sky);
   --chart-3: var(--tint-mint);
   --chart-4: var(--tint-lavender);
   --chart-5: var(--tint-butter);
+}
 
-  /* glass controls */
-  --glass-blur: 24px;
-  --glass-saturate: 140%;
+/* ---- DARK theme ---- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: var(--c-ink);
+  --foreground: var(--c-cream);
+
+  --card: var(--g-800);
+  --card-foreground: var(--c-cream);
+
+  --popover: var(--g-800);
+  --popover-foreground: var(--c-cream);
+
+  --primary: var(--c-signal);
+  --primary-foreground: var(--c-ink);
+
+  --secondary: var(--g-700);
+  --secondary-foreground: var(--c-cream);
+
+  --muted: var(--g-800);
+  --muted-foreground: var(--g-300);
+
+  --accent: var(--g-700);
+  --accent-foreground: var(--c-cream);
+
+  --destructive: #FF7257;
+  --destructive-foreground: var(--c-ink);
+
+  --border: rgba(244, 239, 230, 0.12);
+  --input: rgba(244, 239, 230, 0.08);
+  --ring: var(--c-signal);
+
+  --surface-1: var(--g-800);
+  --surface-2: var(--g-700);
+  --surface-3: var(--g-600);
+
+  /* Per-modul tinty — dark theme: světlejší pastel verze pro kontrast na ink */
+  --tint-peach:     var(--c-signal);
+  --tint-mint:      #7AB8B0;
+  --tint-lavender:  #C1A8D4;
+  --tint-sky:       #8FC0DE;
+  --tint-sage:      #A5C5A8;
+  --tint-butter:    #E8C97A;
+  --tint-rose:      #F09797;
+  --tint-pink:      #E0A0C2;
+  --tint-cool-blue: #95B6D8;
+
+  --chart-1: var(--tint-peach);
+  --chart-2: var(--tint-sky);
+  --chart-3: var(--tint-mint);
+  --chart-4: var(--tint-lavender);
+  --chart-5: var(--tint-butter);
 }
 
 /* ---- Map shadcn tokens do Tailwind v4 @theme ---- */
@@ -91,16 +175,15 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
 /* ---- Base ---- */
 html {
-  font-size: 15.5px;
-  color-scheme: dark;
+  font-size: 16px;
 }
 
 html,
@@ -109,111 +192,148 @@ body {
   background: var(--background);
   color: var(--foreground);
   min-height: 100vh;
-  font-feature-settings: "ss01", "cv01", "cv11";
+  font-feature-settings: "ss01", "ss02", "tnum";
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Default: nadpisy bezpatkové (čitelnější pro Gideona).
-   Pro serif použij `class="font-serif"` explicit. */
-h1, h2, h3 {
+/* Headings — Space Grotesk 700 s negativním trackingem (brand identity).
+   Žádný serif. Pokud někdo dříve psal `class="font-serif"`, fallback je sans. */
+h1, h2, h3, h4 {
   font-family: var(--font-sans);
-  letter-spacing: -0.02em;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
+
+h1 { letter-spacing: -0.045em; }
 
 .font-serif {
-  font-family: var(--font-serif);
-  letter-spacing: -0.015em;
+  /* legacy: dřív Fraunces. Nyní bold sans s tighter tracking pro vizuální hierarchii. */
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .font-mono, code, kbd, samp {
   font-family: var(--font-mono);
+  font-feature-settings: "ss01", "tnum";
 }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
 :where(:focus-visible) {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--c-signal);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
-/* ---- Liquid glass background mesh ----
-   Fixed gradient base + 3 pastelové blobs, vše pod obsahem v z-0.
-   Na blobech: blur 120px → vytváří mlhavé světelné zdroje za sklem. */
-body {
-  background:
-    radial-gradient(1200px 800px at 85% -10%, oklch(40% 0.15 300 / 0.35), transparent 60%),
-    radial-gradient(1000px 700px at -10% 110%, oklch(45% 0.14 200 / 0.35), transparent 60%),
-    radial-gradient(800px 600px at 50% 50%, oklch(38% 0.12 40 / 0.18), transparent 70%),
-    var(--background);
-  background-attachment: fixed;
+/* ---- Brand utility classes ---- */
+
+/* Eyebrow — mono tag s ↳ na začátku */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }
 
-/* ---- Glass utility classes (použijeme je namísto bg-card kde chceme wow) ---- */
+/* Display headlines */
+.h-display { font-family: var(--font-sans); font-weight: 700; letter-spacing: -0.045em; line-height: 0.95; }
+.h-title   { font-family: var(--font-sans); font-weight: 700; letter-spacing: -0.03em;  line-height: 1.05; }
+.h-body    { font-family: var(--font-sans); font-weight: 400; letter-spacing: -0.005em; line-height: 1.5; }
+.h-mono    { font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.04em; }
+
+/* Rule (divider) */
+.rule { height: 1px; background: var(--border); }
+.rule--thick { height: 4px; background: currentColor; opacity: 1; }
+
+/* The Switch — UI toggle component pro wordmark + dekorativní pruhy */
+.toggle {
+  --h: 1em;
+  --track: var(--c-signal);
+  --knob: var(--c-cream);
+  display: inline-block;
+  width: calc(var(--h) * 1.85);
+  height: var(--h);
+  border-radius: 999px;
+  position: relative;
+  vertical-align: baseline;
+  background: var(--track);
+  flex: none;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: calc(var(--h) * 0.72);
+  height: calc(var(--h) * 0.72);
+  border-radius: 50%;
+  right: calc(var(--h) * 0.14);
+  top: calc(var(--h) * 0.14);
+  background: var(--knob);
+}
+.toggle--ink    { --track: var(--c-ink);    --knob: var(--c-cream); }
+.toggle--cream  { --track: var(--c-cream);  --knob: var(--c-ink); }
+.toggle--signal { --track: var(--c-signal); --knob: var(--c-cream); }
+.toggle--teal   { --track: var(--c-teal);   --knob: var(--c-cream); }
+.toggle--sand   { --track: var(--c-sand);   --knob: var(--c-ink); }
+
+/* ---- LEGACY glass utility — alias na plain card style ----
+   Existující komponenty (~50 souborů) používají `glass`, `glass-strong`,
+   `glass-subtle`. Místo abychom je teď všechny refactorovali, mapujeme je
+   na čistou card surface. Fáze C postupně nahradí explicitní `card` třídou. */
+
 @utility glass {
-  background: var(--card);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  box-shadow:
-    inset 0 1px 0 0 oklch(100% 0 0 / 0.08),
-    0 20px 60px -30px oklch(0% 0 0 / 0.6);
+  box-shadow: 0 1px 2px 0 rgba(14, 14, 16, 0.04);
 }
 
 @utility glass-strong {
-  background: oklch(100% 0 0 / 0.08);
-  backdrop-filter: blur(32px) saturate(150%);
-  -webkit-backdrop-filter: blur(32px) saturate(150%);
-  border: 1px solid oklch(100% 0 0 / 0.14);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   box-shadow:
-    inset 0 1px 0 0 oklch(100% 0 0 / 0.12),
-    0 30px 80px -40px oklch(0% 0 0 / 0.75);
+    0 2px 4px -1px rgba(14, 14, 16, 0.06),
+    0 4px 12px -2px rgba(14, 14, 16, 0.08);
 }
 
 @utility glass-subtle {
-  background: oklch(100% 0 0 / 0.025);
-  backdrop-filter: blur(12px) saturate(130%);
-  -webkit-backdrop-filter: blur(12px) saturate(130%);
-  border: 1px solid oklch(100% 0 0 / 0.06);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
-/* ---- Jemné kartové elevace + transitiony ---- */
 .glass-hover {
-  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease;
 }
 .glass-hover:hover {
-  background: oklch(100% 0 0 / 0.06);
-  border-color: oklch(100% 0 0 / 0.15);
+  background: var(--surface-3);
+  border-color: var(--g-300);
 }
 
-/* ---- Prvotní nahrání: velmi jemný fade-in obsahu ---- */
-@keyframes rasel-fade-up {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Dark theme variant: shadowy box-shadow nedává smysl, použij subtle outline. */
+:root[data-theme="dark"] {
+  --shadow-card: 0 1px 0 0 rgba(244, 239, 230, 0.04);
 }
-main > :is(section, div, h1):first-child,
-main > :is(section, div):nth-child(-n+3) {
-  animation: rasel-fade-up 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-main > :nth-child(2) { animation-delay: 40ms; }
-main > :nth-child(3) { animation-delay: 80ms; }
-
-@media (prefers-reduced-motion: reduce) {
-  main > * { animation: none !important; }
+:root[data-theme="dark"] .glass-hover:hover {
+  background: var(--surface-2);
+  border-color: var(--g-500);
 }
 
-/* ---- Prose styling pro markdown výstup (Gemini health analýza) ---- */
+/* ---- Prose styling pro markdown (Gemini health analýzy, AI summaries) ---- */
 .prose-rasel h1, .prose-rasel h2, .prose-rasel h3 {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
+  font-weight: 700;
   color: var(--foreground);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.025em;
 }
 .prose-rasel h2 {
   font-size: 1.25rem;
   margin: 1.25rem 0 0.5rem;
   padding-bottom: 0.4rem;
-  border-bottom: 1px solid oklch(100% 0 0 / 0.08);
+  border-bottom: 1px solid var(--border);
 }
 .prose-rasel h2:first-child { margin-top: 0; }
 .prose-rasel h3 {
@@ -228,24 +348,25 @@ main > :nth-child(3) { animation-delay: 80ms; }
   margin: 0.25rem 0;
 }
 .prose-rasel ul li::before {
-  content: "•";
+  content: "↳";
   position: absolute;
   left: 0;
-  color: var(--tint-lavender);
-  font-weight: bold;
+  color: var(--c-signal);
+  font-family: var(--font-mono);
 }
 .prose-rasel strong {
-  color: oklch(100% 0 0);
-  font-weight: 600;
+  color: var(--foreground);
+  font-weight: 700;
 }
 .prose-rasel code {
-  background: oklch(100% 0 0 / 0.08);
+  background: var(--muted);
   padding: 0.1em 0.35em;
   border-radius: 3px;
   font-size: 0.9em;
+  font-family: var(--font-mono);
 }
 .prose-rasel blockquote {
-  border-left: 2px solid var(--tint-butter);
+  border-left: 3px solid var(--c-signal);
   padding-left: 0.75rem;
   margin: 0.75rem 0;
   color: var(--muted-foreground);
@@ -266,23 +387,28 @@ html.sidebar-open [data-sidebar-backdrop] {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ---- Scrollbar, čisté a decentní ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---- Scrollbar — minimalistický, ne křiklavý ---- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: oklch(100% 0 0 / 0.08);
+  background: var(--g-300);
   border-radius: 4px;
 }
-::-webkit-scrollbar-thumb:hover { background: oklch(100% 0 0 / 0.15); }
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--g-600); }
+::-webkit-scrollbar-thumb:hover { background: var(--g-400); }
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: var(--g-500); }
 
-/* ---- Tisková verze pro Týden / Měsíc / Health analýzy ----
-   Cíl: A4 landscape, jedna stránka pokud možno. Žádná aplikační navigace,
-   černý text na bílém, kompaktní mřížka. Předtím (commit e26893c) se obsah
-   nepředatelně lámal na další stránky kvůli min-width gridu a overflow-x. */
+/* ---- Tisk (A4 landscape) — zachováno z původní verze ---- */
 @media print {
   @page { size: A4 landscape; margin: 5mm; }
 
-  /* Tělo a viewport — vypnout pevný layout, ať tiskárna může proudit */
   html, body {
     background: white !important;
     color: black !important;
@@ -290,22 +416,18 @@ html.sidebar-open [data-sidebar-backdrop] {
     overflow: visible !important;
   }
 
-  /* Schovat aplikační UI */
   aside, header.glass, .glass:has(button[aria-label="Hledat"]) { display: none !important; }
   .print\:hidden { display: none !important; }
 
-  /* Vypnout backdrop blur, glass efekty */
   .glass, .glass-strong, .glass-subtle {
     background: white !important;
     border: 1px solid #ddd !important;
-    backdrop-filter: none !important;
     box-shadow: none !important;
     color: black !important;
     padding: 4px !important;
     border-radius: 4px !important;
   }
 
-  /* Text — kompaktní velikosti pro A4 */
   h1 { font-size: 13pt !important; margin: 0 0 3pt !important; line-height: 1.2 !important; }
   h2 { font-size: 10pt !important; margin: 3pt 0 2pt !important; }
   h3 { font-size: 9pt !important; }
@@ -316,9 +438,6 @@ html.sidebar-open [data-sidebar-backdrop] {
   .text-muted-foreground, [class*="text-muted-foreground"] { color: #555 !important; }
   [style*="--tint-"], [style*="var(--tint-"] { color: black !important; }
 
-  /* KLÍČOVÉ: vypnout overflow + min-width na week mřížce. Předtím grid měl
-     min-width 700px + overflow-x-auto, což při tisku vytvořilo extrémně
-     široký kontejner co se nelámal. */
   .week-print-root,
   .week-print-root *,
   .month-print-root,
@@ -327,23 +446,17 @@ html.sidebar-open [data-sidebar-backdrop] {
     min-width: 0 !important;
   }
 
-  /* Zmenšit celý týdenní grid přes transform aby se vešel na 1 A4 landscape.
-     56 px/h × 17 h = 952 px pro samotnou osu. Po scale 0.62 to je ~590 px.
-     A4 landscape na 8mm margins má ~191mm = ~720 px (300 dpi varianta).
-     Zmenšení 0.62 vejde i s hlavičkou, all-day proužkem a interpretací. */
   .week-print-root {
     transform: scale(0.62);
     transform-origin: top left;
     width: 161%;
   }
-  /* Měsíční pohled ne tak agresivní — 7×6 mřížka už je kompaktnější */
   .month-print-root {
     transform: scale(0.85);
     transform-origin: top left;
     width: 117%;
   }
 
-  /* Truncate / line-clamp v tisku zrušíme — text se má vejít kompletní */
   .truncate, [class*="line-clamp-"] {
     overflow: visible !important;
     text-overflow: clip !important;
@@ -352,12 +465,6 @@ html.sidebar-open [data-sidebar-backdrop] {
     white-space: normal !important;
   }
 
-  /* Myši PDF export — řešen samostatnou stránkou /bwmys/<id>/tisk
-     se svým vlastním print designem (NE window.print z detailu). */
-
-  /* Page-break: glass kontejnery NESMÍ být atomic blocky — povolit lámání
-     uvnitř (předtím page-break-inside: avoid na .glass tlačil obsah na další
-     stránku). Avoid jen pro absolutně pozicované eventové bloky. */
   .glass { page-break-inside: auto !important; break-inside: auto !important; }
   button[class*="absolute"],
   a[class*="absolute"] {
@@ -365,8 +472,6 @@ html.sidebar-open [data-sidebar-backdrop] {
     break-inside: avoid;
   }
 
-  /* Schovat navigation šipky (left/right chevron) a now badge — v tisku
-     nemají smysl, jen zabírají místo */
   button[aria-label*="Předchozí"],
   button[aria-label*="Následující"],
   a[aria-label*="Předchozí"],

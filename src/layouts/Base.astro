@@ -1,7 +1,10 @@
 ---
-import "@fontsource-variable/fraunces";
-import "@fontsource-variable/geist";
-import "@fontsource-variable/geist-mono";
+// Petr 2026-06-18 redesign: Space Grotesk + JetBrains Mono (Gide-on brand).
+// Legacy fonty (fraunces, geist, geist-mono) z původní Liquid Glass verze
+// odstraněny — Space Grotesk je jediný display + body, JetBrains Mono pro
+// eyebrow, čísla a kód.
+import "@fontsource-variable/space-grotesk";
+import "@fontsource-variable/jetbrains-mono";
 import "@/styles/global.css";
 
 interface Props {
@@ -36,14 +39,28 @@ const ogImageUrl = ogImagePath.startsWith("http") ? ogImagePath : `${baseUrl}${o
 ---
 
 <!doctype html>
-<html lang="cs" data-theme="rasel">
+<html lang="cs" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <meta name="description" content={description} />
-    <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0a0920" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#0E0E10" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F4EFE6" media="(prefers-color-scheme: light)" />
+    {/* Petr 2026-06-18 redesign: bootstrap theme z localStorage PŘED renderem.
+        Brzdí flash blank/wrong theme při loadu. Default = dark, ale když user
+        v Settings přepnul, hodnota je tam. */}
+    <script is:inline>
+      (function () {
+        try {
+          var saved = localStorage.getItem("gide-on-theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          }
+        } catch (e) { /* ignore localStorage errors (private mode) */ }
+      })();
+    </script>
     {/* Petr 2026-05-27: favicon priority order — PNG první, SVG jako enhanced
         fallback. iOS Safari pro Add to Home Screen občas preferuje SVG před
         apple-touch-icon → dříve vidělo tmavý SVG. PNG sizes v order brání tomu. */}
