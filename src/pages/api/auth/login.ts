@@ -4,6 +4,7 @@ import argon2 from "argon2";
 import { prisma } from "@/lib/db";
 import { checkLoginRateLimit, recordLoginAttempt } from "@/lib/rate-limit";
 import { issuePreauth } from "@/lib/webauthn";
+import { createSession } from "@/lib/session";
 
 export const prerender = false;
 
@@ -56,6 +57,29 @@ export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
   if (!user || !valid) {
     await recordLoginAttempt(body.username, ip, false);
     return Response.json({ error: "INVALID_CREDENTIALS" }, { status: 401 });
+  }
+
+  // Petr 2026-06-18 (lokální dev): pokud DEV_SKIP_PASSKEY=1 AND běžíme proti
+  // localhost (host header), vystavit plnou session rovnou bez passkey kroku.
+  //
+  // Bezpečnostní pojistky (musí PROJÍT VŠECHNY 3):
+  //   1) NODE_ENV !== "production" (nikdy v produkci)
+  //   2) process.env.DEV_SKIP_PASSKEY === "1" (explicit opt-in, v .env.local)
+  //   3) Host header je localhost / 127.0.0.1 (ne veřejná IP)
+  //
+  // Stejný hardening jako v src/lib/session.ts:secure=NODE_ENV === "production".
+  // Pokud kdokoli z těch tří selže, fallback na původní passkey flow.
+  const host = (request.headers.get("host") ?? "").toLowerCase();
+  const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
+  const devBypass =
+    process.env.NODE_ENV !== "production" &&
+    process.env.DEV_SKIP_PASSKEY === "1" &&
+    isLocalhost;
+
+  if (devBypass) {
+    await createSession(cookies, user.id, ip, request.headers.get("user-agent") ?? undefined);
+    await recordLoginAttempt(body.username, ip, true);
+    return Response.json({ ok: true, next: "done" });
   }
 
   // Heslo OK — NESPOUŠTĚJ full session. Vystav preauth cookie a pošli klienta

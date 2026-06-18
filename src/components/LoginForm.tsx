@@ -54,6 +54,12 @@ export default function LoginForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(humanError(data.error ?? "UNKNOWN", data.scope)); return; }
       setPassword("");
+      // Petr 2026-06-18 dev bypass: pokud server v dev módu vystavil plnou
+      // session rovnou (DEV_SKIP_PASSKEY=1 + localhost), redirect na /.
+      if (data.next === "done") {
+        window.location.assign("/");
+        return;
+      }
       setStep(data.next === "enroll_passkey" ? "enroll_passkey" : "verify_passkey");
     } catch { setError(humanError("UNKNOWN")); }
     finally { setPending(false); }
