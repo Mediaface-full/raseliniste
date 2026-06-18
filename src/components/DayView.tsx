@@ -376,19 +376,25 @@ export default function DayView({ initial }: { initial: Initial }) {
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="size-4" style={{ color: "var(--c)" }} />
           <h2 className="font-serif text-lg">Briefing</h2>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto inline-flex items-center rounded-md border border-border bg-secondary/30 p-0.5">
             <button
               onClick={() => setBriefingTab("today")}
-              className={`px-3 py-1 rounded-md text-xs font-mono ${
-                briefingTab === "today" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:bg-white/5"
+              aria-pressed={briefingTab === "today"}
+              className={`px-3 py-1 rounded text-xs font-mono uppercase tracking-wider transition-colors ${
+                briefingTab === "today"
+                  ? "bg-foreground text-background font-medium"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Tento den
             </button>
             <button
               onClick={() => setBriefingTab("tomorrow")}
-              className={`px-3 py-1 rounded-md text-xs font-mono ${
-                briefingTab === "tomorrow" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:bg-white/5"
+              aria-pressed={briefingTab === "tomorrow"}
+              className={`px-3 py-1 rounded text-xs font-mono uppercase tracking-wider transition-colors ${
+                briefingTab === "tomorrow"
+                  ? "bg-foreground text-background font-medium"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Zítřek
