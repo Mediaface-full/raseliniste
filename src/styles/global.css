@@ -387,6 +387,13 @@ main > .max-w-7xl {
   background-color: var(--secondary) !important;
 }
 
+/* Legacy Liquid Glass shadow artefakty — `shadow-black/N` v light theme
+   vypadají divně (tmavý glow na cream pozadí). Override na subtle shadow. */
+:root[data-theme="light"] [class*="shadow-black/"] {
+  --tw-shadow-color: rgba(14, 14, 16, 0.08) !important;
+  --tw-shadow: var(--tw-shadow-colored) !important;
+}
+
 /* Dark theme variant: shadowy box-shadow nedává smysl, použij subtle outline. */
 :root[data-theme="dark"] {
   --shadow-card: 0 1px 0 0 rgba(244, 239, 230, 0.04);
