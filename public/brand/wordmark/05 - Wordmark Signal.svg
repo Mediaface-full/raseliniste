@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 320" width="1100" height="320" role="img" aria-label="Gide-on">
+  <title>Gide-on · wordmark · signal coral</title>
+  
+  
+  <text x="40" y="245" fill="#FF5C2E" style="font-family:&#39;Space Grotesk&#39;,system-ui,sans-serif;font-weight:700;letter-spacing:-8.36px;font-size:220px">Gide</text>
+  <path fill="#FF5C2E" fill-rule="evenodd" d="M 582 87 h 134 a 79 79 0 0 1 0 158 h -134 a 79 79 0 0 1 0 -158 z M 659 166 a 57 57 0 1 0 114 0 a 57 57 0 1 0 -114 0 z"></path>
+  <text x="821" y="245" fill="#FF5C2E" style="font-family:&#39;Space Grotesk&#39;,system-ui,sans-serif;font-weight:700;letter-spacing:-8.36px;font-size:220px">on</text>
+</svg>

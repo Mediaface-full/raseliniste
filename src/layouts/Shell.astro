@@ -3,6 +3,7 @@ import Base from "./Base.astro";
 import LogoutButton from "@/components/LogoutButton";
 import SidebarToggle from "@/components/SidebarToggle";
 import ThemeToggle from "@/components/ThemeToggle";
+import GideonWordmark from "@/components/GideonWordmark";
 import { Icon } from "astro-icon/components";
 import { readSession } from "@/lib/session";
 import { getPostaBadgeCount } from "@/lib/posta-badge";
@@ -127,11 +128,11 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
              lg:transition-[opacity,transform] lg:duration-200
              lg:data-[collapsed=true]:opacity-0 lg:data-[collapsed=true]:-translate-x-4 lg:data-[collapsed=true]:pointer-events-none"
     >
-      <div class="px-5 py-5 border-b border-white/5">
-        <a href="/" class="flex items-baseline gap-2 group">
-          <span class="font-serif text-2xl tracking-tight">Rašeliniště</span>
+      <div class="px-5 py-5 border-b border-border">
+        <a href="/start" class="flex flex-col gap-1 group" aria-label="Gide-on — Rašeliniště">
+          <GideonWordmark size="sm" />
           <span class="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-            v0.1
+            Rašeliniště · v0.2
           </span>
         </a>
       </div>
