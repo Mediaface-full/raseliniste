@@ -185,7 +185,7 @@ export default function BwMysDetail({ id }: { id: string }) {
   return (
     <div className="space-y-4">
       {/* Hlavička */}
-      <div className="glass-strong rounded-xl p-4 space-y-2 relative">
+      <div className="modal-panel p-4 space-y-2 relative">
         <div className="absolute top-3 right-3 flex items-center gap-1">
           {d.status === "aktivni" && (
             <button
@@ -224,7 +224,7 @@ export default function BwMysDetail({ id }: { id: string }) {
       {/* Akční toolbar — nahoře, pod hlavičkou. Petr nemusí scrollovat dolů.
           Zobrazený jen u aktivních rozhodnutí. */}
       {d.status === "aktivni" && (
-        <div className="glass-strong rounded-xl p-3 flex flex-wrap gap-2">
+        <div className="modal-panel p-3 flex flex-wrap gap-2">
           <Button onClick={() => setAdding(true)}>
             <Plus /> Zápis textem
           </Button>
@@ -424,7 +424,7 @@ export default function BwMysDetail({ id }: { id: string }) {
       )}
 
       {d.status !== "aktivni" && (
-        <div className="glass-strong rounded-xl p-4 border-l-4 border-[var(--tint-sage)] space-y-3">
+        <div className="modal-panel p-4 border-l-4 border-[var(--tint-sage)] space-y-3">
           {d.verdiktText && (
             <>
               <div className="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
@@ -480,8 +480,8 @@ function NewEntryModal({ decisionId, onClose }: { decisionId: string; onClose: (
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
-      <div className="glass-strong rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={() => onClose(false)}>
+      <div className="modal-panel max-w-md w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="font-serif text-lg">Nový zápis</div>
 
         {/* Nálada */}
@@ -934,8 +934,8 @@ function CloseDecisionDialog({ decision, onClose, mode }: { decision: Decision; 
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
-      <div className="glass-strong rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={() => onClose(false)}>
+      <div className="modal-panel max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="font-serif text-lg">{titleMap[mode]}</div>
 
         {(mode === "jdu" || mode === "nejdu") && (
@@ -1090,8 +1090,8 @@ function EditFramingModal({ decision, onClose }: { decision: Decision; onClose: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
-      <div className="glass-strong rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={() => onClose(false)}>
+      <div className="modal-panel max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="font-serif text-lg">Upravit zarámování</h3>
           <button onClick={() => onClose(false)} className="p-1 hover:bg-white/5 rounded">
@@ -1251,8 +1251,8 @@ function ReopenDialog({ decision, onClose }: { decision: Decision; onClose: (r: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
-      <div className="glass-strong rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={() => onClose(false)}>
+      <div className="modal-panel max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="font-serif text-lg">↻ Znovu otevřít rozhodnutí</h3>
           <button onClick={() => onClose(false)} className="p-1 hover:bg-white/5 rounded">

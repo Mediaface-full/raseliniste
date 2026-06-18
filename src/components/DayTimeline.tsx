@@ -683,7 +683,7 @@ export default function DayTimeline({
         const end = new Date(ev.endsAt);
         return createPortal((
           <div
-            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-3 sm:p-6"
+            className="modal-overlay"
             onClick={() => setOpenId(null)}
             style={{ background: "oklch(8% 0.02 260 / 0.55)", backdropFilter: "blur(8px)" }}
           >

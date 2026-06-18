@@ -34,11 +34,11 @@ export default function GuestGuide({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-3 sm:p-6"
+          className="modal-overlay"
           onClick={() => setOpen(false)}
         >
           <div
-            className="glass-strong rounded-xl max-w-2xl w-full max-h-[92vh] overflow-y-auto"
+            className="modal-panel max-w-2xl w-full max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 bg-[var(--background)]/85 backdrop-blur-md border-b border-white/10 px-5 py-3 flex items-center justify-between">

@@ -187,9 +187,9 @@ function EventDetailModal({ event, onClose }: { event: CalendarEventDTO; onClose
   const end = new Date(event.endsAt);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose}>
       <div
-        className="glass-strong rounded-xl max-w-md w-full p-5 space-y-3"
+        className="modal-panel max-w-md w-full p-5 space-y-3"
         onClick={(e) => e.stopPropagation()}
         style={{ ["--c" as string]: tint }}
       >

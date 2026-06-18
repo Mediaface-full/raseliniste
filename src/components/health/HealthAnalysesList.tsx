@@ -200,7 +200,7 @@ function AnalysisDetailModal({ id, onClose }: { id: string; onClose: () => void 
       style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="glass-strong rounded-xl w-full max-w-3xl">
+      <div className="modal-panel w-full max-w-3xl">
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div

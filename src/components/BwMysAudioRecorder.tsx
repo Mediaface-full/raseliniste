@@ -124,8 +124,8 @@ export default function BwMysAudioRecorder({
   const elS = Math.floor((elapsedMs % 60000) / 1000).toString().padStart(2, "0");
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
-      <div className="glass-strong rounded-xl max-w-md w-full p-6 text-center space-y-4" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={() => onClose(false)}>
+      <div className="modal-panel max-w-md w-full p-6 text-center space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div className="font-serif text-lg">Nahrát zápis</div>
           <button onClick={() => onClose(false)} className="p-1 hover:bg-white/5 rounded">

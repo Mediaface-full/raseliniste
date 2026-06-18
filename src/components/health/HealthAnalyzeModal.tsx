@@ -156,12 +156,12 @@ export default function HealthAnalyzeModal({
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4"
+      className="modal-overlay"
       style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(16px)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="glass-strong rounded-xl w-full max-w-3xl flex flex-col max-h-[95vh] sm:max-h-[90vh]"
+        className="modal-panel w-full max-w-3xl flex flex-col max-h-[95vh] sm:max-h-[90vh]"
         style={{ background: "oklch(16% 0.025 260 / 0.96)" }}
       >
         {/* Header (sticky) */}

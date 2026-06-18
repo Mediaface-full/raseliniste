@@ -219,9 +219,9 @@ function Editor({ item, onClose }: { item: Anniversary | null; onClose: (r: bool
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={() => onClose(false)}>
+    <div className="modal-overlay" onClick={() => onClose(false)}>
       <div
-        className="glass-strong rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4"
+        className="modal-panel max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">

@@ -394,6 +394,38 @@ main > .max-w-7xl {
   --tw-shadow: var(--tw-shadow-colored) !important;
 }
 
+/* ─── Brand modal pattern (Petr 2026-06-19) ───────────────────────────
+   Petr nesnášel agresivní fullscreen modal vzhled — `bg-black/60 + backdrop-blur`
+   + glass-strong na cream pozadí vypadalo jako „nové okno", silenost.
+   Modaly teď používají `.modal-overlay` + `.modal-panel`:
+   - Lehčí overlay (ink 35% v light, ink 60% v dark)
+   - Panel se subtle border místo glass-strong, méně „pop-out" pocit */
+@utility modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background-color: rgba(14, 14, 16, 0.35);
+  backdrop-filter: blur(2px);
+}
+:root[data-theme="dark"] .modal-overlay {
+  background-color: rgba(14, 14, 16, 0.7);
+}
+
+@utility modal-panel {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 4px 12px -2px rgba(14, 14, 16, 0.08),
+    0 10px 30px -10px rgba(14, 14, 16, 0.15);
+}
+:root[data-theme="dark"] .modal-panel {
+  box-shadow: 0 4px 30px -8px rgba(0, 0, 0, 0.5);
+}
+
 /* Dark theme variant: shadowy box-shadow nedává smysl, použij subtle outline. */
 :root[data-theme="dark"] {
   --shadow-card: 0 1px 0 0 rgba(244, 239, 230, 0.04);
