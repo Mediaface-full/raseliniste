@@ -638,9 +638,8 @@ function UploadAudioGuestButton({
           color: "color-mix(in oklch, var(--tint-lavender) 92%, white)",
         }}
       >
-        <Upload className="size-4 inline mr-2" />
         {uploading ? (
-          `Nahrávám soubor… ${progress}%`
+          <span className="inline-flex items-center gap-2"><Loader2 className="size-4 animate-spin" /> Nahrávám soubor… {progress}%</span>
         ) : (
           <span className="inline-flex items-center gap-2"><Paperclip className="size-4" /> Nahrát audio soubor (MP3/M4A/...)</span>
         )}
