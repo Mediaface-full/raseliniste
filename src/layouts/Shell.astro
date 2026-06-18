@@ -137,10 +137,10 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
         </a>
       </div>
 
-      <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5 text-sm">
+      <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5 text-[15px]">
         {nav.map((section) => (
           <div>
-            <div class="px-2 mb-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">
+            <div class="px-2.5 mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-mono font-medium">
               {section.group}
             </div>
             <ul class="space-y-0.5">
@@ -154,17 +154,17 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
                       aria-disabled={disabled}
                       style={`--c: var(--tint-${item.tint});`}
                       class:list={[
-                        "relative flex items-center gap-2.5 px-2.5 py-2 rounded-md transition-colors",
+                        "relative flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors",
                         active
-                          ? "bg-accent text-foreground"
-                          : "text-foreground/75 hover:bg-accent hover:text-foreground",
+                          ? "bg-accent text-foreground font-medium"
+                          : "text-foreground/80 hover:bg-accent hover:text-foreground",
                         disabled && "opacity-45 cursor-not-allowed pointer-events-none",
                       ]}
                     >
                       {active && (
-                        <span class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r" style="background: var(--c);"></span>
+                        <span class="absolute left-0 top-2 bottom-2 w-[3px] rounded-r" style="background: var(--c);"></span>
                       )}
-                      <Icon name={item.icon} class="size-4 shrink-0" style="color: var(--c);" />
+                      <Icon name={item.icon} class="size-5 shrink-0" style="color: var(--c);" />
                       <span>{item.label}</span>
                       {item.badge !== undefined && item.badge > 0 && (
                         <span
@@ -205,77 +205,77 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
 
     {/* Main column — topbar + content, žádný outer glass (content karty nesou glass samy) */}
     <div class="flex flex-col min-w-0 gap-3">
-      <header class="glass rounded-xl h-14 px-3 lg:px-5 flex items-center gap-3">
+      <header class="glass rounded-xl h-16 px-4 lg:px-5 flex items-center gap-3">
         <SidebarToggle client:load />
         <a
           href="/start"
-          class="h-8 px-2 sm:px-3 rounded-md bg-[var(--tint-sky)]/10 border border-[var(--tint-sky)]/30 hover:bg-[var(--tint-sky)]/20 flex items-center gap-1.5 text-[var(--tint-sky)] transition-colors shrink-0"
+          class="h-10 px-3 sm:px-4 rounded-md bg-[var(--tint-sky)]/10 border-2 border-[var(--tint-sky)]/40 hover:bg-[var(--tint-sky)]/20 flex items-center gap-2 text-[var(--tint-sky)] transition-colors shrink-0 font-semibold"
           aria-label="Zpět na úvodní obrazovku Start"
           title="Zpět na Start"
         >
-          <Icon name="lucide:home" class="size-4" />
-          <span class="text-xs font-medium hidden sm:inline">Start</span>
+          <Icon name="lucide:home" class="size-[18px]" />
+          <span class="text-sm hidden sm:inline">Start</span>
         </a>
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
+        <div class="flex items-center gap-2.5 text-base text-muted-foreground min-w-0">
           {breadcrumb.length === 0 ? (
-            <span class="text-foreground">{heading ?? title}</span>
+            <span class="text-foreground font-medium truncate">{heading ?? title}</span>
           ) : (
             breadcrumb.map((crumb, i) => (
               <>
                 {crumb.href ? (
-                  <a href={crumb.href} class="hover:text-foreground transition-colors">{crumb.label}</a>
+                  <a href={crumb.href} class="hover:text-foreground transition-colors truncate">{crumb.label}</a>
                 ) : (
-                  <span class="text-foreground">{crumb.label}</span>
+                  <span class="text-foreground font-medium truncate">{crumb.label}</span>
                 )}
                 {i < breadcrumb.length - 1 && (
-                  <Icon name="lucide:chevron-right" class="size-3 text-muted-foreground/60" />
+                  <Icon name="lucide:chevron-right" class="size-4 text-muted-foreground/60 shrink-0" />
                 )}
               </>
             ))
           )}
         </div>
 
-        <div class="ml-auto flex items-center gap-1.5">
+        <div class="ml-auto flex items-center gap-1">
           {/* Petr 2026-06-18 redesign — light/dark toggle */}
           <ThemeToggle size="compact" client:load />
           {/* Rychlé přepínače pohledů kalendáře — Petr je chce v topbaru */}
           <a
             href="/dnes"
-            class="h-8 px-2.5 rounded-md hover:bg-accent text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            class="h-10 px-3 rounded-md hover:bg-accent text-sm font-mono text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
             title="Dnešní den"
           >
-            <Icon name="lucide:calendar-clock" class="size-3.5" />
+            <Icon name="lucide:calendar-clock" class="size-[18px]" />
             <span class="hidden sm:inline">Den</span>
           </a>
           <a
             href="/calendar/tyden"
-            class="h-8 px-2.5 rounded-md hover:bg-accent text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            class="h-10 px-3 rounded-md hover:bg-accent text-sm font-mono text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
             title="Týdenní pohled"
           >
-            <Icon name="lucide:calendar-days" class="size-3.5" />
+            <Icon name="lucide:calendar-days" class="size-[18px]" />
             <span class="hidden sm:inline">Týden</span>
           </a>
           <a
             href="/calendar/mesic"
-            class="h-8 px-2.5 rounded-md hover:bg-accent text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            class="h-10 px-3 rounded-md hover:bg-accent text-sm font-mono text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
             title="Měsíční pohled"
           >
-            <Icon name="lucide:calendar" class="size-3.5" />
+            <Icon name="lucide:calendar" class="size-[18px]" />
             <span class="hidden sm:inline">Měsíc</span>
           </a>
-          <span class="hidden md:inline-block w-px h-5 bg-border mx-1" />
-          <button type="button" class="h-8 px-3 rounded-md hover:bg-accent text-sm text-muted-foreground flex items-center gap-2 transition-colors" aria-label="Hledat">
-            <Icon name="lucide:search" class="size-4" />
+          <span class="hidden md:inline-block w-px h-6 bg-border mx-1" />
+          <button type="button" class="h-10 px-3 rounded-md hover:bg-accent text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors" aria-label="Hledat">
+            <Icon name="lucide:search" class="size-[18px]" />
             <span class="hidden md:inline font-mono text-xs">⌘K</span>
           </button>
-          <a href="/settings" class="size-8 rounded-md hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label="Nastavení">
-            <Icon name="lucide:settings" class="size-4" />
+          <a href="/settings" class="size-10 rounded-md hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label="Nastavení">
+            <Icon name="lucide:settings" class="size-[18px]" />
           </a>
         </div>
       </header>
 
       <main class="flex-1 min-w-0 overflow-y-auto px-1 pb-3">
-        {heading && <h1 class="font-serif text-3xl mb-5 tracking-tight">{heading}</h1>}
+        {heading && <h1 class="font-sans font-bold text-4xl mb-6 tracking-[-0.04em] leading-tight">{heading}</h1>}
         <slot />
       </main>
     </div>
