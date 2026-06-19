@@ -1,13 +1,14 @@
 {
+  "id": "/ozvena",
   "name": "Ozvěna",
   "short_name": "Ozvěna",
   "description": "Rychlý záznam úkolů a deníku do Rašeliniště",
-  "start_url": "/ozvena",
-  "scope": "/ozvena",
+  "start_url": "/ozvena/pwa",
+  "scope": "/ozvena/pwa",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0c1126",
-  "theme_color": "#0c1126",
+  "background_color": "#F4EFE6",
+  "theme_color": "#0E0E10",
   "icons": [
     {
       "src": "/apple-touch-icon.png",

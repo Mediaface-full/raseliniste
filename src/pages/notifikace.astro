@@ -1,11 +1,18 @@
 ---
-import Base from "../layouts/Base.astro";
+import Shell from "../layouts/Shell.astro";
 import { Icon } from "astro-icon/components";
+import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 import { loadNotifications } from "../lib/notifications";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
 
 const items = await loadNotifications(session.uid);
 
@@ -28,15 +35,13 @@ const typeMeta: Record<string, { label: string; icon: string; tint: string }> = 
 };
 ---
 
-<Base title="Notifikace · Rašeliniště" appleTitle="Notifikace" appleCapable={true}>
-  <main class="min-h-screen flex flex-col">
-    <div class="border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <a href="/start" class="text-xs font-mono text-muted-foreground hover:text-foreground">← Start</a>
-      <span class="text-xs font-mono text-muted-foreground">Notifikace</span>
-    </div>
-
-    <div class="flex-1 px-4 sm:px-6 pt-6 pb-8">
-      <div class="w-full max-w-2xl mx-auto space-y-3">
+<Shell
+  title="Notifikace · Rašeliniště"
+  username={user.username}
+  heading="Notifikace"
+  breadcrumb={[{ label: "Vstupy" }, { label: "Notifikace" }]}
+>
+  <div class="max-w-2xl space-y-3">
         <header class="text-center mb-4">
           <div class="text-xs uppercase tracking-widest font-mono text-muted-foreground mb-1">
             posledních 24-48 h
@@ -120,7 +125,5 @@ const typeMeta: Record<string, { label: string; icon: string; tint: string }> = 
             </a>
           );
         })}
-      </div>
-    </div>
-  </main>
-</Base>
+  </div>
+</Shell>

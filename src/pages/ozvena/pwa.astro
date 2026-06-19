@@ -1,0 +1,50 @@
+---
+import Base from "../../layouts/Base.astro";
+import DiktatRecorder from "../../components/DiktatRecorder";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// Petr 2026-06-19: tato cesta je targetem PWA Ozvěna (manifest start_url +
+// scope = /ozvena/pwa). Mobilní fullscreen layout bez Shell sidebar.
+// Pro browser tab na desktopu → /ozvena (Shell mode s menu).
+---
+
+<Base
+  title="Ozvěna · Rašeliniště"
+  appleTitle="Ozvěna"
+  appleCapable={true}
+  manifestPath="/manifest-ozvena.json"
+>
+  <main class="min-h-screen flex flex-col">
+    <div class="border-b border-border px-4 py-3 flex items-center gap-3">
+      <a
+        href="/start"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-accent text-sm font-medium border border-border"
+      >
+        <span aria-hidden>←</span>
+        <span>Start</span>
+      </a>
+      <a href="/" class="text-xs font-mono text-muted-foreground hover:text-foreground">Dashboard</a>
+      <span class="ml-auto text-xs font-mono text-muted-foreground">{user.username}</span>
+    </div>
+
+    <div class="flex-1 flex items-start sm:items-center justify-center p-4 sm:p-6">
+      <div class="w-full max-w-5xl">
+        <DiktatRecorder client:load />
+      </div>
+    </div>
+
+    <div class="text-center text-xs font-mono text-muted-foreground/60 pb-4 px-4">
+      Tip: <strong>Sdílet → Přidat na plochu</strong> = ikona Ozvěna
+    </div>
+  </main>
+</Base>

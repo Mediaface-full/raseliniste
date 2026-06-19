@@ -1,5 +1,5 @@
 ---
-import Base from "../layouts/Base.astro";
+import Shell from "../layouts/Shell.astro";
 import DiktatRecorder from "../components/DiktatRecorder";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
@@ -12,44 +12,21 @@ const user = await prisma.user.findUnique({
   select: { username: true },
 });
 if (!user) return Astro.redirect("/login");
+
+// Petr 2026-06-19: tato stránka je Shell mode (menu + sidebar) pro browser
+// tab na desktopu. PWA Ozvěna byla přesměrována na /ozvena/pwa (mobilní
+// fullscreen Base layout) přes manifest start_url + scope. Tím se odděluje
+// PWA experience od běžného browsování — Petr na desktopu klikne odkaz
+// /ozvena a dostane plný Shell s menu, ne fullscreen PWA window.
 ---
 
-<Base
+<Shell
   title="Ozvěna · Rašeliniště"
-  appleTitle="Ozvěna"
-  appleCapable={true}
-  manifestPath="/manifest-ozvena.json"
+  username={user.username}
+  heading="Ozvěna"
+  breadcrumb={[{ label: "Vstupy" }, { label: "Ozvěna" }]}
 >
-  <main class="min-h-screen flex flex-col">
-    <!-- Petr 2026-05-27 #9: lepší navigace zpět — větší touch target,
-         primárně na /start (mobile dashboard), Dashboard jako sekundární. -->
-    <div class="border-b border-white/5 px-4 py-3 flex items-center gap-3">
-      <a
-        href="/start"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 text-sm font-medium"
-      >
-        <span aria-hidden>←</span>
-        <span>Start</span>
-      </a>
-      <a
-        href="/"
-        class="text-xs font-mono text-muted-foreground hover:text-foreground"
-      >
-        Dashboard
-      </a>
-      <span class="ml-auto text-xs font-mono text-muted-foreground">{user.username}</span>
-    </div>
-
-    <!-- Petr 2026-05-25: max-w-2xl → max-w-5xl, ať tabulky úkolů a review
-         mají dech a nemusí se text wrapovat na desktopu. -->
-    <div class="flex-1 flex items-start sm:items-center justify-center p-4 sm:p-6">
-      <div class="w-full max-w-5xl">
-        <DiktatRecorder client:load />
-      </div>
-    </div>
-
-    <div class="text-center text-xs font-mono text-muted-foreground/60 pb-4 px-4">
-      Tip: <strong>Sdílet → Přidat na plochu</strong> = ikona Ozvěna
-    </div>
-  </main>
-</Base>
+  <div class="max-w-5xl">
+    <DiktatRecorder client:load />
+  </div>
+</Shell>
