@@ -53,8 +53,8 @@ function safeIconName(icon: string | null): string {
   breadcrumb={[{ label: "Přehled" }, { label: "Page Links" }]}
 >
   <div class="max-w-5xl space-y-4">
-    {links.length === 0 ? (
-      <div class="glass rounded-2xl p-8 text-center space-y-3">
+    {links.length === 0 && (
+      <div class="rounded-2xl p-8 text-center space-y-3 border border-border bg-card">
         <Icon name="lucide:link" class="size-12 mx-auto text-muted-foreground" />
         <h2 class="text-lg font-bold tracking-[-0.02em]">Zatím žádné odkazy</h2>
         <p class="text-sm text-muted-foreground">
@@ -67,7 +67,8 @@ function safeIconName(icon: string | null): string {
           <Icon name="lucide:plus" class="size-4" /> Přidat první odkaz
         </a>
       </div>
-    ) : (
+    )}
+    {links.length > 0 && (
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {links.map((link) => (
           <a
@@ -75,16 +76,16 @@ function safeIconName(icon: string | null): string {
             target="_blank"
             rel="noopener noreferrer external"
             data-external-link
-            class="glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition hover:bg-white/5 active:scale-[0.98]"
-            style={`--c: var(--tint-${link.tint});`}
+            class="rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition border border-border bg-card hover:border-foreground/40 hover:bg-accent/40 active:scale-[0.98]"
+            style={`--c: var(--tint-${link.tint ?? "sky"});`}
           >
             <div
-              class="absolute -top-12 -right-12 size-32 rounded-full blur-2xl pointer-events-none"
-              style="background: color-mix(in oklch, var(--c) 28%, transparent);"
+              class="absolute -top-12 -right-12 size-32 rounded-full blur-2xl pointer-events-none opacity-50"
+              style="background: var(--c, var(--tint-sky));"
             ></div>
             <div
-              class="size-10 rounded-xl grid place-items-center"
-              style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
+              class="size-10 rounded-xl grid place-items-center relative"
+              style="border: 1px solid var(--c, var(--tint-sky)); color: var(--c, var(--tint-sky));"
             >
               <Icon name={safeIconName(link.icon)} class="size-5" />
             </div>
