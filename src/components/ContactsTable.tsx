@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { ContactEditor } from "./ContactsManager";
+import { ContactEditor } from "./ContactEditor";
 import {
   Search, Save, RefreshCw, Loader2, AlertTriangle, Check, Cloud, CloudUpload,
   Users, Phone, Mail, Filter, X, ChevronLeft, ChevronRight, Trash2,

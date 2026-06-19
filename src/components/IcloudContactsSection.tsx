@@ -112,7 +112,7 @@ export default function IcloudContactsSection({
 
       <p className="text-sm text-muted-foreground leading-relaxed">
         Stažení kontaktů + skupin z iCloudu do Rašeliniště. Overlay pole (VIP, aliasy, klient slug)
-        se nepřepisují. Tabulková editace v <a href="/contacts/tabulka" className="underline">/contacts/tabulka</a>.
+        se nepřepisují. Tabulková editace v <a href="/contacts" className="underline">/contacts</a>.
       </p>
 
       {contactCount !== null && (
@@ -142,7 +142,7 @@ export default function IcloudContactsSection({
           {testing ? <><Loader2 className="size-4 animate-spin" /> Testuji…</> : <><RefreshCw className="size-4" /> Test připojení</>}
         </Button>
         <a
-          href="/contacts/tabulka"
+          href="/contacts"
           className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-sm text-[var(--tint-lavender)] hover:bg-[var(--tint-lavender)]/10"
         >
           Otevřít tabulku <ArrowRight className="size-3.5" />

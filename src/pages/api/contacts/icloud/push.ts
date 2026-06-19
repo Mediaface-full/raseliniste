@@ -4,7 +4,7 @@
  * Push single contact z DB do iCloudu (PUT vCard).
  * Body: { contactId: string }
  *
- * Vola se po edit v `/contacts/tabulka`. Pokud Contact nemá icloudUid,
+ * Vola se po edit v `/contacts`. Pokud Contact nemá icloudUid,
  * vygeneruje se UUID + vytvoří nový vCard. Jinak If-Match etag (412
  * pokud někdo upravil z jiného zařízení).
  */

@@ -80,7 +80,7 @@ export async function createInvite(input: CreateInviteInput): Promise<{
     if (!contactSnapshot.email) {
       throw new Error(
         `Kontakt "${contactSnapshot.name ?? "(bez jména)"}" nemá zadaný email. ` +
-        `Doplň email v Kontaktech → /contacts/tabulka, jinak host nedostane ` +
+        `Doplň email v Kontaktech → /contacts, jinak host nedostane ` +
         `potvrzovací mail. (Pro pozvánku bez emailu použij univerzální invite — ` +
         `contactId=null, host zadá email při rezervaci.)`,
       );

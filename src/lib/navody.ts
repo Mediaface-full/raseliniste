@@ -549,7 +549,7 @@ texty „Gíďo, máš misi", vokativ z DB. Cross-VIP průsak fyzicky nemožný 
 - Backfill tlačítko v \`/contacts\` pro existující VIP bez tokenu
 - **Smart routing fields (05-10):** \`isTeam\` checkbox (kolega/dlouhodobý spolupracovník) + \`clientTag\` slug (kontaktní osoba klienta). Badges v listu: mint „tým", sky „klient-{slug}".
 - **Alias systém (05-10):** \`aliases\` (synonyma jména v audiu — „Karel", „Kája") + \`clientTagAliases\` (synonyma klient slugu — „TK", „Tékáčko"). AI v extract promptu fuzzy match přes všechna synonyma, ale do JSON/tagu vždy KANONICKÁ hodnota. Comma-separated input s chip listem v edit modalu.
-- **iCloud auto-sync (NOVÉ 05-27):** cron \`sync-contacts-icloud\` à 30 min pullne změny z mobilu + onMount \`/contacts\` tichu pullne (rate-limit 30s). Předtím byl iCloud sync jen manuální button v /contacts/tabulka. Google sync běží přes \`sync-contacts\` cron denně 4:00.
+- **iCloud auto-sync (NOVÉ 05-27):** cron \`sync-contacts-icloud\` à 30 min pullne změny z mobilu + onMount \`/contacts\` tichu pullne (rate-limit 30s). Předtím byl iCloud sync jen manuální button v /contacts. Google sync běží přes \`sync-contacts\` cron denně 4:00.
 - **Todoist user ID (NOVÉ 05-27):** \`todoistUserId\` pro členy týmu (isTeam=true). Když je vyplněné, push úkolů do Todoistu posílá \`responsible_uid\` = člen týmu dostane reálnou notifikaci v Todoistu. Bez ID se úkol jen vytvoří v sekci s jménem, ale asignovaný zůstává Petrovi. ID najdeš na \`/api/integrations/todoist/collaborators\`.
       `,
       co_neumi: `

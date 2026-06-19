@@ -379,7 +379,7 @@ export default function InviteCreator() {
               <div className="mt-1 leading-relaxed">{error}</div>
               {error.toLowerCase().includes("email") && (
                 <div className="mt-2 text-sm">
-                  <a href="/contacts/tabulka" className="underline text-[var(--tint-sky)]">
+                  <a href="/contacts" className="underline text-[var(--tint-sky)]">
                     → Otevřít kontakty a doplnit email
                   </a>
                 </div>

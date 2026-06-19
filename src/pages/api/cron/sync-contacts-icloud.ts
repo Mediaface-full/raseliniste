@@ -20,7 +20,7 @@ export const prerender = false;
  * Vznikl protože Petr 2026-05-24 nahlásil, že úprava kontaktu na mobilu
  * se nepropíše do /contacts (UI v Rašeliništi). Dosud běžel jen
  * `sync-contacts` cron pro Google People (4:00), iCloud byl pure-manual
- * (tlačítko "Obnovit" v /contacts/tabulka).
+ * (tlačítko "Obnovit" v /contacts).
  *
  * Push (Rašeliniště → iCloud) zůstává manuální — tady jen pull.
  */
