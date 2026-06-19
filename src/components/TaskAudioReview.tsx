@@ -630,17 +630,20 @@ function ProposalRow({
             onSave={(next) => onChange({ title: next })}
           />
 
-          <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+          {/* Hierarchie: prioritní info v 1. řádku (datum + trvání + priorita),
+              přiřazení v 2. řádku (kontakt + projekt + tagy). Vše brand neutral —
+              border-border + bg-background. Žádné per-pole tinty. */}
+          <div className="flex flex-wrap items-center gap-2 mt-3 text-sm">
             {/* Trvání (t-* tag) */}
-            <label className="flex items-center gap-1 cursor-pointer" title="Trvání úkolu">
-              <Hourglass className="size-3.5 text-[var(--tint-lavender)]" />
+            <label className="flex items-center gap-1.5 cursor-pointer" title="Trvání úkolu">
+              <Hourglass className="size-3.5 text-muted-foreground" />
               <select
                 value={getTTag(proposal.tags)}
                 onChange={(e) => {
                   const newTTag = e.target.value as TTag;
                   onChange({ tags: [...stripTTag(proposal.tags), newTTag] });
                 }}
-                className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm font-mono cursor-pointer hover:border-white/40 focus:outline-none focus:border-[var(--tint-lavender)]/70"
+                className="bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground cursor-pointer hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
               >
                 {T_TAGS.map((t) => (
                   <option key={t} value={t}>{T_LABEL[t]}</option>
@@ -648,9 +651,9 @@ function ProposalRow({
               </select>
             </label>
 
-            {/* Datum — vždy viditelný native date input, prázdné = bez termínu */}
-            <label className="flex items-center gap-1" title="Datum splnění">
-              <Clock className="size-3.5 text-foreground/70" />
+            {/* Datum */}
+            <label className="flex items-center gap-1.5" title="Datum splnění">
+              <Clock className="size-3.5 text-muted-foreground" />
               <input
                 type="date"
                 value={proposal.dueAt ? proposal.dueAt.slice(0, 10) : ""}
@@ -658,18 +661,22 @@ function ProposalRow({
                   const v = e.target.value;
                   onChange({ dueAt: v ? new Date(`${v}T09:00:00`).toISOString() : null, dueIsTime: false });
                 }}
-                className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm font-mono cursor-pointer hover:border-white/40 focus:outline-none focus:border-[var(--tint-butter)]/70"
+                className="bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground cursor-pointer hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
               />
             </label>
 
-            {/* Priorita — vždy viditelný select */}
-            <label className="flex items-center gap-1" title="Priorita">
-              <span className="text-foreground/70 font-mono">!</span>
+            {/* Priorita */}
+            <label className="flex items-center gap-1.5" title="Priorita">
+              <span className="text-muted-foreground font-mono">!</span>
               <select
                 value={proposal.priority}
                 onChange={(e) => onChange({ priority: e.target.value as "low" | "normal" | "high" })}
-                className={`bg-black/40 border border-white/20 rounded px-2 py-1 text-sm font-mono cursor-pointer hover:border-white/40 focus:outline-none ${
-                  proposal.priority === "high" ? "text-[var(--tint-rose)]" : proposal.priority === "low" ? "text-foreground/70" : "text-foreground"
+                className={`bg-background border rounded-md px-2 py-1 text-sm font-mono cursor-pointer focus:outline-none focus:ring-2 focus:ring-foreground/10 transition ${
+                  proposal.priority === "high"
+                    ? "border-[color:var(--c-signal)]/60 text-[color:var(--c-signal)] hover:border-[color:var(--c-signal)]"
+                    : proposal.priority === "low"
+                      ? "border-border text-muted-foreground hover:border-foreground/40"
+                      : "border-border text-foreground hover:border-foreground/40"
                 }`}
               >
                 <option value="low">↓ Low</option>
@@ -677,29 +684,28 @@ function ProposalRow({
                 <option value="high">! Priorita</option>
               </select>
             </label>
+          </div>
 
-            {/* Kontakt — vždy viditelný select, prázdné = „Já" */}
-            <label className="flex items-center gap-1" title="Komu úkol patří">
-              <UserCheck className={`size-3.5 ${proposal.assignedToContactId ? "text-[var(--tint-lavender)]" : "text-foreground/70"}`} />
+          <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+            {/* Kontakt */}
+            <label className="flex items-center gap-1.5" title="Komu úkol patří">
+              <UserCheck className="size-3.5 text-muted-foreground" />
               <select
                 value={proposal.assignedToContactId ?? ""}
                 onChange={(e) => onChange({ assignedToContactId: e.target.value || null })}
-                className="bg-black/40 border border-white/20 rounded px-2 py-1 text-sm cursor-pointer hover:border-white/40 focus:outline-none focus:border-[var(--tint-lavender)]/70 max-w-[160px]"
+                className="bg-background border border-border rounded-md px-2 py-1 text-sm text-foreground cursor-pointer hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 max-w-[160px] transition"
               >
                 <option value="">Já</option>
                 {contacts.map((c) => <option key={c.id} value={c.id}>{c.displayName}</option>)}
               </select>
             </label>
             {proposal.assignedToContactName && !proposal.assignedToContactId && (
-              <span className="flex items-center gap-1 text-[var(--tint-butter)] text-xs italic">
-                AI nabídla: {proposal.assignedToContactName} (vyber kontakt ↑)
+              <span className="text-[color:var(--c-signal)] text-xs italic">
+                AI nabídla: {proposal.assignedToContactName} →
               </span>
             )}
 
-            {/* Petr 2026-05-27: chip = preview kam to půjde v Todoistu.
-                Petr 2026-06-09: chip je teď klikatelný dropdown — manual
-                override Smart routingu. Výběr „Automaticky" = auto routing.
-                Pokud Petr zvolí konkrétní projekt/sekci, override. */}
+            {/* Projekt picker */}
             <ProjectPicker
               proposal={proposal}
               contacts={contacts}
@@ -707,9 +713,9 @@ function ProposalRow({
               onChange={onChange}
             />
 
-            {/* Tagy — inline input s čárkou. Zachovává t-* tag mimo. */}
-            <label className="flex items-center gap-1 flex-1 min-w-[160px]" title="Tagy oddělené čárkou (bez #, bez t-*)">
-              <Tag className="size-3.5 text-foreground/70" />
+            {/* Tagy */}
+            <label className="flex items-center gap-1.5 flex-1 min-w-[180px]" title="Tagy oddělené čárkou (bez #, bez t-*)">
+              <Tag className="size-3.5 text-muted-foreground" />
               <input
                 type="text"
                 defaultValue={stripTTag(proposal.tags).join(", ")}
@@ -723,23 +729,25 @@ function ProposalRow({
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 placeholder="tagy, čárkou"
-                className="flex-1 min-w-0 bg-black/40 border border-white/20 rounded px-2 py-1 text-sm font-mono hover:border-white/40 focus:outline-none focus:border-[var(--tint-sage)]/70"
+                className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground placeholder:text-muted-foreground/60 hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
               />
             </label>
           </div>
 
-          {/* Poznámka — inline textarea, vždy viditelná, prázdný placeholder */}
+          {/* Poznámka */}
           <textarea
             value={proposal.notes ?? ""}
             onChange={(e) => onChange({ notes: e.target.value || null })}
             placeholder="+ poznámka"
             rows={proposal.notes ? 2 : 1}
-            className="w-full mt-2 bg-black/30 border border-white/10 rounded px-2 py-1.5 text-sm leading-snug resize-y hover:border-white/20 focus:outline-none focus:border-white/40 placeholder:text-muted-foreground/60"
+            className="w-full mt-3 bg-background border border-border rounded-md px-2.5 py-1.5 text-sm leading-snug resize-y text-foreground placeholder:text-muted-foreground/60 hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
           />
 
-          {/* Surová citace z přepisu — read only */}
+          {/* Citace z přepisu */}
           {proposal.rawSnippet && (
-            <div className="text-sm italic text-muted-foreground mt-1.5">„{proposal.rawSnippet}"</div>
+            <div className="text-sm italic text-muted-foreground mt-2 pl-3 border-l-2 border-border">
+              „{proposal.rawSnippet}"
+            </div>
           )}
         </div>
 
