@@ -68,52 +68,50 @@ function safeIconName(icon: string | null): string {
         </a>
       </div>
     ) : (
-      <>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {links.map((link) => (
-            <a
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer external"
-              data-external-link
-              class="glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition hover:bg-white/5 active:scale-[0.98]"
-              style={`--c: var(--tint-${link.tint});`}
-            >
-              <div
-                class="absolute -top-12 -right-12 size-32 rounded-full blur-2xl pointer-events-none"
-                style="background: color-mix(in oklch, var(--c) 28%, transparent);"
-              ></div>
-              <div
-                class="size-10 rounded-xl grid place-items-center"
-                style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
-              >
-                <Icon name={safeIconName(link.icon)} class="size-5" />
-              </div>
-              <div class="relative mt-auto">
-                <div class="text-base font-semibold tracking-tight">{link.name}</div>
-                <div class="text-[10px] font-mono text-muted-foreground/70 truncate">
-                  {prettyDomain(link.url)}
-                </div>
-              </div>
-            </a>
-          ))}
-
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {links.map((link) => (
           <a
-            href="/settings/page-links"
-            class="rounded-2xl p-4 flex flex-col items-start gap-2 min-h-[96px] border border-dashed border-border hover:border-foreground/40 hover:bg-accent/40 transition"
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer external"
+            data-external-link
+            class="glass rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition hover:bg-white/5 active:scale-[0.98]"
+            style={`--c: var(--tint-${link.tint});`}
           >
-            <div class="size-10 rounded-xl grid place-items-center border border-border text-muted-foreground">
-              <Icon name="lucide:settings" class="size-5" />
+            <div
+              class="absolute -top-12 -right-12 size-32 rounded-full blur-2xl pointer-events-none"
+              style="background: color-mix(in oklch, var(--c) 28%, transparent);"
+            ></div>
+            <div
+              class="size-10 rounded-xl grid place-items-center"
+              style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
+            >
+              <Icon name={safeIconName(link.icon)} class="size-5" />
             </div>
-            <div class="mt-auto">
-              <div class="text-base font-semibold tracking-tight">Upravit odkazy</div>
-              <div class="text-[10px] font-mono text-muted-foreground/70">
-                přidat · přejmenovat · smazat
+            <div class="relative mt-auto">
+              <div class="text-base font-semibold tracking-tight">{link.name}</div>
+              <div class="text-[10px] font-mono text-muted-foreground/70 truncate">
+                {prettyDomain(link.url)}
               </div>
             </div>
           </a>
-        </div>
-      </>
+        ))}
+
+        <a
+          href="/settings/page-links"
+          class="rounded-2xl p-4 flex flex-col items-start gap-2 min-h-[96px] border border-dashed border-border hover:border-foreground/40 hover:bg-accent/40 transition"
+        >
+          <div class="size-10 rounded-xl grid place-items-center border border-border text-muted-foreground">
+            <Icon name="lucide:settings" class="size-5" />
+          </div>
+          <div class="mt-auto">
+            <div class="text-base font-semibold tracking-tight">Upravit odkazy</div>
+            <div class="text-[10px] font-mono text-muted-foreground/70">
+              přidat · přejmenovat · smazat
+            </div>
+          </div>
+        </a>
+      </div>
     )}
   </div>
 </Shell>
