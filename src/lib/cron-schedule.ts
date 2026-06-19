@@ -219,7 +219,8 @@ export const CRON_JOBS: CronJobDef[] = [
     name: "posta-commitment-detect",
     endpoint: "/api/cron/posta-commitment-detect",
     schedule: { type: "every", minutes: 15 },
-    description: "Pošta — detector vyšumělých závazků (fáze 6: LLM scan outbound mailů, dedup soft-link, confidence routing >=0.85 auto)",
+    fireAndForget: true,
+    description: "Pošta — detector vyšumělých závazků (fáze 6: LLM scan outbound mailů, dedup soft-link, confidence routing >=0.85 auto). 2026-06-19 Gideon: fireAndForget=true protože LLM scan výrazně přesahuje 90s dispatcher timeout (AbortError 'This operation was aborted'); běží na pozadí bez čekání.",
   },
   {
     name: "posta-commitment-todoist-sync",
