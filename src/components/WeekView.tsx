@@ -545,22 +545,20 @@ export default function WeekView({
           <div
             className="modal-overlay"
             onClick={() => setOpenId(null)}
-            style={{ background: "oklch(8% 0.02 260 / 0.55)", backdropFilter: "blur(8px)" }}
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl p-5 space-y-2 text-sm shadow-2xl"
-              style={{
-                background: "oklch(14% 0.025 260 / 0.98)",
-                border: `1px solid color-mix(in oklch, var(--tint-${tint}) 35%, transparent)`,
-              }}
+              className="modal-panel w-full max-w-md max-h-[85vh] overflow-y-auto p-5 space-y-2 text-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-xs font-mono tabular font-semibold mb-0.5" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 90%, white)` }}>
+                  <div
+                    className="text-xs font-mono tabular font-semibold mb-0.5"
+                    style={{ color: `var(--tint-${tint})` }}
+                  >
                     {ev.allDay ? "celý den" : `${start.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "numeric" })} · ${fmtTime(start)}–${fmtTime(end)}`}
                   </div>
-                  <h3 className="font-serif text-lg leading-tight" style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}>
+                  <h3 className="text-lg font-bold tracking-[-0.02em] leading-tight text-foreground">
                     {ev.title}
                   </h3>
                 </div>
@@ -574,7 +572,7 @@ export default function WeekView({
                 </div>
               )}
               {ev.prepNote && (
-                <div className="text-xs text-[var(--tint-butter)] mt-1.5 px-2 py-1.5 rounded bg-black/20">
+                <div className="text-xs text-foreground mt-1.5 px-2 py-1.5 rounded border border-border bg-accent/40">
                   {ev.prepNote}
                 </div>
               )}
@@ -591,7 +589,7 @@ export default function WeekView({
                       ) as string,
                     }}
                   />
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--tint-peach)] flex items-center gap-1 pt-2 mt-2 border-t border-white/[0.05]">
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-1 pt-2 mt-2 border-t border-border">
                     <Sparkles className="size-3" /> rituál
                     <a href="/settings/ritualy" className="ml-auto hover:underline">
                       upravit text →
@@ -600,7 +598,7 @@ export default function WeekView({
                 </>
               ) : (
                 ev.description && (
-                  <p className="text-xs text-muted-foreground/90 whitespace-pre-wrap mt-2 leading-relaxed">
+                  <p className="text-xs text-foreground/85 whitespace-pre-wrap mt-2 leading-relaxed">
                     {ev.description}
                   </p>
                 )
@@ -643,23 +641,14 @@ export default function WeekView({
               animation: "fadeIn 120ms ease-out",
             }}
           >
-            <div
-              className="rounded-lg p-3 shadow-2xl border"
-              style={{
-                background: "oklch(14% 0.025 260 / 0.96)",
-                borderColor: `color-mix(in oklch, var(--tint-${tint}) 35%, transparent)`,
-              }}
-            >
+            <div className="modal-panel rounded-lg p-3">
               <div
                 className="text-[10px] uppercase tracking-wider font-mono mb-1 font-semibold"
-                style={{ color: `color-mix(in oklch, var(--tint-${tint}) 90%, white)` }}
+                style={{ color: `var(--tint-${tint})` }}
               >
                 {ev.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
               </div>
-              <div
-                className="font-serif text-base leading-tight mb-2"
-                style={{ color: `color-mix(in oklch, var(--tint-${tint}) 96%, white)` }}
-              >
+              <div className="text-base font-bold tracking-[-0.02em] leading-tight mb-2 text-foreground">
                 {ev.title}
               </div>
               {ev.locationText && (
