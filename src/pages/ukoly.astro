@@ -62,10 +62,10 @@ function fmtDuration(sec: number | null) {
        v levém panelu (Shell má desktop collapse přes data-sidebar-collapsed). -->
   <div class="max-w-6xl space-y-4">
     {pendingBatches.length > 0 && (
-      <section class="glass rounded-xl p-4 space-y-3" style="--c: var(--tint-peach);">
+      <section class="rounded-xl p-4 space-y-3 border border-border bg-card">
         <div class="flex items-center gap-2">
-          <Icon name="lucide:inbox" class="size-4" style="color: var(--c);" />
-          <h2 class="font-serif text-lg">Audio salvy čekají na review</h2>
+          <Icon name="lucide:inbox" class="size-4 text-muted-foreground" />
+          <h2 class="text-lg font-bold tracking-[-0.02em]">Audio salvy čekají na review</h2>
           <span class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
             {pendingBatches.length}
           </span>
