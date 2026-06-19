@@ -800,6 +800,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
               <th className="px-2 py-2 text-left w-[180px]">Adresa</th>
               <th className="px-2 py-2 text-left w-[140px]">Skupiny</th>
               <th className="px-2 py-2 text-left w-[100px]">Narozeniny</th>
+              <th className="px-2 py-2 text-left w-[200px]">Poznámka</th>
               <th className="px-2 py-2 text-center w-[60px]" title="VIP/Team flagy z Rašeliniště (overlay)">Flag</th>
               <th className="px-2 py-2 text-center w-[40px]" title="Push do iCloudu">⤴</th>
               <th className="px-2 py-2 text-center w-[40px]" title="Smazat kontakt (DB + iCloud + Google)"></th>
@@ -807,11 +808,11 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={12} className="px-3 py-12 text-center text-sm text-muted-foreground">
+              <tr><td colSpan={13} className="px-3 py-12 text-center text-sm text-muted-foreground">
                 <Loader2 className="size-5 animate-spin mx-auto mb-2" /> Načítám…
               </td></tr>
             ) : contacts.length === 0 ? (
-              <tr><td colSpan={12} className="px-3 py-12 text-center text-sm text-muted-foreground italic">
+              <tr><td colSpan={13} className="px-3 py-12 text-center text-sm text-muted-foreground italic">
                 Žádné kontakty v aktuálním filtru.
               </td></tr>
             ) : contacts.map((c) => {
@@ -856,6 +857,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
                       editCell(c.id, "birthDay", d);
                     }}
                   />
+                  <EditableCell value={eff.note ?? ""} onSave={(v) => editCell(c.id, "note", v)} placeholder="—" />
                   <td className="px-2 py-2 text-center">
                     <div className="inline-flex items-center gap-1">
                       <button
