@@ -56,15 +56,15 @@ function safeIconName(icon: string | null): string {
     {links.length === 0 ? (
       <div class="glass rounded-2xl p-8 text-center space-y-3">
         <Icon name="lucide:link" class="size-12 mx-auto text-muted-foreground" />
-        <h2 class="font-serif text-lg">Zatím žádné odkazy</h2>
+        <h2 class="text-lg font-bold tracking-[-0.02em]">Zatím žádné odkazy</h2>
         <p class="text-sm text-muted-foreground">
           Přidej si odkazy na často navštěvované weby, otevřou se v novém okně.
         </p>
         <a
           href="/settings/page-links"
-          class="inline-block mt-2 px-4 py-2 rounded-md bg-[var(--tint-sky)]/20 hover:bg-[var(--tint-sky)]/30 text-[var(--tint-sky)] text-sm font-medium"
+          class="inline-flex items-center gap-1.5 mt-2 px-4 py-2 rounded-md bg-foreground text-background text-sm font-medium hover:opacity-90 transition"
         >
-          + Přidat první odkaz
+          <Icon name="lucide:plus" class="size-4" /> Přidat první odkaz
         </a>
       </div>
     ) : (
@@ -97,14 +97,20 @@ function safeIconName(icon: string | null): string {
               </div>
             </a>
           ))}
-        </div>
 
-        <div class="text-center pt-2">
           <a
             href="/settings/page-links"
-            class="text-xs font-mono text-muted-foreground hover:text-foreground"
+            class="rounded-2xl p-4 flex flex-col items-start gap-2 min-h-[96px] border border-dashed border-border hover:border-foreground/40 hover:bg-accent/40 transition"
           >
-            ⚙ Upravit odkazy
+            <div class="size-10 rounded-xl grid place-items-center border border-border text-muted-foreground">
+              <Icon name="lucide:settings" class="size-5" />
+            </div>
+            <div class="mt-auto">
+              <div class="text-base font-semibold tracking-tight">Upravit odkazy</div>
+              <div class="text-[10px] font-mono text-muted-foreground/70">
+                přidat · přejmenovat · smazat
+              </div>
+            </div>
           </a>
         </div>
       </>
