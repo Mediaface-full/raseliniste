@@ -82,8 +82,10 @@ function fmtDuration(sec: number | null) {
                   href={`/ukoly/audio/${b.id}/review`}
                   class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition-colors border border-white/5"
                 >
-                  <span class="size-8 rounded-md grid place-items-center shrink-0" style={`background: color-mix(in oklch, var(--c) ${isReady ? 18 : 10}%, transparent);`}>
-                    {isReady && <Icon name="lucide:check-circle-2" class="size-4" style="color: var(--c);" />}
+                  <span class={`size-8 rounded-md grid place-items-center shrink-0 border ${
+                    isError ? "border-destructive/30 bg-destructive/10" : "border-border bg-accent/30"
+                  }`}>
+                    {isReady && <Icon name="lucide:check-circle-2" class="size-4 text-muted-foreground" />}
                     {isProcessing && <Icon name="lucide:loader-2" class="size-4 animate-spin text-muted-foreground" />}
                     {isError && <Icon name="lucide:alert-triangle" class="size-4 text-destructive" />}
                   </span>
