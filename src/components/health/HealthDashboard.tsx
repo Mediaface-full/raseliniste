@@ -186,10 +186,6 @@ export default function HealthDashboard() {
           size="sm"
           onClick={() => setAnalyzeOpen(true)}
           className="ml-auto"
-          style={{
-            background: "color-mix(in oklch, var(--tint-lavender) 85%, white 5%)",
-            color: "oklch(22% 0.05 290)",
-          }}
         >
           <Sparkles />
           Analyzovat
