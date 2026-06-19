@@ -195,6 +195,10 @@ export const PATCH: APIRoute = async ({ cookies, request }) => {
           case "email2":
             emailOps.push({ slot: parseInt(c.field.slice(5), 10) - 1, value: String(c.value ?? "") });
             break;
+          case "isVip":
+          case "isTeam":
+            updateData[c.field] = Boolean(c.value);
+            break;
         }
       }
 

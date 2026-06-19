@@ -20,7 +20,7 @@ import { ContactEditor } from "./ContactEditor";
 import {
   Search, Save, RefreshCw, Loader2, AlertTriangle, Check, Cloud, CloudUpload,
   Users, Phone, Mail, Filter, X, ChevronLeft, ChevronRight, Trash2,
-  Wrench, Plus, UserPlus, FolderPlus,
+  Wrench, Plus, UserPlus, FolderPlus, Edit3,
 } from "lucide-react";
 
 interface Contact {
@@ -113,6 +113,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
   // (z ContactsManager.tsx). Předchozí UX vytvořilo placeholder řádek
   // v tabulce — Petr ho hledal a frustroval se.
   const [newContactModalOpen, setNewContactModalOpen] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   // Real-time sync progress (Petr 2026-05-16) — polluje à 2s pokud syncing
@@ -194,7 +195,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
   }
 
   // Cell edit handler — uloží do dirty mapy + local edit
-  function editCell(contactId: string, field: string, value: string | number | null | string[]) {
+  function editCell(contactId: string, field: string, value: string | number | boolean | null | string[]) {
     const key = `${contactId}-${field}`;
     setDirty((m) => new Map(m).set(key, { id: contactId, field, value }));
 
@@ -856,9 +857,39 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
                     }}
                   />
                   <td className="px-2 py-2 text-center">
-                    {eff.isVip && <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-[var(--tint-rose)]/20 text-[var(--tint-rose)]">VIP</span>}
-                    {eff.isTeam && <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-[var(--tint-sky)]/20 text-[var(--tint-sky)] ml-1">TÝM</span>}
-                    {eff.clientTag && <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-[var(--tint-mint)]/20 text-[var(--tint-mint)] ml-1" title={eff.clientTag}>K</span>}
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); editCell(c.id, "isVip", !eff.isVip); }}
+                        title={eff.isVip ? "Klik = sundat VIP flag" : "Klik = označit jako VIP (po uložení dostanou odkaz na /call-log)"}
+                        className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition ${
+                          eff.isVip
+                            ? "border-[color:var(--c-signal)]/60 bg-[color:var(--c-signal)]/15 text-[color:var(--c-signal)]"
+                            : "border-border text-muted-foreground/40 hover:text-foreground hover:border-foreground/40"
+                        }`}
+                      >VIP</button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); editCell(c.id, "isTeam", !eff.isTeam); }}
+                        title={eff.isTeam ? "Klik = sundat TÝM flag" : "Klik = označit jako člena týmu (Smart routing #3)"}
+                        className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition ${
+                          eff.isTeam
+                            ? "border-foreground/60 bg-foreground/10 text-foreground"
+                            : "border-border text-muted-foreground/40 hover:text-foreground hover:border-foreground/40"
+                        }`}
+                      >TÝM</button>
+                      {eff.clientTag && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border bg-secondary/40 text-foreground" title={`Klient: ${eff.clientTag}`}>K</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setEditingContactId(c.id); }}
+                        title="Upravit kontakt (oslovení, aliasy, klient tag, todoist user, VIP odkaz na call-log)"
+                        className="ml-0.5 p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent transition"
+                      >
+                        <Edit3 className="size-3" />
+                      </button>
+                    </div>
                   </td>
                   <td className="px-2 py-2 text-center">
                     <button
@@ -925,6 +956,41 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
           }}
         />
       )}
+
+      {/* Petr 2026-06-19: edit existing contact = klik na ✎ ve sloupci Flag.
+          Otevírá ContactEditor s plnými fields (oslovení / aliasy / clientTag
+          / VIP odkaz na /call-log / todoist user). */}
+      {editingContactId && (() => {
+        const c = getContact(editingContactId);
+        if (!c) return null;
+        const eff = effective(c) as Contact & { callLogToken?: string | null; callLogTokenCreatedAt?: string | null };
+        return (
+          <ContactEditor
+            contact={{
+              id: eff.id,
+              displayName: eff.displayName,
+              firstName: eff.firstName,
+              lastName: eff.lastName,
+              vocative: (eff as Contact & { vocative?: string | null }).vocative ?? null,
+              greetingOverride: (eff as Contact & { greetingOverride?: string | null }).greetingOverride ?? null,
+              company: eff.company,
+              note: eff.note,
+              isVip: eff.isVip,
+              isTeam: eff.isTeam,
+              clientTag: eff.clientTag,
+              aliases: (eff as Contact & { aliases?: string[] }).aliases ?? [],
+              clientTagAliases: (eff as Contact & { clientTagAliases?: string[] }).clientTagAliases ?? [],
+              callLogToken: eff.callLogToken ?? null,
+              callLogTokenCreatedAt: eff.callLogTokenCreatedAt ?? null,
+              todoistUserId: (eff as Contact & { todoistUserId?: string | null }).todoistUserId ?? null,
+            }}
+            onClose={(reload) => {
+              setEditingContactId(null);
+              if (reload) void load();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
