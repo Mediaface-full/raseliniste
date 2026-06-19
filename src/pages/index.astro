@@ -4,6 +4,7 @@ import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 import { Icon } from "astro-icon/components";
 import SchedulerStatus from "../components/SchedulerStatus.astro";
+import QuickRecordButton from "../components/QuickRecordButton";
 import { loadNotifications } from "../lib/notifications";
 
 const session = await readSession(Astro.cookies);
@@ -193,6 +194,13 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
         Poslední přihlášení: <span class="text-foreground">{fmt(user.lastLoginAt)}</span>
       </div>
     </div>
+
+    {/* Rychlý záznam — Petr 2026-06-19: klik = start, klik znovu = stop.
+        Funguje přímo z dashboardu, žádný redirect na /ozvena potřeba. */}
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <QuickRecordButton client:load mode="task" />
+      <QuickRecordButton client:load mode="journal" />
+    </section>
 
     {/* Plán — nejbližší eventy + Notifikace (místo Pravidla, viz Petr 2026-05-27) */}
     {(upcomingEvents.length > 0 || notifications.length > 0) && (
