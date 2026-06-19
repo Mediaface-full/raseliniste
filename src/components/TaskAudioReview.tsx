@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
-  Loader2, Check, X, Edit3, Trash2, AlertTriangle, RotateCw, Clock, UserCheck, Tag, ChevronDown, Hourglass, Folder,
+  Loader2, Check, X, Edit3, Trash2, AlertTriangle, RotateCw, Clock, UserCheck, Tag, ChevronDown, ChevronRight, Hourglass, Folder, ChevronsUpDown, ChevronsDownUp,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
@@ -185,6 +185,25 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
   const [showRaw, setShowRaw] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Petr 2026-06-19: default collapsed list (jen titulek + meta chips), klik rozbalí
+  // plný edit panel. Při 20+ úkolech jinak nelze najít konkrétní položku.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function expandAll() {
+    const all = new Set<string>();
+    proposals.forEach((p) => {
+      all.add(p._id);
+      (p.subtasks ?? []).forEach((s) => all.add(s._id));
+    });
+    setExpandedIds(all);
+  }
+  function collapseAll() { setExpandedIds(new Set()); }
 
   useEffect(() => {
     void loadContacts();
@@ -531,17 +550,40 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
         </div>
       ) : (
         <div className="space-y-2">
+          {proposals.length > 3 && (
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-mono text-muted-foreground">
+                {proposals.length} úkolů · {expandedIds.size} rozbalených
+              </span>
+              <div className="flex gap-1">
+                <button
+                  onClick={expandAll}
+                  className="text-xs px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 transition"
+                >
+                  <ChevronsUpDown className="size-3" /> Rozbalit vše
+                </button>
+                <button
+                  onClick={collapseAll}
+                  className="text-xs px-2 py-1 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 transition"
+                >
+                  <ChevronsDownUp className="size-3" /> Sbalit vše
+                </button>
+              </div>
+            </div>
+          )}
           {proposals.map((p, idx) => (
             <div key={p._id} className="space-y-1">
               <ProposalRow
                 proposal={p}
                 contacts={contacts}
                 todoistProjects={todoistProjects}
+                expanded={expandedIds.has(p._id)}
+                onToggleExpanded={() => toggleExpanded(p._id)}
                 onChange={(patch) => setProposals((prev) => prev.map((q, i) => (i === idx ? { ...q, ...patch } : q)))}
                 onRemove={() => setProposals((prev) => prev.filter((_, i) => i !== idx))}
               />
               {p.subtasks && p.subtasks.length > 0 && (
-                <div className="ml-7 space-y-1 border-l-2 border-[var(--tint-peach)]/30 pl-3">
+                <div className="ml-7 space-y-1 border-l-2 border-border pl-3">
                   {p.subtasks.map((sub, sIdx) => (
                     <ProposalRow
                       key={sub._id}
@@ -549,7 +591,8 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
                       contacts={contacts}
                       todoistProjects={todoistProjects}
                       isSubtask
-                      // Pokud rodič odškrtnut, sub se vizuálně tmaví ale dál edituje
+                      expanded={expandedIds.has(sub._id)}
+                      onToggleExpanded={() => toggleExpanded(sub._id)}
                       onChange={(patch) =>
                         setProposals((prev) =>
                           prev.map((q, i) =>
@@ -596,6 +639,7 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
 
 function ProposalRow({
   proposal, contacts, todoistProjects, onChange, onRemove, isSubtask = false,
+  expanded, onToggleExpanded,
 }: {
   proposal: Proposal;
   contacts: Contact[];
@@ -603,28 +647,86 @@ function ProposalRow({
   onChange: (patch: Partial<Proposal>) => void;
   onRemove: () => void;
   isSubtask?: boolean;
+  expanded: boolean;
+  onToggleExpanded: () => void;
 }) {
   const dueObj = proposal.dueAt ? new Date(proposal.dueAt) : null;
+  const tTag = getTTag(proposal.tags);
+  const otherTags = stripTTag(proposal.tags);
+  const assignee = proposal.assignedToContactId
+    ? contacts.find((c) => c.id === proposal.assignedToContactId)?.displayName
+    : null;
+
+  // Compact summary chip helper
+  function fmtDate(d: Date | null) {
+    if (!d) return null;
+    return d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" });
+  }
 
   return (
-    <div className={`${isSubtask ? "rounded-md p-3 bg-white/[0.04]" : "glass rounded-xl p-4 border border-white/10"} ${!proposal._checked ? "opacity-50" : ""}`}>
-      <div className="flex items-start gap-3">
+    <div className={`${isSubtask ? "rounded-md bg-accent/20" : "rounded-xl border border-border bg-card"} ${!proposal._checked ? "opacity-50" : ""}`}>
+      {/* Compact row — vždy viditelný, klik na titulek/řádek rozbalí */}
+      <div className="flex items-center gap-3 p-3">
         <button
-          onClick={() => onChange({ _checked: !proposal._checked })}
-          className={`mt-1 size-5 rounded border shrink-0 ${
+          onClick={(e) => { e.stopPropagation(); onChange({ _checked: !proposal._checked }); }}
+          className={`size-5 rounded border shrink-0 ${
             proposal._checked
               ? "bg-[var(--tint-peach)]/40 border-[var(--tint-peach)]"
-              : "border-white/40 hover:border-white/70"
+              : "border-border hover:border-foreground/60"
           } grid place-items-center`}
         >
           {proposal._checked && <Check className="size-3" />}
         </button>
 
-        <div className="flex-1 min-w-0">
-          {/* Petr 2026-05-25: vše inline — žádný „rozkliknout edit panel".
-              Title editovatelný klikem, ostatní pole vždy viditelné selecty/inputy.
-              Tab přeskakuje, změny se ukládají rovnou do local state (DB commit
-              jde tlačítkem „Uložit X úkolů" dole). */}
+        <button
+          onClick={onToggleExpanded}
+          className="flex-1 min-w-0 flex items-center gap-2 text-left"
+        >
+          {expanded ? (
+            <ChevronDown className="size-3.5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
+          )}
+          <span className="font-medium truncate">{proposal.title}</span>
+
+          {/* Meta chips — viditelné i v collapsed režimu */}
+          {!expanded && (
+            <span className="flex items-center gap-1.5 ml-2 shrink-0 text-xs text-muted-foreground">
+              {dueObj && (
+                <span className="flex items-center gap-0.5 font-mono">
+                  <Clock className="size-3" /> {fmtDate(dueObj)}
+                </span>
+              )}
+              {proposal.priority === "high" && (
+                <span className="text-[color:var(--c-signal)] font-mono">! priorita</span>
+              )}
+              {tTag !== "t-?" && (
+                <span className="font-mono">{T_LABEL[tTag]}</span>
+              )}
+              {assignee && (
+                <span className="flex items-center gap-0.5">
+                  <UserCheck className="size-3" /> {assignee}
+                </span>
+              )}
+              {otherTags.length > 0 && (
+                <span className="font-mono">#{otherTags.length}</span>
+              )}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={onRemove}
+          className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive shrink-0"
+          title="Smazat tento návrh"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      {/* Expanded edit panel — renderuje se jen když rozbalené */}
+      {expanded && (
+        <div className="px-3 pb-3 pl-11 space-y-2">
           <InlineTitle
             value={proposal.title}
             onSave={(next) => onChange({ title: next })}
@@ -750,17 +852,7 @@ function ProposalRow({
             </div>
           )}
         </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={onRemove}
-            className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground"
-            title="Smazat tento návrh"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
