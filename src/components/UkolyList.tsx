@@ -469,23 +469,26 @@ function TaskRow({
   const isOverdue = dueDate && dueDate < new Date() && !isDone;
   const isToday = dueDate && dueDate.toDateString() === new Date().toDateString();
 
+  // Petr 2026-06-19: kompaktní 1-row layout. Titulek + meta inline.
+  // Detail (poznámka, tagy list) pod toggle 'Detail' jen když je potřeba.
+  const tagsToShow = task.tags.slice(0, 3);
+  const tagsMore = Math.max(0, task.tags.length - tagsToShow.length);
+
   return (
-    <div className={`glass rounded-xl p-4 border border-white/10 ${isDone ? "opacity-50" : ""}`}>
-      <div className="flex items-start gap-3">
+    <div className={`rounded-md border border-border bg-card hover:border-foreground/20 transition ${isDone ? "opacity-50" : ""}`}>
+      <div className="flex items-center gap-2.5 px-3 py-2">
         <button
           onClick={onToggleDone}
           disabled={busy}
-          className={`mt-1 size-5 rounded border shrink-0 ${
-            isDone ? "bg-[var(--tint-sage)]/40 border-[var(--tint-sage)]" : "border-white/40 hover:border-white/70"
+          className={`size-5 rounded border shrink-0 ${
+            isDone ? "bg-foreground/10 border-foreground/40" : "border-border hover:border-foreground/60"
           } grid place-items-center`}
         >
           {isDone && <Check className="size-3" />}
           {busy && !isDone && <Loader2 className="size-3 animate-spin" />}
         </button>
 
-        <div className="flex-1 min-w-0">
-          {/* Petr 2026-05-25: klik na název = inline edit, blur/Enter ukládá,
-              Escape ruší. Šetří otevírání plného Edit panelu pro 90 % případů. */}
+        <div className="flex-1 min-w-0 flex items-center gap-2.5 flex-wrap">
           <InlineTitle
             value={task.title}
             done={isDone}
@@ -497,73 +500,55 @@ function TaskRow({
             }}
           />
 
-          {/* Petr 2026-05-25: vyšší kontrast — text-xs→text-sm, foreground/80
-              místo muted-foreground na neutrálních metách. */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm">
-            {dueDate && (
-              <span className={`flex items-center gap-1 font-mono ${isOverdue ? "text-[var(--tint-rose)]" : isToday ? "text-[var(--tint-butter)]" : "text-foreground/80"}`}>
-                <Clock className="size-3.5" />
-                {dueDate.toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" })}
-                {task.dueIsTime && ` ${dueDate.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}`}
-              </span>
-            )}
-            {task.assignedToContact && (
-              <span className="flex items-center gap-1 text-[var(--tint-lavender)]">
-                <UserCheck className="size-3.5" /> {task.assignedToContact.displayName}
-              </span>
-            )}
-            {task.priority === "high" && (
-              <span className="flex items-center gap-1 text-[var(--tint-rose)] font-mono">! priorita</span>
-            )}
-            {task.priority === "low" && (
-              <span className="text-foreground/70 font-mono">↓ low</span>
-            )}
-            {task.tags.length > 0 && (
-              <span className="flex items-center gap-1 text-foreground/75">
-                <Tag className="size-3.5" />
-                {task.tags.map((t) => `#${t}`).join(" ")}
-              </span>
-            )}
-            {task.todoistProjectName && (
-              <span className="font-mono text-[var(--tint-sky)]">{task.todoistProjectName}</span>
-            )}
-            {task.todoistTaskId && !task.todoistProjectName && (
-              <span className="text-[var(--tint-sage)] font-mono">Todoist</span>
-            )}
-            {task.source === "vip_call_log" && (
-              <span className="font-mono text-[var(--tint-rose)]">VIP firewall</span>
-            )}
-            {task.source !== "manual" && task.source !== "vip_call_log" && (
-              <span className="text-muted-foreground font-mono text-xs">[{task.source}]</span>
-            )}
-          </div>
-
-          {(task.notes || task.rawSnippet) && (
-            <button
-              onClick={() => setShowDetail(!showDetail)}
-              className="text-xs text-muted-foreground hover:text-foreground mt-1 flex items-center gap-1"
-            >
-              <ChevronDown className={`size-3 transition-transform ${showDetail ? "rotate-180" : ""}`} />
-              detail
-            </button>
+          {/* Meta chips — jen to nejdůležitější, inline, decent. */}
+          {dueDate && (
+            <span className={`flex items-center gap-1 text-xs font-mono shrink-0 ${
+              isOverdue ? "text-[color:var(--c-signal)]" : isToday ? "text-foreground" : "text-muted-foreground"
+            }`}>
+              <Clock className="size-3" />
+              {dueDate.toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" })}
+              {task.dueIsTime && ` ${dueDate.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}`}
+            </span>
           )}
-          {showDetail && (
-            <div className="mt-2 text-xs space-y-1">
-              {task.notes && <div className="text-muted-foreground">{task.notes}</div>}
-              {task.rawSnippet && <div className="italic text-muted-foreground">„{task.rawSnippet}"</div>}
-              {task.pushError && (
-                <div className="text-destructive">Push error: {task.pushError}</div>
-              )}
-            </div>
+          {task.priority === "high" && (
+            <span className="text-[color:var(--c-signal)] text-xs font-mono shrink-0">!</span>
+          )}
+          {task.assignedToContact && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+              <UserCheck className="size-3" /> {task.assignedToContact.displayName}
+            </span>
+          )}
+          {tagsToShow.length > 0 && (
+            <span className="text-xs font-mono text-muted-foreground shrink-0">
+              {tagsToShow.map((t) => `#${t}`).join(" ")}
+              {tagsMore > 0 && ` +${tagsMore}`}
+            </span>
+          )}
+          {task.todoistProjectName && (
+            <span className="text-[10px] font-mono text-muted-foreground/70 shrink-0 truncate max-w-[120px]">
+              {task.todoistProjectName}
+            </span>
+          )}
+          {task.source === "vip_call_log" && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[color:var(--c-signal)]/40 text-[color:var(--c-signal)] shrink-0">VIP</span>
           )}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
+          {(task.notes || task.rawSnippet) && (
+            <button
+              onClick={() => setShowDetail(!showDetail)}
+              className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+              title={showDetail ? "Skrýt detail" : "Detail (poznámka/citát)"}
+            >
+              <ChevronDown className={`size-3.5 transition-transform ${showDetail ? "rotate-180" : ""}`} />
+            </button>
+          )}
           {!task.todoistTaskId && todoistConfigured && !isDone && (
             <button
               onClick={onPush}
               disabled={busy}
-              className="p-1.5 rounded hover:bg-[var(--tint-sage)]/20 text-muted-foreground hover:text-[var(--tint-sage)]"
+              className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
               title="Push do Todoistu"
             >
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
@@ -571,20 +556,34 @@ function TaskRow({
           )}
           <button
             onClick={() => setEditing(!editing)}
-            className="p-1.5 rounded hover:bg-white/5 text-muted-foreground"
+            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
             title="Upravit"
           >
             <Edit3 className="size-3.5" />
           </button>
           <button
             onClick={onDelete}
-            className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground"
+            className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
             title="Smazat"
           >
             <Trash2 className="size-3.5" />
           </button>
         </div>
       </div>
+
+      {showDetail && (task.notes || task.rawSnippet || task.pushError) && (
+        <div className="px-3 pb-2.5 pl-10 text-xs space-y-1">
+          {task.notes && <div className="text-foreground/80">{task.notes}</div>}
+          {task.rawSnippet && (
+            <div className="italic text-muted-foreground pl-2 border-l-2 border-border">
+              „{task.rawSnippet}"
+            </div>
+          )}
+          {task.pushError && (
+            <div className="text-destructive">Push error: {task.pushError}</div>
+          )}
+        </div>
+      )}
 
       {editing && (
         <EditInline

@@ -75,11 +75,20 @@ export const GET: APIRoute = async ({ cookies, url }) => {
   const includeVipDone = status === "done" || status === "all";
   const fourteenDaysAgo = new Date(Date.now() - 14 * 86400000);
 
+  // Aplikuj assignedTo filter i na VIP mise — bez něj filter 'Honza Svěrák'
+  // vrátil prisma tasks JEN pro Honzu, ALE VIP mise od Lucie/Gáti se přesto
+  // zobrazily protože VIP query byla bezpodmínečná. Fix 2026-06-19 Gideon.
+  const vipAssigneeFilter =
+    assignedTo === "all" ? {} :
+    assignedTo === "me" ? { contactId: null } :
+    { contactId: assignedTo };
+
   const vipCalls = await prisma.callLog.findMany({
     where: {
       userId: session.uid,
       wasVip: true,
       ...(tag ? { id: "__never__" } : {}), // VIP mise nemají tagy → tag filtr je vyřadí
+      ...vipAssigneeFilter,
       OR: [
         ...(includeVipOpen ? [{ seenAt: null }] : []),
         ...(includeVipDone ? [{ seenAt: { gte: fourteenDaysAgo } }] : []),
