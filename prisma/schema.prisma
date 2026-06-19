@@ -867,6 +867,10 @@ model ProjectFile {
   projectId    String
   project      ProjectBox @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  // Petr 2026-06-19: kdo nahrál — null = Petr (admin), guestUserId = host přes Studánku.
+  guestUserId  String?
+  guestUser    GuestUser? @relation(fields: [guestUserId], references: [id], onDelete: SetNull)
+
   filename     String   // bezpečné jméno na disku (uuid + ext)
   originalName String   // původní jméno z uploadu (pro download "save as")
   mime         String
@@ -876,9 +880,17 @@ model ProjectFile {
   // Volitelný popis — Petr si může napsat „faktura listopad 2026" apod.
   note         String?  @db.Text
 
+  // Petr 2026-06-19: extrakce textu z dokumentu (PDF/DOCX/XLSX/TXT) + RAG index.
+  // Status: null (audio nebo neznámý typ, neextrahujeme) | "pending" | "ok" | "error".
+  // extractedText: plný text pro RAG search + audit. Max ~100k chars.
+  extractedText    String? @db.Text
+  extractionStatus String?
+  extractionError  String?
+
   uploadedAt   DateTime @default(now())
 
   @@index([projectId, uploadedAt])
+  @@index([guestUserId])
 }
 
 model GuestUser {
@@ -896,6 +908,7 @@ model GuestUser {
 
   invitations ProjectInvitation[]
   recordings  ProjectRecording[]
+  files       ProjectFile[]
 
   createdAt   DateTime @default(now())
   lastSeenAt  DateTime?

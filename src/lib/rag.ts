@@ -28,7 +28,7 @@ export const CHUNK_SIZE = 600;     // znaků
 export const CHUNK_OVERLAP = 100;  // znaků (10-20% pro kontext mezi chunky)
 export const SEARCH_TOP_K = 8;     // kolik chunků vrátit do LLM kontextu
 
-export type RagSource = "journal" | "task" | "studna";
+export type RagSource = "journal" | "task" | "studna" | "project-document";
 
 // ---------------------------------------------------------------------------
 // Chunking

@@ -570,10 +570,33 @@ function getExtensionFromMime(mime: string): string {
 }
 
 /**
- * Upload audio button pro hosty s canUploadAudio=true v invitation.
- * MP3/M4A/WAV/... → POST /api/me/<token>/upload-audio.
+ * Upload audio/dokument button pro hosty s canUploadAudio=true v invitation.
+ *
+ * Petr 2026-06-19: rozšířeno o dokumenty. Detekce podle MIME:
+ *   - audio/* → POST /api/me/<token>/upload-audio (transkript + AI)
+ *   - PDF/DOCX/XLSX/TXT → POST /api/me/<token>/upload-document
+ *     (extrakce textu + RAG indexace do znalostní báze projektu)
+ *
  * Žádné spinning kolečko (Petr 2026-05-07 — matoucí), jen progress bar.
  */
+
+function isDocumentByName(file: File): boolean {
+  const m = (file.type || "").toLowerCase();
+  const n = file.name.toLowerCase();
+  if (m.startsWith("audio/") || m.startsWith("video/")) return false;
+  if (m === "application/pdf" || n.endsWith(".pdf")) return true;
+  if (
+    m.includes("wordprocessingml") || m === "application/msword" ||
+    n.endsWith(".docx") || n.endsWith(".doc")
+  ) return true;
+  if (
+    m.includes("spreadsheetml") || m === "application/vnd.ms-excel" ||
+    n.endsWith(".xlsx") || n.endsWith(".xls")
+  ) return true;
+  if (m === "text/plain" || n.endsWith(".txt") || n.endsWith(".md")) return true;
+  return false;
+}
+
 function UploadAudioGuestButton({
   token,
   projectId,
@@ -586,11 +609,15 @@ function UploadAudioGuestButton({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [lastSuccess, setLastSuccess] = useState<string | null>(null);
 
   async function uploadFile(file: File) {
     setError(null);
+    setLastSuccess(null);
     setUploading(true);
     setProgress(0);
+    const isDoc = isDocumentByName(file);
+    const endpoint = isDoc ? `/api/me/${token}/upload-document` : `/api/me/${token}/upload-audio`;
     try {
       const fd = new FormData();
       fd.append("projectId", projectId);
@@ -613,10 +640,13 @@ function UploadAudioGuestButton({
           }
         });
         xhr.addEventListener("error", () => reject(new Error("Síťová chyba")));
-        xhr.open("POST", `/api/me/${token}/upload-audio`);
+        xhr.open("POST", endpoint);
         xhr.send(fd);
       });
       await done;
+      const kindLabel = isDoc ? "Dokument" : "Audio";
+      setLastSuccess(`${kindLabel} přijat: ${file.name}`);
+      setTimeout(() => setLastSuccess(null), 5000);
       onSuccess();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -639,13 +669,13 @@ function UploadAudioGuestButton({
         }}
       >
         {uploading ? (
-          <span className="inline-flex items-center gap-2"><Loader2 className="size-4 animate-spin" /> Nahrávám soubor… {progress}%</span>
+          <span className="inline-flex items-center gap-2"><Loader2 className="size-4 animate-spin" /> Nahrávám… {progress}%</span>
         ) : (
-          <span className="inline-flex items-center gap-2"><Paperclip className="size-4" /> Nahrát audio soubor (MP3/M4A/...)</span>
+          <span className="inline-flex items-center gap-2"><Paperclip className="size-4" /> Nahrát audio nebo dokument (PDF, DOCX, XLSX, TXT)</span>
         )}
         <input
           type="file"
-          accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.webm,.mp4,.flac"
+          accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.webm,.mp4,.flac,application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,application/msword,.doc,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx,application/vnd.ms-excel,.xls,text/plain,.txt,.md"
           className="hidden"
           disabled={uploading}
           onChange={(e) => {
@@ -656,8 +686,18 @@ function UploadAudioGuestButton({
         />
       </label>
       {uploading && (
-        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mt-2">
-          <div className="h-full bg-[var(--foreground)] transition-all" style={{ width: `${progress}%` }} />
+        <div className="h-1.5 bg-secondary rounded-full overflow-hidden mt-2">
+          <div className="h-full bg-foreground transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      {lastSuccess && !uploading && (
+        <div className="mt-2 text-center text-xs text-[color:var(--c-signal)]">
+          ✓ {lastSuccess}
+        </div>
+      )}
+      {error && !uploading && (
+        <div className="mt-2 text-center text-xs text-destructive">
+          {error}
         </div>
       )}
       {error && (
