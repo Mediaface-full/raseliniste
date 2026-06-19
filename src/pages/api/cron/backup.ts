@@ -3,8 +3,40 @@ import { env } from "@/lib/env";
 import { runBackup } from "@/lib/backup";
 import { sendMail } from "@/lib/mailer";
 import { readSession } from "@/lib/session";
+import { prisma } from "@/lib/db";
 
 export const prerender = false;
+
+// Manuální i cron run promítnout do CronRun aby /start widget
+// (SchedulerStatus) odrážel realitu. Bez tohoto manuální GET úspěch
+// nezavolá dispatcher → lastError visí dál.
+async function recordCronRun(ok: boolean, error: string | null, durationMs: number) {
+  const now = new Date();
+  await prisma.cronRun.upsert({
+    where: { jobName: "backup" },
+    update: {
+      lastTriggeredAt: now,
+      lastSuccessAt: ok ? now : undefined,
+      lastError: ok ? null : error,
+      lastDurationMs: durationMs,
+      lastStatus: ok ? 200 : 500,
+      runCount: { increment: 1 },
+      successCount: ok ? { increment: 1 } : undefined,
+      errorCount: ok ? undefined : { increment: 1 },
+    },
+    create: {
+      jobName: "backup",
+      lastTriggeredAt: now,
+      lastSuccessAt: ok ? now : null,
+      lastError: ok ? null : error,
+      lastDurationMs: durationMs,
+      lastStatus: ok ? 200 : 500,
+      runCount: 1,
+      successCount: ok ? 1 : 0,
+      errorCount: ok ? 0 : 1,
+    },
+  });
+}
 
 /**
  * POST /api/cron/backup
@@ -26,6 +58,8 @@ export const POST: APIRoute = async ({ request }) => {
   console.log("[cron-backup] start");
   const result = await runBackup({ triggeredBy: "cron" });
   console.log(`[cron-backup] done in ${result.durationMs}ms, ok=${result.ok}`);
+
+  await recordCronRun(result.ok, result.ok ? null : "backup failed", result.durationMs);
 
   // Mail při fail (info-level success do logu stačí)
   const to = env.NOTIFICATION_EMAIL;
@@ -69,5 +103,6 @@ export const GET: APIRoute = async ({ url, cookies }) => {
 
   console.log(`[cron-backup] manual GET trigger (${session ? "session" : "cron-key"})`);
   const result = await runBackup({ triggeredBy: session ? "manual-session" : "manual-key" });
+  await recordCronRun(result.ok, result.ok ? null : "backup failed", result.durationMs);
   return Response.json(result, { status: result.ok ? 200 : 500 });
 };

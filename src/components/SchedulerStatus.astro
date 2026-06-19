@@ -28,8 +28,12 @@ const errorJobs = CRON_JOBS
   .map((def) => ({ def, run: map.get(def.name) }))
   .filter(({ run }) => {
     if (!run?.lastError) return false;
-    // Nedávno úspěch zhojil chybu?
-    if (run.lastSuccessAt && run.lastSuccessAt > new Date(Date.now() - 60_000)) return false;
+    // Poslední pokus byl úspěšný (success >= trigger) → chyba je zhojena.
+    // Pozn: 60s grace by selhal u daily/weekly jobů (success z minulé noci).
+    if (
+      run.lastSuccessAt &&
+      run.lastSuccessAt.getTime() >= run.lastTriggeredAt.getTime() - 1000
+    ) return false;
     return true;
   });
 
