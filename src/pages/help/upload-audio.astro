@@ -2,12 +2,12 @@
 import Base from "../../layouts/Base.astro";
 ---
 
-<Base title="Jak nahrát audio soubor · Studánka">
+<Base title="Jak nahrát soubor · Studánka">
   <main class="print-root">
     {/* Toolbar — schovaný v tisku */}
     <div class="toolbar print:hidden">
       <a href="/" class="btn-link">← Zpět</a>
-      <button type="button" onclick="window.print()" class="btn-primary">🖨 Vytisknout / Uložit PDF</button>
+      <button type="button" onclick="window.print()" class="btn-primary">Vytisknout / Uložit PDF</button>
     </div>
 
     <header class="page-header">
@@ -15,10 +15,11 @@ import Base from "../../layouts/Base.astro";
         <span class="kontext-pill">Návod pro hosty</span>
         <span class="date-stamp">Studánka · Rašeliniště</span>
       </div>
-      <h1 class="title">Jak nahrát audio soubor do Studánky</h1>
+      <h1 class="title">Jak nahrát soubor do Studánky</h1>
       <p class="subtitle">
-        Stačí jakákoli aplikace, která umí audio uložit do souboru — typicky <strong>Voice Recorder</strong>
-        na iPhone, ale jakákoli jiná funguje stejně.
+        Můžeš poslat <strong>audio</strong> (Voice Recorder, podcast, schůzka) nebo
+        <strong>dokument</strong> (PDF, Word, Excel, prostý text). Studánka oba zpracuje —
+        audio přepíše do textu, dokument extrahuje a zařadí do znalostní báze projektu.
       </p>
     </header>
 
@@ -26,10 +27,15 @@ import Base from "../../layouts/Base.astro";
     <section class="section break-inside-avoid">
       <div class="step-num">1</div>
       <div class="step-body">
-        <h2>Nahraj nebo otevři audio záznam</h2>
+        <h2>Najdi nebo připrav soubor</h2>
         <p>
-          Použij svou oblíbenou nahrávací aplikaci (Voice Recorder, Hlasové poznámky, Diktafon).
-          Nebo si můžeš poslat soubor z WhatsAppu, mailu — odkudkoli, co se ti uloží do Files.
+          <strong>Audio:</strong> nahraj v oblíbené aplikaci (Voice Recorder, Hlasové poznámky,
+          Diktafon). Nebo si pošli soubor z WhatsAppu, mailu — odkudkoli, co se ti uloží do Files.
+        </p>
+        <p>
+          <strong>Dokument:</strong> jakýkoli PDF, Word (.docx / .doc), Excel (.xlsx / .xls) nebo
+          textový soubor (.txt). Naskenovaná smlouva, faktura, podklad, poznámky — cokoli, co
+          chceš mít v projektu.
         </p>
       </div>
     </section>
@@ -40,8 +46,11 @@ import Base from "../../layouts/Base.astro";
       <div class="step-body">
         <h2>Ulož ho jako soubor (NE jako přílohu mailu)</h2>
         <p>
-          Ve Voice Recorder klikni na záznam → ikona <strong>Sdílet</strong> (čtvereček se šipkou nahoru).
-          Z dlouhého seznamu vyber <strong>JEDNU z těchto tří</strong>:
+          Pokud nemáš soubor v Files (iPhone) / Souborech (Android) / na ploše PC, ulož ho tam nejdřív.
+        </p>
+        <p>
+          Příklad pro audio z Voice Recorder na iPhone: klikni na záznam → ikona <strong>Sdílet</strong>
+          (čtvereček se šipkou nahoru). Z dlouhého seznamu vyber <strong>JEDNU z těchto tří</strong>:
         </p>
 
         <table class="options">
@@ -93,9 +102,9 @@ import Base from "../../layouts/Base.astro";
     <section class="section break-inside-avoid">
       <div class="step-num">4</div>
       <div class="step-body">
-        <h2>Klikni na „Nahrát audio soubor"</h2>
+        <h2>Klikni na „Nahrát audio nebo dokument"</h2>
         <p>
-          Lavender tlačítko pod hlavním nahrávacím kruhem.
+          Tlačítko s ikonou sponky pod hlavním nahrávacím kruhem.
         </p>
       </div>
     </section>
@@ -131,26 +140,44 @@ import Base from "../../layouts/Base.astro";
       <div class="step-body">
         <h2>Hotovo</h2>
         <p>
-          Po nahrání ti Studánka řekne <em>„Hotovo"</em>. Soubor se uložil, <strong>přepis do textu</strong>
-          se připraví na pozadí — vrátíš se kdykoli a v seznamu svých záznamů uvidíš plný text.
+          Po nahrání uvidíš potvrzení. Soubor je v projektu, zpracování běží na pozadí:
         </p>
+        <ul>
+          <li><strong>Audio</strong> — přepis do textu (vrátíš se kdykoli a v seznamu vidíš plný text)</li>
+          <li><strong>Dokument</strong> — extrakce textu + zařazení do znalostní báze projektu</li>
+        </ul>
       </div>
     </section>
 
     {/* === BLOK Co se po uploadu stane === */}
     <section class="info-section break-inside-avoid">
       <h2>Co se po uploadu stane</h2>
+
+      <div class="kicker">Audio</div>
       <table class="stages">
         <thead><tr><th>Fáze</th><th>Co se děje</th><th>Trvání</th></tr></thead>
         <tbody>
           <tr><td>Upload</td><td>Audio jde z telefonu na server</td><td>~2–60 sekund</td></tr>
           <tr><td>Přepis</td><td>AI (Gemini) si soubor poslechne a doslova ho přepíše</td><td>30 s – 5 min</td></tr>
-          <tr><td>Hotovo</td><td>V seznamu uvidíš záznam s tvým názvem souboru a plným textem</td><td>—</td></tr>
+          <tr><td>Hotovo</td><td>V seznamu uvidíš záznam s tvým názvem a plným textem</td><td>—</td></tr>
         </tbody>
       </table>
+
+      <div class="kicker" style="margin-top: 10pt;">Dokument</div>
+      <table class="stages">
+        <thead><tr><th>Fáze</th><th>Co se děje</th><th>Trvání</th></tr></thead>
+        <tbody>
+          <tr><td>Upload</td><td>Soubor jde na server</td><td>~2–10 sekund</td></tr>
+          <tr><td>Extrakce</td><td>Server přečte text z PDF / Word / Excel / TXT</td><td>2–30 sekund</td></tr>
+          <tr><td>RAG</td><td>Text se zařadí do znalostní báze projektu — vyhledatelný</td><td>30 s – 2 min</td></tr>
+          <tr><td>Hotovo</td><td>V seznamu uvidíš soubor se značkou „Přijato"</td><td>—</td></tr>
+        </tbody>
+      </table>
+
       <p class="note">
-        <strong>Jen přepis, žádná AI analýza.</strong> Tvoje audio + text Gideon najde v projektu, ale AI z toho
-        nedělá shrnutí ani extrakce — když nahráváš podcast nebo zápis schůzky, chceš jen text, ne interpretaci.
+        <strong>Audio = jen přepis</strong> (bez AI shrnutí — když nahráváš podcast, chceš text).<br/>
+        <strong>Dokument = extrakce + RAG</strong> — Gideon pak může vyhledávat „co bylo v té faktuře z listopadu"
+        a najde text napříč všema dokumenty + audio přepisy projektu.
       </p>
     </section>
 
@@ -159,37 +186,50 @@ import Base from "../../layouts/Base.astro";
       <h2>Formáty + limity</h2>
       <div class="two-col">
         <div>
-          <div class="kicker">Funguje</div>
+          <div class="kicker">Audio (max 500 MB, 20/h)</div>
           <ul class="ok-list">
             <li>MP3</li><li>M4A</li><li>WAV</li><li>OGG</li><li>AAC</li><li>FLAC</li><li>WebM</li>
           </ul>
         </div>
         <div>
-          <div class="kicker">Limity</div>
-          <ul>
-            <li>Velikost souboru: <strong>max 500 MB</strong> (cca 6+ hodin v 128 kbps)</li>
-            <li>Počet uploadů: max 20 za hodinu</li>
-            <li>Délka audia: bez stropu — server zvládne i hodinové podcasty</li>
+          <div class="kicker">Dokumenty (max 50 MB, 30/h)</div>
+          <ul class="ok-list">
+            <li>PDF (.pdf)</li>
+            <li>Word (.docx, .doc)</li>
+            <li>Excel (.xlsx, .xls)</li>
+            <li>Text (.txt, .md)</li>
           </ul>
         </div>
       </div>
+      <p class="note" style="margin-top: 10pt;">
+        Limity jsou nezávislé — můžeš ve stejné hodině nahrát 20 audio + 30 dokumentů.
+        Délka audia bez stropu — server zvládne i hodinové podcasty.
+      </p>
     </section>
 
     {/* === BLOK Časté problémy === */}
     <section class="info-section break-inside-avoid">
       <h2>Časté problémy</h2>
       <dl class="faq">
-        <dt>„Soubor není audio"</dt>
-        <dd>Server poznal, že to není zvuk (např. omylem fotka nebo video). V aplikaci Voice Recorder zkontroluj, že vybíráš zvukový záznam; v exportu zvol M4A nebo MP3.</dd>
+        <dt>„Nepodporovaný typ"</dt>
+        <dd>Soubor není ani audio, ani PDF / Word / Excel / TXT. Pokud máš jiný formát (RTF, HTML, Pages),
+            zkus ho exportovat jako PDF nebo .txt.</dd>
 
         <dt>„Soubor je moc velký"</dt>
-        <dd>Přes 500 MB. Buď rozsekni audio na kratší úseky v editoru, nebo re-encodni na nižší bitrate (Voice Recorder má volbu kvality).</dd>
+        <dd>Audio: přes 500 MB. Buď rozsekni na kratší úseky, nebo re-encodni na nižší bitrate.<br/>
+            Dokument: přes 50 MB. Pokud je to naskenovaný PDF, komprese v náhledu obvykle pomůže
+            (Soubor → Exportovat jako PDF se sníženou kvalitou).</dd>
 
         <dt>Nahrávání trvá věčně</dt>
         <dd>Velký soubor + slabší WiFi. Počkej. Pokud se to nepodaří, ne posílej znovu hned — zkus lepší síť.</dd>
 
-        <dt>Po uploadu nevidím přepis</dt>
-        <dd>AI ho zpracovává na pozadí — typicky 30 s až 5 min. Dej mu chvíli a obnov stránku. Pokud po 10 minutách pořád nic, napiš Gideonovi.</dd>
+        <dt>Po uploadu nevidím přepis (audio)</dt>
+        <dd>AI ho zpracovává na pozadí — typicky 30 s až 5 min. Dej mu chvíli a obnov stránku.
+            Pokud po 10 minutách pořád nic, napiš Gideonovi.</dd>
+
+        <dt>Dokument se ukázal jako „Selhalo"</dt>
+        <dd>Extrakce textu selhala — typicky scanned PDF bez OCR vrstvy, zaheslovaný soubor, nebo poškozený formát.
+            Otevři dokument na svém zařízení, ulož ho jako nový PDF (Print → Save as PDF) a zkus znovu.</dd>
       </dl>
     </section>
 
