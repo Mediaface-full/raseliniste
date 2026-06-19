@@ -69,6 +69,11 @@ interface ProjectDetail {
     bytes: number;
     note: string | null;
     uploadedAt: string;
+    // Petr 2026-06-19: host upload + extrakce textu (PDF/DOCX/XLSX/TXT)
+    extractionStatus?: string | null;
+    extractionError?: string | null;
+    guestUserId?: string | null;
+    guestUser?: { name: string } | null;
   }>;
 }
 
@@ -1862,8 +1867,25 @@ function FilesTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: (
                     <span className="text-[11px] font-mono text-muted-foreground">
                       {fmtBytes(f.bytes)}
                     </span>
+                    {/* Petr 2026-06-19: extrakce textu + RAG status */}
+                    {f.extractionStatus === "pending" && (
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
+                        <Loader2 className="size-3 animate-spin" /> Indexuji
+                      </span>
+                    )}
+                    {f.extractionStatus === "ok" && (
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--c-signal)]" title="Text extrahován, dokument je v RAG znalostní bázi projektu (vyhledatelné přes /zeptat-se).">
+                        ↳ v RAG
+                      </span>
+                    )}
+                    {f.extractionStatus === "error" && (
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-destructive" title={f.extractionError ?? ""}>
+                        ↳ extrakce selhala
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
+                    {f.guestUser?.name ? `Host ${f.guestUser.name} · ` : ""}
                     {f.note ? `${f.note} · ` : ""}
                     {new Date(f.uploadedAt).toLocaleString("cs-CZ", {
                       day: "numeric", month: "numeric", year: "numeric",

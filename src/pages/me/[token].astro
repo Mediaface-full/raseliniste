@@ -27,6 +27,15 @@ let recentRecordings: Array<{
   createdAt: string;
   uploadedFilename: string | null;
 }> = [];
+let recentDocs: Array<{
+  id: string;
+  projectName: string;
+  originalName: string;
+  mime: string;
+  bytes: number;
+  extractionStatus: string | null;
+  uploadedAt: string;
+}> = [];
 let canUploadAudioAny = false;
 
 if (token) {
@@ -85,6 +94,28 @@ if (token) {
       transcript: r.transcript,
       createdAt: r.createdAt.toISOString(),
       uploadedFilename: r.uploadedFilename,
+    }));
+
+    // Petr 2026-06-19: dokumenty co host nahrál — kontext pro něj samého
+    // (transparentnost: ví že soubor byl přijat + status extrakce).
+    const docs = await prisma.projectFile.findMany({
+      where: { guestUserId: g.id },
+      orderBy: { uploadedAt: "desc" },
+      take: 5,
+      select: {
+        id: true, originalName: true, mime: true, bytes: true,
+        extractionStatus: true, uploadedAt: true,
+        project: { select: { name: true } },
+      },
+    });
+    recentDocs = docs.map((d) => ({
+      id: d.id,
+      projectName: d.project.name,
+      originalName: d.originalName,
+      mime: d.mime,
+      bytes: d.bytes,
+      extractionStatus: d.extractionStatus,
+      uploadedAt: d.uploadedAt.toISOString(),
     }));
 
     // Touch lastSeenAt asynchronně (fire-and-forget)
@@ -157,6 +188,45 @@ const guideVariant: "standard" | "brief" =
 
           {recentRecordings.length > 0 && (
             <GuestRecordings client:load recordings={recentRecordings} hideErrors={true} />
+          )}
+
+          {recentDocs.length > 0 && (
+            <div class="mt-6 space-y-2">
+              <div class="text-[11px] uppercase tracking-[0.22em] text-muted-foreground font-mono">
+                ↳ Tvé poslední dokumenty
+              </div>
+              <div class="space-y-1.5">
+                {recentDocs.map((d) => (
+                  <div class="glass rounded-lg p-3 flex items-center gap-3">
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-medium truncate">{d.originalName}</div>
+                      <div class="text-[11px] text-muted-foreground font-mono">
+                        {d.projectName} · {(d.bytes / 1024).toFixed(0)} kB ·{" "}
+                        {new Date(d.uploadedAt).toLocaleString("cs-CZ", {
+                          day: "numeric", month: "numeric",
+                          hour: "2-digit", minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
+                    {d.extractionStatus === "pending" && (
+                      <span class="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+                        Zpracovávám…
+                      </span>
+                    )}
+                    {d.extractionStatus === "ok" && (
+                      <span class="text-[10px] font-mono uppercase tracking-wider text-[color:var(--c-signal)]">
+                        ✓ Přijato
+                      </span>
+                    )}
+                    {d.extractionStatus === "error" && (
+                      <span class="text-[10px] font-mono uppercase tracking-wider text-destructive">
+                        Selhalo
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           <p class="mt-6 text-center text-[11px] text-muted-foreground font-mono tracking-wider">

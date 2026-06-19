@@ -71,6 +71,9 @@ export const GET: APIRoute = async ({ cookies, params }) => {
         select: {
           id: true, originalName: true, mime: true, bytes: true,
           note: true, uploadedAt: true,
+          extractionStatus: true, extractionError: true,
+          guestUserId: true,
+          guestUser: { select: { name: true } },
         },
       },
     },
