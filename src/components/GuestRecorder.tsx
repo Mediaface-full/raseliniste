@@ -671,7 +671,7 @@ function UploadAudioGuestButton({
         {uploading ? (
           <span className="inline-flex items-center gap-2"><Loader2 className="size-4 animate-spin" /> Nahrávám… {progress}%</span>
         ) : (
-          <span className="inline-flex items-center gap-2"><Paperclip className="size-4" /> Nahrát audio nebo dokument (PDF, DOCX, XLSX, TXT)</span>
+          <span className="inline-flex items-center gap-2"><Paperclip className="size-4" /> Nahrát audio nebo dokument</span>
         )}
         <input
           type="file"
