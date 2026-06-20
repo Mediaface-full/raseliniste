@@ -13,17 +13,38 @@ const user = await prisma.user.findUnique({
 });
 if (!user) return Astro.redirect("/login");
 
-const links = await prisma.pageLink.findMany({
-  where: { userId: session.uid },
-  orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-});
+// Petr 2026-06-19 (verze 4): minimální možný fetch + render. Defenzivní
+// try/catch zachytí jakoukoli chybu z Prisma a ukáže ji přímo na stránce.
+// Pokud Astro SSR padá někde mezi `<Shell>` a daty, výpis tady to ukáže.
+type LinkRow = {
+  id: string;
+  name: string;
+  url: string;
+  tint: string;
+  icon: string | null;
+  order: number;
+};
 
-// Petr 2026-06-19: pokud /links na produkci nic nezobrazuje, otevři
-// /links?debug=1 → uvidíš raw data + minimal render. Pomůže najít zda
-// padá Astro SSR rendering nebo Prisma fetch.
-const debug = Astro.url.searchParams.get("debug") === "1";
+let links: LinkRow[] = [];
+let fetchError: string | null = null;
+try {
+  const rows = await prisma.pageLink.findMany({
+    where: { userId: session.uid },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    select: { id: true, name: true, url: true, tint: true, icon: true, order: true },
+  });
+  links = rows.map((r) => ({
+    id: r.id,
+    name: r.name ?? "(bez názvu)",
+    url: r.url ?? "#",
+    tint: r.tint ?? "sky",
+    icon: r.icon,
+    order: r.order,
+  }));
+} catch (e) {
+  fetchError = e instanceof Error ? e.message : String(e);
+}
 
-// Petr 2026-05-27: pretty domain pro malý subtitle pod názvem
 function prettyDomain(url: string): string {
   try {
     const u = new URL(url);
@@ -33,21 +54,11 @@ function prettyDomain(url: string): string {
   }
 }
 
-// Petr 2026-05-27: validace lucide icon name. Pokud Petr zadal něco co
-// není v lucide-icons (např. „Immich", „PhotoPrism" = brand names), fallback
-// na generic „globe". Bez tohoto guardu Astro při buildu/SSR padl protože
-// `lucide:Immich` neexistuje → stránka prázdná.
-//
-// Heuristika: lucide names jsou kebab-case lowercase. Pokud icon obsahuje
-// velké písmeno (capital), je to brand jméno → fallback. Jinak věřit.
-function safeIconName(icon: string | null): string {
+const VALID_LUCIDE = /^[a-z][a-z0-9-]*$/;
+function safeIcon(icon: string | null): string {
   if (!icon || !icon.trim()) return "lucide:globe";
-  const trimmed = icon.trim();
-  // Brand jména (Immich/Video/PhotoPrism) mají capital nebo nejsou kebab-case
-  if (/[A-Z]/.test(trimmed) || !/^[a-z][a-z0-9-]*$/.test(trimmed)) {
-    return "lucide:globe";
-  }
-  return `lucide:${trimmed}`;
+  const t = icon.trim();
+  return VALID_LUCIDE.test(t) ? `lucide:${t}` : "lucide:globe";
 }
 ---
 
@@ -58,92 +69,72 @@ function safeIconName(icon: string | null): string {
   breadcrumb={[{ label: "Přehled" }, { label: "Page Links" }]}
 >
   <div class="max-w-5xl space-y-4">
-    {debug && (
-      <div class="rounded-xl border-2 border-foreground p-4 bg-card font-mono text-xs space-y-3">
-        <div class="text-base font-bold">DEBUG /links</div>
-        <div>links.length = <strong>{links.length}</strong></div>
-        <div>Astro renders OK (pokud čteš tohle).</div>
-        <details>
-          <summary class="cursor-pointer">Raw data ({links.length} items)</summary>
-          <pre class="mt-2 p-2 bg-background border border-border rounded overflow-x-auto text-[10px]">{JSON.stringify(links, null, 2)}</pre>
-        </details>
-        <div class="pt-2 border-t border-border">
-          <div class="font-semibold mb-1">Minimal render:</div>
-          {links.map((l) => (
-            <div>· <a href={l.url} class="underline">{l.name}</a> ({l.tint ?? "—"}/{l.icon ?? "—"})</div>
-          ))}
-        </div>
+    {fetchError && (
+      <div class="rounded-xl border-2 border-destructive p-4 bg-destructive/10 text-destructive font-mono text-sm">
+        <strong>Chyba načtení odkazů z DB:</strong>
+        <pre class="mt-2 text-xs whitespace-pre-wrap">{fetchError}</pre>
       </div>
     )}
-    {!debug && links.length === 0 && (
-      <div class="rounded-2xl p-8 text-center space-y-3 border border-border bg-card">
+
+    {!fetchError && links.length === 0 && (
+      <div class="rounded-2xl border border-border bg-card p-8 text-center space-y-3">
         <Icon name="lucide:link" class="size-12 mx-auto text-muted-foreground" />
         <h2 class="text-lg font-bold tracking-[-0.02em]">Zatím žádné odkazy</h2>
         <p class="text-sm text-muted-foreground">
-          Přidej si odkazy na často navštěvované weby, otevřou se v novém okně.
+          Přidejte si odkazy na často navštěvované weby, otevřou se v novém okně.
         </p>
         <a
           href="/settings/page-links"
-          class="inline-flex items-center gap-1.5 mt-2 px-4 py-2 rounded-md bg-foreground text-background text-sm font-medium hover:opacity-90 transition"
+          class="inline-flex items-center gap-1.5 mt-2 px-4 py-2 rounded-md bg-foreground text-background text-sm font-medium hover:opacity-90"
         >
-          <Icon name="lucide:plus" class="size-4" /> Přidat první odkaz
+          + Přidat první odkaz
         </a>
       </div>
     )}
-    {!debug && links.length > 0 && (
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+
+    {!fetchError && links.length > 0 && (
+      <ul class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 list-none p-0 m-0">
         {links.map((link) => (
-          <a
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer external"
-            data-external-link
-            class="rounded-2xl p-4 relative overflow-hidden flex flex-col items-start gap-2 min-h-[96px] transition border border-border bg-card hover:border-foreground/40 hover:bg-accent/40 active:scale-[0.98]"
-            style={`--c: var(--tint-${link.tint ?? "sky"});`}
-          >
-            <div
-              class="absolute -top-12 -right-12 size-32 rounded-full blur-2xl pointer-events-none opacity-50"
-              style="background: var(--c, var(--tint-sky));"
-            ></div>
-            <div
-              class="size-10 rounded-xl grid place-items-center relative"
-              style="border: 1px solid var(--c, var(--tint-sky)); color: var(--c, var(--tint-sky));"
+          <li class="m-0 p-0">
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer external"
+              data-external-link
+              class="block rounded-2xl p-4 border border-border bg-card hover:border-foreground/40 hover:bg-accent/40 transition min-h-[96px] no-underline"
             >
-              <Icon name={safeIconName(link.icon)} class="size-5" />
-            </div>
-            <div class="relative mt-auto">
-              <div class="text-base font-semibold tracking-tight">{link.name}</div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="size-9 rounded-lg grid place-items-center border border-border text-muted-foreground shrink-0">
+                  <Icon name={safeIcon(link.icon)} class="size-5" />
+                </span>
+              </div>
+              <div class="text-base font-semibold tracking-tight text-foreground">{link.name}</div>
               <div class="text-[10px] font-mono text-muted-foreground/70 truncate">
                 {prettyDomain(link.url)}
               </div>
-            </div>
-          </a>
+            </a>
+          </li>
         ))}
-
-        <a
-          href="/settings/page-links"
-          class="rounded-2xl p-4 flex flex-col items-start gap-2 min-h-[96px] border border-dashed border-border hover:border-foreground/40 hover:bg-accent/40 transition"
-        >
-          <div class="size-10 rounded-xl grid place-items-center border border-border text-muted-foreground">
-            <Icon name="lucide:settings" class="size-5" />
-          </div>
-          <div class="mt-auto">
-            <div class="text-base font-semibold tracking-tight">Upravit odkazy</div>
-            <div class="text-[10px] font-mono text-muted-foreground/70">
-              přidat · přejmenovat · smazat
+        <li class="m-0 p-0">
+          <a
+            href="/settings/page-links"
+            class="block rounded-2xl p-4 border border-dashed border-border hover:border-foreground/40 hover:bg-accent/40 transition min-h-[96px] no-underline"
+          >
+            <div class="flex items-center gap-2 mb-2">
+              <span class="size-9 rounded-lg grid place-items-center border border-border text-muted-foreground shrink-0">
+                <Icon name="lucide:settings" class="size-5" />
+              </span>
             </div>
-          </div>
-        </a>
-      </div>
+            <div class="text-base font-semibold tracking-tight text-foreground">Upravit odkazy</div>
+            <div class="text-[10px] font-mono text-muted-foreground/70">přidat · přejmenovat · smazat</div>
+          </a>
+        </li>
+      </ul>
     )}
   </div>
 </Shell>
 
 <script>
-  // Force external links to open in browser window (not PWA scope).
-  // Chrome PWA / iOS PWA default behavior pro target="_blank" je otevřít
-  // link v in-app browser uvnitř PWA okna. window.open() s noopener
-  // přesměruje na hlavní browser okno (Chrome tab / Safari).
   document.querySelectorAll<HTMLAnchorElement>('a[data-external-link]').forEach((a) => {
     a.addEventListener('click', (e) => {
       e.preventDefault();
