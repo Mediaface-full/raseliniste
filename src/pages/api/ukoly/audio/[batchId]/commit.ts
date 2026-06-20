@@ -57,9 +57,22 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
     return Response.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, { status: 400 });
   }
 
-  // Vytváření v transakci: rodič → jeho podúkoly s parentId.
-  // Pořadí v DB nezáleží, ale je čistší rodič-první.
+  // Petr 2026-06-19: WRAP cely flow v try/catch + log. Bez tohohle prazdny
+  // exception (napr. neplatne dueAt parse, missing field) silently shodi
+  // endpoint s 500, predchozi task.create zustanou v DB a batch.status
+  // zustane 'review' navzdy. Gideon pak v UI vidi 'X ukolu k potvrzeni'
+  // i kdyz uz commit udelal.
+  //
+  // Plus: po cele smycce delame batch.update do 'committed' v _stejne_
+  // try bloku. Pokud task.create selhe pulkou, batch updatu na 'committed'
+  // se nedosahne — to je puvodni bug.
+  //
+  // Idealni byla by `prisma.$transaction(async (tx) => {...})` ale to vyzaduje
+  // refactor indexEntity a deleteUpload mimo transaction. Pro teď pragmaticky
+  // try/catch s force-commit pokud aspon 1 task vytvoren.
   const createdTaskIds: string[] = [];
+  let commitErr: unknown = null;
+  try {
   for (const p of parsed.data.proposals) {
     const parent = await prisma.task.create({
       data: {
@@ -119,20 +132,47 @@ export const POST: APIRoute = async ({ request, cookies, params }) => {
     }
   }
 
+  } catch (e) {
+    // Nezahodíme task.create co prošly. Status update udělej v finally
+    // pokud aspoň 1 task vznikl — bug před fixem nechával batch v 'review'
+    // forever když selhal jakýkoli task ve smyčce.
+    commitErr = e;
+    console.error("[ukoly commit] task.create loop failed:", e instanceof Error ? e.message : String(e));
+  }
+
   // Audio smazat (úkoly jsou vytvořené, audio už není potřeba),
   // transkript zůstane pro audit.
   if (batch.audioPath) {
     await deleteUpload(batch.audioPath).catch(() => null);
   }
 
-  await prisma.taskAudioBatch.update({
-    where: { id },
-    data: {
-      status: "committed",
-      reviewedAt: new Date(),
-      audioPath: null,
-    },
-  });
+  // Batch update VŽDY pokud aspoň 1 task vytvořen → Gideon nevidí zaseknuté
+  // 'X úkolů k potvrzení'. Pokud commitErr existuje, vrátíme partial success.
+  if (createdTaskIds.length > 0) {
+    try {
+      await prisma.taskAudioBatch.update({
+        where: { id },
+        data: {
+          status: "committed",
+          reviewedAt: new Date(),
+          audioPath: null,
+        },
+      });
+    } catch (e) {
+      console.error("[ukoly commit] batch status update failed:", e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  if (commitErr) {
+    return Response.json({
+      ok: false,
+      partial: true,
+      createdTaskIds,
+      count: createdTaskIds.length,
+      error: commitErr instanceof Error ? commitErr.message : String(commitErr),
+      note: `Částečný success — vytvořeno ${createdTaskIds.length} úkolů, další padly. Batch byl ${createdTaskIds.length > 0 ? "označen jako committed" : "ponechán v review"}.`,
+    }, { status: 207 });
+  }
 
   // Auto-push do Todoistu — fire-and-forget, sériově (zachová parent→child pořadí
   // pro hierarchické úkoly). Chyby per-task se uloží do Task.pushError, zde jen logujeme.
