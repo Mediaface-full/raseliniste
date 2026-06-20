@@ -62,25 +62,26 @@ function fmtDuration(sec: number | null) {
        v levém panelu (Shell má desktop collapse přes data-sidebar-collapsed). -->
   <div class="max-w-6xl space-y-4">
     {pendingBatches.length > 0 && (
-      <section class="rounded-xl p-4 space-y-3 border border-border bg-card">
-        <div class="flex items-center gap-2">
+      <details class="rounded-xl border border-border bg-card group" open={pendingBatches.length <= 2}>
+        <summary class="flex items-center gap-2 p-4 cursor-pointer list-none">
           <Icon name="lucide:inbox" class="size-4 text-muted-foreground" />
-          <h2 class="text-lg font-bold tracking-[-0.02em]">Audio salvy čekají na review</h2>
+          <h2 class="text-base font-bold tracking-[-0.02em]">Audio salvy čekají na review</h2>
           <span class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
             {pendingBatches.length}
           </span>
-        </div>
-        <ul class="space-y-1.5">
+          <Icon name="lucide:chevron-down" class="size-4 ml-auto text-muted-foreground group-open:rotate-180 transition-transform" />
+        </summary>
+        <ul class="space-y-1.5 px-4 pb-4">
           {pendingBatches.map((b) => {
             const proposals = Array.isArray(b.proposalsJson) ? b.proposalsJson.length : 0;
             const isReady = b.status === "review";
             const isProcessing = b.status === "processing";
             const isError = b.status === "error";
             return (
-              <li>
+              <li class="flex items-center gap-1">
                 <a
                   href={`/ukoly/audio/${b.id}/review`}
-                  class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition-colors border border-white/5"
+                  class="flex-1 flex items-center gap-3 px-3 py-2 rounded-md hover:bg-accent/40 transition-colors border border-border"
                 >
                   <span class={`size-8 rounded-md grid place-items-center shrink-0 border ${
                     isError ? "border-destructive/30 bg-destructive/10" : "border-border bg-accent/30"
@@ -105,13 +106,52 @@ function fmtDuration(sec: number | null) {
                   </div>
                   <Icon name="lucide:chevron-right" class="size-4 text-muted-foreground shrink-0" />
                 </a>
+                <button
+                  data-batch-discard
+                  data-batch-id={b.id}
+                  type="button"
+                  class="p-2 rounded-md hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition shrink-0"
+                  title="Skrýt tuto audio salvu (úkoly už jsem zařadil / nepotřebuji)"
+                  aria-label="Skrýt batch"
+                >
+                  <Icon name="lucide:x" class="size-4" />
+                </button>
               </li>
             );
           })}
         </ul>
-      </section>
+      </details>
     )}
 
     <UkolyList client:load todoistConfigured={todoistConfigured} />
   </div>
 </Shell>
+
+<script>
+  // Petr 2026-06-19: skrýt zaseknuté Audio salvy ve stavu review/error
+  // pokud Gideon úkoly z nich už zařadil ručně. Klik na ✕ → POST discard
+  // (status = discarded) → query filtru `status in [processing, review,
+  // error]` je vyřadí.
+  document.querySelectorAll<HTMLButtonElement>('button[data-batch-discard]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.dataset.batchId;
+      if (!id) return;
+      if (!confirm('Skrýt tuhle audio salvu?\n\nÚkoly co jsou v Todoist/Rašeliništi zůstanou. Přepis a hlavička batch zmizí ze seznamu.')) return;
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/ukoly/audio/${id}/discard`, { method: 'POST' });
+        if (res.ok) {
+          btn.closest('li')?.remove();
+        } else {
+          alert('Skrytí selhalo. Zkus refresh + znovu.');
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Síťová chyba: ' + (err instanceof Error ? err.message : String(err)));
+        btn.disabled = false;
+      }
+    });
+  });
+</script>
