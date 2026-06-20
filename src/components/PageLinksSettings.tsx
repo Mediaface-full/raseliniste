@@ -201,30 +201,37 @@ function PageLinkRow({
 
   if (!editing) {
     return (
-      <div
-        className="glass rounded-xl p-3 flex items-center gap-3"
-        style={{ ["--c" as string]: `var(--tint-${link.tint})` }}
-      >
-        <div
-          className="size-8 rounded-lg grid place-items-center shrink-0 [&>svg]:size-4"
-          style={{ background: "color-mix(in oklch, var(--c) 22%, transparent)", color: "var(--c)" }}
+      <div className="rounded-xl p-3 flex items-center gap-3 border border-border bg-card hover:bg-accent/30 transition">
+        <a
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => { e.preventDefault(); window.open(link.url, '_blank', 'noopener,noreferrer'); }}
+          className="size-9 rounded-lg grid place-items-center shrink-0 border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition"
+          title="Otevřít v nové záložce"
         >
           <Globe className="size-4" />
-        </div>
-        <div className="flex-1 min-w-0">
+        </a>
+        <a
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => { e.preventDefault(); window.open(link.url, '_blank', 'noopener,noreferrer'); }}
+          className="flex-1 min-w-0 no-underline text-foreground"
+        >
           <div className="text-sm font-medium truncate">{link.name}</div>
           <div className="text-[11px] font-mono text-muted-foreground truncate">{link.url}</div>
-        </div>
+        </a>
         <button
           onClick={() => setEditing(true)}
-          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-white/5"
+          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-accent"
         >
           Upravit
         </button>
         <button
           onClick={onRemove}
           disabled={busy}
-          className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-[var(--tint-rose)]"
+          className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
         </button>
