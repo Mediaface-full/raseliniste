@@ -187,6 +187,11 @@ model SchedulingConfig {
   onlineHoursStart String
   onlineHoursEnd   String
 
+  // Petr 2026-06-19: pracovní oběd v Praze (90 min default, 11:00-13:30 default)
+  lunchDays         Int[]    @default([])
+  lunchHoursStart   String   @default("11:00")
+  lunchHoursEnd     String   @default("13:30")
+
   // Denní okolnosti
   lunchBreakStart  String   // "12:00"
   lunchBreakEnd    String   // "13:00"
@@ -1049,6 +1054,7 @@ enum EventType {
   MEETING_HOME        // prezenční u Petra doma
   MEETING_ELSEWHERE   // prezenční jinde (Plzeň, Brno...)
   MEETING_ONLINE      // online (Meet, Zoom...)
+  MEETING_LUNCH_PRAGUE // pracovní oběd v Praze (90 min, 11:00-13:30)
   PERSONAL            // soukromé, nepatří do bookingů
   HOCKEY_SON          // hokejové tréninky (auto z ICLOUD_SON)
   PARTNER_SHIFT       // partnerčina směna (auto z ICLOUD_PARTNER)
@@ -1116,6 +1122,7 @@ enum BookingMeetingType {
   CHOICE_ONLINE
   CHOICE_HOME
   CHOICE_ANY
+  CHOICE_LUNCH_PRAGUE   // Petr 2026-06-19: pracovní oběd v Praze, 90 min
 }
 
 enum BookingStatus {

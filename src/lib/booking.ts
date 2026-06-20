@@ -147,6 +147,7 @@ function mapMeetingType(t: string): EventTypeStr[] {
     case "CHOICE_PRAGUE": return ["MEETING_PRAGUE"];
     case "CHOICE_ONLINE": return ["MEETING_ONLINE"];
     case "CHOICE_HOME": return ["MEETING_HOME"];
+    case "CHOICE_LUNCH_PRAGUE": return ["MEETING_LUNCH_PRAGUE"];
     case "CHOICE_ANY": return ["MEETING_PRAGUE", "MEETING_ONLINE", "MEETING_HOME"];
     default: return ["MEETING_ONLINE"];
   }
@@ -472,7 +473,9 @@ export function buildBookingConfirmMail(params: {
       ? `<p><strong>Místo:</strong> Praha — adresa pošta samostatně.</p>`
       : slotType === "MEETING_HOME"
         ? `<p><strong>Místo:</strong> u Petra doma — adresa pošta samostatně.</p>`
-        : "";
+        : slotType === "MEETING_LUNCH_PRAGUE"
+          ? `<p><strong>Místo:</strong> pracovní oběd v Praze — adresu restaurace pošlu samostatně.</p>`
+          : "";
 
   // Petr 2026-05-25: pokud je publicNote, ukáže se v mailu pod místem.
   const publicNoteHtml = publicNote
@@ -537,7 +540,9 @@ function buildIcs(params: {
       ? "Praha (adresa pošta samostatně)"
       : slotType === "MEETING_HOME"
         ? "U Petra doma (adresa pošta samostatně)"
-        : "";
+        : slotType === "MEETING_LUNCH_PRAGUE"
+          ? "Pracovní oběd v Praze (adresu restaurace pošlu samostatně)"
+          : "";
   // Petr 2026-05-25: publicNote do popisu eventu — host ji uvidí v kalendáři
   const descParts: string[] = [];
   if (publicNote) descParts.push(publicNote);

@@ -27,6 +27,10 @@ const Body = z.object({
   homeHours: z.object({ start: time(), end: time() }),
   onlineDays: z.array(DayInt).max(7),
   onlineHours: z.object({ start: time(), end: time() }),
+  // Petr 2026-06-19: pracovní oběd v Praze. Backward-compat: optional + default
+  // pro existující klienty kteří ještě nepošlou tyhle fieldy.
+  lunchBookingDays: z.array(DayInt).max(7).optional().default([]),
+  lunchBookingHours: z.object({ start: time(), end: time() }).optional().default({ start: "11:00", end: "13:30" }),
   lunchBreak: z.object({ start: time(), end: time() }),
   endOfDay: time(),
   bufferPragueMinutes: z.number().int().min(0).max(480),
@@ -85,6 +89,8 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
     homeHours: parsed.homeHours,
     onlineDays: parsed.onlineDays as DayOfWeek[],
     onlineHours: parsed.onlineHours,
+    lunchBookingDays: parsed.lunchBookingDays as DayOfWeek[],
+    lunchBookingHours: parsed.lunchBookingHours,
     lunchBreak: parsed.lunchBreak,
     endOfDay: parsed.endOfDay,
     bufferPragueMinutes: parsed.bufferPragueMinutes,

@@ -31,6 +31,9 @@ export interface SchedulingConfig {
   homeHours: { start: string; end: string };
   onlineDays: DayOfWeek[];
   onlineHours: { start: string; end: string };
+  // Petr 2026-06-19: pracovní oběd v Praze (90 min, 11:00–13:30 default)
+  lunchBookingDays: DayOfWeek[];
+  lunchBookingHours: { start: string; end: string };
   lunchBreak: { start: string; end: string };
   endOfDay: string;
   bufferPragueMinutes: number;
@@ -60,6 +63,8 @@ export const DEFAULT_CONFIG: SchedulingConfig = {
   homeHours: { start: "09:00", end: "17:00" },
   onlineDays: [DAYS.MON, DAYS.TUE, DAYS.THU, DAYS.FRI],
   onlineHours: { start: "09:00", end: "17:00" },
+  lunchBookingDays: [],   // default vypnuto — Petr zapne v /calendar/settings
+  lunchBookingHours: { start: "11:00", end: "13:30" },
   lunchBreak: { start: "12:00", end: "13:00" },
   endOfDay: "17:00",
   bufferPragueMinutes: 60,
@@ -139,6 +144,9 @@ type DbRow = {
   onlineDays: number[];
   onlineHoursStart: string;
   onlineHoursEnd: string;
+  lunchDays: number[];
+  lunchHoursStart: string;
+  lunchHoursEnd: string;
   lunchBreakStart: string;
   lunchBreakEnd: string;
   endOfDay: string;
@@ -163,6 +171,8 @@ function rowToConfig(r: DbRow): SchedulingConfig {
     homeHours: { start: r.homeHoursStart, end: r.homeHoursEnd },
     onlineDays: r.onlineDays.map((d) => d as DayOfWeek),
     onlineHours: { start: r.onlineHoursStart, end: r.onlineHoursEnd },
+    lunchBookingDays: r.lunchDays.map((d) => d as DayOfWeek),
+    lunchBookingHours: { start: r.lunchHoursStart, end: r.lunchHoursEnd },
     lunchBreak: { start: r.lunchBreakStart, end: r.lunchBreakEnd },
     endOfDay: r.endOfDay,
     bufferPragueMinutes: r.bufferPragueMinutes,
@@ -191,6 +201,9 @@ function configToRow(c: SchedulingConfig, userId: string) {
     onlineDays: c.onlineDays,
     onlineHoursStart: c.onlineHours.start,
     onlineHoursEnd: c.onlineHours.end,
+    lunchDays: c.lunchBookingDays,
+    lunchHoursStart: c.lunchBookingHours.start,
+    lunchHoursEnd: c.lunchBookingHours.end,
     lunchBreakStart: c.lunchBreak.start,
     lunchBreakEnd: c.lunchBreak.end,
     endOfDay: c.endOfDay,

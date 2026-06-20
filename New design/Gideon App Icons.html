@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GIDE-ON · ikonky sub-systémů</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="brandbook.css" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <style>
+    html, body { background: var(--c-cream); margin: 0; }
+    body { font-family: var(--f-sans); color: var(--c-ink); padding: 56px 48px 96px; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 1120px; margin: 0 auto; }
+
+    .head { border-bottom: 1px solid var(--g-200); padding-bottom: 30px; margin-bottom: 18px; }
+    .head .wm { font-size: 22px; }
+    .head .eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--c-signal); font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+    .head .dot { width: 6px; height: 6px; background: var(--c-signal); border-radius: 50%; display: inline-block; }
+    .head h1 { font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 14px 0 12px; }
+    .head p { font-size: 16px; color: var(--g-600); max-width: 620px; line-height: 1.55; margin: 0; }
+
+    /* control */
+    .controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 30px 0 8px; position: sticky; top: 0; background: color-mix(in srgb, var(--c-cream) 90%, transparent); backdrop-filter: blur(8px); padding: 14px 0; z-index: 20; }
+    .seg { display: inline-flex; padding: 4px; background: var(--c-paper); border: 1px solid var(--g-200); border-radius: 999px; gap: 3px; }
+    .seg button { border: 0; background: transparent; color: var(--g-600); font-family: var(--f-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 9px 16px; border-radius: 999px; cursor: pointer; }
+    .seg button.on { background: var(--c-ink); color: var(--c-cream); }
+    .controls .note { font-family: var(--f-mono); font-size: 11.5px; color: var(--g-500); }
+
+    .section-label { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--g-500); margin: 54px 0 24px; display: flex; align-items: center; gap: 14px; }
+    .section-label::after { content:''; flex: 1; height: 1px; background: var(--g-200); }
+
+    /* family grid */
+    .fam { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 28px 24px; }
+    .app { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+    .app .ic { width: 116px; height: 116px; border-radius: 26px; box-shadow: 0 8px 24px rgba(14,14,16,0.16), 0 0 0 1px rgba(14,14,16,0.05); display: block; }
+    .app .nm { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .app .ds { font-size: 12.5px; color: var(--g-600); line-height: 1.45; max-width: 22ch; }
+    .app .key { font-family: var(--f-mono); font-size: 10px; color: var(--g-400); letter-spacing: 0.06em; }
+
+    /* devices */
+    .devices { display: flex; gap: 44px; flex-wrap: wrap; align-items: flex-start; }
+    .phone { width: 300px; border-radius: 44px; padding: 16px; background: #0b0b0d; box-shadow: 0 24px 60px rgba(0,0,0,0.32); position: relative; }
+    .phone .scr { border-radius: 30px; overflow: hidden; background-size: cover; background-position: center; padding: 26px 20px 22px; min-height: 520px; display: flex; flex-direction: column; }
+    .phone--ios .scr { background: linear-gradient(165deg, #3a2a52, #1a1430 55%, #0f1626); }
+    .phone--android .scr { background: linear-gradient(165deg, #16322f, #0f1c1b 55%, #0c0f14); }
+    .phone .status { display: flex; justify-content: space-between; align-items: center; color: rgba(255,255,255,0.92); font-size: 12px; font-weight: 600; margin-bottom: 26px; padding: 0 6px; }
+    .phone .status .dots { display: flex; gap: 5px; align-items: center; }
+    .phone .status .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.7); }
+    .grid-apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 14px; }
+    .ga { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+    .ga img { width: 56px; height: 56px; display: block; box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
+    .phone--ios .ga img { border-radius: 14px; }
+    .phone--android .ga img { border-radius: 50%; }
+    .ga span { font-size: 9.5px; color: rgba(255,255,255,0.92); font-weight: 500; letter-spacing: 0.01em; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+    .phone .dock { margin-top: auto; padding-top: 22px; }
+    .phone .dock-bar { background: rgba(255,255,255,0.13); border-radius: 26px; padding: 12px; display: flex; justify-content: space-around; backdrop-filter: blur(8px); }
+    .phone .dock-bar img { width: 52px; height: 52px; }
+    .phone--ios .dock-bar img { border-radius: 13px; }
+    .phone--android .dock-bar img { border-radius: 50%; }
+    .phone .label { text-align: center; color: var(--g-500); font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; margin-top: 16px; }
+
+    /* mask crops */
+    .crops { display: flex; gap: 32px; flex-wrap: wrap; }
+    .crop { display: flex; flex-direction: column; align-items: center; gap: 11px; }
+    .crop img { width: 120px; height: 120px; box-shadow: 0 6px 20px rgba(14,14,16,0.14); }
+    .crop .cap { font-family: var(--f-mono); font-size: 11px; color: var(--g-600); }
+
+    /* code */
+    .code { margin-top: 14px; background: var(--c-ink); color: var(--c-cream); border-radius: 12px; padding: 22px 24px; font-family: var(--f-mono); font-size: 12.5px; line-height: 1.7; overflow-x: auto; white-space: pre; }
+    .code .tag { color: #8A8881; } .code .attr { color: var(--c-sand); } .code .val { color: var(--c-signal); }
+    .meaning { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .mrow { display: flex; gap: 13px; align-items: flex-start; padding: 14px 16px; background: var(--c-paper); border: 1px solid var(--g-200); border-radius: 12px; }
+    .mrow img { width: 40px; height: 40px; border-radius: 10px; flex: none; }
+    .mrow .nm { font-size: 14px; font-weight: 700; }
+    .mrow .ds { font-size: 12.5px; color: var(--g-600); line-height: 1.45; margin-top: 2px; }
+    @media (max-width: 640px){ body { padding: 40px 20px 70px; } .head h1 { font-size: 32px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="head">
+      <div class="eyebrow"><span class="dot"></span>brand · app icons · ekosystém</div>
+      <span class="wm">gide<span class="toggle toggle--ink" style="--h:0.7em"></span>on</span>
+      <h1>Ikonky sub-systémů</h1>
+      <p>Rodina mini-aplikací GIDE-ON na ploše mobilu. Jednotná korálová dlaždice, krémový glyf, sdílený spínač jako podpis značky. Každá appka má vlastní význam — od každé verze <b>se spínačem i bez</b>.</p>
+    </header>
+
+    <div class="controls">
+      <div class="seg" id="switchToggle">
+        <button data-v="off" class="on">Bez spínače</button>
+        <button data-v="on">Se spínačem</button>
+      </div>
+      <span class="note">↳ přepni a sleduj celou rodinu i obrazovky telefonu</span>
+    </div>
+
+    <div class="section-label">rodina · 8 aplikací</div>
+    <div class="fam" id="famGrid"></div>
+
+    <div class="section-label">na ploše mobilu</div>
+    <div class="devices">
+      <div>
+        <div class="phone phone--ios">
+          <div class="scr">
+            <div class="status"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="grid-apps" id="iosGrid"></div>
+            <div class="dock"><div class="dock-bar" id="iosDock"></div></div>
+          </div>
+        </div>
+        <div class="label">iOS · squircle</div>
+      </div>
+      <div>
+        <div class="phone phone--android">
+          <div class="scr">
+            <div class="status"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="grid-apps" id="androidGrid"></div>
+            <div class="dock"><div class="dock-bar" id="androidDock"></div></div>
+          </div>
+        </div>
+        <div class="label">Android · adaptive (maskable)</div>
+      </div>
+    </div>
+
+    <div class="section-label">ořezy systémem · jedna dlaždice, tři masky</div>
+    <div class="crops" id="crops"></div>
+    <p style="font-family:var(--f-mono);font-size:12px;color:var(--g-500);line-height:1.6;margin:18px 0 0;max-width:640px">↳ Dlaždice je uložená jako full-bleed čtverec 512 px. Glyf je v bezpečné zóně (~70 %), takže přežije kruhový ořez Androidu i squircle iOS bez oříznutí.</p>
+
+    <div class="section-label">význam glyfů</div>
+    <div class="meaning" id="meaning"></div>
+
+    <div class="section-label">soubory &amp; vložení</div>
+    <p style="font-size:14px;color:var(--g-600);line-height:1.6;margin:0 0 4px;max-width:640px">Pro každou appku: <b>SVG zdroj</b> + PNG <b>512 / 192 / 180</b>, ve variantě bez spínače i se spínačem. Vše ve složce <code style="font-family:var(--f-mono);font-size:13px">icons-gideon/</code>.</p>
+    <div class="code"><span class="tag">&lt;link</span> <span class="attr">rel</span>=<span class="val">"apple-touch-icon"</span> <span class="attr">sizes</span>=<span class="val">"180x180"</span> <span class="attr">href</span>=<span class="val">"icons-gideon/hatch-180.png"</span><span class="tag">&gt;</span>
+<span class="tag">&lt;link</span> <span class="attr">rel</span>=<span class="val">"icon"</span> <span class="attr">type</span>=<span class="val">"image/png"</span> <span class="attr">sizes</span>=<span class="val">"512x512"</span> <span class="attr">href</span>=<span class="val">"icons-gideon/hatch-512.png"</span><span class="tag">&gt;</span>
+<span class="tag">&lt;meta</span> <span class="attr">name</span>=<span class="val">"theme-color"</span> <span class="attr">content</span>=<span class="val">"#FF5C2E"</span><span class="tag">&gt;</span></div>
+  </div>
+
+  <script>
+    const APPS = [
+      { key: 'studanka', nm: 'Studánka', ds: 'Pramen nápadů a rychlých zápisků' },
+      { key: 'mise', nm: 'Mise', ds: 'Cíle, směr a co je teď důležité' },
+      { key: 'hatch', nm: 'Hatch', ds: 'Kanban nástěnka pro řízení projektů' },
+      { key: 'ozvena', nm: 'Ozvěna', ds: 'Zpětná vazba a odezva klientů' },
+      { key: 'ukoly', nm: 'Úkoly', ds: 'Co je hotové a co ještě čeká' },
+      { key: 'denik', nm: 'Deník', ds: '#JeDnoDuse — denní zápisky' },
+      { key: 'zeptatse', nm: 'Zeptat se', ds: 'Otázky, odpovědi, poradna' },
+      { key: 'zijes', nm: 'Žiješ?', ds: 'Check-in — jsi v obraze?' },
+    ];
+    let variant = 'off';
+    const suf = () => variant === 'on' ? '-switch' : '';
+    const src = (key, size) => `icons-gideon/${key}${suf()}-${size}.png`;
+
+    function render() {
+      // family
+      document.getElementById('famGrid').innerHTML = APPS.map(a => `
+        <div class="app">
+          <img class="ic" src="${src(a.key, 512)}" alt="${a.nm}" />
+          <div><div class="nm">${a.nm}</div><div class="ds">${a.ds}</div></div>
+          <div class="key">${a.key}${suf()}.svg</div>
+        </div>`).join('');
+      // ios grid (first 8) + dock (4)
+      const cell = (a, sz) => `<div class="ga"><img src="${src(a.key, sz)}" alt="${a.nm}" /><span>${a.nm}</span></div>`;
+      const dcell = (a, sz) => `<img src="${src(a.key, sz)}" alt="${a.nm}" />`;
+      document.getElementById('iosGrid').innerHTML = APPS.map(a => cell(a, 192)).join('');
+      document.getElementById('androidGrid').innerHTML = APPS.map(a => cell(a, 192)).join('');
+      document.getElementById('iosDock').innerHTML = ['studanka', 'hatch', 'ukoly', 'zeptatse'].map(k => dcell(APPS.find(a => a.key === k), 192)).join('');
+      document.getElementById('androidDock').innerHTML = ['mise', 'denik', 'ozvena', 'zijes'].map(k => dcell(APPS.find(a => a.key === k), 192)).join('');
+      // crops (use hatch)
+      const k = 'hatch';
+      document.getElementById('crops').innerHTML = `
+        <div class="crop"><img src="${src(k, 512)}" style="border-radius:0" /><div class="cap">čtverec · jak je uložen</div></div>
+        <div class="crop"><img src="${src(k, 512)}" style="border-radius:26px" /><div class="cap">squircle · iOS</div></div>
+        <div class="crop"><img src="${src(k, 512)}" style="border-radius:50%" /><div class="cap">kruh · Android</div></div>`;
+      // meaning
+      document.getElementById('meaning').innerHTML = APPS.map(a => `
+        <div class="mrow"><img src="${src(a.key, 192)}" /><div><div class="nm">${a.nm}</div><div class="ds">${a.ds}</div></div></div>`).join('');
+    }
+    document.getElementById('switchToggle').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      variant = b.dataset.v;
+      [...document.querySelectorAll('#switchToggle button')].forEach(x => x.classList.toggle('on', x === b));
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>

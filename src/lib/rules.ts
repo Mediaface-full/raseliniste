@@ -216,6 +216,18 @@ export async function evaluateSlot(input: EvaluateInput): Promise<EvaluationResu
     }
   }
 
+  // HARD_DAY_RESTRICTION_LUNCH (Petr 2026-06-19)
+  if (input.type === "MEETING_LUNCH_PRAGUE") {
+    const dow = dowOf(input.startsAt);
+    if (!cfg.lunchBookingDays.includes(dow)) {
+      signals.push({
+        rule: "HARD_DAY_RESTRICTION_LUNCH",
+        severity: "ERROR",
+        message: `Pracovní oběd v Praze nemáš v tento den (${czDay(dow)}) povolený.`,
+      });
+    }
+  }
+
   // HARD_ONLINE_HOURS
   if (input.type === "MEETING_ONLINE") {
     const startMin = minutesOfDay(input.startsAt);
@@ -485,7 +497,7 @@ function aggregate(signals: RuleSignal[]): Verdict {
 }
 
 function isInPerson(t: EventTypeStr): boolean {
-  return t === "MEETING_PRAGUE" || t === "MEETING_HOME" || t === "MEETING_ELSEWHERE";
+  return t === "MEETING_PRAGUE" || t === "MEETING_HOME" || t === "MEETING_ELSEWHERE" || t === "MEETING_LUNCH_PRAGUE";
 }
 
 function overlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
@@ -528,6 +540,7 @@ function availabilityForType(t: EventTypeStr, cfg: SchedulingConfig) {
   if (t === "MEETING_PRAGUE") return { days: cfg.pragueDays, ...cfg.pragueHours };
   if (t === "MEETING_HOME") return { days: cfg.homeDays, ...cfg.homeHours };
   if (t === "MEETING_ONLINE") return { days: cfg.onlineDays, ...cfg.onlineHours };
+  if (t === "MEETING_LUNCH_PRAGUE") return { days: cfg.lunchBookingDays, ...cfg.lunchBookingHours };
   return null;
 }
 

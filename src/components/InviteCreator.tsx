@@ -35,8 +35,16 @@ export default function InviteCreator() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [universal, setUniversal] = useState(false);
   const [mode, setMode] = useState<"CLIENT" | "FRIEND">("CLIENT");
-  const [meetingType, setMeetingType] = useState<"CHOICE_PRAGUE" | "CHOICE_ONLINE" | "CHOICE_HOME" | "CHOICE_ANY">("CHOICE_ANY");
+  const [meetingType, setMeetingType] = useState<"CHOICE_PRAGUE" | "CHOICE_ONLINE" | "CHOICE_HOME" | "CHOICE_ANY" | "CHOICE_LUNCH_PRAGUE">("CHOICE_ANY");
   const [duration, setDuration] = useState("60");
+
+  // Petr 2026-06-19: pracovní oběd má pevnou délku 90 min (11:00-13:30 okno
+  // s posledním startem v 12:00). Při výběru tohoto typu zamknout duration.
+  useEffect(() => {
+    if (meetingType === "CHOICE_LUNCH_PRAGUE" && duration !== "90") {
+      setDuration("90");
+    }
+  }, [meetingType]);
   const [validity, setValidity] = useState("14");
   const [internalNote, setInternalNote] = useState("");
   // Petr 2026-05-25: per-invite "sloty dostupné od" — YYYY-MM-DD string.
@@ -292,17 +300,22 @@ export default function InviteCreator() {
               <option value="CHOICE_PRAGUE">Jen Praha</option>
               <option value="CHOICE_ONLINE">Jen online</option>
               <option value="CHOICE_HOME">Jen u mě doma</option>
+              <option value="CHOICE_LUNCH_PRAGUE">Oběd v Praze (90 min, 11:00–13:30)</option>
             </select>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-mono uppercase text-muted-foreground">Délka</label>
+            <label className="text-xs font-mono uppercase text-muted-foreground">
+              Délka
+              {meetingType === "CHOICE_LUNCH_PRAGUE" && <span className="ml-1 text-[10px] normal-case">· pevně 90 min</span>}
+            </label>
             <select
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
-              className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
+              disabled={meetingType === "CHOICE_LUNCH_PRAGUE"}
+              className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="30">30 min</option>
               <option value="45">45 min</option>
@@ -517,6 +530,7 @@ function meetingTypeLabel(t: string): string {
     case "CHOICE_PRAGUE": return "Praha";
     case "CHOICE_ONLINE": return "online";
     case "CHOICE_HOME": return "doma";
+    case "CHOICE_LUNCH_PRAGUE": return "oběd v Praze";
     case "CHOICE_ANY": return "libovolně";
     default: return t;
   }

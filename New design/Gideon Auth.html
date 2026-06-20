@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="cs" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gideon · Auth &amp; stavy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="stylesheet" href="hatch-admin.css" />
+  <link rel="stylesheet" href="gideon-admin.css" />
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('hatch-theme') || 'dark');</script>
+  <style>
+    /* screen switcher rail */
+    .rail { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 100; display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 999px; padding: 5px; box-shadow: var(--shadow-pop); flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px); }
+    .rail button { border: 0; background: transparent; color: var(--text-3); font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; padding: 8px 13px; border-radius: 999px; }
+    .rail button.on { background: var(--text); color: var(--bg); }
+    .rail .th { color: var(--c-signal); }
+    .screen { display: none; }
+    .screen.on { display: block; }
+    .b--full { width: 100%; justify-content: center; }
+    @media print { .rail { display: none; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const Wm = () => <span className="wm">Gide<span className="switch" />on</span>;
+    const Aside = ({ quote }) => (
+      <div className="auth__aside">
+        <Wm />
+        <div className="auth__quote" dangerouslySetInnerHTML={{ __html: quote }} />
+        <div className="auth__foot">gide-on.cz · průvodce zapnutý.</div>
+      </div>
+    );
+
+    function Login() {
+      const [show, setShow] = useState(false);
+      return (
+        <div className="auth">
+          <Aside quote='Průvodce, který je <span class="sig">zapnutý.</span>' />
+          <div className="auth__main"><div className="auth__card">
+            <h1>Přihlášení</h1>
+            <p className="lead">Vítej zpátky. Zadej přihlašovací údaje do administrace.</p>
+            <div className="auth__field"><label className="lab">E-mail</label><input className="in" type="email" defaultValue="jan@gide-on.cz" /></div>
+            <div className="auth__field">
+              <label className="lab"><span>Heslo</span><a href="#">Zapomněl jsem heslo</a></label>
+              <div className="in-icon" style={{ position: 'relative' }}>
+                <input className="in" type={show ? 'text' : 'password'} defaultValue="heslo1234" style={{ paddingRight: 42 }} />
+                <button onClick={() => setShow(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 0, background: 'none', color: 'var(--text-3)' }}>
+                  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7S19 19 12 19 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <label className="cbx on" style={{ margin: '4px 0 20px' }}><span className="box"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span className="ctxt" style={{ fontSize: 13.5 }}>Zůstat přihlášen</span></label>
+            <button className="b b--primary b--lg b--full">Přihlásit se</button>
+            <div className="auth__sep">nebo</div>
+            <button className="b b--outline b--lg b--full">Přihlásit přes Google</button>
+            <div className="auth__alt">Nemáš účet? <a href="#">Požádej o pozvánku</a></div>
+          </div></div>
+        </div>
+      );
+    }
+
+    function Register() {
+      return (
+        <div className="auth">
+          <Aside quote='Založ svůj <span class="sig">tým.</span>' />
+          <div className="auth__main"><div className="auth__card">
+            <h1>Vytvořit účet</h1>
+            <p className="lead">Pozvánka do gide-on administrace. Vyplň své údaje.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="auth__field"><label className="lab">Jméno</label><input className="in" defaultValue="Jan" /></div>
+              <div className="auth__field"><label className="lab">Příjmení</label><input className="in" defaultValue="Procházka" /></div>
+            </div>
+            <div className="auth__field"><label className="lab">Pracovní e-mail</label><input className="in" type="email" placeholder="jmeno@gide-on.cz" /></div>
+            <div className="auth__field"><label className="lab">Heslo</label><input className="in" type="password" placeholder="Min. 8 znaků" /><div className="hint">Aspoň 8 znaků, jedno číslo a velké písmeno.</div></div>
+            <label className="cbx" style={{ margin: '4px 0 20px' }}><span className="box"></span><span className="ctxt" style={{ fontSize: 13 }}>Souhlasím s podmínkami a zpracováním údajů</span></label>
+            <button className="b b--primary b--lg b--full">Vytvořit účet</button>
+            <div className="auth__alt">Už máš účet? <a href="#">Přihlas se</a></div>
+          </div></div>
+        </div>
+      );
+    }
+
+    function Forgot() {
+      return (
+        <div className="auth">
+          <Aside quote='Nic se <span class="sig">neztratí.</span>' />
+          <div className="auth__main"><div className="auth__card">
+            <h1>Zapomenuté heslo</h1>
+            <p className="lead">Zadej e-mail a pošleme ti odkaz pro nastavení nového hesla.</p>
+            <div className="auth__field"><label className="lab">E-mail</label><input className="in" type="email" placeholder="jmeno@gide-on.cz" /></div>
+            <button className="b b--primary b--lg b--full" style={{ marginTop: 6 }}>Poslat odkaz</button>
+            <div className="auth__alt"><a href="#">← Zpět na přihlášení</a></div>
+          </div></div>
+        </div>
+      );
+    }
+
+    function TwoFA() {
+      const [vals, setVals] = useState(['', '', '', '', '', '']);
+      const set = (i, v) => { if (!/^\d?$/.test(v)) return; setVals(a => a.map((x, j) => j === i ? v : x)); if (v && i < 5) { const nx = document.getElementById('otp' + (i + 1)); if (nx) nx.focus(); } };
+      return (
+        <div className="auth">
+          <Aside quote='Tvůj účet, <span class="sig">v bezpečí.</span>' />
+          <div className="auth__main"><div className="auth__card" style={{ textAlign: 'center' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: 'color-mix(in srgb, var(--c-signal) 14%, transparent)', color: 'var(--c-signal)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <h1>Ověření 2FA</h1>
+            <p className="lead">Zadej šestimístný kód z aplikace nebo SMS na <b style={{ color: 'var(--text-2)' }}>+420 ··· ··· 233</b>.</p>
+            <div className="otp">{vals.map((v, i) => <input key={i} id={'otp' + i} value={v} onChange={e => set(i, e.target.value)} maxLength="1" inputMode="numeric" />)}</div>
+            <button className="b b--primary b--lg b--full" style={{ marginTop: 24 }}>Ověřit a přihlásit</button>
+            <div className="auth__alt">Nepřišel kód? <a href="#">Poslat znovu (0:28)</a></div>
+          </div></div>
+        </div>
+      );
+    }
+
+    function ErrPage({ code, title, msg }) {
+      return (
+        <div className="errpage">
+          <div style={{ marginBottom: 28 }}><Wm /></div>
+          <div className="code2">{code === '404' ? <>4<span className="switch" />4</> : code}</div>
+          <h2>{title}</h2>
+          <p>{msg}</p>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <a className="b b--primary b--lg" href="Gideon Admin.html">Zpět na dashboard</a>
+            <button className="b b--outline b--lg">Nahlásit problém</button>
+          </div>
+        </div>
+      );
+    }
+
+    const SCREENS = [
+      { key: 'login', label: 'Přihlášení', el: <Login /> },
+      { key: 'register', label: 'Registrace', el: <Register /> },
+      { key: 'forgot', label: 'Zapomenuté', el: <Forgot /> },
+      { key: '2fa', label: '2FA', el: <TwoFA /> },
+      { key: '404', label: '404', el: <ErrPage code="404" title="Stránka nenalezena" msg="Tahle adresa neexistuje nebo byla přesunuta. Spínač je zapnutý — jen ne tady." /> },
+      { key: '500', label: '500', el: <ErrPage code="500" title="Něco se pokazilo" msg="Na serveru nastala chyba. Zkus to za chvíli znovu — pracujeme na tom." /> },
+      { key: 'maint', label: 'Údržba', el: <ErrPage code="✦" title="Probíhá údržba" msg="Krátce vylepšujeme administraci. Za pár minut bude vše zase v provozu." /> },
+    ];
+
+    function App() {
+      const [scr, setScr] = useState('login');
+      const [theme, setTheme] = useState(() => document.documentElement.getAttribute('data-theme') || 'dark');
+      useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('hatch-theme', theme); }, [theme]);
+      return (
+        <>
+          {SCREENS.map(s => <div key={s.key} className={'screen' + (scr === s.key ? ' on' : '')}>{s.el}</div>)}
+          <div className="rail">
+            {SCREENS.map(s => <button key={s.key} className={scr === s.key ? 'on' : ''} onClick={() => setScr(s.key)}>{s.label}</button>)}
+            <button className="th" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>{theme === 'light' ? '☾ dark' : '☀ light'}</button>
+          </div>
+        </>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

@@ -9,6 +9,8 @@ interface Config {
   homeHours: { start: string; end: string };
   onlineDays: number[];
   onlineHours: { start: string; end: string };
+  lunchBookingDays: number[];
+  lunchBookingHours: { start: string; end: string };
   lunchBreak: { start: string; end: string };
   endOfDay: string;
   bufferPragueMinutes: number;
@@ -41,7 +43,7 @@ export default function SchedulingSettings({ initial }: { initial: Config }) {
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
-  function toggleDay(field: "pragueDays" | "homeDays" | "onlineDays", day: number) {
+  function toggleDay(field: "pragueDays" | "homeDays" | "onlineDays" | "lunchBookingDays", day: number) {
     setConfig((c) => {
       const set = new Set(c[field]);
       set.has(day) ? set.delete(day) : set.add(day);
@@ -101,6 +103,16 @@ export default function SchedulingSettings({ initial }: { initial: Config }) {
         <DayPicker label="Dny" value={config.homeDays} onToggle={(d) => toggleDay("homeDays", d)} />
         <HoursPicker label="Hodiny" start={config.homeHours.start} end={config.homeHours.end}
           onChange={(start, end) => setConfig((c) => ({ ...c, homeHours: { start, end } }))} />
+      </Section>
+
+      {/* Pracovní oběd v Praze — Petr 2026-06-19 */}
+      <Section icon={<Coffee className="size-4" />} title="Pracovní oběd v Praze (90 min)" tint="peach">
+        <DayPicker label="Dny" value={config.lunchBookingDays} onToggle={(d) => toggleDay("lunchBookingDays", d)} />
+        <HoursPicker label="Okno" start={config.lunchBookingHours.start} end={config.lunchBookingHours.end}
+          onChange={(start, end) => setConfig((c) => ({ ...c, lunchBookingHours: { start, end } }))} />
+        <p className="text-xs text-muted-foreground -mt-1">
+          Délka pevně 90 min. Okno default 11:00–13:30 (poslední start v 12:00). Dovolená / nomád automaticky blokují.
+        </p>
       </Section>
 
       {/* Pauzy a denní okolnosti */}

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="cs" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GIDE-ON · knihovna ikon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="stylesheet" href="hatch-admin.css" />
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('hatch-theme') || 'dark');</script>
+  <style>
+    body { font-family: "Space Grotesk", system-ui, sans-serif; color: var(--text); background: var(--bg); margin: 0; padding: 44px 40px 96px; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 1180px; margin: 0 auto; }
+    .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 26px; margin-bottom: 8px; }
+    .head .eyebrow { font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ph-spark); font-weight: 600; display: flex; align-items: center; gap: 9px; }
+    .head .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ph-spark); }
+    .head .wm { font-size: 22px; margin-top: 16px; display: inline-flex; }
+    .head h1 { font-size: 38px; font-weight: 700; letter-spacing: -0.03em; margin: 12px 0 10px; }
+    .head p { font-size: 15px; color: var(--text-3); max-width: 56ch; line-height: 1.55; margin: 0; }
+    .head .right { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+    .iconbtn2 { width: 40px; height: 40px; border-radius: 11px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text-2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .iconbtn2 svg { width: 18px; height: 18px; }
+    .count { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--text-3); }
+
+    .toolbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; padding: 18px 0; margin-bottom: 12px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); flex-wrap: wrap; }
+    .srch { position: relative; flex: 1; min-width: 240px; }
+    .srch svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--muted); }
+    .srch input { width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 12px 14px 12px 40px; color: var(--text); font-size: 14px; font-family: inherit; outline: none; }
+    .srch input:focus { border-color: var(--ph-spark); box-shadow: 0 0 0 3px var(--ring); }
+    .seg { display: inline-flex; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; gap: 2px; }
+    .seg button { border: 0; background: transparent; color: var(--text-3); font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; padding: 9px 15px; border-radius: 999px; cursor: pointer; }
+    .seg button.on { background: var(--text); color: var(--bg); }
+
+    .cat { font-family: "JetBrains Mono", monospace; font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-3); margin: 34px 0 16px; display: flex; align-items: center; gap: 13px; }
+    .cat::after { content:''; flex: 1; height: 1px; background: var(--line); }
+    .cat .n { color: var(--ph-spark); }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 12px; }
+    .cell { display: flex; flex-direction: column; align-items: center; gap: 11px; padding: 20px 10px 13px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); cursor: pointer; transition: border-color .14s, transform .12s, background .14s; position: relative; }
+    .cell:hover { border-color: var(--ph-spark); transform: translateY(-2px); }
+    .cell svg { width: 26px; height: 26px; color: var(--text); }
+    .cell .nm { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--text-3); text-align: center; word-break: break-word; line-height: 1.4; }
+    .cell.copied::after { content: 'zkopírováno'; position: absolute; top: 7px; right: 7px; font-family: "JetBrains Mono", monospace; font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ph-spark); }
+    .empty { text-align: center; color: var(--text-3); padding: 60px 0; font-size: 14px; }
+
+    .hint { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--text-3); margin: 16px 0 0; line-height: 1.6; }
+    .hint b { color: var(--text-2); }
+    .wm .switch { background: var(--ph-spark); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="head">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>design systém · ikony</div>
+        <span class="wm">Gide<span class="switch" style="--h:0.7em"></span>on</span>
+        <h1>Knihovna ikon</h1>
+        <p>Jednotná line sada — 24×24, tah 2&nbsp;px, kulaté konce. Stejný jazyk jako sidebar adminu, jen mnohem širší. Klikni na ikonu a zkopíruj ji jako SVG nebo JSX.</p>
+      </div>
+      <div class="right">
+        <button class="iconbtn2" id="themeBtn" title="Přepnout motiv"></button>
+        <span class="count" id="count"></span>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="srch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="q" placeholder="Hledat ikonu… (např. faktura, šipka, uživatel)" />
+      </div>
+      <div class="seg" id="fmt">
+        <button data-f="svg" class="on">Kopírovat SVG</button>
+        <button data-f="jsx">JSX</button>
+        <button data-f="name">Název</button>
+      </div>
+    </div>
+
+    <div id="gallery"></div>
+    <p class="hint">↳ <b>SVG</b> = hotový <code>&lt;svg&gt;</code> s <code>currentColor</code> (dědí barvu textu). <b>JSX</b> = komponenta pro React admin. <b>Název</b> = klíč do <code>GIc</code>. · V adminu volej <code>&lt;GIc.faktura /&gt;</code> apod. přes <code>gideon-icons.jsx</code>.</p>
+  </div>
+
+  <script src="icon-set.js"></script>
+  <script>
+    const ICONS = window.GIDEON_ICONS;
+    const WRAP = inner => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+    let fmt = 'svg';
+
+    const all = Object.entries(ICONS).flatMap(([cat, m]) => Object.keys(m).map(k => k));
+    document.getElementById('count').textContent = all.length + ' ikon · ' + Object.keys(ICONS).length + ' skupin';
+
+    function copyText(name, inner) {
+      if (fmt === 'name') return name;
+      if (fmt === 'jsx') return `${name}: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>${inner.replace(/stroke-(\w)/g, (m,c)=>'stroke'+c.toUpperCase()).replace(/-(\w)/g,(m,c)=>c.toUpperCase())}</svg>,`;
+      return WRAP(inner);
+    }
+
+    function render() {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const g = document.getElementById('gallery');
+      let html = '', total = 0;
+      for (const [cat, m] of Object.entries(ICONS)) {
+        const entries = Object.entries(m).filter(([k]) => !q || k.toLowerCase().includes(q) || cat.toLowerCase().includes(q));
+        if (!entries.length) continue;
+        total += entries.length;
+        html += `<div class="cat"><span class="n">${entries.length}</span> ${cat}</div><div class="grid">`;
+        for (const [k, inner] of entries) {
+          html += `<div class="cell" data-name="${k}" tabindex="0">${WRAP(inner)}<span class="nm">${k}</span></div>`;
+        }
+        html += `</div>`;
+      }
+      g.innerHTML = total ? html : '<div class="empty">Nic nenalezeno. Zkus jiný výraz.</div>';
+    }
+
+    document.getElementById('gallery').addEventListener('click', e => {
+      const cell = e.target.closest('.cell'); if (!cell) return;
+      const name = cell.dataset.name;
+      let inner = '';
+      for (const m of Object.values(ICONS)) if (m[name] != null) inner = m[name];
+      navigator.clipboard && navigator.clipboard.writeText(copyText(name, inner));
+      cell.classList.add('copied');
+      setTimeout(() => cell.classList.remove('copied'), 1100);
+    });
+    document.getElementById('q').addEventListener('input', render);
+    document.getElementById('fmt').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      fmt = b.dataset.f;
+      [...document.querySelectorAll('#fmt button')].forEach(x => x.classList.toggle('on', x === b));
+    });
+
+    const sun = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+    const moon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+    const tb = document.getElementById('themeBtn');
+    const setIcon = () => tb.innerHTML = document.documentElement.getAttribute('data-theme') === 'light' ? moon : sun;
+    tb.addEventListener('click', () => {
+      const t = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t); localStorage.setItem('hatch-theme', t); setIcon();
+    });
+    setIcon();
+    render();
+  </script>
+</body>
+</html>

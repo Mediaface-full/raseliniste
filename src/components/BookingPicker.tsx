@@ -223,6 +223,16 @@ export default function BookingPicker({ token }: { token: string }) {
               </div>
             </div>
           )}
+
+          {confirmedSlot.type === "MEETING_LUNCH_PRAGUE" && (
+            <div className="flex items-start gap-3 pt-3 border-t border-white/5">
+              <MapPin className="size-5 mt-0.5 text-[var(--tint-sage)] shrink-0" />
+              <div>
+                <div className="text-xs font-mono uppercase text-muted-foreground tracking-wide">Místo</div>
+                <div className="text-sm">Pracovní oběd v Praze — adresu restaurace pošlu samostatně.</div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="text-sm text-foreground/80 leading-relaxed space-y-2">
@@ -269,6 +279,10 @@ export default function BookingPicker({ token }: { token: string }) {
     MEETING_HOME: {
       title: "Rezervace schůzky u mě doma",
       intro: "Vyberte si termín. Po potvrzení Vám přijde mailem pozvánka z Google Kalendáře s adresou.",
+    },
+    CHOICE_LUNCH_PRAGUE: {
+      title: "Rezervace pracovního oběda v Praze",
+      intro: "Vyberte si termín pro pracovní oběd (90 min, 11:00–13:30). Po potvrzení Vám přijde mailem pozvánka z Google Kalendáře, adresu restaurace pošlu samostatně.",
     },
     CHOICE_ANY: {
       title: "Rezervace schůzky",
