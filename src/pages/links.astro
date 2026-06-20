@@ -65,10 +65,20 @@ function safeIcon(icon: string | null): string {
 <Shell
   title="Page Links · Rašeliniště"
   username={user.username}
-  heading="Page Links"
+  heading="Page Links · v4 build"
   breadcrumb={[{ label: "Přehled" }, { label: "Page Links" }]}
 >
   <div class="max-w-5xl space-y-4">
+    <!-- Petr 2026-06-19: marker že tento konkrétní commit je deploynutý.
+         Pokud Gideon NEVIDÍ box níže, kód neběží na produkci → problem
+         je deploy (GH Actions selhal, DSM nedělal Recreate, Chrome cachuje). -->
+    <div class="rounded-lg border-2 border-foreground bg-card p-3 text-xs font-mono">
+      ✅ <strong>links.astro v4</strong> — debug build z 2026-06-19, defensive rewrite (commit 28e06d0+).
+      Pokud tohle vidíš ALE žádné dlaždice/error/empty state, problém je v Astro SSR mezi tímto markerem a renderem dat dole.
+      <br />
+      <span class="text-muted-foreground">DB fetch returned <strong>{links.length}</strong> links · fetchError = <strong>{fetchError ? "YES" : "no"}</strong></span>
+    </div>
+
     {fetchError && (
       <div class="rounded-xl border-2 border-destructive p-4 bg-destructive/10 text-destructive font-mono text-sm">
         <strong>Chyba načtení odkazů z DB:</strong>
