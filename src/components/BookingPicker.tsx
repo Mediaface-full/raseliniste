@@ -145,13 +145,13 @@ export default function BookingPicker({ token }: { token: string }) {
 
   // Stavy invite
   if (invite.status === "CONFIRMED") {
-    return centerCard("", "Termín už je potvrzený", "Zkontroluj e-mail nebo Google Calendar.");
+    return centerCard("", "Termín už je potvrzený", "Zkontrolujte prosím e-mail nebo Google Calendar.");
   }
   if (invite.status === "CANCELED") {
-    return centerCard("⊘", "Pozvánka byla zrušena", "Pošlu ti novou.");
+    return centerCard("⊘", "Pozvánka byla zrušena", "Pošlu Vám novou.");
   }
   if (invite.status === "EXPIRED" || new Date(invite.validUntil) < new Date()) {
-    return centerCard("⌛", "Pozvánka už neplatí", "Pošlu ti novou.");
+    return centerCard("⌛", "Pozvánka už neplatí", "Pošlu Vám novou.");
   }
 
   if (done && confirmedSlot) {
@@ -260,19 +260,19 @@ export default function BookingPicker({ token }: { token: string }) {
   const titleByType: Record<string, { title: string; intro: string }> = {
     MEETING_ONLINE: {
       title: "Rezervace online schůzky",
-      intro: "Vyber si termín, který ti vyhovuje. Po potvrzení ti přijde mailem pozvánka z Google Kalendáře s odkazem na videohovor.",
+      intro: "Vyberte si termín, který Vám vyhovuje. Po potvrzení Vám přijde mailem pozvánka z Google Kalendáře s odkazem na videohovor.",
     },
     MEETING_PRAGUE: {
       title: "Rezervace schůzky v Praze",
-      intro: "Vyber si termín. Po potvrzení ti přijde mailem pozvánka z Google Kalendáře s přesným místem.",
+      intro: "Vyberte si termín. Po potvrzení Vám přijde mailem pozvánka z Google Kalendáře s přesným místem.",
     },
     MEETING_HOME: {
       title: "Rezervace schůzky u mě doma",
-      intro: "Vyber si termín. Po potvrzení ti přijde mailem pozvánka z Google Kalendáře s adresou.",
+      intro: "Vyberte si termín. Po potvrzení Vám přijde mailem pozvánka z Google Kalendáře s adresou.",
     },
     CHOICE_ANY: {
       title: "Rezervace schůzky",
-      intro: "Vyber si formát a termín. Po potvrzení ti přijde mailem pozvánka z Google Kalendáře.",
+      intro: "Vyberte si formát a termín. Po potvrzení Vám přijde mailem pozvánka z Google Kalendáře.",
     },
   };
   const header = titleByType[invite.meetingType] ?? titleByType.CHOICE_ANY;

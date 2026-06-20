@@ -402,8 +402,8 @@ export default function InviteCreator() {
       </div>
 
       {/* Existující pozvánky */}
-      <div className="glass rounded-xl p-5">
-        <h2 className="font-serif text-lg mb-3">Vytvořené pozvánky ({invites.length})</h2>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-lg font-bold tracking-[-0.02em] mb-3">Vytvořené pozvánky ({invites.length})</h2>
         {invites.length === 0 ? (
           <div className="text-sm text-muted-foreground italic">Žádné pozvánky.</div>
         ) : (
@@ -416,7 +416,7 @@ export default function InviteCreator() {
               const isActive = inv.status !== "CANCELED" && inv.status !== "EXPIRED";
               const canResend = inv.status === "CONFIRMED" || inv.status === "RESERVED";
               return (
-                <div key={inv.id} className="rounded-lg border border-white/10 bg-black/15 p-4">
+                <div key={inv.id} className="rounded-lg border border-border bg-background p-4">
                   {/* Header: jméno + status (zalomené na mobilu) */}
                   <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
                     <div className="flex items-center gap-2 min-w-0">
@@ -444,7 +444,7 @@ export default function InviteCreator() {
                   <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                     <button
                       onClick={() => copy(url)}
-                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 text-foreground"
+                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md border border-border bg-card hover:bg-accent text-foreground"
                     >
                       <Copy className="size-4" /> Kopírovat
                     </button>
@@ -452,14 +452,14 @@ export default function InviteCreator() {
                       href={url}
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 text-foreground"
+                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md border border-border bg-card hover:bg-accent text-foreground"
                     >
                       <ExternalLink className="size-4" /> Otevřít
                     </a>
                     {canResend && (
                       <button
                         onClick={() => resend(inv.id, inv.inviteeEmail ?? null)}
-                        className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-[var(--tint-sky)]/15 hover:bg-[var(--tint-sky)]/25 text-[var(--tint-sky)] sm:ml-auto"
+                        className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md border border-foreground/30 bg-foreground text-background hover:opacity-90 sm:ml-auto"
                         title={inv.inviteeEmail ? `Poslat na ${inv.inviteeEmail}` : "Pozvánka nemá email — zadáš ho v dialogu"}
                       >
                         <Mail className="size-4" /> Poslat mail
@@ -468,7 +468,7 @@ export default function InviteCreator() {
                     {/* Petr 2026-06-10: Diagnostika — proč mail nedorazil */}
                     <button
                       onClick={() => diagnoseInvite(inv.id)}
-                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground"
+                      className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md border border-border bg-card hover:bg-accent text-muted-foreground"
                       title="Proč mail nedorazil? Stav invite + mail log + verdict"
                     >
                       Diagnostika
@@ -476,7 +476,7 @@ export default function InviteCreator() {
                     {isActive && (
                       <button
                         onClick={() => cancel(inv.id)}
-                        className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md bg-destructive/15 hover:bg-destructive/25 text-[var(--tint-rose)]"
+                        className="flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-md border border-destructive/40 bg-destructive/10 hover:bg-destructive/20 text-destructive"
                       >
                         <Trash2 className="size-4" /> Zrušit
                       </button>
