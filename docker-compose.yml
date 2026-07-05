@@ -71,6 +71,12 @@ services:
       # nový Personal projekt — místo toho hodí chybu. Smysl: během migrace
       # do Team Workspace nechceme tichá duplicit. Default "true" (auto-create OK).
       TODOIST_AUTO_CREATE: ${TODOIST_AUTO_CREATE:-true}
+      # ---- Anthropic Claude + Telegram bot (ClaudeClaw, Petr 2026-06-22) ----
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ALLOWED_USER_ID: ${TELEGRAM_ALLOWED_USER_ID:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
     volumes:
       - ./uploads:/data/uploads
       - ./backups:/data/backups
