@@ -29,6 +29,12 @@ function isPublic(pathname: string): boolean {
   if (pathname.startsWith("/api/webhooks/gosms/")) return true;
   // Pošta — Gmail Pub/Sub push webhook (autorizace přes OIDC JWT v Authorization header)
   if (pathname === "/api/posta/gmail-webhook") return true;
+  // Telegram bot ClaudeClaw — autorizace přes X-Telegram-Bot-Api-Secret-Token
+  // header (TELEGRAM_WEBHOOK_SECRET) + whitelist user ID uvnitř endpointu.
+  // Bez tohoto middleware vracel 401 UNAUTHENTICATED dřív, než se request
+  // dostal k webhook kódu — Petr 2026-07-05 hodinu debugoval secret,
+  // který byl celou dobu správně.
+  if (pathname === "/api/telegram/webhook") return true;
   // Studna — pozvánkové linky pro hosty (autorizace přes guestToken v URL).
   if (pathname.startsWith("/me/")) return true;
   if (pathname.startsWith("/api/me/")) return true;

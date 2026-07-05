@@ -139,12 +139,30 @@ async function handleMessage(chatId: number, text: string, userId: string): Prom
  * GET pro health-check + zjištění stavu (dá se otevřít v browseru).
  */
 export const GET: APIRoute = async () => {
+  // Petr 2026-06-22: masked preview secretů — Gideon může srovnat "live test"
+  // přes HTTPS s tím co dává do curl setWebhook. Bez leakování celé hodnoty.
+  function preview(v: unknown): string {
+    if (typeof v !== "string" || !v) return "(nenastaveno)";
+    if (v.length <= 8) return `(short, len=${v.length})`;
+    return `${v.slice(0, 6)}…${v.slice(-4)} (len=${v.length})`;
+  }
+
+  const secret = env.TELEGRAM_WEBHOOK_SECRET as string | undefined;
+  const token = env.TELEGRAM_BOT_TOKEN as string | undefined;
+  const anthropicKey = env.ANTHROPIC_API_KEY as string | undefined;
+
   const cfg = {
-    anthropic_key: Boolean(env.ANTHROPIC_API_KEY),
-    telegram_token: Boolean(env.TELEGRAM_BOT_TOKEN),
-    allowed_user_id: env.TELEGRAM_ALLOWED_USER_ID ?? "(nenastaveno — bude v logu po první zprávě)",
-    webhook_secret: env.TELEGRAM_WEBHOOK_SECRET ? "(set)" : "(nenastaveno)",
+    anthropic_key: preview(anthropicKey),
+    telegram_token: preview(token),
+    telegram_token_number: token ? token.split(":")[0] : "(nenastaveno)",
+    allowed_user_id: env.TELEGRAM_ALLOWED_USER_ID ?? "(nenastaveno — v logu po první zprávě)",
+    webhook_secret: preview(secret),
     model: env.ANTHROPIC_MODEL ?? "claude-haiku-4-5",
+    tips: [
+      "Porovnej webhook_secret prefix+suffix se secretem co dáváš do setWebhook.",
+      "Když sedí prefix+suffix ale Telegram vrací 401 → někde v mezi znacích je typo.",
+      "telegram_token_number musí sedět s ID bota v @BotFather.",
+    ],
   };
   return Response.json({ ok: true, ...cfg });
 };
