@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/db";
-import { sendMessage, sendTyping, type TelegramUpdate } from "@/lib/telegram";
+import { sendMessage, sendTyping, getFilePath, type TelegramUpdate } from "@/lib/telegram";
 import { runAgent } from "@/lib/telegram-agent";
 
 export const prerender = false;
@@ -52,8 +52,8 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const msg = update.message ?? update.edited_message;
-  if (!msg || !msg.text) {
-    // Ignoruj typing indicators, edits bez textu, voice zatím neřešíme
+  if (!msg || (!msg.text && !msg.voice)) {
+    // Ignoruj typing indicators, edits bez textu, fotky apod.
     return new Response("ok", { status: 200 });
   }
 
@@ -82,12 +82,64 @@ export const POST: APIRoute = async ({ request }) => {
 
   // 5) Zpracuj asynchronně — Telegram chce 200 rychle (< 5s), jinak retry
   //    fire-and-forget: vrátíme 200 hned, agent běží na pozadí
-  void handleMessage(chatId, msg.text, user.id).catch((e) => {
-    console.error("[telegram] handler failed:", e instanceof Error ? e.message : e);
-  });
+  if (msg.voice) {
+    // Gideon 2026-07-05: hlasovka → Gemini přepis (stejná pipeline jako
+    // Studánka/Ozvěna) → text do agenta. OGG/Opus, typicky pár set kB.
+    const voice = msg.voice;
+    void handleVoiceMessage(chatId, voice.file_id, voice.mime_type, user.id).catch((e) => {
+      console.error("[telegram] voice handler failed:", e instanceof Error ? e.message : e);
+    });
+  } else {
+    void handleMessage(chatId, msg.text!, user.id).catch((e) => {
+      console.error("[telegram] handler failed:", e instanceof Error ? e.message : e);
+    });
+  }
 
   return new Response("ok", { status: 200 });
 };
+
+async function handleVoiceMessage(
+  chatId: number,
+  fileId: string,
+  mimeType: string | undefined,
+  userId: string,
+): Promise<void> {
+  const typingInterval = setInterval(() => {
+    void sendTyping(chatId).catch(() => null);
+  }, 4000);
+  await sendTyping(chatId);
+
+  try {
+    // 1) Stáhni OGG z Telegram file API
+    const fileUrl = await getFilePath(fileId);
+    const res = await fetch(fileUrl);
+    if (!res.ok) throw new Error(`Telegram file download failed: ${res.status}`);
+    const audio = Buffer.from(await res.arrayBuffer());
+
+    // 2) Gemini přepis (sdílená pipeline se Studánkou)
+    const { transcribeAudioOnly } = await import("@/lib/audio-transcribe");
+    const { transcript } = await transcribeAudioOnly({
+      audio,
+      mimeType: mimeType ?? "audio/ogg",
+    });
+
+    const text = transcript.trim();
+    if (!text) {
+      await sendMessage(chatId, "Z hlasovky jsem nic nevyrozuměl — zkus to znovu nebo napiš text.");
+      return;
+    }
+
+    // 3) Ukaž co jsem slyšel + pošli do agenta
+    await sendMessage(chatId, `🎙 „${text}"`);
+    const reply = await runAgent({ userMessage: text, userId });
+    await sendMessage(chatId, reply);
+  } catch (e) {
+    console.error("[telegram] voice error:", e instanceof Error ? e.stack : e);
+    await sendMessage(chatId, `Hlasovku se nepodařilo zpracovat: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    clearInterval(typingInterval);
+  }
+}
 
 async function handleMessage(chatId: number, text: string, userId: string): Promise<void> {
   // Ukaž "typing…" hned + každých 4s (agent volá tools = může trvat 5-15s)
