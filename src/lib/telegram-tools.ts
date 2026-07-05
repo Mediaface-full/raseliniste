@@ -147,6 +147,9 @@ export function buildAgentTools(userId: string) {
         where: {
           startsAt: { gte: start, lte: end },
           ...(includeAllDay ? {} : { allDay: false }),
+          // Eventy smazané v Googlu zůstávají v DB s flagem — bez filtru
+          // bot ukazoval zrušené schůzky (Gideon 2026-07-05).
+          deletedRemotely: false,
         },
         orderBy: { startsAt: "asc" },
         take: 30,
@@ -191,7 +194,7 @@ export function buildAgentTools(userId: string) {
 
       const [events, tasks, studankaCount] = await Promise.all([
         prisma.calendarEvent.findMany({
-          where: { startsAt: { gte: start, lte: end } },
+          where: { startsAt: { gte: start, lte: end }, deletedRemotely: false },
           orderBy: { startsAt: "asc" },
           select: {
             title: true,
