@@ -18,6 +18,7 @@
     "posta:encrypt-migrate": "tsx scripts/posta-encrypt-migrate.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
     "@astrojs/node": "^10.0.5",
     "@astrojs/react": "^5.0.3",
     "@fontsource-variable/fraunces": "^5.2.9",

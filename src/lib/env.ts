@@ -64,6 +64,13 @@ const schema = z.object({
   NOTIFICATION_EMAIL: emptyToUndef(z.string().email().optional()),
   // Cron endpoint auth (Synology Task Scheduler posílá v x-cron-key).
   CRON_SECRET: emptyToUndef(z.string().min(16).optional()),
+  // Anthropic Claude API — pro Telegram bot conversational agent
+  ANTHROPIC_API_KEY: emptyToUndef(z.string().min(10).optional()),
+  ANTHROPIC_MODEL: emptyToUndef(z.string().min(3).optional()),
+  // Telegram bot API (setup: @BotFather → token, /getMe → bot id)
+  TELEGRAM_BOT_TOKEN: emptyToUndef(z.string().min(10).optional()),
+  TELEGRAM_ALLOWED_USER_ID: emptyToUndef(z.string().min(3).optional()),
+  TELEGRAM_WEBHOOK_SECRET: emptyToUndef(z.string().min(16).optional()),
   // Google OAuth (Calendar + People API)
   GOOGLE_CLIENT_ID: emptyToUndef(z.string().min(10).optional()),
   GOOGLE_CLIENT_SECRET: emptyToUndef(z.string().min(10).optional()),
