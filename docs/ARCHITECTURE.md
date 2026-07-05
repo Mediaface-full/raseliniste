@@ -248,14 +248,54 @@ Quick reference:
 
 ## Vizuální jazyk
 
-**Liquid Glass** (Apple VisionOS inspirovaný):
-- Dark-only (žádný light mode)
-- Půlnoční modré pozadí (`oklch(14% 0.025 260)`)
-- 3 pastelové radial blobs (peach/lavender/sky) jako accent
-- Glass povrchy: `.glass-subtle`, `.glass`, `.glass-strong` (3 vrstvy intenzity)
-- Typografie: Fraunces (serif), Geist (body), Geist Mono (data)
-- Per-modul pastelový tint (peach=úkoly, mint=poznámky, butter=deník,
-  sky=kalendář, lavender=kontakty, sage=finance, rose=AI, pink=soubory)
-- Kontrast je must-have (Petr je starší, foreground text 98%, muted 78%)
+### Současné: Gide-on brand (2026-06-18/19, na branchi `claude/redesign-gideon`, čeká deploy)
 
-Detail: `INSTRUKCE/02-architektura.md` + `src/styles/global.css`.
+- **Light + dark theme** přes `[data-theme]` atribut + localStorage `"gide-on-theme"`. Bootstrap script v `Base.astro` pre-render proti flash.
+- **Paleta:** Ink `#0E0E10` / Cream `#F4EFE6` / Signal Coral `#FF5C2E` (max 10% UI plochy) / Teal `#1B4E50` / Sand `#EAC9A2` + teplá grayscale (g-50…g-900, biased k Ink).
+- **Typo:** Space Grotesk Variable (sans + bold display) + JetBrains Mono Variable (eyebrow, čísla). Fraunces serif odchází.
+- **Per-modul tinty** (peach/mint/butter/sky/lavender/sage/rose/pink) JEN pro identity: sidebar ikona, eyebrow nadpis, dashboard tile, badge. NIKDY pro CTA.
+- **Wordmark:** `GideonWordmark.tsx` pure-CSS scalable se switchem (sizes tiny/xs/sm/md/lg/xl/hero/cover). Nahrazuje AnimatedG.astro + modrou „G".
+- **Brand modal:** `modal-overlay` (subtle ink 35% light / 70% dark) + `modal-panel` (var(--surface-elevated) + 1px border + soft shadow). Nahrazuje `bg-black/60 + glass-strong`.
+- **Service Worker auto-update:** `VERSION="gide-on-v1"`, postMessage `SW_UPDATED`, `SwUpdateBanner.tsx` ukáže coral banner „Nová verze připravena → Restartovat".
+
+### Legacy: Liquid Glass (stále v `main`, do prvního pushe redesignu)
+
+- Dark-only (žádný light mode), půlnoční modré pozadí.
+- Glass povrchy `.glass-subtle/.glass/.glass-strong`.
+- Fraunces + Geist + Geist Mono.
+
+Detail: `src/styles/global.css`, memory `feedback_brand_palette_rules.md`, `session_2026_06_18_19_redesign_gideon.md`.
+
+## Document parsing pipeline (Studánka host upload, 2026-06-19)
+
+Host nahraje PDF/DOCX/XLSX/TXT do projektu Studánky → extrakce textu → RAG index.
+
+```
+Browser (GuestRecorder.tsx)
+  └─ POST /api/me/[token]/upload-document
+       ├─ Auth: guestToken + ProjectInvitation.canUploadAudio flag
+       ├─ Rate limit: 30/h
+       ├─ Max 50 MB
+       └─ Uloží do project-documents/ + ProjectFile row (extractionStatus: pending)
+            │
+            └─ Fire-and-forget worker
+                 ├─ detectDocKind(mime, filename) → pdf|docx|xlsx|txt
+                 ├─ parseDocument(buffer) → { text, truncated }   (max 100k chars)
+                 │    ├─ pdf  → pdf-parse (dynamic import)
+                 │    ├─ docx → mammoth.extractRawText
+                 │    ├─ xlsx → xlsx SheetJS sheet_to_csv per sheet
+                 │    └─ txt  → buffer.toString("utf-8")
+                 ├─ Update ProjectFile.extractedText + extractionStatus = "ok"
+                 └─ indexEntity({ sourceType: "project-document", id, text, projectId })
+                      └─ Gemini text-embedding-004 → RagChunk rows
+```
+
+Klíčové soubory:
+- `src/lib/document-parser.ts` — `detectDocKind`, `parseDocument`
+- `src/pages/api/me/[token]/upload-document.ts` — endpoint
+- `src/lib/rag.ts` — RagSource type rozšířen o `"project-document"`
+- `src/components/GuestRecorder.tsx` — `isDocumentByName()`, endpoint selection
+- `src/components/StudnaDetail.tsx` — admin zobrazí `extractionStatus` badge + jméno hosta
+- `src/pages/me/[token].astro` — host vidí posledních 5 dokumentů + status
+
+Detail: migrace `20260619180000_studanka_documents` (ProjectFile.guestUserId FK + extractedText + extractionStatus + extractionError).

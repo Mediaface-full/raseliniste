@@ -1,0 +1,11 @@
+{
+  "context_files": [
+    "CLAUDE.md",
+    "AGENTS.md",
+    "docs/PROGRESS.md",
+    "docs/ARCHITECTURE.md",
+    "docs/DECISIONS.md",
+    "docs/GOTCHAS.md"
+  ],
+  "instructions": "Vždy začni přečtením CLAUDE.md a docs/PROGRESS.md. Před UI/routing/AI prompt změnou aktivně grep memory soubory v ~/.claude/projects/-Users-petrperina-CLOUDS-CLOUDE-PROJECTS-raseliniste/memory/ na téma. Po každé velké session aktualizuj docs/PROGRESS.md (co bylo uděláno, kde se skončilo, další kroky) + docs/GOTCHAS.md pokud trvalo > 30 min něco rozlousknout. SYNOLOGY NAS deploy (NE Hetzner/diego — to je Mediaface!), Petr pushuje GitHub Desktopem ne terminálem."
+}

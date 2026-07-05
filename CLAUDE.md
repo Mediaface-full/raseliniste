@@ -38,6 +38,12 @@ Existující `INSTRUKCE/HANDOFF-*.md` zůstávají jako detail per session.
 
 ---
 
+## ✅ STAV PRODUKCE (2026-07-05)
+
+- **🎨 Gide-on brand redesign NASAZEN** (2026-06-19+) — Ink/Cream/Signal Coral, Space Grotesk, light+dark theme nahradily „Liquid Glass". Brand pravidla STRICT: memory `feedback_brand_palette_rules.md` (žádné emoji, žádné dvojité čáry, mic = Signal Coral, fialová mimo brand, modal-overlay+modal-panel). Studánka host upload PDF/DOCX/XLSX/TXT + RAG. Kontakty sjednoceny na `/contacts`.
+- **🤖 Telegram bot ClaudeClaw LIVE** (2026-07-05) — @Raselinistebot, Claude Haiku 4.5 + tool use nad Prisma (úkoly/kalendář/program/Studánka), hlasovky přes Gemini přepis. Soubory `src/lib/telegram*.ts`, `src/lib/anthropic.ts`, `src/pages/api/telegram/webhook.ts`. Memory `project_telegram_claudeclaw.md`. ⚠️ Nový public API endpoint VŽDY přidat do `isPublic()` v `src/middleware.ts` + CalendarEvent dotazy VŽDY s `deletedRemotely: false` (viz docs/GOTCHAS.md).
+- **📅 Booking „Oběd v Praze"** — CHOICE_LUNCH_PRAGUE, 90 min, okno 11:00–13:30, dny v /calendar/settings, dovolená/nomád blokují.
+
 ## ✅ STAV PRODUKCE (2026-06-09)
 
 - **Push notifikace LIVE** — iPhone PWA Gide-on dostává push (VAPID + Web Push + per-source filtry + blacklist rules)

@@ -722,6 +722,210 @@ Transkripty + analýza **zůstávají vždy**.
 
 ---
 
+---
+
+## PWA manifest `id` change → force reinstall (Petr nesnáší)
+
+**Problém:** Změna `manifest.id` mezi verzemi udělá z update force-reinstall. Hosti/VIP musí smazat starou PWA + znovu Add to Home Screen. Push subscriptions umřou (Web Push protokol váže endpoint na public key + scope).
+
+**Příčina:** Manifest `id` = identita PWA pro browser/OS. Stejné `id` = upgrade (existující ikona + SW auto-update flow), jiné `id` = nová aplikace.
+
+**Řešení:** **NIKDY** neměnit `manifest.id` při běžném deployi. 2026-06-19 redesign branch měl `id="/start-gide-on-v4"` (overcorrection), revert na `v3` commitem `6dfd945` před deploy.
+
+**Soubor:** `public/manifest-start.json` + `public/manifest.json`.
+
+---
+
+## `pdf-parse` side-effects on static import
+
+**Problém:** `import pdfParse from "pdf-parse"` při bundle crash v produkčním kontejneru — modul při importu zkouší otevřít `node_modules/pdf-parse/test/data/05-versions-space.pdf` (debug self-test). V produkci to není (devDep ne `node_modules`).
+
+**Příčina:** Library má top-level kód `if (!module.parent) { fs.readFileSync('./test/data/...') }` — chytá self-test ale ne všechny bundlery to spolehlivě eliminují.
+
+**Řešení:** Dynamic import + fallback default vs namespace:
+
+```ts
+const mod: any = await import("pdf-parse");
+const pdfParse = mod.default ?? mod;
+const result = await pdfParse(buffer);
+```
+
+**Soubor:** `src/lib/document-parser.ts`.
+
+---
+
+## `bg-black/60 + glass-strong` modaly „přiserne stranky"
+
+**Problém:** Legacy modaly mají overlay `fixed inset-0 z-50 bg-black/60 backdrop-blur-sm` + panel `glass-strong rounded-xl`. Vypadá jako fullscreen page transition, agresivní v light theme. Petr 2026-06-19: „takhle desná věc … příserné stránky".
+
+**Příčina:** Liquid Glass design je dark-only. V light theme `bg-black/60` přehlcuje, `glass-strong` ztrácí čitelnost (saturate na white surface = sytost neexistuje).
+
+**Řešení:** Brand utility `modal-overlay` (subtle ink 35% light / 70% dark) + `modal-panel` (var(--surface-elevated) + 1px border + soft shadow). 10 modalů refaktorováno commitem `dba5bc4`.
+
+```astro
+<!-- ❌ legacy -->
+<div class="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm">
+  <div class="glass-strong rounded-xl p-6 max-w-md">...</div>
+</div>
+<!-- ✅ brand -->
+<div class="modal-overlay">
+  <div class="modal-panel p-6 max-w-md">...</div>
+</div>
+```
+
+**Soubor:** `src/styles/global.css` (utility), memory `feedback_brand_palette_rules.md`.
+
+---
+
+## Per-modul tint pro CTA = brand mimo
+
+**Problém:** Mic tlačítko v DiktatRecorder bylo `tint-butter` (žluté), upload tlačítko `tint-lavender` (fialové). Petr 2026-06-19: „fialová není v brandu, mikrofonek deníku taky barva mimo".
+
+**Příčina:** Per-modul tinty (peach/mint/butter/sky/lavender/sage/rose/pink) jsou identity tokens (sidebar/eyebrow/tile per modul). Když je použiju jako CTA color, působí to jako šum — nepatří k akci, patří k orientaci.
+
+**Řešení:** Pravidlo brand vs identity:
+- **CTA / primary akce** (mic, save, submit) → vždy `--c-signal` (Signal Coral), MAX 10% UI plochy.
+- **Neutral akce** (upload, secondary button) → border + secondary surface (žádný tint).
+- **Per-modul tint** JEN pro: sidebar ikona, eyebrow nadpis, dashboard tile hero, badge per typ.
+
+**Soubor:** `src/components/DiktatRecorder.tsx`, `src/components/GuestRecorder.tsx`, memory `feedback_brand_palette_rules.md`.
+
+---
+
+## `border-2 + ring-2` zdvojená čára
+
+**Problém:** AwayManager Dovolená/Nomád picker měl `border-2 border-tint-... ring-2 ring-tint-.../30`. Vizuálně dvě paralelní čáry. Petr 2026-06-19: „zdvojená čára taky není v brandu".
+
+**Příčina:** ring + border kombinace je legacy Tailwind focus pattern, ne brand selection state. Vypadá jako accessibility overlay.
+
+**Řešení:** Jeden border 1-2px max + bg tint pro selected state:
+
+```tsx
+className={cn(
+  "rounded-lg border p-3 transition",
+  selected ? "border-foreground bg-foreground/5" : "border-border hover:bg-accent",
+)}
+```
+
+**Soubor:** `src/components/AwayManager.tsx`.
+
+---
+
+## Emoji v UI mimo brand
+
+**Problém:** 228 emoji napříč 67 souborů (📁, 📎, 🔍, ✅, ❌, ⚠️ …). Petr 2026-06-19: emoji nepatří do strict brand UI.
+
+**Příčina:** Emoji rendering závisí na OS (Apple vs Windows vs Linux), nelze ovládnout barvu/velikost, působí dětsky vedle Space Grotesk.
+
+**Řešení:** Lucide ikony (`<Folder />`, `<Paperclip />`, `<Search />`, `<Check />`, …) konzistentní stroke + theme-aware barva. Python script commit `52a745b`.
+
+**Výjimka:** Mood emoji v Deníku (😊😢😡…) ZACHOVÁNY — expresivní modul, emoji je obsah ne dekorace.
+
+---
+
+## Light theme hardcoded `bg-white/N`, `border-white/N`, `bg-black/N`, `shadow-black/N`
+
+**Problém:** Legacy Liquid Glass komponenty mají 134+ míst hardcoded jako `bg-white/5`, `border-white/10`, `bg-black/40`, `shadow-black/30`. V light theme:
+- `bg-white/N` na cream surface = neviditelné (white na white).
+- `border-white/10` na cream = neviditelná hranice.
+- `bg-black/40` jako input → black plocha v cream UI.
+
+**Příčina:** Tailwind opacity utility nejsou theme-aware.
+
+**Řešení:** CSS overrides v `global.css` per data-theme místo refactoru 134+ míst:
+
+```css
+:root[data-theme="light"] [class*="bg-black/20"],
+:root[data-theme="light"] [class*="bg-black/30"],
+:root[data-theme="light"] [class*="bg-black/40"] { background-color: var(--input) !important; }
+:root[data-theme="light"] [class*="border-white/5"],
+:root[data-theme="light"] [class*="border-white/10"],
+:root[data-theme="light"] [class*="border-white/20"] { border-color: var(--border) !important; }
+:root[data-theme="light"] [class*="shadow-black/"] { --tw-shadow-color: rgba(14,14,16,0.08) !important; }
+```
+
+**Pravidlo:** Fix tokens (CSS overrides), ne komponenty. Nová kategorie legacy → přidat override, ne projít všechny soubory.
+
+**Soubor:** `src/styles/global.css`.
+
+---
+
+## `pdf-parse` / `mammoth` / `xlsx` — npm deps na produkci
+
+**Problém:** Po deploy redesign branche **build GH Actions trvá ~7 min** (z ~5 min) kvůli třem novým deps (`pdf-parse`, `mammoth`, `xlsx`). První `npm ci` po Pull v DSM Container Manageru re-fetch celý lock.
+
+**Řešení:** Žádný fix — počítat s tím, neztratit nervy během build. Smoke test až po Recreate dokončí.
+
+**Soubor:** `package.json`, `.github/workflows/docker-build.yml`.
+
+---
+
+## Brand `font-serif` legacy zbytky (88+ výskytů)
+
+**Problém:** Po brand redesignu jsou v kódu 88+ míst `font-serif` (Fraunces). Nový brand používá jen Space Grotesk + JetBrains Mono. `font-serif` mapuje v Tailwind config na fallback sans (Petr to nevidí), ale je to dead code.
+
+**Příčina:** Sed script `font-serif text-3xl tracking-tight` → brand display class neudělal 100% coverage (různé varianty).
+
+**Řešení:** Audit po deploy redesignu — `grep -rn "font-serif" src/` + nahradit `text-4xl font-bold tracking-[-0.04em] leading-tight` (h1) / `text-2xl font-bold` (h2). Není kritické, jen čistka.
+
+**Soubor:** globálně v `src/` po deploy.
+
+---
+
+## Middleware blokuje nové public API endpointy (401 dřív než se endpoint spustí)
+
+**Problém:** Nový webhook/public endpoint vrací `{"error":"UNAUTHENTICATED"}` 401, i když má vlastní auth (secret header, token) a ta je správně. Petr 2026-07-05 hodinu debugoval Telegram webhook secret, který byl celou dobu v pořádku.
+
+**Příčina:** Globální auth middleware (`src/middleware.ts`) chrání VŠECHNY `/api/*` routy session cookie. Request se k endpoint kódu vůbec nedostane — middleware ho odmítne dřív.
+
+**Jak poznat:** Response formát. Middleware vrací JSON `{"error":"UNAUTHENTICATED"}`; endpoint by vrátil svoji vlastní hlášku (např. plain „unauthorized"). Když vidíš UNAUTHENTICATED u endpointu, který session nepoužívá → middleware.
+
+**Řešení:** Přidat cestu do `isPublic()` v `src/middleware.ts` — stejný pattern jako `/api/cron/`, gmail-webhook, gosms webhooky (vlastní auth uvnitř endpointu).
+
+**Soubor:** `src/middleware.ts` (funkce `isPublic`), memory `project_telegram_claudeclaw.md`.
+
+---
+
+## Telegram webhook — secret jen hex, ověření deployed kódu
+
+**Problém 1:** Webhook secret se speciálními znaky (`{}$#@[]&()`) rozbije shell (visící `>` prompt v Terminalu) a Telegram ho stejně odmítne — povoluje jen `A-Za-z0-9_-`.
+**Řešení:** Vždy `openssl rand -hex 24`.
+
+**Problém 2:** Jak ověřit, že na produkci běží konkrétní commit? Názvy funkcí bundling přejmenuje.
+**Řešení:** Grep na **český string literal**, který minifikaci přežije: `docker exec raseliniste_app sh -c 'grep -rl "nepodařilo zpracovat" /app/dist/server/ >/dev/null && echo NOVY || echo STARY'`. Pozor: `grep | head && echo` je vadný test — head vrací 0 vždy.
+
+**Diagnostika doručování:** `https://api.telegram.org/bot<TOKEN>/getWebhookInfo` → `last_error_message` + `pending_update_count`. Přímý test auth: `curl -X POST <endpoint> -H "X-Telegram-Bot-Api-Secret-Token: <secret>"`.
+
+**Soubor:** `src/pages/api/telegram/webhook.ts`, memory `project_telegram_claudeclaw.md`.
+
+---
+
+## CalendarEvent dotazy — vždy `deletedRemotely: false`
+
+**Problém:** Telegram bot ukázal Gideonovi 7 zítřejších schůzek, 6 z nich bylo v Googlu dávno zrušených.
+
+**Příčina:** Eventy smazané v Google Kalendáři se z DB nemažou — sweep je jen označí `deletedRemotely: true`. Všechny web pohledy (day, týden, měsíc, away, rules.ts) filtr mají, nový kód na to snadno zapomene.
+
+**Řešení:** Každý `prisma.calendarEvent.findMany` MUSÍ mít `deletedRemotely: false` (pokud záměrně nechceš i smazané).
+
+**Bonus — SQL ověření z NASky:** `docker exec raseliniste_db psql -U raseliniste -d raseliniste -A -t -c "..."`. Pozor na timestampy: sloupce jsou naive UTC → `AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Prague'` (jednoduchý `AT TIME ZONE` posune špatným směrem).
+
+**Soubor:** `src/lib/telegram-tools.ts`, vzor filtru v `src/pages/day/[date].astro:35`.
+
+---
+
+## macOS dark dock auto-tintuje ikony bez plného pozadí
+
+**Problém:** PWA ikona přidaná přes Safari do docku je v dark modu černá skvrna bez viditelného G.
+
+**Příčina:** macOS Sonoma+ dark dock auto-tintuje ikony s transparentním okolím. Plus Dock cachuje ikonu lokálně (`~/Library/Application Support/Dock/`) — server-side výměna PNG sama nic nezmění.
+
+**Řešení:** apple-touch-icon = varianta s **100% neprůhledným pozadím** (cream square s ink G — `icon-cream-180.png`). Po výměně na serveru: Remove from Dock → `killall Dock` → Safari hard refresh → Přidat na Dock znovu.
+
+**Soubor:** `public/apple-touch-icon.png`, `src/layouts/Base.astro` (cache buster `?v=5`).
+
+---
+
 ## File header
 
 Pokud při řešení něčeho narazíš na netriviální problém co

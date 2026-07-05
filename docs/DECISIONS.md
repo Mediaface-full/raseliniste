@@ -279,3 +279,131 @@ Důvod: 2026-06-09 jsem 3× porušil pravidlo:
 - Portal pattern v memory od 2026-05-05 → ignoroval při ProjectPicker
 - Team Workspace routing #3 gap v memory implicit → nepřipomněl si
 - AI prompt z reálných transkriptů → psal anglickou logikou ze stolu
+
+---
+
+## Brand redesign 2026-06-18/19 — z „Liquid Glass" na „Gide-on"
+
+### Proč přechod
+
+Liquid Glass (OKLCH glass + blur + radial blobs, Fraunces serif) měl problémy:
+- Light theme rozbitý — `bg-white/N`, `border-white/N`, `bg-black/N` hardcoded na 134+ místech
+- Modaly agresivní (`bg-black/60 + backdrop-blur-sm + glass-strong`) — Petr: „příserné stránky"
+- Per-modul tinty kolidovaly s CTA (mic byl `tint-butter` ne brand akcent)
+- Brand identity tříštěná — žádný wordmark, jen modré písmeno „G"
+
+### Co bylo zvoleno
+
+- **Paleta:** Ink `#0E0E10` / Cream `#F4EFE6` / Signal Coral `#FF5C2E` + Teal `#1B4E50` + Sand `#EAC9A2` + teplá grayscale (biased k Ink, NIKDY pure neutral).
+- **Typo:** Space Grotesk Variable (sans + bold display) + JetBrains Mono Variable (eyebrow, čísla). Fraunces serif odchází.
+- **Theme:** Light + dark přes `[data-theme]` atribut + localStorage `"gide-on-theme"`. Bootstrap script v Base.astro pre-render proti flash.
+- **Wordmark:** `GideonWordmark.tsx` pure-CSS scalable s toggle switchem. Nahrazuje AnimatedG.astro a modrou „G" ikonu.
+
+### Klíčové pravidlo brand vs identity
+
+- **Per-modul tinty** (peach/mint/butter/sky/lavender/sage/rose/pink) JEN pro identity: sidebar ikona, eyebrow nadpis, dashboard tile, badge.
+- **Brand paleta** (Ink / Signal Coral / neutral border) pro akce: CTA tlačítka (mic, save, primary), upload (neutral), hover stavy.
+- Mixing porušuje brand — Petr nesnášel mic-jako-butter, upload-jako-lavender.
+
+### CSS overrides ne refactor
+
+134+ legacy hardcoded styles nepřepsat jednotlivě → global CSS overrides per theme:
+
+```css
+:root[data-theme="light"] [class*="bg-black/20"] { background-color: var(--input) !important; }
+:root[data-theme="light"] [class*="border-white/10"] { border-color: var(--border) !important; }
+:root[data-theme="light"] [class*="shadow-black/"] { --tw-shadow-color: rgba(14,14,16,0.08) !important; }
+```
+
+Pravidlo: **fix tokens, ne komponenty.** Nová kategorie legacy hardcode → přidat override do `global.css`.
+
+---
+
+## Modal pattern — `modal-overlay` + `modal-panel`
+
+### Proč ne `bg-black/60 + glass-strong`
+
+Petr 2026-06-19: „takhle desná věc … příserné stránky". 10 fullscreen modalů použivalo legacy pattern (`fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm` + `glass-strong rounded-xl`).
+
+Problémy:
+- Overlay `bg-black/60` agresivní (vypadá jako fullscreen page transition, ne overlay).
+- `glass-strong` v modálu = nečitelný v light theme.
+- Žádný shared pattern → každý modal vlastní z-index/padding/border.
+
+### Co je teď
+
+Utility classes v `global.css`:
+
+```css
+@utility modal-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; background-color: rgba(14,14,16,0.35); backdrop-filter: blur(2px); }
+:root[data-theme="dark"] .modal-overlay { background-color: rgba(14,14,16,0.7); }
+@utility modal-panel { background: var(--surface-elevated); border: 1px solid var(--border); border-radius: 0.75rem; box-shadow: 0 4px 12px -2px rgba(14,14,16,0.08), 0 10px 30px -10px rgba(14,14,16,0.15); }
+```
+
+Použití místo legacy. Subtle ink overlay (35% light, 70% dark), brand-aware surface, soft shadow.
+
+### Kdy modal vs inline-row
+
+Petr explicit: pro **„+ Nový kontakt"** chce inline řádek v tabulce, ne modal. Modal jen pro **„Upravit kontakt"** s plnými fields.
+
+Pravidlo: rychlé create akce → inline + autofocus. Plný edit (mnoho fields) → modal.
+
+---
+
+## Sjednocení kontaktů na jeden UI
+
+### Proč zrušit `ContactsManager` (939 řádků card view)
+
+Petr 2026-06-19: „proč bych měl mít dva?". Měl `/contacts` (card view) **A** `/contacts/tabulka` (sync table). Duplikovaná funkce, různé features (tabulka měla iCloud sync + Google sync + duplicate merge, card view neměl).
+
+### Co je teď
+
+- `ContactsManager.tsx` smazán.
+- `/contacts/index.astro` ← bývalá `tabulka.astro` (jediný UI).
+- `/contacts/tabulka` → 301 redirect na `/contacts` (backward compat pro bookmarky).
+- `ContactEditor.tsx` extrahován jako shared modal pro „Upravit kontakt".
+- API endpoint `/api/contacts/tabulka` zůstává (lehký stats endpoint, ≠ UI stránka).
+
+### Pravidlo
+
+Když jsou v UI dvě stránky se stejnou doménou (kontakty, kalendář, soubory…) → SJEDNOTIT. Ten sync/novější vyhrává, starý card view zmizí.
+
+---
+
+## PWA manifest `id` = identita PWA (kritické)
+
+### Co se naučilo
+
+- **Stejné `id` mezi verzemi = upgrade** — existující ikona na ploše, push subscriptions přežijí, Service Worker auto-update flow.
+- **Jiné `id` = nová PWA** — host musí smazat starou, reinstall, push subscriptions umřou.
+
+### Pravidlo
+
+**NIKDY** neměnit `manifest.id` při běžném deployi. Změna `id="/start-gide-on-v3"` na `v4` (overcorrection při redesignu) → revert commitem `6dfd945`. Petr: „já je asi nedonutim aby … smazali app nainstalovali app".
+
+Force reinstall jen v exceptional případech (jiná aplikace, jiný uživatel, ne brand redesign).
+
+---
+
+## Document parsing pro Studánku RAG
+
+### Proč
+
+Petr 2026-06-19: chtěl rozšířit Studánka host upload audio o dokumenty (PDF/DOCX/XLSX/TXT) + extrakce textu + zařadit do RAG knowledge base projektu.
+
+### Co bylo zvoleno
+
+- **Stack:** `pdf-parse` (PDF) + `mammoth` (DOCX) + `xlsx` SheetJS (XLSX) + native UTF-8 (TXT). Žádný univerzální parser (např. textract) — moc závislostí.
+- **`detectDocKind(mime, filename)`** — MIME + extension dvojí check (browser někdy posílá generic `application/octet-stream`).
+- **Max 100 000 chars** truncate (Gemini context limit + RAG embedding chunks).
+- **Sdílený flag** s audio: `ProjectInvitation.canUploadAudio` (Petr: „je to ta stejná pozvánka, jeden host = jedno právo nahrávat").
+- **Fire-and-forget** Stage 1 jen extrakce (žádná Stage 2 analýza jako u audio). RAG index sourceType `"project-document"`.
+
+### Gotcha: pdf-parse side-effects on import
+
+`pdf-parse` při statickém importu otevírá test PDF z `node_modules/pdf-parse/test/data/`. V produkčním kontejneru ten soubor není → crash. Fix: dynamic import + fallback:
+
+```ts
+const mod: any = await import("pdf-parse");
+const pdfParse = mod.default ?? mod;
+```

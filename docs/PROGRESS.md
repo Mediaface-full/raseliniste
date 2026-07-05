@@ -4,6 +4,114 @@
 > a ví kde se skončilo. Detail jednotlivých session bloků v
 > `INSTRUKCE/HANDOFF-*.md` a v memory souborech.
 
+## Session 2026-06-19 → 2026-07-05 — Deploy redesignu, UX opravy, Oběd v Praze, Telegram bot ClaudeClaw
+
+**~27 commitů na main, vše nasazeno. Memory: `project_telegram_claudeclaw.md`.**
+
+### Deploy redesignu + post-deploy opravy (2026-06-19 … 22)
+
+- Redesign branch (30 commitů) mergnut do main a nasazen. Hosti i VIP bez akce, Petr klik „Restartovat" v PWA banneru.
+- **Backup „fetch failed" widget** — 2 bugy: SchedulerStatus 60s grace nefungoval pro daily joby (fix: porovnat lastSuccessAt vs lastTriggeredAt) + manuální GET /api/cron/backup neaktualizoval CronRun (fix: recordCronRun v POST i GET). `posta-commitment-detect` → fireAndForget (LLM > 90s timeout).
+- **UX batch dle Gideonova feedbacku:** health „Analyzovat" z lavender na brand; kalendářový event modal čitelný v dark theme (hardcoded OKLCH → modal-panel); Kontakty: Nástroje dropdown + zvýrazněný search + odfialovění + klikatelné VIP/TÝM flagy + ✎ edit modal s VIP odkazem + sloupec Poznámka; Triage: 2řádková hierarchie + collapsed list s meta chips + Rozbalit/Sbalit vše; Úkoly: kompaktní 1-row + ✕ discard batchů + neutral status ikony; **fix VIP filtru asignace** (CallLog mise ignorovaly assignedTo) + **fix commit endpointu** (batch zůstával v review když část tasků selhala — try/catch + force status update); booking: brand pozadí + vykání; /ozvena + /notifikace: Shell na desktopu, PWA scope na /ozvena/pwa (manifest id zachován); dashboard: 2× QuickRecordButton (úkoly + deník, klik=start/stop, timer, bez redirectu); Page Links sjednoceny na /settings/page-links (stará /links po 5 marných fixech zrušena → redirect); apple-touch-icon na cream variantu (Mac dark dock auto-tintoval transparent PNG).
+- **Booking „Oběd v Praze"** — nový typ CHOICE_LUNCH_PRAGUE / MEETING_LUNCH_PRAGUE, 90 min fix, okno 11:00–13:30, dny v /calendar/settings (lunchDays), dovolená/nomád blokují (isInPerson). Migrace `20260619200000_booking_lunch_prague`.
+
+### Telegram bot ClaudeClaw (2026-06-22 … 2026-07-05, LIVE)
+
+- **Stack:** `@anthropic-ai/sdk` + Claude Haiku 4.5 (env `ANTHROPIC_MODEL` override), beta toolRunner, 4 read-only tools nad Prisma: get_tasks / get_events / get_schedule / get_studanka_activity. Factory `buildAgentTools(userId)` (userId v closure). Webhook `/api/telegram/webhook` (secret header + whitelist user ID), fire-and-forget, /start + /help.
+- **Hlasovky:** Telegram OGG → `transcribeAudioOnly()` (Gemini, sdílená pipeline se Studánkou) → bot pošle `🎙 „přepis"` → agent.
+- **Debug maraton (~2h, lekce v GOTCHAS):** (1) compose bez explicit env řádků — VAPID lekce znovu; (2) webhook secret se spec. znaky rozbil shell i Telegram validaci — jen hex; (3) **hlavní bug: middleware blokoval webhook** — `/api/telegram/webhook` chyběl v `isPublic()` → 401 UNAUTHENTICATED dřív než se endpoint spustil; (4) bot ukazoval smazané schůzky — chyběl `deletedRemotely: false` filtr (ověřeno SQL: 6 ze 7 zobrazených eventů bylo smazaných).
+- **Env:** ANTHROPIC_API_KEY, ANTHROPIC_MODEL, TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USER_ID, TELEGRAM_WEBHOOK_SECRET (+ explicit řádky v compose).
+
+### Další kroky
+
+1. Rotace Anthropic API klíče (prošel chat transcriptem při debugu)
+2. Triage ~15 high-priority úkolů s termínem přešlým o měsíc (špiní botové odpovědi)
+3. RAG tool `search_notes` pro bota (přes searchSimilar v rag.ts) — až Gideon narazí na dotaz nad poznámkami
+4. Off-site backup na fridu (BACKUP_REMOTE_* env nenastaveny — jen lokální záloha, spawnut task chip)
+
+---
+
+## Session 2026-06-18 / 2026-06-19 — Gide-on brand redesign + Studánka dokumenty + Kontakty sjednoceny
+
+**30 commitů na separátní branchi `claude/redesign-gideon` (worktree `redesign-gideon`).**
+**STAV: hotov, čeká na Petrovo "pushni" → merge do main → DSM Pull/Recreate.**
+
+Memory: `session_2026_06_18_19_redesign_gideon.md`, `feedback_brand_palette_rules.md`.
+
+### Co bylo uděláno (fáze A–H)
+
+| Fáze | Obsah |
+|---|---|
+| A | Brand tokens — Ink `#0E0E10` / Cream `#F4EFE6` / Signal Coral `#FF5C2E` / Teal `#1B4E50` / Sand `#EAC9A2` + teplá grayscale. Space Grotesk Variable (sans+display) + JetBrains Mono Variable (eyebrow/čísla). Light+dark theme přes `[data-theme]` + localStorage `"gide-on-theme"`. Bootstrap script v Base.astro pre-render proti flash. |
+| B | `GideonWordmark.tsx` (pure CSS scalable wordmark se switchem) + `GideonMark.tsx`. Assets v `public/brand/`. PWA manifest `id="/start-gide-on-v3"` zachován (= upgrade, NE reinstall). 8 module ikon. |
+| C | UI primitives — Button (default/ink/outline/ghost/secondary/destructive/glass), Input (clean + Signal focus ring), Card, Eyebrow (`↳ TEXT` mono), Switch (brand toggle motiv). |
+| D | Shell + sidebar polish — odstraněn `bg-white/N` hardcoded (lámal light theme), accent token pro hover/active, font-size 17px. |
+| E | Per-modul stránky polish + **emoji strip (228 emoji odstraněno přes 67 souborů)**. Briefing tab inverted segmented pattern. Topbar ikony 18px, h1 brand display `text-4xl bold tracking-[-0.04em]`. |
+| F | Public stránky — `/login`, `/me/[token]`, `/call-log`, `/i/[token]` dostávají `GideonWordmark` místo modré ikony „G" / AnimatedG. |
+| G | PWA SW auto-update — `VERSION="gide-on-v1"`, postMessage `SW_UPDATED`, `SwUpdateBanner.tsx` coral „Nová verze připravena → Restartovat". |
+| H | Final polish — shadow-black/N override v light, ring-2 odstraněn z AwayManager (Petr „zdvojená čára není v brandu"), GuestGuide info button decentní. |
+
+### Nový feature: Studánka — upload dokumentů + RAG
+
+- **Migrace** `20260619180000_studanka_documents`: `ProjectFile.guestUserId` (FK GuestUser, SetNull) + `extractedText` + `extractionStatus` + `extractionError`. GuestUser.files relation.
+- **`src/lib/document-parser.ts`** — pdf-parse + mammoth + xlsx (SheetJS) + native TXT. `detectDocKind()` (MIME + extension). Max 100k chars truncate. Dynamic import pdf-parse (side-effects on import).
+- **Endpoint** `/api/me/[token]/upload-document` — auth přes guestToken + `canUploadAudio` flag (sdílený). Rate 30/h. Max 50 MB. Fire-and-forget: parse → extractedText → `indexEntity(sourceType: "project-document")`.
+- **RagSource** type rozšířen o `"project-document"` v `src/lib/rag.ts`.
+- **Frontend** `GuestRecorder.tsx` — `isDocumentByName()` heuristika, endpoint selection (audio/* → upload-audio, ostatní → upload-document). Accept attribute PDF/DOCX/XLSX/TXT.
+- **Admin** `StudnaDetail.tsx` zobrazuje `extractionStatus` inline badge + jméno hosta. `/me/<token>` host vidí svých posledních 5 dokumentů + status.
+- **Návod** `/help/upload-audio` přepsán pro oba flow (Audio = transkript, Dokument = extrakce + RAG search).
+
+### Sjednocení kontaktů
+
+- Smazán `ContactsManager.tsx` (939 řádků card view) + `src/pages/contacts.astro`.
+- `ContactEditor.tsx` extrakce do samostatného souboru (shared modal pro „Upravit kontakt" v tabulce).
+- `/contacts/tabulka` → `/contacts/index.astro` (= `/contacts`).
+- `/contacts/tabulka` 301 redirect na `/contacts` (backward compat).
+- Sidebar zjednodušený — jen položka „Kontakty".
+
+### Drobné polish
+
+- Triage projekt picker Folder ikona (po emoji strip).
+- Popover background brand-aware (border-border + bg-popover místo border-white/20 + bg-black/95).
+- **10 fullscreen modalů refactor** na `modal-overlay` + `modal-panel` utility (Petr nesnášel agresivní `bg-black/60 + backdrop-blur-sm + glass-strong`).
+- Page wrappers `max-w-2xl..7xl` → `100% !important`.
+- AwayManager Dovolená/Nomád: border-2 + ring-2 → border-1 + bg tint.
+- DiktatRecorder + GuestRecorder mic + upload na brand paletu (Signal Coral CTA, ne tint).
+- Studánka host info button: tint-sky modrá → border-border neutral subtle.
+- Mood emoji v Deníku ZACHOVÁNY (záměrně, expresivní modul).
+
+### PWA upgrade chování (kritické)
+
+Manifest `id="/start-gide-on-v3"` **zachován stejný jako produkce** = upgrade, ne reinstall.
+
+| Kdo | Akce po deploy |
+|---|---|
+| Hosti Studánky `/me/<token>` | NIC — nemají SW, otevřou link, vidí nový brand. |
+| VIP `/call-log?t=<token>` | NIC — link z emailu, nový brand při dalším otevření. |
+| Petr (Gide-on PWA iPhone) | Coral banner „Nová verze připravena → Restartovat". Stará ikona zůstává, push subscriptions přežijí. |
+| Petr (Chrome PC) | Hard refresh (Cmd+R). |
+
+### Deploy plán (až Petr řekne „pushni")
+
+1. Merge `claude/redesign-gideon` → `main` (FF z worktree).
+2. Push origin.
+3. GH Actions build (~7 min — nové npm deps `pdf-parse` + `mammoth` + `xlsx`).
+4. DSM Container Manager → Pull → Recreate.
+5. Entrypoint: heal-migrations → migrate deploy (`20260609180000` + `20260619180000`) → start.
+6. Smoke test: login, kalendář, `/contacts`, `/me/<existing>`, `/call-log?t=<existing>`.
+7. Verify migrace: `docker exec raseliniste_db psql ... "\d \"ProjectFile\""` — vidět nové sloupce.
+
+### Co se naučilo
+
+- **Brand identity = palette + typo + tinty per-modul. Mixing per-modul tinty s CTA působí mimo brand.** Mic = vždy Signal Coral, ne tint-butter. Per-modul tint je orientace (sidebar/eyebrow/tile), brand paleta je akce.
+- **`bg-white/N`, `border-white/N`, `bg-black/N`, `shadow-black/N`** byly všude jako legacy Liquid Glass. Refaktor 134+ jednotlivě nedával smysl → CSS overrides v `global.css` per data-theme.
+- **`backdrop-filter` v glass parent láme `position: fixed`** containing block (Portal pattern z 2026-05-05 platí pro VŠECHNY dropdowny v glass kartách).
+- **PWA manifest `id` = identita PWA**. Stejné = upgrade (push subscriptions přežijí), jiné = force reinstall. NIKDY měnit při běžném deployi.
+- **`pdf-parse` má side-effects on import** (otevírá test PDF z node_modules). Dynamic import + fallback `mod.default ?? mod`.
+- **Modální pattern**: `modal-overlay` (subtle ink 35% v light, 70% v dark) + `modal-panel` (var(--surface-elevated) + border + soft shadow). Nahrazeno 10× `bg-black/60 + glass-strong rounded-xl`.
+
+---
+
 ## Session 2026-06-09 (večer) — Triage picker, Team Workspace routing, Portal audit
 
 **8+ hodin práce, ~10 commitů. Petr právem frustrovaný že většina toho
