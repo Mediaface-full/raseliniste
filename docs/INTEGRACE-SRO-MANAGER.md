@@ -46,30 +46,36 @@ Gideon řekne a doplním UI sekci do StudnaDetail.
 
 ## ČÁST B — co implementovat v SRO Manageru
 
-SRO Manager stack: PHP 8.3 + Slim 4 + MariaDB (standardní Mediaface stack).
+SRO Manager stack: **FastAPI + SQLAlchemy (async) + asyncpg + Alembic**
+(ověřeno 2026-07-06 z `backend/requirements.txt`). Postgres.
 
-### 1. DB tabulka
+### 1. DB tabulka (Alembic migrace)
 
-```sql
-CREATE TABLE studanka_recordings (
-  id            VARCHAR(40) PRIMARY KEY,      -- recordingId z Rašeliniště (cuid)
-  client_ref    VARCHAR(120) NOT NULL,        -- párování na klienta
-  project_id    VARCHAR(40) NOT NULL,
-  project_name  VARCHAR(200) NOT NULL,
-  recording_type VARCHAR(20) NOT NULL,        -- STANDARD | BRIEF | UPLOAD
-  guest_name    VARCHAR(200) NULL,
-  duration_sec  INT NULL,
-  transcript    MEDIUMTEXT NOT NULL,
-  summary       TEXT NULL,                    -- AI shrnutí (UPLOAD nemá)
-  recorded_at   DATETIME NOT NULL,            -- createdAt z payloadu
-  received_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_client (client_ref),
-  INDEX idx_recorded (recorded_at)
-) CHARACTER SET utf8mb4 COLLATE utf8mb4_czech_ci;
+```python
+# alembic revision: studanka_recordings
+op.create_table(
+    "studanka_recordings",
+    sa.Column("id", sa.String(40), primary_key=True),        # recordingId z Rašeliniště (cuid)
+    sa.Column("client_ref", sa.String(120), nullable=False), # párování na klienta
+    sa.Column("project_id", sa.String(40), nullable=False),
+    sa.Column("project_name", sa.String(200), nullable=False),
+    sa.Column("recording_type", sa.String(20), nullable=False),  # STANDARD | BRIEF | UPLOAD
+    sa.Column("guest_name", sa.String(200), nullable=True),
+    sa.Column("duration_sec", sa.Integer, nullable=True),
+    sa.Column("transcript", sa.Text, nullable=False),
+    sa.Column("summary", sa.Text, nullable=True),            # AI shrnutí (UPLOAD nemá)
+    sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("received_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+)
+op.create_index("ix_studanka_client", "studanka_recordings", ["client_ref"])
+op.create_index("ix_studanka_recorded", "studanka_recordings", ["recorded_at"])
 ```
 
 `id` jako primary key = přirozená idempotence (Rašeliniště může webhook
-retry-nout 3×, `INSERT ... ON DUPLICATE KEY UPDATE` to vyřeší).
+retry-nout 3× → Postgres `INSERT ... ON CONFLICT (id) DO UPDATE`).
+
+Párování `client_ref` ↔ klient: doporučeně použít existující ID klienta
+v SRO Manageru (int/uuid jako string) — Gideon ho vyplní do studánky.
 
 ### 2. Webhook endpoint (přijímací)
 
@@ -97,57 +103,62 @@ retry-nout 3×, `INSERT ... ON DUPLICATE KEY UPDATE` to vyřeší).
 **Ověření podpisu (POVINNÉ):** hlavička `X-Raseliniste-Signature`
 obsahuje `sha256=<hex HMAC-SHA256 raw body přes webhookSecret>`.
 
-```php
-// Slim 4 route handler
-$app->post('/api/webhooks/studanka', function (Request $request, Response $response) {
-    $rawBody = (string) $request->getBody();
-    $signature = $request->getHeaderLine('X-Raseliniste-Signature');
+```python
+# FastAPI router — backend/app/routers/studanka_webhook.py
+import hashlib, hmac
+from datetime import datetime
+from fastapi import APIRouter, Request, Response
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-    $secret = $_ENV['STUDANKA_WEBHOOK_SECRET']; // stejný jako v Rašeliništi
-    $expected = 'sha256=' . hash_hmac('sha256', $rawBody, $secret);
+router = APIRouter()
 
-    if (!hash_equals($expected, $signature)) {
-        return $response->withStatus(401);
-    }
+@router.post("/api/webhooks/studanka")
+async def studanka_webhook(request: Request):
+    raw_body = await request.body()  # RAW bytes — podpis se počítá z nich
+    signature = request.headers.get("x-raseliniste-signature", "")
 
-    $data = json_decode($rawBody, true);
-    if (($data['event'] ?? '') !== 'recording.processed') {
-        return $response->withStatus(200); // neznámý event typ — ack a ignoruj
-    }
+    secret = settings.STUDANKA_WEBHOOK_SECRET  # stejný jako v Rašeliništi
+    expected = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
 
-    // Idempotentní upsert — Rašeliniště může retry-nout
-    $stmt = $this->get(PDO::class)->prepare('
-        INSERT INTO studanka_recordings
-          (id, client_ref, project_id, project_name, recording_type,
-           guest_name, duration_sec, transcript, summary, recorded_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          transcript = VALUES(transcript), summary = VALUES(summary)
-    ');
-    $stmt->execute([
-        $data['recordingId'],
-        $data['clientRef'] ?? '',
-        $data['projectId'],
-        $data['projectName'],
-        $data['recordingType'],
-        $data['guestName'],
-        $data['durationSec'],
-        $data['transcript'],
-        $data['summary'],
-        (new DateTime($data['createdAt']))->format('Y-m-d H:i:s'),
-    ]);
+    if not hmac.compare_digest(expected, signature):
+        return Response(status_code=401)
 
-    return $response->withStatus(200);
-});
+    data = await request.json()
+    if data.get("event") != "recording.processed":
+        return Response(status_code=200)  # neznámý event — ack a ignoruj
+
+    # Idempotentní upsert — Rašeliniště může retry-nout 3×
+    stmt = pg_insert(StudankaRecording).values(
+        id=data["recordingId"],
+        client_ref=data.get("clientRef") or "",
+        project_id=data["projectId"],
+        project_name=data["projectName"],
+        recording_type=data["recordingType"],
+        guest_name=data.get("guestName"),
+        duration_sec=data.get("durationSec"),
+        transcript=data["transcript"],
+        summary=data.get("summary"),
+        recorded_at=datetime.fromisoformat(data["createdAt"].replace("Z", "+00:00")),
+    ).on_conflict_do_update(
+        index_elements=["id"],
+        set_={"transcript": data["transcript"], "summary": data.get("summary")},
+    )
+    async with async_session() as session:
+        await session.execute(stmt)
+        await session.commit()
+
+    return Response(status_code=200)
 ```
 
 **Důležité:**
 - Vrátit **200 do 15 s**, jinak Rašeliniště retry-ne (2 s, pak 10 s backoff).
-- `hash_equals()` proti timing attackům, ne `===`.
-- Podpis se počítá z **raw body** — žádný re-encode JSON před ověřením.
+- `hmac.compare_digest()` proti timing attackům, ne `==`.
+- Podpis se počítá z **raw body bytes** (`await request.body()`) — žádný
+  re-encode JSON před ověřením.
 - `clientRef` může být null (projekt bez párování) — rozhodni se: uložit
   s prázdným ref, nebo 200 + ignorovat.
-- Endpoint musí být mimo session auth SRO Manageru (webhook nemá cookie).
+- Endpoint musí být **mimo session/CSRF auth** SRO Manageru (webhook nemá
+  cookie) — zkontrolovat `auth.py` + `csrf.py` middleware exempty.
 
 ### 3. UI v SRO Manageru
 
