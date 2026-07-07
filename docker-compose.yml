@@ -77,6 +77,8 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_ALLOWED_USER_ID: ${TELEGRAM_ALLOWED_USER_ID:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      # ---- Export API pro externí systémy (SRO Manager, Petr 2026-07-06) ----
+      STUDANKA_EXPORT_TOKEN: ${STUDANKA_EXPORT_TOKEN:-}
     volumes:
       - ./uploads:/data/uploads
       - ./backups:/data/backups

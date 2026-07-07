@@ -71,6 +71,8 @@ const schema = z.object({
   TELEGRAM_BOT_TOKEN: emptyToUndef(z.string().min(10).optional()),
   TELEGRAM_ALLOWED_USER_ID: emptyToUndef(z.string().min(3).optional()),
   TELEGRAM_WEBHOOK_SECRET: emptyToUndef(z.string().min(16).optional()),
+  // Export API pro externí systémy (SRO Manager) — Bearer token
+  STUDANKA_EXPORT_TOKEN: emptyToUndef(z.string().min(16).optional()),
   // Google OAuth (Calendar + People API)
   GOOGLE_CLIENT_ID: emptyToUndef(z.string().min(10).optional()),
   GOOGLE_CLIENT_SECRET: emptyToUndef(z.string().min(10).optional()),

@@ -18,6 +18,10 @@ const PatchBody = z.object({
   analysisModel: z.enum(["gemini-2.5-flash", "gemini-2.5-pro"]).nullable().optional(),
   includeInDigest: z.boolean().optional(),
   archive: z.boolean().optional(),
+  // Integrace s externím systémem (SRO Manager) — Petr 2026-07-06
+  webhookUrl: z.string().url().max(500).nullable().optional().or(z.literal("").transform(() => null)),
+  webhookSecret: z.string().max(200).nullable().optional().or(z.literal("").transform(() => null)),
+  externalClientRef: z.string().max(120).nullable().optional().or(z.literal("").transform(() => null)),
 });
 
 async function own(userId: string, id: string) {
@@ -118,6 +122,10 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
   if (body.archive !== undefined) {
     data.archivedAt = body.archive ? new Date() : null;
   }
+  // Integrace SRO Manager (Petr 2026-07-06)
+  if (body.webhookUrl !== undefined) data.webhookUrl = body.webhookUrl?.trim() || null;
+  if (body.webhookSecret !== undefined) data.webhookSecret = body.webhookSecret?.trim() || null;
+  if (body.externalClientRef !== undefined) data.externalClientRef = body.externalClientRef?.trim() || null;
 
   const project = await prisma.projectBox.update({ where: { id }, data });
   return Response.json({ project });

@@ -82,6 +82,12 @@ export async function processRecording(params: {
       });
       console.log(`[process-recording] ${params.recordingId} processed OK in ${Date.now() - entry.startedAt}ms`);
 
+      // Externí webhook (SRO Manager) — fire-and-forget, vlastní pinning
+      try {
+        const { notifyExternalSystem } = await import("./studanka-webhook");
+        notifyExternalSystem(params.recordingId);
+      } catch { /* nikdy neblokuj pipeline */ }
+
       // RAG indexace (fire-and-forget, vlastní pinning v rag.ts)
       try {
         const { indexEntity } = await import("./rag");
@@ -173,6 +179,12 @@ export async function processRecordingFromText(params: {
       });
       console.log(`[process-recording-text] ${params.recordingId} processed OK in ${Date.now() - entry.startedAt}ms`);
 
+      // Externí webhook (SRO Manager) — fire-and-forget
+      try {
+        const { notifyExternalSystem } = await import("./studanka-webhook");
+        notifyExternalSystem(params.recordingId);
+      } catch { /* nikdy neblokuj pipeline */ }
+
       // RAG indexace
       try {
         const { indexEntity } = await import("./rag");
@@ -255,6 +267,12 @@ export async function processUploadAudio(params: {
         },
       });
       console.log(`[process-upload-audio] ${params.recordingId} processed OK in ${Date.now() - entry.startedAt}ms`);
+
+      // Externí webhook (SRO Manager) — fire-and-forget
+      try {
+        const { notifyExternalSystem } = await import("./studanka-webhook");
+        notifyExternalSystem(params.recordingId);
+      } catch { /* nikdy neblokuj pipeline */ }
 
       // RAG indexace — i UPLOAD recordings se hodí mít searchable
       try {

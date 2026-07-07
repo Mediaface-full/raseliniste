@@ -19,6 +19,9 @@ interface ProjectDetail {
   projectSummaryPrompt: string | null;
   analysisModel: string | null;
   includeInDigest: boolean;
+  webhookUrl: string | null;
+  webhookSecret: string | null;
+  externalClientRef: string | null;
   archivedAt: string | null;
   createdAt: string;
   invitations: Array<{
@@ -1309,6 +1312,10 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
     Boolean(project.studnaStandardPrompt || project.studnaBriefPrompt),
   );
   const [includeInDigest, setIncludeInDigest] = useState(project.includeInDigest);
+  // Integrace SRO Manager (Petr 2026-07-06)
+  const [webhookUrl, setWebhookUrl] = useState(project.webhookUrl ?? "");
+  const [webhookSecret, setWebhookSecret] = useState(project.webhookSecret ?? "");
+  const [externalClientRef, setExternalClientRef] = useState(project.externalClientRef ?? "");
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
@@ -1328,6 +1335,9 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           studnaStandardPrompt: studnaStandardPrompt.trim() || null,
           studnaBriefPrompt: studnaBriefPrompt.trim() || null,
           includeInDigest,
+          webhookUrl: webhookUrl.trim() || null,
+          webhookSecret: webhookSecret.trim() || null,
+          externalClientRef: externalClientRef.trim() || null,
         }),
       });
       if (res.ok) {
@@ -1517,6 +1527,44 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
           />
           Zahrnout do denního souhrnu (e-mail v 7:00 ráno)
         </label>
+
+        {/* Integrace SRO Manager — Petr 2026-07-06. Návod: docs/INTEGRACE-SRO-MANAGER.md */}
+        <div className="pt-3 border-t border-border space-y-3">
+          <div>
+            <div className="text-sm font-medium mb-0.5">Napojení na SRO Manager</div>
+            <div className="text-xs text-muted-foreground leading-relaxed">
+              Po dokončení přepisu se pošle JSON s přepisem na webhook URL (podepsáno
+              HMAC secretem). ID klienta páruje projekt s klientem v SRO Manageru.
+              Prázdné = integrace vypnutá. Návod: docs/INTEGRACE-SRO-MANAGER.md.
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-mono uppercase text-muted-foreground">ID klienta (externalClientRef)</label>
+              <Input
+                value={externalClientRef}
+                onChange={(e) => setExternalClientRef(e.target.value)}
+                placeholder="např. firma-novak-sro"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-mono uppercase text-muted-foreground">Webhook secret</label>
+              <Input
+                value={webhookSecret}
+                onChange={(e) => setWebhookSecret(e.target.value)}
+                placeholder="openssl rand -hex 24"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-mono uppercase text-muted-foreground">Webhook URL</label>
+            <Input
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://sro.example.cz/api/webhooks/studanka"
+            />
+          </div>
+        </div>
 
         {/* Export přepisů */}
         <div className="pt-3 border-t border-white/5">

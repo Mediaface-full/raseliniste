@@ -824,6 +824,14 @@ model ProjectBox {
   // Notifikace v 18:00 cron — pokud false, projekt se v digestu vynechá
   includeInDigest   Boolean  @default(true)
 
+  // Petr 2026-07-06: integrace s externím systémem (SRO Manager).
+  // webhookUrl: po dokončení přepisu POST JSON s přepisem na tuto URL.
+  // webhookSecret: HMAC-SHA256 podpis payloadu v hlavičce X-Raseliniste-Signature.
+  // externalClientRef: ID/slug klienta v externím systému — párování projekt↔klient.
+  webhookUrl        String?
+  webhookSecret     String?
+  externalClientRef String?
+
   // Prskavka modul = osobní projekty (knížky, nápady, soukromé tvoření).
   // false = klasická Studánka (sdílená s klienty), true = Prskavka (jen Petr).
   // Liší se jen filtrem a kde se zobrazí, jinak je chování identické.
