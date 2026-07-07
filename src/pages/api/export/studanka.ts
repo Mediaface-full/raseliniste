@@ -32,6 +32,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
   const clientRef = url.searchParams.get("client");
   const sinceRaw = url.searchParams.get("since");
+  const untilRaw = url.searchParams.get("until"); // exclusive — pro stránkování desc (backfill)
   const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10) || 50, 200);
 
   let since: Date | undefined;
@@ -42,12 +43,22 @@ export const GET: APIRoute = async ({ request, url }) => {
     }
     since = d;
   }
+  let until: Date | undefined;
+  if (untilRaw) {
+    const d = new Date(untilRaw);
+    if (isNaN(d.getTime())) {
+      return Response.json({ error: "INVALID_UNTIL — použij ISO 8601" }, { status: 400 });
+    }
+    until = d;
+  }
 
   const recordings = await prisma.projectRecording.findMany({
     where: {
       status: "processed",
       transcript: { not: "" },
-      ...(since ? { createdAt: { gte: since } } : {}),
+      ...(since || until
+        ? { createdAt: { ...(since ? { gte: since } : {}), ...(until ? { lt: until } : {}) } }
+        : {}),
       project: clientRef
         ? { externalClientRef: clientRef }
         : { externalClientRef: { not: null } },
