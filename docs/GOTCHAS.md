@@ -926,6 +926,49 @@ className={cn(
 
 ---
 
+## Zod schema ≠ switch case — přidání pole do PATCH má DVĚ místa
+
+**Problém:** Klikatelné VIP/TÝM flagy v kontaktech se tvářily funkčně, ale každé uložení padlo na 400 INVALID. Tři týdny rozbité (od fb5b341), nikdo si nevšiml — UI optimisticky ukázalo změnu, error zapadl.
+
+**Příčina:** Do PATCH endpointu se přidal `case "isVip"` do switche, ale zod `Change.field` enum ani `Change.value` union se nerozšířily. Zod odmítl request dřív, než se switch spustil.
+
+**Řešení:** Při přidávání pole do bulk-PATCH endpointů (tabulka pattern) vždy 3 místa: (1) zod enum `field`, (2) zod union `value` (boolean!), (3) switch case. Plus TS check — `tsc --noEmit` tenhle konkrétní bug odhalil.
+
+**Soubor:** `src/pages/api/contacts/tabulka.ts` (Change schema + switch).
+
+---
+
+## Prisma enum ≠ TS union — nová hodnota patří do obou
+
+**Problém:** `MEETING_LUNCH_PRAGUE` přidán do Prisma `EventType` enum, ale TS union `EventTypeStr` v `event-classifier.ts` zůstal starý → type error v booking mapMeetingType (a tichý mismatch kdekoli se casty obcházejí).
+
+**Řešení:** Enum hodnoty žijí ve DVOU místech: `prisma/schema.prisma` (DB) a `src/lib/event-classifier.ts` (`EventTypeStr` union). Při přidání aktualizovat obě.
+
+---
+
+## Edit modal + neúplný GET = tichá ztráta dat
+
+**Problém:** ✎ edit kontaktu otevřel modal s prázdným oslovením/aliasy/todoistUserId, a uložení je vynulovalo — GET `/api/contacts/tabulka` overlay pole vůbec nevracel, editor je inicializoval na `""` a PUT je poslal jako null.
+
+**Pravidlo:** Když modal edituje pole X, GET co ho plní MUSÍ X vracet. Při napojování edit formuláře zkontrolovat že každé pole formuláře má zdroj v API response — jinak save maže.
+
+**Soubor:** `src/pages/api/contacts/tabulka.ts` GET (overlay pole od 2026-07-06).
+
+---
+
+## SRO Manager (cross-repo) — migrace na prod ručně, Caddy stripuje /api
+
+**Kontext:** Integrace Studánka → SRO Manager (`mediaface_sro/sro-manager`, FastAPI + SQLAlchemy + Coolify na diego).
+
+1. **Migrace:** entrypoint SRO aplikuje SQL migrace JEN na prázdnou DB. Na produkci vždy ručně: `ssh diego "docker exec -i <db-container> psql -U sro -d sro_manager" < backend/migrations/NNN.sql`. DB container: `ssh diego "docker ps --format '{{.Names}}' | grep db-f5jl986m"`. Zapomenutí = 500 „interní chyba serveru" s error_id (UndefinedTableError v logu).
+2. **Routing:** Caddy `handle_path /api/*` stripuje prefix → FastAPI routy JSOU bez `/api` (router `/webhooks/studanka` = veřejně `https://sro.mediaface.cz/api/webhooks/studanka`).
+3. **CSRF:** POST bez session musí do `_PUBLIC_PREFIXES` v `backend/app/csrf.py` (obdoba middleware whitelistu v Rašeliništi — stejná třída chyb).
+4. **Workflow:** commit lokálně, Petr pushuje GH Desktop, Coolify auto-deploy. Diego SSH funguje z Claude terminálu (`ssh diego`).
+
+**Soubor:** `docs/INTEGRACE-SRO-MANAGER.md` (kompletní spec obou stran).
+
+---
+
 ## File header
 
 Pokud při řešení něčeho narazíš na netriviální problém co

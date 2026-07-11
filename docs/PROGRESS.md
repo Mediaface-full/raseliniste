@@ -4,6 +4,72 @@
 > a ví kde se skončilo. Detail jednotlivých session bloků v
 > `INSTRUKCE/HANDOFF-*.md` a v memory souborech.
 
+## Session 2026-07-06 — Integrace SRO Manager (Studánka), výchozí Meet link kontaktu
+
+**5 commitů raseliniste + 2 commity sro-manager. Cross-repo práce (poprvé).**
+
+### Integrace Studánka → SRO Manager (obě strany hotové)
+
+Gideon: klientské studánky se mají propisovat do firemního systému SRO Manager
+(FastAPI + SQLAlchemy + Coolify na diego, `mediaface_sro/sro-manager`).
+
+**Rašeliniště strana** (`9c5d4d5` + `38c8ce2`):
+- `ProjectBox.webhookUrl / webhookSecret / externalClientRef` (migrace `20260706090000`)
+- `src/lib/studanka-webhook.ts` — po dokončení přepisu POST JSON (event
+  `recording.processed`, transcript + summary + guest + clientRef) s HMAC-SHA256
+  podpisem v `X-Raseliniste-Signature`. Retry 0s/2s/10s, fire-and-forget,
+  module-level Set proti GC. Hook ve všech 3 dokončovacích bodech
+  process-recording.ts.
+- Pull API `GET /api/export/studanka?client=&since=&until=&limit=` (Bearer
+  `STUDANKA_EXPORT_TOKEN`, middleware whitelist!). `until` cursor pro desc
+  stránkování backfillu.
+- UI: StudnaDetail Nastavení → sekce „Napojení na SRO Manager" (3 pole).
+- Návod pro druhou stranu: `docs/INTEGRACE-SRO-MANAGER.md` (pozor: SRO je
+  FastAPI, ne PHP — opraveno v `eb7a113`).
+
+**SRO Manager strana** (`a1f12f9` + `c6d6844` v sro-manager repu):
+- Migrace `033_studanka_recordings.sql` (id=recordingId PK → idempotence).
+  **Aplikována ručně na prod** přes `ssh diego docker exec db psql` —
+  entrypoint migruje jen prázdnou DB!
+- `routes/studanka.py` — POST /webhooks/studanka (HMAC compare_digest,
+  CSRF exempt přes `_PUBLIC_PREFIXES` += `/webhooks/`), GET
+  /studanka/clients/{id}, GET /studanka/backfill (owner-only, stránkuje
+  pull API přes `until`).
+- `StudankaBox.tsx` na detailu klienta (vzor MeetBox) — bez dat se nerenderuje.
+- Ověřeno na produkci: backfill importoval **21 záznamů**.
+
+**Párování:** `externalClientRef` = interní UUID klienta v SRO (na detailu
+klienta, klik kopíruje — commit `0e34fff` v sro-manager). Sdílený webhook
+secret + export token — hodnoty v .env obou systémů.
+
+### Výchozí Meet link kontaktu (`2ea2cb7`)
+
+Gideon: kontakt s trvalou Meet místností → booking použije jeho link místo
+generování nového. `Contact.defaultMeetLink` (migrace `20260706120000`),
+confirmReservation: `conferenceData=false` + link do location/description/
+mailu/.ics/BookingInvite.meetLink. Pole v ContactEditoru. Caveat: event nemá
+nativní „Join with Meet" tlačítko (link je v location — klikatelné).
+
+### 3 bugy nalezené TS auditem (opravené v `2ea2cb7`)
+
+1. **VIP/TÝM toggle save byl rozbitý** (od fb5b341) — zod `Change.field` enum
+   neobsahoval isVip/isTeam a `value` nepovoloval boolean → každé uložení
+   flagu 400. Lekce: **po přidání case do switche zkontrolovat i zod schema.**
+2. **✎ edit modal mazal overlay pole** — tabulka GET nevracel vocative/aliases/
+   todoistUserId → editor je otevřel prázdné a save je vynuloval.
+3. `EventTypeStr` nemel `MEETING_LUNCH_PRAGUE` (Prisma enum ≠ TS union —
+   při přidání enum hodnoty aktualizovat obě místa).
+
+### Další kroky
+
+1. Push obou rep (raseliniste 5 commitů, sro-manager 2) + DSM/Coolify deploy
+2. `STUDANKA_EXPORT_TOKEN` do .env na Synology (hodnota u Gideona)
+3. Spárovat klientské studánky (ID klienta + webhook URL + secret v nastavení)
+4. Test: nahrávka do spárované studánky → karta klienta v SRO
+5. Zbývá z minula: rotace Anthropic klíče, triage přešlých úkolů, RAG tool pro bota
+
+---
+
 ## Session 2026-06-19 → 2026-07-05 — Deploy redesignu, UX opravy, Oběd v Praze, Telegram bot ClaudeClaw
 
 **~27 commitů na main, vše nasazeno. Memory: `project_telegram_claudeclaw.md`.**
