@@ -31,6 +31,7 @@ export interface Contact {
   isVip: boolean;
   isTeam: boolean;
   todoistUserId: string | null;
+  defaultMeetLink: string | null;
   clientTag: string | null;
   aliases: string[];
   clientTagAliases: string[];
@@ -61,6 +62,7 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
   const [isVip, setIsVip] = useState(contact?.isVip ?? false);
   const [isTeam, setIsTeam] = useState(contact?.isTeam ?? false);
   const [todoistUserId, setTodoistUserId] = useState(contact?.todoistUserId ?? "");
+  const [defaultMeetLink, setDefaultMeetLink] = useState(contact?.defaultMeetLink ?? "");
   const [clientTag, setClientTag] = useState(contact?.clientTag ?? "");
   // Aliases — input je čárkou oddělený řetězec, parsujeme při uložení.
   // Display chip list pod inputem ukazuje aktuálně uložené hodnoty.
@@ -97,6 +99,7 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
       isVip,
       isTeam,
       todoistUserId: todoistUserId.trim() || null,
+      defaultMeetLink: defaultMeetLink.trim() || null,
       // clientTag — povolíme jen lowercase + pomlčky bez diakritiky (server to taky validuje).
       clientTag: clientTag.trim() ? clientTag.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || null : null,
       // Parse comma-separated aliases — server pak trim+lowercase+dedup
@@ -255,6 +258,22 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
               />
               <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
                 Pokud má kontakt slug, úkoly delegované jemu i úkoly s tagem <code>klient-{clientTag || "<slug>"}</code> půjdou do projektu „Práce" / sekce „{clientTag ? clientTag.split("-").map(w => w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)).join(" ") : "<klient>"}".
+              </p>
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block mb-1">
+                Výchozí Meet link (volitelně)
+              </label>
+              <Input
+                value={defaultMeetLink}
+                onChange={(e) => setDefaultMeetLink(e.target.value)}
+                placeholder="https://meet.google.com/abc-defg-hij"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                Trvalá Meet místnost tohoto kontaktu. Když potvrdí online schůzku
+                z booking pozvánky, použije se tenhle link místo generování nového —
+                přijde mu v potvrzovacím mailu i v kalendářové události.
               </p>
             </div>
 

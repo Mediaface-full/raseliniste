@@ -93,6 +93,16 @@ export const GET: APIRoute = async ({ cookies, url }) => {
       isVip: c.isVip,
       isTeam: c.isTeam,
       clientTag: c.clientTag,
+      // Overlay pole pro ✎ ContactEditor modal (Petr 2026-07-06) — bez nich
+      // by editor otevřel prázdné hodnoty a uložení by je VYMAZALO.
+      vocative: c.firstNameVocative,
+      greetingOverride: c.greetingOverride,
+      aliases: c.aliases,
+      clientTagAliases: c.clientTagAliases,
+      todoistUserId: c.todoistUserId,
+      defaultMeetLink: c.defaultMeetLink,
+      callLogToken: c.callLogToken,
+      callLogTokenCreatedAt: c.callLogTokenCreatedAt?.toISOString() ?? null,
       syncSource: c.syncSource,
       icloudUid: c.icloudUid,
       lastIcloudSyncAt: c.lastIcloudSyncAt?.toISOString() ?? null,
@@ -119,8 +129,9 @@ const Change = z.object({
     "phone1", "phone2", "phone3",       // 3 sloty
     "email1", "email2",                  // 2 sloty
     "address", "groups",
+    "isVip", "isTeam",   // klikatelné flagy (Petr 2026-06-19)
   ]),
-  value: z.union([z.string(), z.number(), z.null(), z.array(z.string())]),
+  value: z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]),
 });
 
 const PatchBody = z.object({

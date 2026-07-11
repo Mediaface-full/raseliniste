@@ -100,7 +100,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
   const [validationCounts, setValidationCounts] = useState<Record<ValidationFilter, number>>({} as Record<ValidationFilter, number>);
 
   // Dirty tracking — pole změn neuložených na server. Klíč = contactId-field.
-  const [dirty, setDirty] = useState<Map<string, { id: string; field: string; value: string | number | null | string[] }>>(new Map());
+  const [dirty, setDirty] = useState<Map<string, { id: string; field: string; value: string | number | boolean | null | string[] }>>(new Map());
   const [saving, setSaving] = useState(false);
   // Petr 2026-05-15: rozdělené stavy per provider — sdílený `syncing` rozsvěcoval
   // spinnery u OBOU tlačítek najednou, i když uživatel klikl jen jedno.
@@ -965,7 +965,18 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
       {editingContactId && (() => {
         const c = getContact(editingContactId);
         if (!c) return null;
-        const eff = effective(c) as Contact & { callLogToken?: string | null; callLogTokenCreatedAt?: string | null };
+        // Overlay pole přicházejí z /api/contacts/tabulka (GET vrací od
+        // 2026-07-06 vocative/aliases/todoistUserId/defaultMeetLink/callLog*).
+        const eff = effective(c) as Contact & {
+          vocative?: string | null;
+          greetingOverride?: string | null;
+          aliases?: string[];
+          clientTagAliases?: string[];
+          todoistUserId?: string | null;
+          defaultMeetLink?: string | null;
+          callLogToken?: string | null;
+          callLogTokenCreatedAt?: string | null;
+        };
         return (
           <ContactEditor
             contact={{
@@ -973,18 +984,25 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
               displayName: eff.displayName,
               firstName: eff.firstName,
               lastName: eff.lastName,
-              vocative: (eff as Contact & { vocative?: string | null }).vocative ?? null,
-              greetingOverride: (eff as Contact & { greetingOverride?: string | null }).greetingOverride ?? null,
-              company: eff.company,
+              firstNameVocative: eff.vocative ?? null,
+              greetingOverride: eff.greetingOverride ?? null,
               note: eff.note,
               isVip: eff.isVip,
               isTeam: eff.isTeam,
               clientTag: eff.clientTag,
-              aliases: (eff as Contact & { aliases?: string[] }).aliases ?? [],
-              clientTagAliases: (eff as Contact & { clientTagAliases?: string[] }).clientTagAliases ?? [],
+              aliases: eff.aliases ?? [],
+              clientTagAliases: eff.clientTagAliases ?? [],
               callLogToken: eff.callLogToken ?? null,
               callLogTokenCreatedAt: eff.callLogTokenCreatedAt ?? null,
-              todoistUserId: (eff as Contact & { todoistUserId?: string | null }).todoistUserId ?? null,
+              todoistUserId: eff.todoistUserId ?? null,
+              defaultMeetLink: eff.defaultMeetLink ?? null,
+              birthMonth: eff.birthMonth,
+              birthDay: eff.birthDay,
+              birthdayReminderDaysBefore: null,
+              birthdayReminderChannels: [],
+              importedFrom: null,
+              phones: eff.phones,
+              emails: eff.emails,
             }}
             onClose={(reload) => {
               setEditingContactId(null);

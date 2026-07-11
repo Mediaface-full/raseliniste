@@ -266,7 +266,10 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
   htmlLink: string | null;
   meetLink: string | null;
 }> {
-  const invite = await prisma.bookingInvite.findUnique({ where: { id: inviteId } });
+  const invite = await prisma.bookingInvite.findUnique({
+    where: { id: inviteId },
+    include: { contact: { select: { defaultMeetLink: true } } },
+  });
   if (!invite) throw new Error("Pozvánka neexistuje.");
   if (invite.status === "CONFIRMED") {
     throw new Error("Termín už je potvrzený. Zkontroluj e-mail s potvrzením.");
@@ -313,11 +316,18 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
         ? [30]
         : [15]; // default fallback
 
+  // Petr 2026-07-06: kontakt může mít vlastní trvalou Meet místnost
+  // (Contact.defaultMeetLink). Pokud ji má a schůzka je online, použije se
+  // JEHO link — negenerujeme nový přes Google conferenceData. Link jde do
+  // location (Google/Apple Calendar ho ukáže jako klikatelný) i do popisu.
+  const contactMeetLink =
+    slot.type === "MEETING_ONLINE" ? (invite.contact?.defaultMeetLink?.trim() || null) : null;
+
   // Location pro Apple/Google Maps ETA. Konkrétní adresu Petr nemá v UI,
   // posíláme jen indikativní text. Pro Time to Leave funkční je třeba
   // explicit adresa — Petr ji případně doplní v Google Calendar appce.
   const location = slot.type === "MEETING_ONLINE"
-    ? "Google Meet (online)"
+    ? (contactMeetLink ?? "Google Meet (online)")
     : slot.type === "MEETING_PRAGUE"
       ? "Praha"
       : slot.type === "MEETING_HOME"
@@ -326,14 +336,18 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
 
   const result = await createGoogleEvent(ownerUserId, {
     summary,
-    description,
+    description: contactMeetLink ? `Google Meet: ${contactMeetLink}\n\n${description}` : description,
     location,
     startsAt,
     endsAt,
     attendeeEmails: invite.inviteeEmail ? [invite.inviteeEmail] : undefined,
-    conferenceData: slot.type === "MEETING_ONLINE",
+    conferenceData: slot.type === "MEETING_ONLINE" && !contactMeetLink,
     reminderMinutes,
   });
+
+  // Kontaktův link má přednost před vygenerovaným (result.meetLink je null
+  // když conferenceData=false, ale defensive fallback pro jistotu).
+  const effectiveMeetLink = contactMeetLink ?? result.meetLink;
 
   // Petr 2026-05-25: persistuj meetLink + googleEventId, ať to má resend
   // i diagnose endpoint bez query do Google API.
@@ -342,7 +356,7 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
     data: {
       status: "CONFIRMED",
       confirmedAt: new Date(),
-      meetLink: result.meetLink,
+      meetLink: effectiveMeetLink,
       googleEventId: result.eventId,
     },
   });
@@ -362,7 +376,7 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
       startsAt,
       endsAt,
       slotType: slot.type,
-      meetLink: result.meetLink,
+      meetLink: effectiveMeetLink,
       inviteeName: invite.inviteeName,
       inviteeEmail: invite.inviteeEmail,
       inviteeSubject: invite.inviteeSubject,
@@ -390,7 +404,7 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
     invite: { id: updated.id, status: updated.status },
     eventId: result.eventId,
     htmlLink: result.htmlLink,
-    meetLink: result.meetLink,
+    meetLink: effectiveMeetLink,
   };
 }
 

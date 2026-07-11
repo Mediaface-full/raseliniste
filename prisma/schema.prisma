@@ -425,6 +425,12 @@ model Contact {
   note         String?
   isVip        Boolean        @default(false)
 
+  // Petr 2026-07-06: výchozí Meet link kontaktu. Když má hodnotu a potvrdí se
+  // online booking schůzka s tímto kontaktem, použije se TENHLE link místo
+  // generování nového Meet přes Google conferenceData. Use case: klienti
+  // s trvalou Meet místností.
+  defaultMeetLink   String?
+
   // Booking módy (kalendář): kontakt může mít víc tagů zároveň
   isClient            Boolean        @default(false)
   isFriend            Boolean        @default(false)

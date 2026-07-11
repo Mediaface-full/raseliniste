@@ -15,6 +15,7 @@ export type EventTypeStr =
   | "MEETING_HOME"
   | "MEETING_ELSEWHERE"
   | "MEETING_ONLINE"
+  | "MEETING_LUNCH_PRAGUE"
   | "PERSONAL"
   | "HOCKEY_SON"
   | "PARTNER_SHIFT"

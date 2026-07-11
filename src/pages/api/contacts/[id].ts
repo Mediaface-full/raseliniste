@@ -19,6 +19,9 @@ const PatchBody = z.object({
   // Petr 2026-05-25: Todoist Workspace user ID (string, většinou číselné).
   // Vyplnit u členů týmu, ať push posílá responsible_uid.
   todoistUserId: z.string().max(40).nullable().optional(),
+  // Petr 2026-07-06: trvalá Meet místnost kontaktu — online booking ji
+  // použije místo generování nového linku.
+  defaultMeetLink: z.string().max(300).nullable().optional(),
   // Slug klienta — povolen jen lowercase, číslice, pomlčka. Server-side
   // poslední bezpečnost před AI-generated slugy.
   clientTag: z.string().max(60).regex(/^[a-z0-9-]*$/, "Slug může obsahovat jen malá písmena, číslice a pomlčky").nullable().optional(),
@@ -97,6 +100,7 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
       ...(body.isVip !== undefined ? { isVip: body.isVip } : {}),
       ...(body.isTeam !== undefined ? { isTeam: body.isTeam } : {}),
       ...(body.todoistUserId !== undefined ? { todoistUserId: body.todoistUserId?.trim() || null } : {}),
+      ...(body.defaultMeetLink !== undefined ? { defaultMeetLink: body.defaultMeetLink?.trim() || null } : {}),
       ...(body.clientTag !== undefined ? { clientTag: body.clientTag || null } : {}),
       // Aliases — trim + lowercase + dedup
       ...(body.aliases !== undefined ? {
