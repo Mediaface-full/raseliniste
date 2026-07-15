@@ -6,6 +6,7 @@ import { Icon } from "astro-icon/components";
 import SchedulerStatus from "../components/SchedulerStatus.astro";
 import QuickRecordButton from "../components/QuickRecordButton";
 import { loadNotifications } from "../lib/notifications";
+import { getForecast3Days } from "../lib/weather";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -215,6 +216,12 @@ const dnesRows: DnesRow[] = [
 ];
 
 const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
+
+// Počasí dnes + 2 dny (Petr 2026-07-15) — chipy v hlavičce Plánu.
+// null při výpadku API = chipy se nevykreslí, dashboard jede dál.
+const weather = await getForecast3Days();
+const weatherDayLabel = (dateStr: string, i: number) =>
+  i === 0 ? "dnes" : new Date(`${dateStr}T12:00:00`).toLocaleDateString("cs-CZ", { weekday: "short" });
 ---
 
 <Shell title="Dashboard · Rašeliniště" username={user.username}>
@@ -275,6 +282,17 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
           <div class="flex items-center gap-2 mb-3">
             <Icon name="lucide:calendar-days" class="size-4" style="color: var(--c);" />
             <h2 class="font-serif text-lg">Plán (dnes + 2 dny)</h2>
+            {weather && (
+              <div class="flex items-center gap-2 ml-2 flex-wrap" title="Předpověď — Jílové u Prahy (Open-Meteo)">
+                {weather.map((w, i) => (
+                  <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-mono bg-white/[0.04] text-muted-foreground" title={`${w.label}, ${w.tMin}–${w.tMax} °C`}>
+                    <span class="lowercase">{weatherDayLabel(w.date, i)}</span>
+                    <Icon name={w.icon} class="size-3.5" style="color: var(--tint-sky);" />
+                    <span class="tabular text-foreground">{w.tMax}°</span>
+                  </span>
+                ))}
+              </div>
+            )}
             <div class="ml-auto flex items-center gap-3 flex-wrap">
               <a href="/calendar/tyden" class="text-xs font-mono text-[var(--tint-sky)] hover:underline">
                 Týden →
