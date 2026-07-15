@@ -251,8 +251,21 @@ export default function WeekView({
     () => Math.max(1, Math.max(...allDaySpans.map((s) => s.row + 1), 0)),
     [allDaySpans],
   );
-  const ALL_DAY_VISIBLE_ROWS = 2;
-  const [allDayExpanded, setAllDayExpanded] = useState(false);
+  // Petr 2026-07-15: 2 řádky byly málo (dovolené je trvale obsadily a vše
+  // ostatní padalo za "+X dalších") a rozbalení se po refreshi resetovalo.
+  // → 3 řádky default + stav rozbalení přežívá v localStorage.
+  const ALL_DAY_VISIBLE_ROWS = 3;
+  const ALL_DAY_EXPAND_KEY = "gideon.weekAllDayExpanded";
+  const [allDayExpanded, setAllDayExpandedRaw] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(ALL_DAY_EXPAND_KEY) === "1") setAllDayExpandedRaw(true);
+    } catch { /* private mode apod. */ }
+  }, []);
+  const setAllDayExpanded = (v: boolean) => {
+    setAllDayExpandedRaw(v);
+    try { localStorage.setItem(ALL_DAY_EXPAND_KEY, v ? "1" : "0"); } catch { /* noop */ }
+  };
   const visibleAllDayRows = allDayExpanded ? allDayRows : Math.min(ALL_DAY_VISIBLE_ROWS, allDayRows);
   const hiddenSpansCount = allDaySpans.filter((s) => s.row >= visibleAllDayRows).length;
 
