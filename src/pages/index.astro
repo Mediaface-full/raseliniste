@@ -137,15 +137,81 @@ const activity = [
   { icon: "lucide:user-plus",    label: "Účet vytvořen",           at: fmt(user.createdAt),   tint: "lavender" as Tint },
 ];
 
-const modules: { icon: string; label: string; tint: Tint; status: string }[] = [
-  { icon: "lucide:check-square", label: "Úkoly",     tint: "peach",    status: "v plánu" },
-  { icon: "lucide:notebook-pen", label: "Poznámky",  tint: "mint",     status: "v plánu" },
-  { icon: "lucide:book-open",    label: "Deník",     tint: "butter",   status: "v plánu" },
-  { icon: "lucide:calendar",     label: "Kalendář",  tint: "sky",      status: "v plánu" },
-  { icon: "lucide:users",        label: "Kontakty",  tint: "lavender", status: "v plánu" },
-  { icon: "lucide:wallet",       label: "Finance",   tint: "sage",     status: "v plánu" },
-  { icon: "lucide:sparkles",     label: "AI chat",   tint: "rose",     status: "v plánu" },
-  { icon: "lucide:list-todo",    label: "Superlist", tint: "pink",     status: "v plánu" },
+// Petr 2026-07-15: moduly co už existují jsou klikatelné zkratky ("aktivní"),
+// zbytek zůstává "v plánu" bez odkazu
+const modules: { icon: string; label: string; tint: Tint; href?: string }[] = [
+  { icon: "lucide:check-square", label: "Úkoly",     tint: "peach",    href: "/ukoly" },
+  { icon: "lucide:notebook-pen", label: "Poznámky",  tint: "mint",     href: "/notes" },
+  { icon: "lucide:book-open",    label: "Deník",     tint: "butter",   href: "/denik" },
+  { icon: "lucide:calendar",     label: "Kalendář",  tint: "sky",      href: "/calendar" },
+  { icon: "lucide:users",        label: "Kontakty",  tint: "lavender", href: "/contacts" },
+  { icon: "lucide:wallet",       label: "Finance",   tint: "sage" },
+  { icon: "lucide:sparkles",     label: "AI chat",   tint: "rose",     href: "/zeptat-se" },
+  { icon: "lucide:list-todo",    label: "Superlist", tint: "pink" },
+];
+const activeModulesCount = modules.filter((m) => m.href).length;
+
+// "Dnes" tabulka — reálná data místo scaffold placeholderu (Petr 2026-07-15):
+// úkoly s termínem dnes + dnešní události + stav zápisu dne
+const todayKey = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" });
+const [dueTodayTasks, todayEventsRaw, todayJournalEntry] = await Promise.all([
+  prisma.task.findMany({
+    where: { userId: session.uid, status: "open", dueAt: { gte: todayStart, lt: todayEnd } },
+    select: { id: true, title: true, dueAt: true, dueIsTime: true },
+    orderBy: [{ dueAt: "asc" }],
+    take: 6,
+  }),
+  prisma.calendarEvent.findMany({
+    where: {
+      deletedRemotely: false,
+      // gt (ne gte): all-day event končící přesně o dnešní půlnoci patří včerejšku
+      AND: [{ endsAt: { gt: todayStart } }, { startsAt: { lt: todayEnd } }],
+    },
+    select: { id: true, title: true, startsAt: true, endsAt: true, allDay: true },
+    orderBy: { startsAt: "asc" },
+    take: 12,
+  }),
+  prisma.journalEntry.findFirst({
+    where: {
+      userId: session.uid,
+      date: { gte: new Date(`${todayKey}T00:00:00`), lte: new Date(`${todayKey}T23:59:59`) },
+    },
+    select: { id: true, title: true },
+  }),
+]);
+
+// Dedup událostí (Google duplicity) — stejný pattern jako Plán výše
+const todaySeen = new Set<string>();
+const todayEvents = todayEventsRaw
+  .filter((e) => {
+    const key = `${e.title}|${e.startsAt.getTime()}|${e.endsAt.getTime()}`;
+    if (todaySeen.has(key)) return false;
+    todaySeen.add(key);
+    return true;
+  })
+  .slice(0, 6);
+
+type DnesRow = { type: string; label: string; cat: string; time: string; state: string; tint: Tint; href: string };
+const fmtHm = (d: Date) =>
+  d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
+const dnesRows: DnesRow[] = [
+  ...dueTodayTasks.map((t) => ({
+    type: "Úkol", label: t.title, cat: "Úkoly",
+    time: t.dueIsTime && t.dueAt ? fmtHm(t.dueAt) : "—",
+    state: "otevřený", tint: "peach" as Tint, href: "/ukoly",
+  })),
+  ...todayEvents.map((e) => ({
+    type: "Událost", label: e.title, cat: "Kalendář",
+    time: e.allDay ? "celý den" : `${fmtHm(e.startsAt)}–${fmtHm(e.endsAt)}`,
+    state: e.endsAt < now ? "proběhlo" : e.startsAt <= now ? "běží" : "čeká",
+    tint: "sky" as Tint, href: `/day/${todayKey}`,
+  })),
+  {
+    type: "Deník", label: todayJournalEntry ? (todayJournalEntry.title || "Dnešní zápis") : "Zápis dne zatím chybí",
+    cat: "Deník", time: "—", state: todayJournalEntry ? "zapsáno" : "chybí",
+    tint: "butter" as Tint,
+    href: todayJournalEntry ? `/denik#${todayJournalEntry.id}` : "/denik",
+  },
 ];
 
 const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
@@ -362,7 +428,7 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
             </p>
           </div>
           <span class="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-            čeká na moduly
+            {today}
           </span>
         </div>
 
@@ -378,12 +444,7 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
               </tr>
             </thead>
             <tbody>
-              {[
-                { type: "Úkol",     label: "Úkoly s termínem dnes",  cat: "Organizace", time: "—", tint: "peach" as Tint },
-                { type: "Událost",  label: "Události v kalendáři",    cat: "Kalendář",   time: "—", tint: "sky" as Tint },
-                { type: "Poznámka", label: "Nedočtené poznámky",      cat: "Organizace", time: "—", tint: "mint" as Tint },
-                { type: "Deník",    label: "Zápis dne",               cat: "Deník",      time: "—", tint: "butter" as Tint },
-              ].map((row) => (
+              {dnesRows.map((row) => (
                 <tr class="border-t border-white/5 hover:bg-white/[0.03] transition-colors">
                   <td class="px-5 py-3">
                     <span class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px]" style={`background: color-mix(in oklch, var(--tint-${row.tint}) 14%, transparent); color: var(--tint-${row.tint});`}>
@@ -391,10 +452,12 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
                       {row.type}
                     </span>
                   </td>
-                  <td class="px-5 py-3 text-foreground">{row.label}</td>
+                  <td class="px-5 py-3 text-foreground">
+                    <a href={row.href} class="hover:underline">{row.label}</a>
+                  </td>
                   <td class="px-5 py-3 text-muted-foreground">{row.cat}</td>
-                  <td class="px-5 py-3 text-right font-mono tabular text-muted-foreground">{row.time}</td>
-                  <td class="px-5 py-3 text-right pr-5 font-mono text-muted-foreground">čeká</td>
+                  <td class="px-5 py-3 text-right font-mono tabular text-muted-foreground whitespace-nowrap">{row.time}</td>
+                  <td class="px-5 py-3 text-right pr-5 font-mono text-muted-foreground">{row.state}</td>
                 </tr>
               ))}
             </tbody>
@@ -428,19 +491,20 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
     <section class="glass rounded-xl">
       <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
         <div>
-          <h2 class="font-serif text-xl">Moduly v plánu</h2>
+          <h2 class="font-serif text-xl">Moduly</h2>
           <p class="text-xs text-muted-foreground mt-0.5">
-            Přijdou postupně podle priority.
+            Zkratky do hotových modulů, zbytek přijde postupně.
           </p>
         </div>
         <span class="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-          {modules.length} moduly
+          {activeModulesCount}/{modules.length} aktivních
         </span>
       </div>
 
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2 p-4 text-sm">
-        {modules.map((m) => (
-          <div
+        {modules.map((m) => m.href ? (
+          <a
+            href={m.href}
             class="flex items-center justify-between gap-3 px-3 py-3 rounded-lg glass-subtle hover:bg-white/[0.06] transition-colors"
             style={`--c: var(--tint-${m.tint});`}
           >
@@ -450,8 +514,23 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
               </div>
               <span class="truncate">{m.label}</span>
             </div>
+            <span class="text-[10px] uppercase tracking-widest font-mono" style="color: var(--c);">
+              aktivní
+            </span>
+          </a>
+        ) : (
+          <div
+            class="flex items-center justify-between gap-3 px-3 py-3 rounded-lg glass-subtle opacity-60"
+            style={`--c: var(--tint-${m.tint});`}
+          >
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="size-8 rounded-md grid place-items-center shrink-0" style="background: color-mix(in oklch, var(--c) 15%, transparent); color: var(--c);">
+                <Icon name={m.icon} class="size-4" />
+              </div>
+              <span class="truncate">{m.label}</span>
+            </div>
             <span class="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-              {m.status}
+              v plánu
             </span>
           </div>
         ))}
