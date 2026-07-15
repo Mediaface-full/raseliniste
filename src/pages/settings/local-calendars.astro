@@ -1,0 +1,25 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import LocalCalendarsManager from "../../components/LocalCalendarsManager";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+---
+
+<Shell
+  title="Nahrané kalendáře · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Nastavení" }, { label: "Nahrané kalendáře" }]}
+>
+  <div class="max-w-3xl">
+    <LocalCalendarsManager client:load />
+  </div>
+</Shell>

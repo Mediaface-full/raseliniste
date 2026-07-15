@@ -58,6 +58,9 @@ export async function evaluateSlot(input: EvaluateInput): Promise<EvaluationResu
   const calendarEvents = await prisma.calendarEvent.findMany({
     where: {
       deletedRemotely: false,
+      // Petr 2026-07-15: nahrané .ics kalendáře jsou čistě informativní —
+      // nesmí blokovat booking sloty ani quickadd evaluaci
+      source: { not: "LOCAL_ICS" },
       AND: [{ endsAt: { gte: queryFrom } }, { startsAt: { lte: queryTo } }],
       ...(input.excludeEventId ? { id: { not: input.excludeEventId } } : {}),
     },

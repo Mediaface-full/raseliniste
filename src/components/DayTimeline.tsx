@@ -66,6 +66,7 @@ function sourceTint(src: string): string {
   if (src === "ICLOUD_SON") return "mint";
   if (src === "GOOGLE_PRIMARY") return "sky";
   if (src === "RASELINISTE") return "butter";
+  if (src === "LOCAL_ICS") return "sage";
   return "butter";
 }
 
@@ -75,6 +76,7 @@ function sourceLabel(src: string): string {
   if (src === "ICLOUD_SON") return "syn";
   if (src === "ICLOUD_PARTNER") return "partner";
   if (src === "RASELINISTE") return "R";
+  if (src === "LOCAL_ICS") return "ics";
   return "G";
 }
 

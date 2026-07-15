@@ -121,9 +121,9 @@ const fmtTime = (d: Date) =>
   d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 const sourceLabel = (src: string) =>
-  src === "ICLOUD_SON" ? "syn" : src === "ICLOUD_PARTNER" ? "partnerka" : "G";
+  src === "ICLOUD_SON" ? "syn" : src === "ICLOUD_PARTNER" ? "partnerka" : src === "LOCAL_ICS" ? "ics" : "G";
 const sourceTint = (src: string): Tint =>
-  src === "ICLOUD_SON" ? "mint" : src === "ICLOUD_PARTNER" ? "lavender" : "sky";
+  src === "ICLOUD_SON" ? "mint" : src === "ICLOUD_PARTNER" ? "lavender" : src === "LOCAL_ICS" ? "sage" : "sky";
 
 const kpis: { label: string; value: string; delta?: string; deltaDir?: "up" | "down" | "flat"; href?: string; icon: string; tint: Tint }[] = [
   { label: "Otevřené úkoly",  value: openTasksCount.toString(), delta: dueTodayCount > 0 ? `${dueTodayCount} dnes` : "nic dnes",   deltaDir: dueTodayCount > 0 ? "up" : "flat", href: "/ukoly", icon: "lucide:check-square",  tint: "peach" },

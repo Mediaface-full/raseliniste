@@ -547,11 +547,13 @@ function fmtTime(d: Date): string {
 function sourceLabel(src: string): string {
   if (src === "ICLOUD_SON") return "syn";
   if (src === "ICLOUD_PARTNER") return "partnerka";
+  if (src === "LOCAL_ICS") return "ics";
   return "G";
 }
 
 function sourceTint(src: string): string {
   if (src === "ICLOUD_SON") return "text-[var(--tint-mint)]";
   if (src === "ICLOUD_PARTNER") return "text-[var(--tint-lavender)]";
+  if (src === "LOCAL_ICS") return "text-[var(--tint-sage)]";
   return "text-[var(--tint-sky)]";
 }

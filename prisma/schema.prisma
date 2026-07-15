@@ -1061,6 +1061,20 @@ enum CalendarSource {
   ICLOUD_SON          // synův program (read-only)
   ICLOUD_PARTNER      // partnerčiny služby (read-only)
   RASELINISTE         // vytvořeno přímo v Rašeliništi (rezerva, zatím nepoužíváno)
+  LOCAL_ICS           // nahraný .ics soubor (display-only, neblokuje booking, žádný sync)
+}
+
+// Nahraný .ics kalendář (Petr 2026-07-15) — čistě informativní zobrazení
+// v Rašeliništi. Nikam se nesynchronizuje, booking ho ignoruje.
+model LocalCalendar {
+  id          String          @id @default(cuid())
+  name        String
+  filename    String
+  eventCount  Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  events      CalendarEvent[]
 }
 
 enum EventType {
@@ -1117,6 +1131,10 @@ model CalendarEvent {
   bookingInviteId String?
   bookingInvite   BookingInvite?  @relation(fields: [bookingInviteId], references: [id])
 
+  // Lokální .ics kalendář (jen pro source=LOCAL_ICS)
+  localCalendarId String?
+  localCalendar   LocalCalendar?  @relation(fields: [localCalendarId], references: [id], onDelete: Cascade)
+
   // Sync metadata
   lastSyncedAt    DateTime
   etag            String?
@@ -1129,6 +1147,7 @@ model CalendarEvent {
   @@index([startsAt, endsAt])
   @@index([type, startsAt])
   @@index([source, lastSyncedAt])
+  @@index([localCalendarId])
 }
 
 enum BookingMeetingType {

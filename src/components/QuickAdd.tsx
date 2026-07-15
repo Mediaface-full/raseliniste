@@ -397,6 +397,7 @@ function SourceBadge({ source, type }: { source: string; type: string }) {
   if (source === "DRAFT") return <span className="text-xs font-mono text-[var(--tint-sky)]">nový</span>;
   if (source === "ICLOUD_SON") return <span className="text-xs font-mono text-[var(--tint-mint)]">syn</span>;
   if (source === "ICLOUD_PARTNER") return <span className="text-xs font-mono text-[var(--tint-lavender)]">partnerka</span>;
+  if (source === "LOCAL_ICS") return <span className="text-xs font-mono text-[var(--tint-sage)]">ics</span>;
   if (type === "OOO_FULL") return <span className="text-xs font-mono text-[var(--tint-butter)]">OOO</span>;
   return <span className="text-xs font-mono text-muted-foreground">G</span>;
 }

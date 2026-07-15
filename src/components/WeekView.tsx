@@ -79,6 +79,7 @@ function sourceTint(src: string): string {
   if (src === "ICLOUD_PARTNER") return "rose";
   if (src === "ICLOUD_SON") return "mint";
   if (src === "GOOGLE_PRIMARY") return "sky";
+  if (src === "LOCAL_ICS") return "sage";
   return "butter";
 }
 
