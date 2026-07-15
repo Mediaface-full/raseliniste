@@ -251,15 +251,16 @@ export default function WeekView({
     () => Math.max(1, Math.max(...allDaySpans.map((s) => s.row + 1), 0)),
     [allDaySpans],
   );
-  // Petr 2026-07-15: 2 řádky byly málo (dovolené je trvale obsadily a vše
-  // ostatní padalo za "+X dalších") a rozbalení se po refreshi resetovalo.
-  // → 3 řádky default + stav rozbalení přežívá v localStorage.
+  // Petr 2026-07-15: celodenní pruh je DEFAULTNĚ ROZBALENÝ — vícedenní pruhy
+  // (dovolené, ubytování) obsadily viditelné řádky a jednodenní události
+  // (narozeniny, .ics kalendáře) byly trvale schované za mini tlačítkem
+  // "+X dalších" v rohu. Sbalení si pohled pamatuje v localStorage.
   const ALL_DAY_VISIBLE_ROWS = 3;
   const ALL_DAY_EXPAND_KEY = "gideon.weekAllDayExpanded";
-  const [allDayExpanded, setAllDayExpandedRaw] = useState(false);
+  const [allDayExpanded, setAllDayExpandedRaw] = useState(true);
   useEffect(() => {
     try {
-      if (localStorage.getItem(ALL_DAY_EXPAND_KEY) === "1") setAllDayExpandedRaw(true);
+      if (localStorage.getItem(ALL_DAY_EXPAND_KEY) === "0") setAllDayExpandedRaw(false);
     } catch { /* private mode apod. */ }
   }, []);
   const setAllDayExpanded = (v: boolean) => {
