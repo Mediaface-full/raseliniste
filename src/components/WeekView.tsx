@@ -382,7 +382,12 @@ export default function WeekView({
           <div className="text-[9px] font-mono text-muted-foreground/70 px-1 py-0.5 border-r border-white/[0.06]">cel.den</div>
           <div
             className="col-span-7 relative border-b border-white/[0.06]"
-            style={{ minHeight: `${visibleAllDayRows * 22 + 4}px` }}
+            style={{
+              // +22px řádek pro "+X dalších"/"sbalit" tlačítko — bez něj
+              // tlačítko přetékalo pod kontejner, kde ho překrývala časová
+              // mřížka a nešlo na něj kliknout (Petr 2026-07-15)
+              minHeight: `${visibleAllDayRows * 22 + (hiddenSpansCount > 0 || (allDayExpanded && allDayRows > ALL_DAY_VISIBLE_ROWS) ? 22 : 0) + 4}px`,
+            }}
           >
             {/* Pozadí 7 sloupců (jemný separátor) */}
             <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
@@ -423,7 +428,7 @@ export default function WeekView({
               <button
                 type="button"
                 onClick={() => setAllDayExpanded(true)}
-                className="absolute text-[9px] font-mono text-muted-foreground hover:text-foreground hover:underline px-1.5"
+                className="absolute z-10 text-[9px] font-mono text-muted-foreground hover:text-foreground hover:underline px-1.5"
                 style={{ top: `${ALL_DAY_VISIBLE_ROWS * 22 + 2}px`, right: 4 }}
               >
                 + {hiddenSpansCount} dalších
@@ -433,7 +438,7 @@ export default function WeekView({
               <button
                 type="button"
                 onClick={() => setAllDayExpanded(false)}
-                className="absolute text-[9px] font-mono text-muted-foreground hover:text-foreground hover:underline px-1.5"
+                className="absolute z-10 text-[9px] font-mono text-muted-foreground hover:text-foreground hover:underline px-1.5"
                 style={{ bottom: 2, right: 4 }}
               >
                 sbalit
