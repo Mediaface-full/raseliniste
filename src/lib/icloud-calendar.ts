@@ -374,30 +374,21 @@ async function upsertFromIcs(
     //
     // BUG FIX 2026-05-05: iterator startuje od DTSTART (kdy event vznikl). Pro
     // daily/weekly event existující od 2020 původní safety<366 vyčerpal limit
-    // dávno před dnešním sync oknem — recurring eventy mizely. Fix:
-    //  1) jump-forward iterator na začátek okna (event.iterator(startTime))
-    //     — pokud DTSTART je před oknem
-    //  2) zvýšit safety limit na 2000 (pokrývá daily přes 5+ let pokud by
-    //     jump-forward selhal a iterator by musel projít vše)
+    // dávno před dnešním sync oknem — recurring eventy mizely.
+    //
+    // BUG FIX 2026-07-15: původní řešení používalo jump-forward
+    // event.iterator(ICAL.Time.fromJSDate(windowStart)) — ale ICAL.js tím
+    // NAHRADÍ DTSTART, takže occurrences dostaly čas-of-day okna (= čas běhu
+    // syncu) místo času události: trénink 07:30 → 15:08, a protože externalId
+    // obsahuje occStart, každý běh tvořil nová ID. Ověřeno replikačním testem.
+    // Správně: iterovat vždy od DTSTART s vysokým safety limitem a pre-window
+    // occurrences přeskočit (denní event 10 let starý ≈ 4000 iterací, in-memory).
     const isRecurring = event.isRecurring();
     if (isRecurring) {
-      // Jump-forward na windowStart pokud DTSTART je dávno před oknem.
-      // Některé RRULE konfigurace jump-forward neřeknou (ICAL.js fallback) —
-      // pak vyšší safety limit dotáhne zbytek.
-      let iter: any;
-      try {
-        if (startsAtRaw < windowStart) {
-          const fromIcal = ICAL.Time.fromJSDate(windowStart, false);
-          iter = event.iterator(fromIcal);
-        } else {
-          iter = event.iterator();
-        }
-      } catch {
-        iter = event.iterator();
-      }
+      const iter = event.iterator();
       let next: any;
       let safety = 0;
-      while ((next = iter.next()) && safety < 2000) {
+      while ((next = iter.next()) && safety < 50000) {
         safety++;
         const occStart = next.toJSDate();
         if (occStart > windowEnd) break;
