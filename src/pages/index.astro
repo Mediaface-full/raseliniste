@@ -75,6 +75,12 @@ const upcomingEvents = upcomingEventsRaw.filter((e) => {
   return true;
 }).slice(0, 12);
 
+// Petr 2026-07-16: vizuální odskok — probíhající vícedenní eventy (dovolené,
+// ubytování) zvlášť nahoře jako ztlumená skupina, pod nimi teprve konkrétní
+// dny. Jinak celodenní pruhy pohltily celý Plán a denní program zapadal.
+const ongoingEvents = upcomingEvents.filter((e) => new Date(e.startsAt) < dayStart);
+const plannedEvents = upcomingEvents.filter((e) => new Date(e.startsAt) >= dayStart);
+
 // Aktivní porušení pravidel pro nejbližší dny (neacknowledged)
 const todayDate = new Date();
 todayDate.setHours(0, 0, 0, 0);
@@ -308,50 +314,72 @@ const weatherDayLabel = (dateStr: string, i: number) =>
           {upcomingEvents.length === 0 ? (
             <div class="text-sm text-muted-foreground italic">Žádné události — užij si volno.</div>
           ) : (
-            <div class="space-y-1.5">
-              {upcomingEvents.map((e) => {
-                const start = new Date(e.startsAt);
-                const end = new Date(e.endsAt);
-                // Multi-day event začatý v minulosti — zobraz "Probíhá" + do kdy,
-                // nikoli původní datum začátku (mátlo).
-                const ongoing = start < dayStart;
-                // Petr 2026-07-12: narozeniny zapadaly mezi ostatní řádky —
-                // zvýraznit (Signal Coral left border + tint bg + ikona dortu).
-                // Match přes title — narozeniny přicházejí z Google kalendáře
-                // s „… – narozeniny" v názvu (žádný vlastní event type nemají).
-                const isBirthday = /narozenin|výročí|svátek/i.test(e.title);
-                return (
-                  <div class={`flex items-center gap-3 text-sm rounded-md px-2 py-1.5 ${
-                    isBirthday
-                      ? "border-l-[3px] border-[color:var(--c-signal)] bg-[color:var(--c-signal)]/10"
-                      : "bg-black/10"
-                  }`}>
-                    <span class={`font-mono text-xs tabular w-20 shrink-0 ${ongoing ? "text-[var(--tint-mint)]" : "text-muted-foreground"}`}>
-                      {ongoing ? "Probíhá" : fmtDay(start)}
-                    </span>
-                    <span class="font-mono text-xs tabular w-24 shrink-0 text-muted-foreground">
-                      {ongoing
-                        ? `do ${fmtDay(end)}`
-                        : e.allDay
-                          ? "celý den"
-                          : `${fmtTime(start)}–${fmtTime(end)}`}
-                    </span>
-                    {isBirthday && (
-                      <Icon name="lucide:cake" class="size-4 shrink-0 text-[color:var(--c-signal)]" />
-                    )}
-                    <span class={`flex-1 truncate ${isBirthday ? "font-semibold" : ""}`}>{e.title}</span>
-                    {e.locationText && (
-                      <span class="text-xs text-muted-foreground truncate max-w-[8rem]">
-                        {e.locationText}
-                      </span>
-                    )}
-                    <span class={`text-xs font-mono text-[var(--tint-${sourceTint(e.source)})]`}>
-                      {sourceLabel(e.source)}
-                    </span>
+            <>
+              {/* Probíhající vícedenní (dovolené, ubytování) — ztlumená skupina */}
+              {ongoingEvents.length > 0 && (
+                <div class="mb-3">
+                  <div class="text-[10px] uppercase tracking-widest font-mono text-muted-foreground mb-1.5">
+                    Probíhá
                   </div>
-                );
-              })}
-            </div>
+                  <div class="space-y-1">
+                    {ongoingEvents.map((e) => (
+                      <div class="flex items-center gap-3 text-xs rounded-md px-2 py-1 bg-black/5 text-muted-foreground">
+                        <span class="font-mono tabular w-24 shrink-0 text-[var(--tint-mint)]">
+                          do {fmtDay(new Date(e.endsAt))}
+                        </span>
+                        <span class="flex-1 truncate">{e.title}</span>
+                        {e.locationText && (
+                          <span class="font-mono truncate max-w-[8rem]">{e.locationText}</span>
+                        )}
+                        <span class={`font-mono text-[var(--tint-${sourceTint(e.source)})]`}>
+                          {sourceLabel(e.source)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div class="border-t border-white/10 mt-3"></div>
+                </div>
+              )}
+
+              {/* Denní program — plné řádky */}
+              <div class="space-y-1.5">
+                {plannedEvents.map((e) => {
+                  const start = new Date(e.startsAt);
+                  const end = new Date(e.endsAt);
+                  // Petr 2026-07-12: narozeniny zapadaly mezi ostatní řádky —
+                  // zvýraznit (Signal Coral left border + tint bg + ikona dortu).
+                  // Match přes title — narozeniny přicházejí z Google kalendáře
+                  // s „… – narozeniny" v názvu (žádný vlastní event type nemají).
+                  const isBirthday = /narozenin|výročí|svátek/i.test(e.title);
+                  return (
+                    <div class={`flex items-center gap-3 text-sm rounded-md px-2 py-1.5 ${
+                      isBirthday
+                        ? "border-l-[3px] border-[color:var(--c-signal)] bg-[color:var(--c-signal)]/10"
+                        : "bg-black/10"
+                    }`}>
+                      <span class="font-mono text-xs tabular w-20 shrink-0 text-muted-foreground">
+                        {fmtDay(start)}
+                      </span>
+                      <span class="font-mono text-xs tabular w-24 shrink-0 text-muted-foreground">
+                        {e.allDay ? "celý den" : `${fmtTime(start)}–${fmtTime(end)}`}
+                      </span>
+                      {isBirthday && (
+                        <Icon name="lucide:cake" class="size-4 shrink-0 text-[color:var(--c-signal)]" />
+                      )}
+                      <span class={`flex-1 truncate ${isBirthday ? "font-semibold" : ""}`}>{e.title}</span>
+                      {e.locationText && (
+                        <span class="text-xs text-muted-foreground truncate max-w-[8rem]">
+                          {e.locationText}
+                        </span>
+                      )}
+                      <span class={`text-xs font-mono text-[var(--tint-${sourceTint(e.source)})]`}>
+                        {sourceLabel(e.source)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
