@@ -7,7 +7,7 @@ import SchedulerStatus from "../components/SchedulerStatus.astro";
 import QuickRecordButton from "../components/QuickRecordButton";
 import { loadNotifications } from "../lib/notifications";
 import { getForecast3Days } from "../lib/weather";
-import { fetchTodoistActivity, getTodoistToken, todoistUserNames, type TodoistActivityEvent } from "../lib/todoist-activity";
+import { fetchTodoistWeekFeed, fetchOwnTodoistUserId, filterTeamEvents, getTodoistToken, todoistUserNames, type TodoistActivityEvent } from "../lib/todoist-activity";
 import { activityIcon, activityLabel } from "../lib/todoist-activity-ui";
 
 const session = await readSession(Astro.cookies);
@@ -228,15 +228,21 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
 // Todoist aktivita + komentáře (Petr 2026-07-16) — posledních 10 na kartě,
 // detail týdne po dnech na /todoist/aktivita. Cache 5 min v lib, selhání
 // API kartu jen schová.
+// Petr 2026-07-16 v2: zajímá ho hlavně aktivita KOLEGŮ a HOSTŮ — vlastní
+// akce feed jen zaplavily (a komentáře od týmu se v nich utopily).
+// → načíst týden, odfiltrovat vlastní eventy, top 10.
 const todoistToken = await getTodoistToken(session.uid);
 let todoistActivity: TodoistActivityEvent[] = [];
 let todoistNames = new Map<string, string>();
 if (todoistToken) {
   try {
-    [todoistActivity, todoistNames] = await Promise.all([
-      fetchTodoistActivity(todoistToken, { limit: 10 }),
+    const [allEvents, ownId, names] = await Promise.all([
+      fetchTodoistWeekFeed(todoistToken),
+      fetchOwnTodoistUserId(todoistToken),
       todoistUserNames(),
     ]);
+    todoistActivity = filterTeamEvents(allEvents, ownId).slice(0, 10);
+    todoistNames = names;
   } catch (e) {
     console.warn("[dashboard] todoist activity failed:", e instanceof Error ? e.message : e);
   }
@@ -565,7 +571,7 @@ const weatherDayLabel = (dateStr: string, i: number) =>
         <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
           <div class="flex items-center gap-2">
             <Icon name="lucide:list-checks" class="size-4" style="color: var(--c);" />
-            <h2 class="font-serif text-xl">Todoist</h2>
+            <h2 class="font-serif text-xl">Todoist — tým a hosté</h2>
           </div>
           <a href="/todoist/aktivita" class="text-xs font-mono text-[var(--tint-mint)] hover:underline">
             Poslední týden po dnech →
@@ -582,9 +588,9 @@ const weatherDayLabel = (dateStr: string, i: number) =>
               />
               <span class="text-muted-foreground shrink-0">{activityLabel(e)}</span>
               <span class="flex-1 truncate">{e.content || "(bez textu)"}</span>
-              {e.initiatorId && todoistNames.get(e.initiatorId) && (
-                <span class="text-xs text-muted-foreground shrink-0">{todoistNames.get(e.initiatorId)}</span>
-              )}
+              <span class="text-xs shrink-0 font-medium text-[var(--tint-mint)]">
+                {(e.initiatorId && todoistNames.get(e.initiatorId)) ?? "host"}
+              </span>
               <span class="text-xs font-mono tabular text-muted-foreground shrink-0">{todoistFmtWhen(e.eventDate)}</span>
             </div>
           ))}

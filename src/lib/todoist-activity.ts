@@ -71,17 +71,19 @@ function normalize(raw: unknown): TodoistActivityEvent | null {
   };
 }
 
-let cache: { key: string; fetchedAt: number; data: TodoistActivityEvent[] } | null = null;
+const cacheMap = new Map<string, { fetchedAt: number; data: TodoistActivityEvent[] }>();
 
 /** Activity log seřazený od nejnovějšího. sinceDays omezuje stáří. */
 export async function fetchTodoistActivity(
   token: string,
-  opts: { limit: number; sinceDays?: number },
+  opts: { limit: number; sinceDays?: number; objectType?: string },
 ): Promise<TodoistActivityEvent[]> {
-  const key = `${opts.limit}|${opts.sinceDays ?? 0}`;
-  if (cache && cache.key === key && Date.now() - cache.fetchedAt < CACHE_TTL_MS) return cache.data;
+  const key = `${opts.limit}|${opts.sinceDays ?? 0}|${opts.objectType ?? ""}`;
+  const hit = cacheMap.get(key);
+  if (hit && Date.now() - hit.fetchedAt < CACHE_TTL_MS) return hit.data;
 
   const params = new URLSearchParams({ limit: String(opts.limit) });
+  if (opts.objectType) params.set("object_type", opts.objectType);
   if (opts.sinceDays) {
     const since = new Date(Date.now() - opts.sinceDays * 86_400_000);
     // Sync API bere "since" jako ISO datetime; v1 wrapper ho ignorovat nevadí
@@ -92,8 +94,61 @@ export async function fetchTodoistActivity(
     .map(normalize)
     .filter((x): x is TodoistActivityEvent => x !== null)
     .sort((a, b) => b.eventDate.getTime() - a.eventDate.getTime());
-  cache = { key, fetchedAt: Date.now(), data };
+  if (cacheMap.size > 20) cacheMap.clear();
+  cacheMap.set(key, { fetchedAt: Date.now(), data });
   return data;
+}
+
+/**
+ * Týdenní feed: obecná aktivita + explicitně komentáře (object_type=note) —
+ * activity log komentáře v defaultním listingu někdy nevrací / utopí je
+ * mezi item eventy. Merge s dedup podle id.
+ */
+export async function fetchTodoistWeekFeed(token: string): Promise<TodoistActivityEvent[]> {
+  const [general, notes] = await Promise.all([
+    fetchTodoistActivity(token, { limit: 100, sinceDays: 7 }),
+    fetchTodoistActivity(token, { limit: 50, sinceDays: 7, objectType: "note" }).catch(() => [] as TodoistActivityEvent[]),
+  ]);
+  const seen = new Set<string>();
+  return [...general, ...notes]
+    .filter((e) => (seen.has(e.id) ? false : (seen.add(e.id), true)))
+    .sort((a, b) => b.eventDate.getTime() - a.eventDate.getTime());
+}
+
+let cachedOwnId: { token: string; id: string | null } | null = null;
+
+/**
+ * Vlastní Todoist user ID (pro odfiltrování Gideonových akcí z týmového
+ * feedu). GET /user; při selhání null → filtr pak bere jen eventy
+ * s initiator_id != null (shared projekty).
+ */
+export async function fetchOwnTodoistUserId(token: string): Promise<string | null> {
+  if (cachedOwnId && cachedOwnId.token === token) return cachedOwnId.id;
+  let id: string | null = null;
+  try {
+    const res = await fetch(`${BASE}/user`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const json = (await res.json()) as Record<string, unknown>;
+      if (json.id != null) id = String(json.id);
+    }
+  } catch { /* null fallback */ }
+  cachedOwnId = { token, id };
+  return id;
+}
+
+/**
+ * Aktivita ostatních (kolegové v Team Workspace, hosté) — bez Gideonových
+ * vlastních akcí. Eventy bez initiator_id jsou z osobních projektů (= vlastní),
+ * ty jdou pryč vždy.
+ */
+export function filterTeamEvents(
+  events: TodoistActivityEvent[],
+  ownId: string | null,
+): TodoistActivityEvent[] {
+  return events.filter((e) => e.initiatorId !== null && (ownId === null || e.initiatorId !== ownId));
 }
 
 /** Dešifrovaný Todoist token uživatele, null když integrace není. */

@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { readSession } from "@/lib/session";
-import { fetchTodoistActivity, getTodoistToken } from "@/lib/todoist-activity";
+import { fetchOwnTodoistUserId, fetchTodoistActivity, getTodoistToken } from "@/lib/todoist-activity";
 
 export const prerender = false;
 
@@ -18,7 +18,9 @@ export const GET: APIRoute = async ({ cookies }) => {
 
   try {
     const events = await fetchTodoistActivity(token, { limit: 5 });
-    return Response.json({ ok: true, count: events.length, sample: events });
+    const ownId = await fetchOwnTodoistUserId(token);
+    const initiators = [...new Set(events.map((e) => e.initiatorId))];
+    return Response.json({ ok: true, count: events.length, ownTodoistUserId: ownId, initiators, sample: events });
   } catch (e) {
     return Response.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 502 });
   }
