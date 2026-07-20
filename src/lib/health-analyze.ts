@@ -1,5 +1,6 @@
 import { getGemini, ANALYSIS_MODEL } from "./gemini";
 import { callTracked } from "./gemini-usage";
+import { labSummaryForAnalysis } from "./health-labs";
 import {
   AGGREGATION_MAP,
   queryBloodPressure,
@@ -268,7 +269,15 @@ export async function analyzeHealth(
       }
     : null;
 
-  const userPrompt = buildUserPrompt(from, to, focus, simples, reducedBp, reducedSleep);
+  // Petr 2026-07-16: krevní výsledky z PDF (HealthLabResult) do analýzy —
+  // poslední hodnota + historie per analyt, bez ohledu na zvolené období
+  // (odběry jsou řídké, analýza má vidět trend).
+  const labSection = await labSummaryForAnalysis(userId).catch(() => null);
+  const userPrompt =
+    buildUserPrompt(from, to, focus, simples, reducedBp, reducedSleep) +
+    (labSection
+      ? `\n## Laboratorní výsledky (krev — poslední hodnota + starší per analyt)\n${labSection}\n`
+      : "");
 
   const gemini = getGemini();
   const response = await callTracked({

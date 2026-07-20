@@ -1,0 +1,226 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import LabReportsPanel from "../../components/health/LabReportsPanel";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const reports = await prisma.healthLabReport.findMany({
+  where: { userId: session.uid },
+  orderBy: [{ sampledAt: "desc" }, { createdAt: "desc" }],
+  select: {
+    id: true, filename: true, sampledAt: true, labName: true,
+    status: true, processingError: true, createdAt: true,
+    _count: { select: { results: true } },
+  },
+});
+const initialReports = reports.map((r) => ({
+  id: r.id, filename: r.filename,
+  sampledAt: r.sampledAt?.toISOString() ?? null,
+  labName: r.labName, status: r.status, processingError: r.processingError,
+  createdAt: r.createdAt.toISOString(), resultCount: r._count.results,
+}));
+
+// Poslední hotový report → tabulka hodnot
+const latestReport = await prisma.healthLabReport.findFirst({
+  where: { userId: session.uid, status: "ready" },
+  orderBy: [{ sampledAt: "desc" }, { createdAt: "desc" }],
+  include: { results: { orderBy: { analyte: "asc" } } },
+});
+
+// Časové řady: všechny číselné hodnoty, seskupit per analyteKey
+const allResults = await prisma.healthLabResult.findMany({
+  where: { userId: session.uid, value: { not: null } },
+  orderBy: { sampledAt: "asc" },
+  select: {
+    analyte: true, analyteKey: true, value: true, unit: true,
+    refLow: true, refHigh: true, flag: true, sampledAt: true,
+  },
+});
+
+interface Series {
+  key: string;
+  analyte: string;
+  unit: string | null;
+  refLow: number | null;
+  refHigh: number | null;
+  points: { at: Date; value: number }[];
+  latestFlag: string | null;
+}
+const seriesMap = new Map<string, Series>();
+for (const r of allResults) {
+  let s = seriesMap.get(r.analyteKey);
+  if (!s) {
+    s = { key: r.analyteKey, analyte: r.analyte, unit: r.unit, refLow: r.refLow, refHigh: r.refHigh, points: [], latestFlag: null };
+    seriesMap.set(r.analyteKey, s);
+  }
+  // Poslední záznam přepisuje metadata (novější reference/název vítězí)
+  s.analyte = r.analyte;
+  s.unit = r.unit ?? s.unit;
+  s.refLow = r.refLow ?? s.refLow;
+  s.refHigh = r.refHigh ?? s.refHigh;
+  s.points.push({ at: r.sampledAt, value: r.value! });
+  s.latestFlag = r.flag;
+}
+// Grafy jen pro analyty s ≥2 body; mimo normu první, pak abecedně
+const series = [...seriesMap.values()]
+  .filter((s) => s.points.length >= 2)
+  .sort((a, b) =>
+    (b.latestFlag ? 1 : 0) - (a.latestFlag ? 1 : 0) ||
+    a.analyte.localeCompare(b.analyte, "cs"));
+
+// SVG sparkline geometrie (SSR, žádná JS knihovna)
+const W = 260, H = 72, PAD = 6;
+function chartFor(s: Series) {
+  const vals = s.points.map((p) => p.value);
+  const lo = Math.min(...vals, s.refLow ?? Infinity);
+  const hi = Math.max(...vals, s.refHigh ?? -Infinity);
+  const span = hi - lo || 1;
+  const min = lo - span * 0.1;
+  const max = hi + span * 0.1;
+  const x = (i: number) => s.points.length === 1 ? W / 2 : PAD + (i / (s.points.length - 1)) * (W - 2 * PAD);
+  const y = (v: number) => H - PAD - ((v - min) / (max - min)) * (H - 2 * PAD);
+  const polyline = s.points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+  const band = s.refLow !== null && s.refHigh !== null
+    ? { y: y(s.refHigh), h: Math.max(2, y(s.refLow) - y(s.refHigh)) }
+    : null;
+  return { polyline, band, dots: s.points.map((p, i) => ({ cx: x(i), cy: y(p.value) })) };
+}
+
+const fmtD = (d: Date) => d.toLocaleDateString("cs-CZ");
+const fmtVal = (v: number) => v.toLocaleString("cs-CZ", { maximumFractionDigits: 2 });
+const outOfRange = (f: string | null) => f === "H" || f === "L";
+---
+
+<Shell
+  title="Krevní výsledky · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Data" }, { label: "Zdraví", href: "/health" }, { label: "Krevní výsledky" }]}
+>
+  <div class="space-y-5">
+    <div class="flex items-end justify-between gap-4 flex-wrap">
+      <div>
+        <h1 class="font-serif text-[2.25rem] leading-tight">Krevní výsledky</h1>
+        <p class="text-sm text-muted-foreground mt-1">
+          PDF z laboratoře → AI extrakce hodnot → historie a trendy. Originál PDF vždy po ruce —
+          extrakci ber jako podklad, ne diagnózu.
+        </p>
+      </div>
+      <a href="/health" class="text-xs font-mono text-[var(--tint-sky)] hover:underline">← Zdraví</a>
+    </div>
+
+    {/* Upload + seznam reportů */}
+    <section class="glass rounded-xl p-4" style="--c: var(--tint-rose);">
+      <div class="flex items-center gap-2 mb-3">
+        <Icon name="lucide:file-plus-2" class="size-4" style="color: var(--c);" />
+        <h2 class="font-serif text-lg">Nahrané zprávy</h2>
+      </div>
+      <LabReportsPanel client:load initialReports={initialReports} />
+    </section>
+
+    {/* Poslední odběr — tabulka */}
+    {latestReport && latestReport.results.length > 0 && (
+      <section class="glass rounded-xl p-4" style="--c: var(--tint-rose);">
+        <div class="flex items-center gap-2 mb-3 flex-wrap">
+          <Icon name="lucide:droplets" class="size-4" style="color: var(--c);" />
+          <h2 class="font-serif text-lg">Poslední odběr</h2>
+          <span class="text-xs font-mono text-muted-foreground">
+            {latestReport.sampledAt ? fmtD(latestReport.sampledAt) : ""}
+            {latestReport.labName && ` · ${latestReport.labName}`}
+          </span>
+          <a href={`/api/health/labs/${latestReport.id}/pdf`} target="_blank" rel="noopener" class="ml-auto text-xs font-mono text-[var(--tint-sky)] hover:underline">
+            originál PDF →
+          </a>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
+                <th class="text-left font-normal px-3 py-1.5">Analyt</th>
+                <th class="text-right font-normal px-3 py-1.5">Hodnota</th>
+                <th class="text-left font-normal px-3 py-1.5">Jednotka</th>
+                <th class="text-left font-normal px-3 py-1.5">Reference</th>
+                <th class="text-right font-normal px-3 py-1.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {latestReport.results.map((r) => (
+                <tr class={`border-t border-white/5 ${outOfRange(r.flag) ? "bg-[color:var(--c-signal)]/10" : ""}`}>
+                  <td class={`px-3 py-1.5 ${outOfRange(r.flag) ? "font-semibold" : ""}`}>{r.analyte}</td>
+                  <td class="px-3 py-1.5 text-right font-mono tabular">
+                    {r.value !== null ? fmtVal(r.value) : (r.valueText ?? "—")}
+                  </td>
+                  <td class="px-3 py-1.5 text-muted-foreground">{r.unit ?? ""}</td>
+                  <td class="px-3 py-1.5 text-muted-foreground font-mono text-xs">{r.refText ?? ""}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-xs">
+                    {r.flag === "H" && <span style="color: var(--c-signal);">↑ nad</span>}
+                    {r.flag === "L" && <span style="color: var(--c-signal);">↓ pod</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    )}
+
+    {/* Trendy — grafy per analyt (jen s ≥2 měřeními) */}
+    {series.length > 0 && (
+      <section class="glass rounded-xl p-4" style="--c: var(--tint-rose);">
+        <div class="flex items-center gap-2 mb-3">
+          <Icon name="lucide:trending-up" class="size-4" style="color: var(--c);" />
+          <h2 class="font-serif text-lg">Vývoj v čase</h2>
+          <span class="text-xs text-muted-foreground">šedý pruh = referenční rozmezí</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {series.map((s) => {
+            const c = chartFor(s);
+            const latest = s.points[s.points.length - 1];
+            return (
+              <div class="rounded-lg bg-black/10 p-3">
+                <div class="flex items-baseline justify-between gap-2 mb-1">
+                  <div class="text-sm truncate" title={s.analyte}>{s.analyte}</div>
+                  <div class={`font-mono tabular text-sm ${outOfRange(s.latestFlag) ? "font-semibold" : ""}`}
+                       style={outOfRange(s.latestFlag) ? "color: var(--c-signal);" : ""}>
+                    {fmtVal(latest.value)} {s.unit ?? ""}
+                  </div>
+                </div>
+                <svg viewBox={`0 0 ${W} ${H}`} class="w-full" role="img" aria-label={`Vývoj ${s.analyte}`}>
+                  {c.band && (
+                    <rect x="0" y={c.band.y} width={W} height={c.band.h} fill="currentColor" opacity="0.08" />
+                  )}
+                  <polyline points={c.polyline} fill="none" stroke="var(--tint-rose)" stroke-width="1.5" />
+                  {c.dots.map((d, i) => (
+                    <circle cx={d.cx} cy={d.cy} r={i === c.dots.length - 1 ? 3 : 2}
+                      fill={i === c.dots.length - 1 ? "var(--c-signal)" : "var(--tint-rose)"} />
+                  ))}
+                </svg>
+                <div class="flex justify-between text-[10px] font-mono text-muted-foreground mt-1">
+                  <span>{fmtD(s.points[0].at)}</span>
+                  <span>{s.points.length}×</span>
+                  <span>{fmtD(latest.at)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    )}
+
+    {initialReports.length === 0 && (
+      <section class="glass rounded-xl p-6 text-sm text-muted-foreground">
+        Zatím žádné výsledky. Nahraj první PDF z laboratoře — extrakce trvá pár sekund
+        a hodnoty se objeví v tabulce i grafech.
+      </section>
+    )}
+  </div>
+</Shell>

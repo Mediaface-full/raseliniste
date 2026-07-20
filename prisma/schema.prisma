@@ -37,6 +37,8 @@ model User {
   healthMetrics HealthMetric[]
   healthEcgs    HealthEcg[]
   healthAnalyses HealthAnalysis[]
+  healthLabReports HealthLabReport[]
+  healthLabResults HealthLabResult[]
   contacts      Contact[]
   callLogs      CallLog[]
   integrations  UserIntegration[]
@@ -380,6 +382,57 @@ model HealthAnalysis {
 enum AnalysisTrigger {
   MANUAL
   MONTHLY_AUTO
+}
+
+// Laboratorní výsledky z PDF (Petr 2026-07-16). Upload PDF → Gemini flash
+// extrakce hodnot → historické řady per analyt. Originál PDF zůstává
+// (AI extrakce ~99 %, ne 100 % — dohledatelnost je nutná).
+model HealthLabReport {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+
+  filename        String            // původní jméno souboru
+  pdfPath         String            // relativní cesta v uploads (health-labs/…)
+  pdfBytes        Int
+
+  sampledAt       DateTime?         // datum odběru (z AI extrakce)
+  labName         String?
+
+  status          String   @default("processing") // processing | ready | error
+  processingError String?  @db.Text
+  model           String?           // použitý Gemini model
+
+  createdAt       DateTime @default(now())
+
+  results         HealthLabResult[]
+
+  @@index([userId, sampledAt])
+}
+
+model HealthLabResult {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  reportId    String
+  report      HealthLabReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  analyte     String            // zobrazovaný název ("Glukóza")
+  analyteKey  String            // normalizovaný slug pro časové řady ("glukoza")
+  value       Float?            // číselná hodnota (null u textových výsledků)
+  valueText   String?           // "negativní", "nezjištěno" apod.
+  unit        String?
+  refLow      Float?
+  refHigh     Float?
+  refText     String?           // referenční rozmezí jak stálo v PDF
+  flag        String?           // "H" (nad), "L" (pod), null = v normě
+
+  sampledAt   DateTime          // denormalizace z reportu — řazení řad
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, analyteKey, sampledAt])
+  @@index([reportId])
 }
 
 model HealthEcg {
