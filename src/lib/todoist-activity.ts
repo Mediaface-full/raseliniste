@@ -12,6 +12,7 @@
 
 import { prisma } from "./db";
 import { decryptSecret } from "./crypto";
+import { getTask, listAllCollaborators } from "./todoist";
 
 const BASE = "https://api.todoist.com/api/v1";
 const CANDIDATE_PATHS = ["/activity", "/activities", "/activity/get"];
@@ -164,13 +165,77 @@ export async function getTodoistToken(userId: string): Promise<string | null> {
   }
 }
 
-/** Mapa Todoist user ID → jméno kontaktu (pro initiator jména). */
-export async function todoistUserNames(): Promise<Map<string, string>> {
+/**
+ * Mapa Todoist user ID → jméno. Priorita: Contact.todoistUserId (hezká
+ * jména), pak Todoist collaborators API (pokryje hosty bez kontaktu).
+ * Collaborators fetch je drahý (dotaz per projekt) → cache 30 min.
+ */
+let collabCache: { fetchedAt: number; map: Map<string, string> } | null = null;
+let collabRefresh: Promise<void> | null = null;
+
+export async function todoistUserNames(token?: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+
+  if (token) {
+    // Collaborators = dotaz per projekt (pomalé) → stale-while-revalidate:
+    // refresh běží na pozadí (dedup), čekáme na něj max 4 s. Starší mapa
+    // je lepší než blokovat dashboard.
+    if (!collabRefresh && (!collabCache || Date.now() - collabCache.fetchedAt > 30 * 60 * 1000)) {
+      collabRefresh = listAllCollaborators(token)
+        .then((collabs) => {
+          collabCache = { fetchedAt: Date.now(), map: new Map(collabs.map((c) => [c.id, c.name])) };
+        })
+        .catch(() => {})
+        .finally(() => { collabRefresh = null; });
+    }
+    if (collabRefresh && !collabCache) {
+      await Promise.race([collabRefresh, new Promise((r) => setTimeout(r, 4000))]);
+    }
+    if (collabCache) for (const [id, name] of collabCache.map) map.set(id, name);
+  }
+
+  // Kontakty přepisují collaborators (kanonická jména — Gáťa vs "Gabriela N.")
   const contacts = await prisma.contact.findMany({
     where: { todoistUserId: { not: null } },
     select: { todoistUserId: true, displayName: true },
   });
-  const map = new Map<string, string>();
   for (const c of contacts) if (c.todoistUserId) map.set(c.todoistUserId, c.displayName);
   return map;
+}
+
+/**
+ * Názvy úkolů pro parent_item_id eventů (komentář sám nenese titulek úkolu).
+ * getTask per id s concurrency 4 + module cache (30 min; smazané úkoly
+ * cacheujeme jako null ať se nedotazují dokola).
+ */
+const taskTitleCache = new Map<string, { fetchedAt: number; title: string | null }>();
+
+export async function todoistTaskTitles(token: string, ids: string[]): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const now = Date.now();
+  const toFetch: string[] = [];
+  for (const id of [...new Set(ids)]) {
+    const hit = taskTitleCache.get(id);
+    if (hit && now - hit.fetchedAt < 30 * 60 * 1000) {
+      if (hit.title) result.set(id, hit.title);
+    } else {
+      toFetch.push(id);
+    }
+  }
+  const CONCURRENCY = 4;
+  for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
+    await Promise.all(
+      toFetch.slice(i, i + CONCURRENCY).map(async (id) => {
+        try {
+          const task = await getTask(token, id);
+          taskTitleCache.set(id, { fetchedAt: now, title: task?.content ?? null });
+          if (task?.content) result.set(id, task.content);
+        } catch {
+          taskTitleCache.set(id, { fetchedAt: now, title: null });
+        }
+      }),
+    );
+  }
+  if (taskTitleCache.size > 500) taskTitleCache.clear();
+  return result;
 }

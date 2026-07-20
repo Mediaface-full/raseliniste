@@ -7,7 +7,7 @@ import SchedulerStatus from "../components/SchedulerStatus.astro";
 import QuickRecordButton from "../components/QuickRecordButton";
 import { loadNotifications } from "../lib/notifications";
 import { getForecast3Days } from "../lib/weather";
-import { fetchTodoistWeekFeed, fetchOwnTodoistUserId, filterTeamEvents, getTodoistToken, todoistUserNames, type TodoistActivityEvent } from "../lib/todoist-activity";
+import { fetchTodoistWeekFeed, fetchOwnTodoistUserId, filterTeamEvents, getTodoistToken, todoistTaskTitles, todoistUserNames, type TodoistActivityEvent } from "../lib/todoist-activity";
 import { activityIcon, activityLabel } from "../lib/todoist-activity-ui";
 
 const session = await readSession(Astro.cookies);
@@ -234,15 +234,26 @@ const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "nu
 const todoistToken = await getTodoistToken(session.uid);
 let todoistActivity: TodoistActivityEvent[] = [];
 let todoistNames = new Map<string, string>();
+let todoistTasks = new Map<string, string>();
+let todoistProjects = new Map<string, string>();
 if (todoistToken) {
   try {
-    const [allEvents, ownId, names] = await Promise.all([
+    const [allEvents, ownId, names, projectMirror] = await Promise.all([
       fetchTodoistWeekFeed(todoistToken),
       fetchOwnTodoistUserId(todoistToken),
-      todoistUserNames(),
+      todoistUserNames(todoistToken),
+      prisma.todoistProjectMirror.findMany({
+        where: { userId: session.uid },
+        select: { todoistId: true, name: true },
+      }),
     ]);
     todoistActivity = filterTeamEvents(allEvents, ownId).slice(0, 10);
     todoistNames = names;
+    todoistProjects = new Map(projectMirror.map((p) => [p.todoistId, p.name]));
+    todoistTasks = await todoistTaskTitles(
+      todoistToken,
+      todoistActivity.map((e) => e.parentItemId).filter((x): x is string => x !== null),
+    );
   } catch (e) {
     console.warn("[dashboard] todoist activity failed:", e instanceof Error ? e.message : e);
   }
@@ -578,22 +589,33 @@ const weatherDayLabel = (dateStr: string, i: number) =>
           </a>
         </div>
         <div class="p-4 space-y-1">
-          {todoistActivity.map((e) => (
-            <div class={`flex items-start gap-2.5 text-sm rounded-md px-2 py-1.5 ${
-              isTodoistComment(e.objectType) ? "bg-[var(--tint-mint)]/8" : "bg-black/10"
-            }`}>
-              <Icon
-                name={activityIcon(e)}
-                class={`size-4 shrink-0 mt-0.5 ${isTodoistComment(e.objectType) ? "text-[var(--tint-mint)]" : "text-muted-foreground"}`}
-              />
-              <span class="text-muted-foreground shrink-0">{activityLabel(e)}</span>
-              <span class="flex-1 truncate">{e.content || "(bez textu)"}</span>
-              <span class="text-xs shrink-0 font-medium text-[var(--tint-mint)]">
-                {(e.initiatorId && todoistNames.get(e.initiatorId)) ?? "host"}
-              </span>
-              <span class="text-xs font-mono tabular text-muted-foreground shrink-0">{todoistFmtWhen(e.eventDate)}</span>
-            </div>
-          ))}
+          {todoistActivity.map((e) => {
+            const who = (e.initiatorId && todoistNames.get(e.initiatorId)) ?? "host";
+            const project = e.parentProjectId ? todoistProjects.get(e.parentProjectId) : null;
+            const task = e.parentItemId ? todoistTasks.get(e.parentItemId) : null;
+            return (
+              <div class={`flex items-start gap-2.5 text-sm rounded-md px-2 py-1.5 ${
+                isTodoistComment(e.objectType) ? "bg-[var(--tint-mint)]/8" : "bg-black/10"
+              }`}>
+                <Icon
+                  name={activityIcon(e)}
+                  class={`size-4 shrink-0 mt-0.5 ${isTodoistComment(e.objectType) ? "text-[var(--tint-mint)]" : "text-muted-foreground"}`}
+                />
+                <div class="min-w-0 flex-1">
+                  <div class="truncate">
+                    <span class="font-semibold text-[var(--tint-mint)]">{who}</span>
+                    <span class="text-muted-foreground"> · {activityLabel(e)}</span>
+                    <span> {e.content || "(bez textu)"}</span>
+                  </div>
+                  <div class="text-xs text-muted-foreground font-mono mt-0.5 truncate">
+                    {todoistFmtWhen(e.eventDate)}
+                    {project && ` · ${project}`}
+                    {task && ` › ${task}`}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
     )}

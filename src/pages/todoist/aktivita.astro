@@ -3,7 +3,7 @@ import Shell from "../../layouts/Shell.astro";
 import { Icon } from "astro-icon/components";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
-import { fetchTodoistWeekFeed, fetchOwnTodoistUserId, filterTeamEvents, getTodoistToken, todoistUserNames } from "../../lib/todoist-activity";
+import { fetchTodoistWeekFeed, fetchOwnTodoistUserId, filterTeamEvents, getTodoistToken, todoistTaskTitles, todoistUserNames } from "../../lib/todoist-activity";
 import { activityIcon, activityLabel } from "../../lib/todoist-activity-ui";
 
 const session = await readSession(Astro.cookies);
@@ -29,7 +29,10 @@ if (token) {
   }
 }
 
-const names = await todoistUserNames();
+const names = await todoistUserNames(token ?? undefined);
+const taskTitles = token
+  ? await todoistTaskTitles(token, events.map((e) => e.parentItemId).filter((x): x is string => x !== null))
+  : new Map<string, string>();
 const projects = await prisma.todoistProjectMirror.findMany({
   where: { userId: session.uid },
   select: { todoistId: true, name: true },
@@ -101,12 +104,15 @@ const isComment = (t: string) => t === "note" || t === "project_note";
             <div class={`flex items-start gap-2.5 text-sm rounded-md px-2 py-1.5 ${isComment(e.objectType) ? "bg-[var(--tint-mint)]/8" : "bg-black/10"}`}>
               <Icon name={activityIcon(e)} class={`size-4 shrink-0 mt-0.5 ${isComment(e.objectType) ? "text-[var(--tint-mint)]" : "text-muted-foreground"}`} />
               <div class="min-w-0 flex-1">
+                {e.initiatorId && (
+                  <span class="font-semibold text-[var(--tint-mint)]">{names.get(e.initiatorId) ?? "host"} · </span>
+                )}
                 <span class="text-muted-foreground">{activityLabel(e)}</span>
                 {e.content && <span class="ml-1">{e.content}</span>}
                 <div class="text-xs text-muted-foreground font-mono mt-0.5">
                   {fmtTime(e.eventDate)}
-                  {e.initiatorId && ` · ${names.get(e.initiatorId) ?? "host"}`}
                   {e.parentProjectId && projectNames.get(e.parentProjectId) && ` · ${projectNames.get(e.parentProjectId)}`}
+                  {e.parentItemId && taskTitles.get(e.parentItemId) && ` › ${taskTitles.get(e.parentItemId)}`}
                 </div>
               </div>
             </div>
