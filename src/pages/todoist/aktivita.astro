@@ -1,0 +1,105 @@
+---
+import Shell from "../../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+import { fetchTodoistActivity, getTodoistToken, todoistUserNames } from "../../lib/todoist-activity";
+import { activityIcon, activityLabel } from "../../lib/todoist-activity-ui";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+const token = await getTodoistToken(session.uid);
+let events: Awaited<ReturnType<typeof fetchTodoistActivity>> = [];
+let fetchError: string | null = null;
+if (token) {
+  try {
+    events = await fetchTodoistActivity(token, { limit: 100, sinceDays: 7 });
+  } catch (e) {
+    fetchError = e instanceof Error ? e.message : String(e);
+  }
+}
+
+const names = await todoistUserNames();
+const projects = await prisma.todoistProjectMirror.findMany({
+  where: { userId: session.uid },
+  select: { todoistId: true, name: true },
+});
+const projectNames = new Map(projects.map((p) => [p.todoistId, p.name]));
+
+// Skupiny po dnech (Europe/Prague)
+const dayKey = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" });
+const dayTitle = (d: Date) =>
+  d.toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "numeric" });
+const groups: { key: string; title: string; items: typeof events }[] = [];
+for (const e of events) {
+  const key = dayKey(e.eventDate);
+  let g = groups.find((x) => x.key === key);
+  if (!g) {
+    g = { key, title: dayTitle(e.eventDate), items: [] };
+    groups.push(g);
+  }
+  g.items.push(e);
+}
+
+const fmtTime = (d: Date) =>
+  d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Prague" });
+const isComment = (t: string) => t === "note" || t === "project_note";
+---
+
+<Shell
+  title="Todoist aktivita · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Todoist" }, { label: "Aktivita" }]}
+>
+  <div class="max-w-3xl space-y-4">
+    <div>
+      <h2 class="font-serif text-xl">Todoist — poslední týden</h2>
+      <p class="text-sm text-muted-foreground mt-1">
+        Aktivita a komentáře po dnech. Zdroj: Todoist activity log.
+      </p>
+    </div>
+
+    {!token && (
+      <div class="glass rounded-xl p-4 text-sm text-muted-foreground">
+        Todoist integrace není připojená — <a href="/settings/integrations" class="underline">nastavit</a>.
+      </div>
+    )}
+    {fetchError && (
+      <div class="glass rounded-xl p-4 text-sm text-[var(--destructive,#e5484d)]">
+        Nepodařilo se načíst aktivitu: {fetchError}
+      </div>
+    )}
+    {token && !fetchError && groups.length === 0 && (
+      <div class="glass rounded-xl p-4 text-sm text-muted-foreground">Za poslední týden žádná aktivita.</div>
+    )}
+
+    {groups.map((g) => (
+      <section class="glass rounded-xl p-4">
+        <h3 class="text-[11px] uppercase tracking-widest font-mono text-muted-foreground mb-2">{g.title}</h3>
+        <div class="space-y-1">
+          {g.items.map((e) => (
+            <div class={`flex items-start gap-2.5 text-sm rounded-md px-2 py-1.5 ${isComment(e.objectType) ? "bg-[var(--tint-mint)]/8" : "bg-black/10"}`}>
+              <Icon name={activityIcon(e)} class={`size-4 shrink-0 mt-0.5 ${isComment(e.objectType) ? "text-[var(--tint-mint)]" : "text-muted-foreground"}`} />
+              <div class="min-w-0 flex-1">
+                <span class="text-muted-foreground">{activityLabel(e)}</span>
+                {e.content && <span class="ml-1">{e.content}</span>}
+                <div class="text-xs text-muted-foreground font-mono mt-0.5">
+                  {fmtTime(e.eventDate)}
+                  {e.initiatorId && names.get(e.initiatorId) && ` · ${names.get(e.initiatorId)}`}
+                  {e.parentProjectId && projectNames.get(e.parentProjectId) && ` · ${projectNames.get(e.parentProjectId)}`}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
+</Shell>

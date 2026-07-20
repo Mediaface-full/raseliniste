@@ -7,6 +7,8 @@ import SchedulerStatus from "../components/SchedulerStatus.astro";
 import QuickRecordButton from "../components/QuickRecordButton";
 import { loadNotifications } from "../lib/notifications";
 import { getForecast3Days } from "../lib/weather";
+import { fetchTodoistActivity, getTodoistToken, todoistUserNames, type TodoistActivityEvent } from "../lib/todoist-activity";
+import { activityIcon, activityLabel } from "../lib/todoist-activity-ui";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -222,6 +224,30 @@ const dnesRows: DnesRow[] = [
 ];
 
 const today = new Date().toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" });
+
+// Todoist aktivita + komentáře (Petr 2026-07-16) — posledních 10 na kartě,
+// detail týdne po dnech na /todoist/aktivita. Cache 5 min v lib, selhání
+// API kartu jen schová.
+const todoistToken = await getTodoistToken(session.uid);
+let todoistActivity: TodoistActivityEvent[] = [];
+let todoistNames = new Map<string, string>();
+if (todoistToken) {
+  try {
+    [todoistActivity, todoistNames] = await Promise.all([
+      fetchTodoistActivity(todoistToken, { limit: 10 }),
+      todoistUserNames(),
+    ]);
+  } catch (e) {
+    console.warn("[dashboard] todoist activity failed:", e instanceof Error ? e.message : e);
+  }
+}
+const todoistFmtWhen = (d: Date) => {
+  const key = d.toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" });
+  const time = d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Prague" });
+  return key === todayKeyPrague ? `dnes ${time}` : `${d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", timeZone: "Europe/Prague" })} ${time}`;
+};
+const todayKeyPrague = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" });
+const isTodoistComment = (t: string) => t === "note" || t === "project_note";
 
 // Počasí dnes + 2 dny (Petr 2026-07-15) — chipy v hlavičce Plánu.
 // null při výpadku API = chipy se nevykreslí, dashboard jede dál.
@@ -532,6 +558,39 @@ const weatherDayLabel = (dateStr: string, i: number) =>
         </ul>
       </div>
     </section>
+
+    {/* Todoist — poslední komentáře + aktivita (Petr 2026-07-16) */}
+    {todoistActivity.length > 0 && (
+      <section class="glass rounded-xl" style="--c: var(--tint-mint);">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+          <div class="flex items-center gap-2">
+            <Icon name="lucide:list-checks" class="size-4" style="color: var(--c);" />
+            <h2 class="font-serif text-xl">Todoist</h2>
+          </div>
+          <a href="/todoist/aktivita" class="text-xs font-mono text-[var(--tint-mint)] hover:underline">
+            Poslední týden po dnech →
+          </a>
+        </div>
+        <div class="p-4 space-y-1">
+          {todoistActivity.map((e) => (
+            <div class={`flex items-start gap-2.5 text-sm rounded-md px-2 py-1.5 ${
+              isTodoistComment(e.objectType) ? "bg-[var(--tint-mint)]/8" : "bg-black/10"
+            }`}>
+              <Icon
+                name={activityIcon(e)}
+                class={`size-4 shrink-0 mt-0.5 ${isTodoistComment(e.objectType) ? "text-[var(--tint-mint)]" : "text-muted-foreground"}`}
+              />
+              <span class="text-muted-foreground shrink-0">{activityLabel(e)}</span>
+              <span class="flex-1 truncate">{e.content || "(bez textu)"}</span>
+              {e.initiatorId && todoistNames.get(e.initiatorId) && (
+                <span class="text-xs text-muted-foreground shrink-0">{todoistNames.get(e.initiatorId)}</span>
+              )}
+              <span class="text-xs font-mono tabular text-muted-foreground shrink-0">{todoistFmtWhen(e.eventDate)}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
 
     {/* Moduly v plánu — glass grid */}
     <section class="glass rounded-xl">
