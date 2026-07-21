@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Upload, Loader2, Trash2, FileText, RefreshCw, AlertTriangle, Check } from "lucide-react";
+import { Upload, Loader2, Trash2, FileText, RefreshCw, AlertTriangle, Check, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "../ui/Button";
 
 interface LabReport {
@@ -22,6 +22,11 @@ export default function LabReportsPanel({ initialReports }: { initialReports: La
   const [reports, setReports] = useState<LabReport[]>(initialReports);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Petr 2026-07-21: seznam souborů defaultně sbalený (překážel) — rozklik.
+  // Auto-rozbalit když něco běží nebo selhalo, ať je feedback vidět.
+  const [listOpen, setListOpen] = useState(
+    initialReports.some((r) => r.status === "processing" || r.status === "error"),
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const hadProcessing = useRef(initialReports.some((r) => r.status === "processing"));
 
@@ -49,6 +54,7 @@ export default function LabReportsPanel({ initialReports }: { initialReports: La
     if (!files || files.length === 0) return;
     setError(null);
     setUploading(true);
+    setListOpen(true); // ať je vidět "zpracovává se"
     try {
       for (const file of Array.from(files)) {
         const fd = new FormData();
@@ -93,6 +99,16 @@ export default function LabReportsPanel({ initialReports }: { initialReports: La
           {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
           Nahrát PDF s výsledky
         </Button>
+        {reports.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setListOpen((v) => !v)}
+            className="inline-flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground"
+          >
+            {listOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {reports.length} {reports.length === 1 ? "soubor" : reports.length < 5 ? "soubory" : "souborů"}
+          </button>
+        )}
         <span className="text-xs text-muted-foreground">
           Lze vybrat víc souborů najednou — i starou historii.
         </span>
@@ -100,7 +116,7 @@ export default function LabReportsPanel({ initialReports }: { initialReports: La
 
       {error && <div className="text-sm text-[var(--destructive,#e5484d)]">{error}</div>}
 
-      {reports.length > 0 && (
+      {reports.length > 0 && listOpen && (
         <div className="space-y-1">
           {reports.map((r) => (
             <div key={r.id} className="flex items-center gap-3 text-sm rounded-md px-2 py-1.5 bg-black/10">
