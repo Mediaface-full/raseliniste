@@ -77,12 +77,28 @@ function extractJson(raw: string): unknown {
   const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   try {
     return JSON.parse(trimmed);
-  } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start >= 0 && end > start) return JSON.parse(trimmed.slice(start, end + 1));
-    throw new Error("Odpověď AI není validní JSON.");
+  } catch { /* pokračuj níž */ }
+
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    } catch { /* pokračuj níž */ }
   }
+
+  // Salvage useknutého outputu (token limit): "results" je poslední klíč,
+  // usekni za posledním kompletním objektem pole a zavři "]}".
+  if (start >= 0) {
+    const body = trimmed.slice(start);
+    const lastComplete = body.lastIndexOf("},");
+    if (lastComplete > 0) {
+      try {
+        return JSON.parse(body.slice(0, lastComplete + 1) + "]}");
+      } catch { /* spadne níž */ }
+    }
+  }
+  throw new Error("Odpověď AI není validní JSON (pravděpodobně useknutá — zkus extrakci znovu).");
 }
 
 async function processInner(reportId: string): Promise<void> {
@@ -106,7 +122,15 @@ async function processInner(reportId: string): Promise<void> {
             ],
           },
         ],
-        config: { temperature: 0, maxOutputTokens: 16000, responseMimeType: "application/json" },
+        // Petr 2026-07-16: realne lab PDF = desitky hodnot, 16k tokenu se
+        // useklo v pulce JSON (lekce „AI extract žádný strop" + posta-classify:
+        // flash thinking si jinak vezme moc a output se trunkne).
+        config: {
+          temperature: 0,
+          maxOutputTokens: 60000,
+          responseMimeType: "application/json",
+          thinkingConfig: { thinkingBudget: 1024 },
+        },
       }),
     });
 
