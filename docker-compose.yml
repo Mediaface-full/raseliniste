@@ -17,8 +17,10 @@ services:
       retries: 5
 
   app:
-    # GitHub username + repo lowercase. Po prvním buildu ghcr.io/duchnotvor/raseliniste/app
-    image: ghcr.io/duchnotvor/raseliniste/app:latest
+    # Org + repo lowercase. Repo přesunuto do organizace Mediaface-full
+    # (2026-07-21) — stará cesta ghcr.io/duchnotvor/... už se nebuilduje!
+    # Balíček v org musí být PUBLIC (NAS táhne bez přihlášení).
+    image: ghcr.io/mediaface-full/raseliniste/app:latest
     container_name: raseliniste_app
     restart: unless-stopped
     environment:
