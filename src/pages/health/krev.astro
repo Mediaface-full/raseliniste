@@ -2,6 +2,7 @@
 import Shell from "../../layouts/Shell.astro";
 import { Icon } from "astro-icon/components";
 import LabReportsPanel from "../../components/health/LabReportsPanel";
+import LabAiSummaryButton from "../../components/health/LabAiSummaryButton";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
 
@@ -213,6 +214,17 @@ const outOfRange = (f: string | null) => f === "H" || f === "L";
             );
           })}
         </div>
+      </section>
+    )}
+
+    {/* AI shrnutí vývoje — pod grafy (Petr 2026-07-21) */}
+    {allResults.length > 0 && (
+      <section class="glass rounded-xl p-4" style="--c: var(--tint-rose);">
+        <div class="flex items-center gap-2 mb-3">
+          <Icon name="lucide:sparkles" class="size-4" style="color: var(--c);" />
+          <h2 class="font-serif text-lg">AI shrnutí vývoje</h2>
+        </div>
+        <LabAiSummaryButton client:load firstSampleIso={allResults[0]?.sampledAt.toISOString() ?? null} />
       </section>
     )}
 

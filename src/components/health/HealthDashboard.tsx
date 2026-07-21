@@ -4,6 +4,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Bed,
+  Droplets,
   Flame,
   Footprints,
   Heart,
@@ -221,6 +222,14 @@ export default function HealthDashboard() {
             </button>
           );
         })}
+        {/* Krev = samostatná stránka (PDF výsledky), ne sekce (Petr 2026-07-21) */}
+        <a
+          href="/health/krev"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        >
+          <Droplets className="size-4" />
+          Krev
+        </a>
       </div>
 
       {loading && !summary && (
@@ -607,12 +616,13 @@ function PressureSection({ s }: { s: Summary }) {
     <div className="space-y-5">
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Systolický Ø" value={bpStats?.systolic.avg ?? null} unit="mmHg" icon={Heart} tint={TINT.rose} trendPct={bpStats?.systolic.trendPct ?? null} />
-        <KpiCard label="Diastolický Ø" value={bpStats?.diastolic.avg ?? null} unit="mmHg" icon={Heart} tint={TINT.pink} trendPct={bpStats?.diastolic.trendPct ?? null} />
+        <KpiCard label="Diastolický Ø" value={bpStats?.diastolic.avg ?? null} unit="mmHg" icon={Heart} tint={TINT.sky} trendPct={bpStats?.diastolic.trendPct ?? null} />
         <KpiCard label="Systolický max" value={bpStats?.systolic.max ?? null} unit="mmHg" icon={ArrowUpRight} tint={TINT.butter} />
         <KpiCard label="Měření" value={bpStats?.systolic.count ?? 0} icon={Activity} tint={TINT.sage} sub="v období" />
       </section>
-      <ChartCard title="Krevní tlak" subtitle="systolic (rose) + diastolic (pink)" tint={TINT.rose}>
-        <BloodPressureChart data={points} systolicColor={TINT.rose} diastolicColor={TINT.pink} />
+      {/* Petr 2026-07-21: rose vs pink byly k nerozeznání → diastolický sky */}
+      <ChartCard title="Krevní tlak" subtitle="systolický (růžová) + diastolický (modrá)" tint={TINT.rose}>
+        <BloodPressureChart data={points} systolicColor={TINT.rose} diastolicColor={TINT.sky} />
       </ChartCard>
     </div>
   );
