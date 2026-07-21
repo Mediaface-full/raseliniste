@@ -5,6 +5,8 @@ import LabReportsPanel from "../../components/health/LabReportsPanel";
 import LabAiSummaryButton from "../../components/health/LabAiSummaryButton";
 import { prisma } from "../../lib/db";
 import { readSession } from "../../lib/session";
+import { labExplanation } from "../../lib/lab-glossary";
+import { analyteKey as toAnalyteKey } from "../../lib/health-labs";
 
 const session = await readSession(Astro.cookies);
 if (!session) return Astro.redirect("/login");
@@ -156,7 +158,14 @@ const outOfRange = (f: string | null) => f === "H" || f === "L";
             <tbody>
               {latestReport.results.map((r) => (
                 <tr class={`border-t border-white/5 ${outOfRange(r.flag) ? "bg-[color:var(--c-signal)]/10" : ""}`}>
-                  <td class={`px-3 py-1.5 ${outOfRange(r.flag) ? "font-semibold" : ""}`}>{r.analyte}</td>
+                  <td class={`px-3 py-1.5 ${outOfRange(r.flag) ? "font-semibold" : ""}`}>
+                    {labExplanation(toAnalyteKey(r.analyte)) ? (
+                      <span
+                        class="underline decoration-dotted decoration-1 underline-offset-4 decoration-[color:var(--muted-foreground)] cursor-help"
+                        title={labExplanation(toAnalyteKey(r.analyte))}
+                      >{r.analyte}</span>
+                    ) : r.analyte}
+                  </td>
                   <td class="px-3 py-1.5 text-right font-mono tabular">
                     {r.value !== null ? fmtVal(r.value) : (r.valueText ?? "—")}
                   </td>
@@ -189,7 +198,10 @@ const outOfRange = (f: string | null) => f === "H" || f === "L";
             return (
               <div class="rounded-lg bg-black/10 p-3">
                 <div class="flex items-baseline justify-between gap-2 mb-1">
-                  <div class="text-sm truncate" title={s.analyte}>{s.analyte}</div>
+                  <div
+                    class={`text-sm truncate ${labExplanation(s.key) ? "underline decoration-dotted decoration-1 underline-offset-4 decoration-[color:var(--muted-foreground)] cursor-help" : ""}`}
+                    title={labExplanation(s.key) ? `${s.analyte} — ${labExplanation(s.key)}` : s.analyte}
+                  >{s.analyte}</div>
                   <div class={`font-mono tabular text-sm ${outOfRange(s.latestFlag) ? "font-semibold" : ""}`}
                        style={outOfRange(s.latestFlag) ? "color: var(--c-signal);" : ""}>
                     {fmtVal(latest.value)} {s.unit ?? ""}
