@@ -162,7 +162,7 @@ const outOfRange = (f: string | null) => f === "H" || f === "L";
                     {labExplanation(toAnalyteKey(r.analyte)) ? (
                       <span
                         class="underline decoration-dotted decoration-1 underline-offset-4 decoration-[color:var(--muted-foreground)] cursor-help"
-                        title={labExplanation(toAnalyteKey(r.analyte))}
+                        data-tip={`${r.analyte} — ${labExplanation(toAnalyteKey(r.analyte))}`}
                       >{r.analyte}</span>
                     ) : r.analyte}
                   </td>
@@ -200,7 +200,7 @@ const outOfRange = (f: string | null) => f === "H" || f === "L";
                 <div class="flex items-baseline justify-between gap-2 mb-1">
                   <div
                     class={`text-sm truncate ${labExplanation(s.key) ? "underline decoration-dotted decoration-1 underline-offset-4 decoration-[color:var(--muted-foreground)] cursor-help" : ""}`}
-                    title={labExplanation(s.key) ? `${s.analyte} — ${labExplanation(s.key)}` : s.analyte}
+                    data-tip={labExplanation(s.key) ? `${s.analyte} — ${labExplanation(s.key)}` : undefined}
                   >{s.analyte}</div>
                   <div class={`font-mono tabular text-sm ${outOfRange(s.latestFlag) ? "font-semibold" : ""}`}
                        style={outOfRange(s.latestFlag) ? "color: var(--c-signal);" : ""}>
@@ -247,4 +247,66 @@ const outOfRange = (f: string | null) => f === "H" || f === "L";
       </section>
     )}
   </div>
+
+  {/* Vlastní tooltip pro [data-tip] — nativní title je pomalý, titěrný a na
+      mobilu nefunguje (Petr 2026-07-21). Div jde na document.body (Portal
+      pattern — .glass backdrop-filter láme position:fixed uvnitř). Desktop:
+      hover, mobil: tap (druhý tap / tap jinam zavře). */}
+  <style is:global>
+    .lab-tooltip {
+      position: fixed;
+      z-index: 9999;
+      max-width: 320px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--card);
+      color: var(--foreground);
+      border: 1px solid color-mix(in oklch, var(--foreground) 18%, transparent);
+      box-shadow: 0 8px 28px rgb(0 0 0 / 0.35);
+      font-size: 0.8rem;
+      line-height: 1.45;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+    .lab-tooltip.visible { opacity: 1; }
+  </style>
+  <script>
+    const tip = document.createElement("div");
+    tip.className = "lab-tooltip";
+    document.body.appendChild(tip);
+
+    let pinned = false;
+
+    function show(el: Element) {
+      const text = el.getAttribute("data-tip");
+      if (!text) return;
+      tip.textContent = text;
+      tip.classList.add("visible");
+      const r = el.getBoundingClientRect();
+      // Nad prvkem, když je místo; jinak pod. Horizontálně přichytit do okna.
+      tip.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 336)) + "px";
+      tip.style.top = "0px"; // reset před měřením
+      const h = tip.offsetHeight;
+      tip.style.top = (r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8) + "px";
+    }
+    function hide() {
+      tip.classList.remove("visible");
+      pinned = false;
+    }
+
+    for (const el of document.querySelectorAll("[data-tip]")) {
+      el.addEventListener("mouseenter", () => { if (!pinned) show(el); });
+      el.addEventListener("mouseleave", () => { if (!pinned) hide(); });
+      // Mobil / tap: toggle + nepropagovat (document click zavírá)
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (pinned && tip.textContent === el.getAttribute("data-tip")) { hide(); return; }
+        show(el);
+        pinned = true;
+      });
+    }
+    document.addEventListener("click", hide);
+    window.addEventListener("scroll", hide, { passive: true });
+  </script>
 </Shell>
