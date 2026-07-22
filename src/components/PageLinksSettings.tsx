@@ -15,6 +15,24 @@ interface PageLink {
 const TINTS = ["peach", "mint", "lavender", "sky", "sage", "butter", "rose", "pink"] as const;
 type Tint = typeof TINTS[number];
 
+/**
+ * Petr 2026-07-22: odkazy se v iOS PWA otvíraly v in-app Safari sheetu
+ * uvnitř aplikace. Z PWA je do skutečného Safari dostane jen URL scheme
+ * x-safari-https:// (iOS 17+). Mimo iOS standalone vracíme URL beze změny
+ * (desktop browser řeší target=_blank sám).
+ */
+function externalHref(url: string): string {
+  if (typeof navigator === "undefined") return url;
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const standalone =
+    (navigator as { standalone?: boolean }).standalone === true ||
+    (typeof matchMedia !== "undefined" && matchMedia("(display-mode: standalone)").matches);
+  if (ios && standalone && url.startsWith("https://")) {
+    return "x-safari-https://" + url.slice("https://".length);
+  }
+  return url;
+}
+
 export default function PageLinksSettings() {
   const [links, setLinks] = useState<PageLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,20 +221,20 @@ function PageLinkRow({
     return (
       <div className="rounded-xl p-3 flex items-center gap-3 border border-border bg-card hover:bg-accent/30 transition">
         <a
-          href={link.url}
+          href={externalHref(link.url)}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => { e.preventDefault(); window.open(link.url, '_blank', 'noopener,noreferrer'); }}
+          onClick={(e) => { e.preventDefault(); window.open(externalHref(link.url), '_blank', 'noopener,noreferrer'); }}
           className="size-9 rounded-lg grid place-items-center shrink-0 border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition"
-          title="Otevřít v nové záložce"
+          title="Otevřít v prohlížeči"
         >
           <Globe className="size-4" />
         </a>
         <a
-          href={link.url}
+          href={externalHref(link.url)}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => { e.preventDefault(); window.open(link.url, '_blank', 'noopener,noreferrer'); }}
+          onClick={(e) => { e.preventDefault(); window.open(externalHref(link.url), '_blank', 'noopener,noreferrer'); }}
           className="flex-1 min-w-0 no-underline text-foreground"
         >
           <div className="text-sm font-medium truncate">{link.name}</div>
