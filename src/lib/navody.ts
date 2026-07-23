@@ -101,6 +101,83 @@ Když delegování trvá víc než 30 sekund, neudělám ho — proto smart rout
   },
 
   {
+    slug: "planovani",
+    title: "Plánování týdne",
+    icon: "lucide:kanban",
+    tint: "sky",
+    oneLiner: "KDY to udělám ≠ dokdy to má být. Board, AI review, theme days, digest pro Gáťu.",
+    href: "/planovani",
+    sections: {
+      co_to_je: `
+**Plánování týdne** = vrstva nad Úkoly postavená podle systému pro kreativce s ADHD.
+Klíčový princip: **execution date ≠ deadline**. Termín (dokdy) je jen informace —
+rozhoduje **plánovaný den výroby** (kdy to budu dělat, pole \`plannedFor\`).
+Úkol bez naplánovaného dne = úkol, který řeším až když klient zavolá.
+
+Čtyři části: **board** (týdenní kanban), **AI weekly review** (návrh rozložení),
+**šablona týdne** (manager/maker/vlastní dny) a **digest pro kolegyni**.
+      `,
+      jak_to_ovladam: `
+**Board (\`/planovani\`):**
+- Vlevo **Backlog** = otevřené nenaplánované úkoly (řazené podle priority a termínu, hledání nahoře)
+- **Přetáhni kartu na den**, kdy ji budeš dělat. Na mobilu místo tahání použij výběr „→ den" na kartě.
+- **Max 3 úkoly na den** — víc = červené počítadlo a varování. To je WIP limit, ne dekorace.
+- Fajfka na kartě = hotovo. Šipky ‹ › nahoře = jiný týden.
+- Nedodělané úkoly z minulých týdnů se vrací nahoru do backlogu s korálovým „nedokončeno z minula".
+
+**AI weekly review (neděle večer, 30 minut):**
+- V neděli 18:30 přijde push „Nedělní plánování týdne".
+- Na boardu klikni **Navrhnout týden (AI)** — AI vezme backlog, termíny, priority,
+  projekty a kalendář (kolik hodin schůzek má který den) a navrhne rozložení.
+- Návrhy mají checkboxy a důvody („batching s dalším úkolem Radys"). Odškrtni co nechceš,
+  **Potvrdit vybrané** — karty se rozskočí na dny. AI nikdy nezapisuje sama.
+
+**Šablona týdne (sbalený řádek nad boardem):**
+- Každému dni dej režim: **Manager** (schůzky, hovory, admin) / **Maker** (deep work klienti) /
+  **Vlastní** (nedotknutelné vlastní projekty) / **Volno**. Volitelný popisek („Radys", „StoryMapa").
+- Badge režimu svítí nad sloupci boardu, AI podle nich plánuje (klientské úkoly jen na maker dny,
+  do vlastního dne VÝHRADNĚ vlastní projekty) a schůzka navržená na maker/vlastní den zežloutne
+  s hláškou „schůzky patří na manager dny".
+
+**Digest pro kolegyni (sbalený řádek pod šablonou):**
+- Vyber týmový kontakt s e-mailem, zaškrtni „posílat denně", ulož. **Náhled** ukáže dnešní obsah.
+- Každý pracovní den v 7:00 jí přijde: co dnes dělám, dnešní schůzky, co je zítra v plánu
+  a „Připrav prosím" (úkoly přiřazené jí s termínem do týdne). Prázdný den se neposílá.
+      `,
+      proc: `
+Reaktivní režim = úkoly řeším, když klient zavolá. Chybí „když". Tohle systémově řeší:
+jedno pevné rozhodnutí týdně (weekly review) místo sto mikro-rozhodnutí denně.
+WIP 3 nutí dokončovat. Theme days ruší přepínání kontextu (nejdražší operace pro ADHD mozek).
+Digest řeší „kolegyně je slepá" — ona nepotřebuje vědět, co dělám teď, ale co budu dělat zítra.
+      `,
+      co_umi: `
+- \`Task.plannedFor\` — čistě rašeliništní pole, do Todoistu se NEsyncuje (termíny nedotčené)
+- Drag&drop (desktop) + select fallback (mobil), optimistické uložení s rollbackem
+- AI návrh: batching po klientech, respekt termínů a priorit, dny se schůzkami >3 h max 1 úkol,
+  víkend jen pro víkendové termíny, WIP limit vynucený i v kódu (AI je jen návrh)
+- Karta: prioritní tečka, projekt z Todoistu, termín (červeně když plánuju dělat po termínu)
+- Dashboard „Dnes" ukazuje úkoly naplánované na dnešek (stav „naplánováno")
+- Digest: náhled bez odeslání, automatický skip víkendů a prázdných dnů
+      `,
+      co_neumi: `
+- Plánování na půldny/hodiny — jednotka je den (záměr: kontejnery, ne mikro-sloty)
+- plannedFor se nepropisuje do Todoistu (jen tady) — Gáťa ho vidí jen přes digest
+- AI návrh nezná odhady trvání (t-* tagy zatím nečte) — kapacitu měří počtem úkolů
+- Šablona je týdenní vzor, ne výjimky per konkrétní datum (dovolenou řeší kalendář)
+      `,
+      napojeni: `
+- **Úkoly** — stejný \`Task\` model; naplánování nemění nic v Todoistu
+- **Kalendář** — AI čte vytíženost dnů; SOFT_THEME_DAY warning platí v quickadd i bookingu
+- **Kontakty** — digest jde na týmový kontakt (\`isTeam\`), sekce „Připrav prosím" z přiřazených úkolů
+- **Push notifikace** — nedělní připomínka (cron \`weekly-review\`, 18:30)
+- **E-mail (SMTP)** — digest (cron \`kolegyne-digest\`, 7:00 pracovní dny)
+- **Zdroj metodiky:** dokument „Systém sebeřízení a plánování pro kreativce s ADHD"
+  (kopie: \`docs/NAVOD-PLANOVANI.md\` v repu)
+      `,
+    },
+  },
+
+  {
     slug: "studanka",
     title: "Studánka",
     icon: "lucide:waves",
