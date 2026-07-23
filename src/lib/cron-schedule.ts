@@ -149,6 +149,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "ŽIJEŠ? večerní check-in",
   },
   {
+    name: "kolegyne-digest",
+    endpoint: "/api/cron/kolegyne-digest",
+    schedule: { type: "daily", hour: 7, minute: 0 },
+    description: "Denní digest pro kolegyni (no-op víkend / vypnuto / prázdný den)",
+  },
+  {
     name: "weekly-review",
     endpoint: "/api/cron/weekly-review",
     schedule: { type: "daily", hour: 18, minute: 30 },

@@ -3,6 +3,7 @@ import Shell from "../layouts/Shell.astro";
 import { Icon } from "astro-icon/components";
 import PlanningBoard from "../components/PlanningBoard";
 import WeekTemplateEditor from "../components/WeekTemplateEditor";
+import DigestSettings from "../components/DigestSettings";
 import { MODE_INFO, type DayMode } from "../lib/week-template";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
@@ -134,6 +135,7 @@ const fmtRange = `${monday.getDate()}. ${monday.getMonth() + 1}. – ${new Date(
       client:load
       initialDays={templateRows.map((r) => ({ weekday: r.weekday, mode: r.mode as DayMode, label: r.label }))}
     />
+    <DigestSettings client:load />
 
     <div class="glass rounded-xl p-3 overflow-x-auto">
       <PlanningBoard

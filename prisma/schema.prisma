@@ -49,6 +49,7 @@ model User {
   guestUsers    GuestUser[]
   tasks            Task[]
   planningDayTemplates PlanningDayTemplate[]
+  planningSettings     PlanningSettings?
   taskAudioBatches TaskAudioBatch[]
   journalEntries   JournalEntry[]
   ragChunks        RagChunk[]
@@ -464,6 +465,8 @@ model Contact {
   id           String         @id @default(cuid())
   userId       String
   user         User           @relation(fields: [userId], references: [id])
+
+  planningDigests PlanningSettings[]
 
   displayName  String
   firstName    String?
@@ -1144,6 +1147,17 @@ enum EventType {
   OOO_FULL            // dovolená, vše blokované
   OOO_TRAVEL_WORKING  // nomád, jen prezenční blokované
   OTHER
+}
+
+// Nastavení plánování (ADHD F4) — digest pro kolegyni.
+model PlanningSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  digestEnabled   Boolean  @default(false)
+  digestContactId String?  // Contact (isTeam) — příjemce denního digestu
+  digestContact   Contact? @relation(fields: [digestContactId], references: [id])
 }
 
 // Šablona týdne — theme days (Petr 2026-07-22, ADHD F3).
