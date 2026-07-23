@@ -1385,6 +1385,11 @@ model Task {
   notes             String?      @db.Text
   dueAt             DateTime?
   dueIsTime         Boolean      @default(false)   // true = včetně času
+
+  // Execution date ≠ deadline (Petr 2026-07-22, ADHD plánování F1):
+  // KDY to budu dělat — plánovaný den výroby. Rašeliniště-only overlay,
+  // do Todoistu se nesyncuje. Board: /planovani.
+  plannedFor        DateTime?
   tags              String[]     @default([])
   status            TaskStatus   @default(open)
   priority          TaskPriority @default(normal)
@@ -1424,6 +1429,7 @@ model Task {
   completedAt       DateTime?
 
   @@index([userId, status, dueAt])
+  @@index([userId, status, plannedFor])
   @@index([sourceBatchId])
   @@index([assignedToContactId])
   @@index([parentId])

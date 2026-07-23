@@ -1,0 +1,123 @@
+---
+import Shell from "../layouts/Shell.astro";
+import { Icon } from "astro-icon/components";
+import PlanningBoard from "../components/PlanningBoard";
+import { prisma } from "../lib/db";
+import { readSession } from "../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+const user = await prisma.user.findUnique({
+  where: { id: session.uid },
+  select: { username: true },
+});
+if (!user) return Astro.redirect("/login");
+
+// Pondělí zobrazeného týdne (?w=YYYY-MM-DD, jinak aktuální)
+const wParam = Astro.url.searchParams.get("w");
+const base = wParam && /^\d{4}-\d{2}-\d{2}$/.test(wParam) ? new Date(`${wParam}T00:00:00`) : new Date();
+base.setHours(0, 0, 0, 0);
+const monday = new Date(base);
+monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+const nextMonday = new Date(monday);
+nextMonday.setDate(nextMonday.getDate() + 7);
+const prevMonday = new Date(monday);
+prevMonday.setDate(prevMonday.getDate() - 7);
+
+const dkey = (d: Date) => d.toLocaleDateString("sv-SE");
+const todayKey = dkey(new Date());
+const DAY_LABELS = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+const days = Array.from({ length: 7 }, (_, i) => {
+  const d = new Date(monday);
+  d.setDate(d.getDate() + i);
+  return { date: dkey(d), label: `${DAY_LABELS[i]} ${d.getDate()}.${d.getMonth() + 1}.`, isToday: dkey(d) === todayKey };
+});
+
+// Úkoly: naplánované v okně týdne + přeteklé (naplánované dřív, nedodělané)
+// + backlog (nenaplánované otevřené, cap 80)
+const BACKLOG_CAP = 80;
+const [weekTasks, overdueTasks, backlogTasks, backlogTotal] = await Promise.all([
+  prisma.task.findMany({
+    where: { userId: session.uid, status: "open", plannedFor: { gte: monday, lt: nextMonday } },
+    select: { id: true, title: true, priority: true, dueAt: true, plannedFor: true, tags: true, todoistProjectId: true },
+  }),
+  prisma.task.findMany({
+    where: { userId: session.uid, status: "open", plannedFor: { lt: monday } },
+    select: { id: true, title: true, priority: true, dueAt: true, plannedFor: true, tags: true, todoistProjectId: true },
+    orderBy: { plannedFor: "asc" },
+    take: 30,
+  }),
+  prisma.task.findMany({
+    where: { userId: session.uid, status: "open", plannedFor: null },
+    select: { id: true, title: true, priority: true, dueAt: true, plannedFor: true, tags: true, todoistProjectId: true },
+    orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+    take: BACKLOG_CAP,
+  }),
+  prisma.task.count({ where: { userId: session.uid, status: "open", plannedFor: null } }),
+]);
+
+const projects = await prisma.todoistProjectMirror.findMany({
+  where: { userId: session.uid },
+  select: { todoistId: true, name: true },
+});
+const projectNames = new Map(projects.map((p) => [p.todoistId, p.name]));
+
+const toCard = (t: (typeof weekTasks)[number], overdue = false) => ({
+  id: t.id,
+  title: t.title,
+  priority: t.priority as "low" | "normal" | "high",
+  dueAt: t.dueAt?.toISOString() ?? null,
+  plannedFor: t.plannedFor ? dkey(t.plannedFor) : null,
+  tags: t.tags,
+  projectName: t.todoistProjectId ? (projectNames.get(t.todoistProjectId) ?? null) : null,
+  overdue,
+});
+const initialCards = [
+  ...overdueTasks.map((t) => toCard(t, true)),
+  ...weekTasks.map((t) => toCard(t)),
+  ...backlogTasks.map((t) => toCard(t)),
+];
+
+const fmtRange = `${monday.getDate()}. ${monday.getMonth() + 1}. – ${new Date(nextMonday.getTime() - 86400000).getDate()}. ${new Date(nextMonday.getTime() - 86400000).getMonth() + 1}.`;
+---
+
+<Shell
+  title="Plánování · Rašeliniště"
+  username={user.username}
+  breadcrumb={[{ label: "Organizace" }, { label: "Plánování" }]}
+>
+  <div class="space-y-4">
+    <div class="flex items-end justify-between gap-4 flex-wrap">
+      <div>
+        <h1 class="font-serif text-[2.25rem] leading-tight">Plánování týdne</h1>
+        <p class="text-sm text-muted-foreground mt-1">
+          Přetáhni úkol na den, kdy ho budeš dělat. Kdy ≠ dokdy — termín je jen informace.
+          Max {3} úkoly na den, jinak se den červená.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href={`/planovani?w=${dkey(prevMonday)}`} class="glass-subtle rounded-md p-2 hover:bg-white/10" title="Předchozí týden">
+          <Icon name="lucide:chevron-left" class="size-4" />
+        </a>
+        <span class="font-mono text-sm tabular">{fmtRange}</span>
+        <a href={`/planovani?w=${dkey(nextMonday)}`} class="glass-subtle rounded-md p-2 hover:bg-white/10" title="Další týden">
+          <Icon name="lucide:chevron-right" class="size-4" />
+        </a>
+        {dkey(monday) !== dkey(new Date(new Date().setDate(new Date().getDate() - ((new Date().getDay() + 6) % 7)))) && (
+          <a href="/planovani" class="text-xs font-mono text-[var(--tint-sky)] hover:underline ml-1">dnes</a>
+        )}
+      </div>
+    </div>
+
+    <div class="glass rounded-xl p-3 overflow-x-auto">
+      <PlanningBoard
+        client:load
+        weekStart={dkey(monday)}
+        days={days}
+        initialCards={initialCards}
+        backlogTotal={backlogTotal}
+      />
+    </div>
+  </div>
+</Shell>

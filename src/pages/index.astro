@@ -163,11 +163,18 @@ const activeModulesCount = modules.filter((m) => m.href).length;
 // "Dnes" tabulka — reálná data místo scaffold placeholderu (Petr 2026-07-15):
 // úkoly s termínem dnes + dnešní události + stav zápisu dne
 const todayKey = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" });
-const [dueTodayTasks, todayEventsRaw, todayJournalEntry] = await Promise.all([
+const [dueTodayTasks, plannedTodayTasks, todayEventsRaw, todayJournalEntry] = await Promise.all([
   prisma.task.findMany({
     where: { userId: session.uid, status: "open", dueAt: { gte: todayStart, lt: todayEnd } },
     select: { id: true, title: true, dueAt: true, dueIsTime: true },
     orderBy: [{ dueAt: "asc" }],
+    take: 6,
+  }),
+  // Naplánované na dnešek z /planovani (execution date) — Petr 2026-07-22
+  prisma.task.findMany({
+    where: { userId: session.uid, status: "open", plannedFor: { gte: todayStart, lt: todayEnd } },
+    select: { id: true, title: true, dueAt: true, dueIsTime: true },
+    orderBy: [{ priority: "desc" }],
     take: 6,
   }),
   prisma.calendarEvent.findMany({
@@ -203,11 +210,17 @@ const todayEvents = todayEventsRaw
 type DnesRow = { type: string; label: string; cat: string; time: string; state: string; tint: Tint; href: string };
 const fmtHm = (d: Date) =>
   d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
+const dueIds = new Set(dueTodayTasks.map((t) => t.id));
 const dnesRows: DnesRow[] = [
   ...dueTodayTasks.map((t) => ({
     type: "Úkol", label: t.title, cat: "Úkoly",
     time: t.dueIsTime && t.dueAt ? fmtHm(t.dueAt) : "—",
     state: "otevřený", tint: "peach" as Tint, href: "/ukoly",
+  })),
+  ...plannedTodayTasks.filter((t) => !dueIds.has(t.id)).map((t) => ({
+    type: "Úkol", label: t.title, cat: "Plánování",
+    time: "—",
+    state: "naplánováno", tint: "sky" as Tint, href: "/planovani",
   })),
   ...todayEvents.map((e) => ({
     type: "Událost", label: e.title, cat: "Kalendář",

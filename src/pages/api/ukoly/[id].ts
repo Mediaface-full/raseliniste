@@ -12,6 +12,8 @@ const patchSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
   dueAt: z.string().datetime().nullable().optional(),
   dueIsTime: z.boolean().optional(),
+  // Plánovaný den výroby (execution date) — YYYY-MM-DD, jen Rašeliniště
+  plannedFor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   tags: z.array(z.string()).optional(),
   priority: z.enum(["low", "normal", "high"]).optional(),
   assignedToContactId: z.string().nullable().optional(),
@@ -95,6 +97,7 @@ export const PATCH: APIRoute = async ({ request, cookies, params }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = { ...d };
   if (d.dueAt !== undefined) data.dueAt = d.dueAt ? new Date(d.dueAt) : null;
+  if (d.plannedFor !== undefined) data.plannedFor = d.plannedFor ? new Date(`${d.plannedFor}T00:00:00`) : null;
 
   // Status změna → propagace do Todoistu (synchronně) + lokální completedAt
   let todoistAction: "close" | "reopen" | null = null;
