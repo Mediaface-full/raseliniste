@@ -44,19 +44,19 @@ for (const s of sections) {
     {/* Header */}
     <div
       class="glass rounded-2xl p-6"
-      style={`--c: var(--tint-${navod.tint}); border-color: color-mix(in oklch, var(--c) 30%, transparent); background: color-mix(in oklch, var(--c) 8%, oklch(14% 0.025 260 / 0.9));`}
+      style={`--c: var(--tint-${navod.tint}); border-color: color-mix(in oklch, var(--c) 30%, transparent); background: color-mix(in oklch, var(--c) 10%, var(--card));`}
     >
       <div class="flex items-start gap-4">
         <div
           class="size-14 rounded-xl grid place-items-center shrink-0"
           style="background: color-mix(in oklch, var(--c) 22%, transparent); border: 1px solid color-mix(in oklch, var(--c) 40%, transparent);"
         >
-          <Icon name={navod.icon} class="size-7" style="color: color-mix(in oklch, var(--c) 92%, white);" />
+          <Icon name={navod.icon} class="size-7" style="color: color-mix(in oklch, var(--c) 55%, var(--foreground));" />
         </div>
         <div class="flex-1 min-w-0">
           <h1
             class="text-4xl font-bold tracking-[-0.04em] leading-tight leading-tight mb-2"
-            style="color: color-mix(in oklch, var(--c) 97%, white);"
+            style="color: color-mix(in oklch, var(--c) 45%, var(--foreground));"
           >
             {navod.title}
           </h1>
@@ -67,7 +67,7 @@ for (const s of sections) {
             <a
               href={navod.href}
               class="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-md text-xs font-mono"
-              style="background: color-mix(in oklch, var(--c) 16%, transparent); color: color-mix(in oklch, var(--c) 95%, white); border: 1px solid color-mix(in oklch, var(--c) 30%, transparent);"
+              style="background: color-mix(in oklch, var(--c) 16%, transparent); color: color-mix(in oklch, var(--c) 45%, var(--foreground)); border: 1px solid color-mix(in oklch, var(--c) 30%, transparent);"
             >
               <Icon name="lucide:external-link" class="size-3" />
               Otevřít {navod.title}
@@ -81,10 +81,10 @@ for (const s of sections) {
     {sections.map((s) => (
       <section class="glass-subtle rounded-xl p-5" style={`--c: var(--tint-${navod.tint});`}>
         <div class="flex items-center gap-2 mb-3">
-          <Icon name={s.icon} class="size-4" style="color: color-mix(in oklch, var(--c) 80%, white);" />
+          <Icon name={s.icon} class="size-4" style="color: color-mix(in oklch, var(--c) 50%, var(--foreground));" />
           <h2
             class="font-serif text-lg tracking-tight"
-            style="color: color-mix(in oklch, var(--c) 90%, white);"
+            style="color: color-mix(in oklch, var(--c) 45%, var(--foreground));"
           >
             {s.label}
           </h2>

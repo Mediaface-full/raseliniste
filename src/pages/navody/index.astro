@@ -36,19 +36,19 @@ if (!user) return Astro.redirect("/login");
         <a
           href={`/navody/${n.slug}`}
           class="glass rounded-xl p-4 group transition-all hover:scale-[1.015] hover:brightness-110 active:scale-[0.99]"
-          style={`--c: var(--tint-${n.tint}); border-color: color-mix(in oklch, var(--c) 25%, transparent); background: color-mix(in oklch, var(--c) 6%, oklch(14% 0.025 260 / 0.85));`}
+          style={`--c: var(--tint-${n.tint}); border-color: color-mix(in oklch, var(--c) 25%, transparent); background: color-mix(in oklch, var(--c) 8%, var(--card));`}
         >
           <div class="flex items-start gap-3">
             <div
               class="size-10 rounded-lg grid place-items-center shrink-0"
               style="background: color-mix(in oklch, var(--c) 18%, transparent); border: 1px solid color-mix(in oklch, var(--c) 35%, transparent);"
             >
-              <Icon name={n.icon} class="size-5" style="color: color-mix(in oklch, var(--c) 90%, white);" />
+              <Icon name={n.icon} class="size-5" style="color: color-mix(in oklch, var(--c) 55%, var(--foreground));" />
             </div>
             <div class="flex-1 min-w-0">
               <h2
                 class="font-serif text-lg tracking-tight leading-tight mb-1"
-                style="color: color-mix(in oklch, var(--c) 96%, white);"
+                style="color: color-mix(in oklch, var(--c) 45%, var(--foreground));"
               >
                 {n.title}
               </h2>
