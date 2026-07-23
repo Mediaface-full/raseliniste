@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
-import { Check, GripVertical, AlertTriangle, Sparkles, Loader2, X } from "lucide-react";
+import { Check, GripVertical, AlertTriangle, Sparkles, Loader2, X, ChevronRight, ChevronDown, Clock } from "lucide-react";
 import { Button } from "./ui/Button";
 
 /**
- * Týdenní plánovací board (Petr 2026-07-22, ADHD F1).
- * Execution date ≠ deadline: karta úkolu se přetáhne na den, KDY se bude
- * dělat (Task.plannedFor). Backlog vlevo = otevřené nenaplánované úkoly.
- * WIP doporučení: max 3 na den — překročení se zvýrazní.
- *
- * Desktop: drag & drop. Mobil: select na kartě.
+ * Týdenní plánovací board (ADHD F1, redesign 2026-07-23 po Gideonově feedbacku):
+ *  - dny = ŘÁDKY pod sebou přes celou šířku (8 sloupců vedle sebe se nevešlo
+ *    na desktop a nebylo vidět, který den je který)
+ *  - backlog = skupiny po PROJEKTECH (sbalené, s počty) — 1400+ úkolů
+ *    v plochém seznamu bylo k ničemu
+ *  - hlavička dne ukazuje schůzky s časy z kalendáře — plánuje se kolem nich
  */
 
 export interface PlanCard {
@@ -19,18 +19,27 @@ export interface PlanCard {
   plannedFor: string | null; // YYYY-MM-DD
   tags: string[];
   projectName: string | null;
-  overdue?: boolean; // naplánováno před tímto týdnem a nedodělané
+  overdue?: boolean;
+}
+
+export interface DayInfo {
+  date: string;
+  label: string;        // "Po 20. 7."
+  dayName: string;      // "Pondělí"
+  isToday: boolean;
+  isPast: boolean;
+  modeName?: string | null;
+  modeTint?: string | null;
+  modeLabel?: string | null;
+  meetings: { time: string; title: string }[];
+  busyHours: number;
 }
 
 interface Props {
-  weekStart: string;                 // pondělí YYYY-MM-DD
-  days: {
-    date: string; label: string; isToday: boolean;
-    // Šablona týdne (F3): badge režimu dne
-    modeName?: string | null; modeTint?: string | null; modeLabel?: string | null;
-  }[];
+  weekStart: string;
+  days: DayInfo[];
   initialCards: PlanCard[];
-  backlogTotal: number;              // celkový počet v backlogu (cap v SSR)
+  backlogTotal: number;
 }
 
 const WIP_LIMIT = 3;
@@ -44,11 +53,12 @@ function priorityDot(p: PlanCard["priority"]): string {
 export default function PlanningBoard({ weekStart, days, initialCards, backlogTotal }: Props) {
   const [cards, setCards] = useState<PlanCard[]>(initialCards);
   const [dragId, setDragId] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<string | null>(null); // date | "backlog"
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
 
-  // Weekly review AI (F2): návrhy plannedFor k potvrzení
+  // ---- AI weekly review ----
   interface Proposal { taskId: string; title: string; date: string; reason: string | null }
   const [aiBusy, setAiBusy] = useState(false);
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
@@ -90,7 +100,6 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
         body: JSON.stringify({ assignments: chosen.map((p) => ({ taskId: p.taskId, date: p.date })) }),
       });
       if (!res.ok) { setError("Potvrzení se nepovedlo."); return; }
-      // Lokálně přesuň karty na navržené dny
       const map = new Map(chosen.map((p) => [p.taskId, p.date]));
       setCards((cs) => cs.map((c) => (map.has(c.id) ? { ...c, plannedFor: map.get(c.id)!, overdue: false } : c)));
       setProposals(null);
@@ -99,19 +108,34 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
     }
   }
 
-  const todayKey = days.find((d) => d.isToday)?.date;
-
-  const backlog = useMemo(
+  // ---- data ----
+  const backlogCards = useMemo(
     () =>
       cards
         .filter((c) => c.plannedFor === null || c.overdue)
-        .filter((c) => !filter || c.title.toLowerCase().includes(filter.toLowerCase()) || c.projectName?.toLowerCase().includes(filter.toLowerCase()))
-        .sort((a, b) =>
-          (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0) ||
-          ["high", "normal", "low"].indexOf(a.priority) - ["high", "normal", "low"].indexOf(b.priority) ||
-          (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999")),
+        .filter((c) => !filter || c.title.toLowerCase().includes(filter.toLowerCase()) || c.projectName?.toLowerCase().includes(filter.toLowerCase())),
     [cards, filter],
   );
+
+  // Skupiny po projektech, největší první; přeteklé z minula vždy nahoře zvlášť
+  const backlogGroups = useMemo(() => {
+    const overdue = backlogCards.filter((c) => c.overdue);
+    const rest = backlogCards.filter((c) => !c.overdue);
+    const map = new Map<string, PlanCard[]>();
+    for (const c of rest) {
+      const key = c.projectName ?? "Bez projektu";
+      const arr = map.get(key) ?? [];
+      arr.push(c);
+      map.set(key, arr);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) =>
+        ["high", "normal", "low"].indexOf(a.priority) - ["high", "normal", "low"].indexOf(b.priority) ||
+        (a.dueAt ?? "9999").localeCompare(b.dueAt ?? "9999"));
+    }
+    const groups = [...map.entries()].sort((a, b) => b[1].length - a[1].length);
+    return { overdue, groups };
+  }, [backlogCards]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, PlanCard[]>();
@@ -125,6 +149,7 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
     return map;
   }, [cards, days]);
 
+  // ---- akce ----
   async function move(cardId: string, target: string | null) {
     const prev = cards;
     setCards((cs) => cs.map((c) => (c.id === cardId ? { ...c, plannedFor: target, overdue: false } : c)));
@@ -154,7 +179,10 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
     }
   }
 
-  function Card({ c }: { c: PlanCard }) {
+  const dayLabelFor = (date: string) => days.find((d) => d.date === date)?.label ?? date;
+
+  // ---- UI kousky ----
+  function Card({ c, compact }: { c: PlanCard; compact?: boolean }) {
     const dueBadge = c.dueAt ? new Date(c.dueAt) : null;
     const dueLate = dueBadge && c.plannedFor && dueBadge < new Date(`${c.plannedFor}T00:00:00`);
     const dueMiss = dueBadge && dueBadge < new Date() && !c.plannedFor;
@@ -163,13 +191,13 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
         draggable
         onDragStart={(e) => { setDragId(c.id); e.dataTransfer.effectAllowed = "move"; }}
         onDragEnd={() => { setDragId(null); setDropTarget(null); }}
-        className={`group rounded-md border border-border bg-card px-2 py-1.5 text-sm cursor-grab active:cursor-grabbing space-y-1 ${
-          dragId === c.id ? "opacity-40" : ""
-        } ${c.overdue ? "border-l-[3px] border-l-[color:var(--c-signal)]" : ""}`}
+        className={`group rounded-md border border-border bg-card px-2 py-1.5 text-sm cursor-grab active:cursor-grabbing ${
+          compact ? "w-full sm:w-60" : "w-full"
+        } ${dragId === c.id ? "opacity-40" : ""} ${c.overdue ? "border-l-[3px] border-l-[color:var(--c-signal)]" : ""}`}
       >
         <div className="flex items-start gap-1.5">
           <GripVertical className="size-3.5 mt-0.5 shrink-0 text-muted-foreground/40" />
-          <span className="flex-1 min-w-0 leading-snug">{c.title}</span>
+          <span className="flex-1 min-w-0 leading-snug line-clamp-2" title={c.title}>{c.title}</span>
           <button
             type="button"
             onClick={() => complete(c.id)}
@@ -181,14 +209,13 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
         </div>
         <div className="flex items-center gap-1.5 flex-wrap pl-5 text-[10px] font-mono text-muted-foreground">
           <span className="size-1.5 rounded-full shrink-0" style={{ background: priorityDot(c.priority) }} />
-          {c.projectName && <span className="truncate max-w-[9rem]">{c.projectName}</span>}
+          {c.projectName && <span className="truncate max-w-[8rem]">{c.projectName}</span>}
           {dueBadge && (
             <span className={dueLate || dueMiss ? "text-[color:var(--c-signal)] font-semibold" : ""}>
               do {dueBadge.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" })}
             </span>
           )}
-          {c.overdue && <span className="text-[color:var(--c-signal)]">nedokončeno z minula</span>}
-          {/* Mobil fallback: výběr dne bez dragu */}
+          {c.overdue && <span className="text-[color:var(--c-signal)]">z minula</span>}
           <select
             value=""
             onChange={(e) => { if (e.target.value) move(c.id, e.target.value === "backlog" ? null : e.target.value); }}
@@ -206,44 +233,67 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
     );
   }
 
-  function Column({ id, title, cardsIn, highlight, subtitle }: {
-    id: string; title: string; cardsIn: PlanCard[]; highlight?: boolean; subtitle?: string;
-  }) {
-    const over = dropTarget === id;
-    const wipOver = id !== "backlog" && cardsIn.length > WIP_LIMIT;
+  function DayRow({ d }: { d: DayInfo }) {
+    const cardsIn = byDay.get(d.date) ?? [];
+    const over = dropTarget === d.date;
+    const wipOver = cardsIn.length > WIP_LIMIT;
     return (
       <div
-        onDragOver={(e) => { e.preventDefault(); setDropTarget(id); }}
-        onDragLeave={() => setDropTarget((t) => (t === id ? null : t))}
-        onDrop={(e) => {
-          e.preventDefault();
-          if (dragId) move(dragId, id === "backlog" ? null : id);
-          setDropTarget(null);
-        }}
-        className={`rounded-xl p-2 flex flex-col gap-1.5 min-h-[10rem] border transition-colors ${
-          over ? "border-[var(--tint-sky)] bg-[var(--tint-sky)]/5" : "border-white/5 bg-black/10"
-        } ${highlight ? "ring-1 ring-[var(--tint-sky)]/40" : ""}`}
+        onDragOver={(e) => { e.preventDefault(); setDropTarget(d.date); }}
+        onDragLeave={() => setDropTarget((t) => (t === d.date ? null : t))}
+        onDrop={(e) => { e.preventDefault(); if (dragId) move(dragId, d.date); setDropTarget(null); }}
+        className={`rounded-xl border p-3 transition-colors ${
+          over ? "border-[var(--tint-sky)] bg-[var(--tint-sky)]/5" : "border-white/10 bg-black/10"
+        } ${d.isToday ? "ring-1 ring-[var(--tint-sky)]/50" : ""} ${d.isPast ? "opacity-60" : ""}`}
       >
-        <div className="flex items-baseline justify-between px-1">
-          <span className={`text-[11px] uppercase tracking-widest font-mono ${highlight ? "text-[var(--tint-sky)]" : "text-muted-foreground"}`}>
-            {title}
-          </span>
-          <span className={`text-[10px] font-mono ${wipOver ? "text-[color:var(--c-signal)] font-semibold" : "text-muted-foreground"}`}>
-            {cardsIn.length}{id !== "backlog" && `/${WIP_LIMIT}`}
+        <div className="flex items-center gap-3 flex-wrap mb-2">
+          <div className="flex items-baseline gap-2 min-w-[9rem]">
+            <span className={`font-serif text-lg ${d.isToday ? "text-[var(--tint-sky)]" : ""}`}>{d.dayName}</span>
+            <span className="font-mono text-xs text-muted-foreground tabular">{d.label.split(" ")[1]}</span>
+            {d.isToday && <span className="text-[10px] font-mono text-[var(--tint-sky)] uppercase">dnes</span>}
+          </div>
+          {d.modeName && (
+            <span
+              className="rounded-md px-2 py-0.5 text-[10px] font-mono"
+              style={{
+                background: `color-mix(in oklch, var(--tint-${d.modeTint ?? "sky"}) 16%, transparent)`,
+                color: `var(--tint-${d.modeTint ?? "sky"})`,
+              }}
+            >
+              {d.modeName}{d.modeLabel ? ` · ${d.modeLabel}` : ""}
+            </span>
+          )}
+          {d.meetings.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground flex-wrap">
+              <Clock className="size-3 shrink-0" />
+              {d.meetings.map((m, i) => (
+                <span key={i} className="whitespace-nowrap">
+                  {m.time} {m.title.length > 24 ? `${m.title.slice(0, 23)}…` : m.title}
+                  {i < d.meetings.length - 1 ? " ·" : ""}
+                </span>
+              ))}
+              {d.busyHours > 0 && <span className="text-muted-foreground/60">({d.busyHours.toFixed(1)} h)</span>}
+            </span>
+          )}
+          <span className={`ml-auto text-[11px] font-mono ${wipOver ? "text-[color:var(--c-signal)] font-semibold" : "text-muted-foreground"}`}>
+            {cardsIn.length}/{WIP_LIMIT}
+            {wipOver && <AlertTriangle className="inline size-3 ml-1 -mt-0.5" />}
           </span>
         </div>
-        {subtitle && <div className="px-1 text-[10px] text-muted-foreground -mt-1">{subtitle}</div>}
-        {wipOver && (
-          <div className="flex items-center gap-1 px-1 text-[10px] text-[color:var(--c-signal)]">
-            <AlertTriangle className="size-3" /> víc než {WIP_LIMIT} — zvaž přesun
+        {cardsIn.length === 0 ? (
+          <div className="text-xs text-muted-foreground/50 italic px-1 py-1.5">přetáhni sem úkol…</div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {cardsIn.map((c) => <Card key={c.id} c={c} compact />)}
           </div>
         )}
-        {cardsIn.map((c) => <Card key={c.id} c={c} />)}
       </div>
     );
   }
 
-  const dayLabelFor = (date: string) => days.find((d) => d.date === date)?.label ?? date;
+  function toggleGroup(name: string) {
+    setOpenGroups((s) => { const n = new Set(s); if (n.has(name)) n.delete(name); else n.add(name); return n; });
+  }
 
   return (
     <div className="space-y-3">
@@ -304,39 +354,71 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
           )}
         </div>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_repeat(7,minmax(150px,1fr))] gap-2 items-start">
-        <div className="space-y-1.5">
+
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-3 items-start">
+        {/* ---- Backlog: skupiny po projektech ---- */}
+        <div className="space-y-1.5 lg:sticky lg:top-2 lg:max-h-[80vh] lg:overflow-y-auto rounded-xl border border-white/10 bg-black/10 p-2">
+          <div className="text-[11px] uppercase tracking-widest font-mono text-muted-foreground px-1 flex items-baseline justify-between">
+            <span>K naplánování</span>
+            <span>{backlogTotal}</span>
+          </div>
+          <div className="px-1 text-[10px] text-muted-foreground/70 leading-snug">
+            Termín do 14 dnů nebo vysoká priorita — po klientech. Zbytek zůstává v Todoistu.
+          </div>
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder={`Hledat v backlogu (${backlogTotal})…`}
+            placeholder="Hledat úkol / klienta…"
             className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm"
           />
-          <Column id="backlog" title="Backlog" cardsIn={backlog} />
-        </div>
-        {days.map((d) => (
-          <div key={d.date} className="space-y-1">
-            {d.modeName && (
-              <div
-                className="rounded-md px-2 py-0.5 text-[10px] font-mono text-center truncate"
-                style={{
-                  background: `color-mix(in oklch, var(--tint-${d.modeTint ?? "sky"}) 16%, transparent)`,
-                  color: `var(--tint-${d.modeTint ?? "sky"})`,
-                }}
-                title={d.modeLabel ?? undefined}
-              >
-                {d.modeName}{d.modeLabel ? ` · ${d.modeLabel}` : ""}
+          {backlogGroups.overdue.length > 0 && (
+            <div className="space-y-1">
+              <div className="px-1 text-[10px] font-mono text-[color:var(--c-signal)] uppercase tracking-widest">
+                Nedokončeno z minula ({backlogGroups.overdue.length})
               </div>
-            )}
-            <Column
-              id={d.date}
-              title={d.label}
-              cardsIn={byDay.get(d.date) ?? []}
-              highlight={d.isToday}
-              subtitle={d.isToday && todayKey ? "dnes" : undefined}
-            />
+              {backlogGroups.overdue.map((c) => <Card key={c.id} c={c} />)}
+            </div>
+          )}
+          {backlogGroups.groups.map(([name, groupCards]) => {
+            const open = openGroups.has(name) || filter.length > 0;
+            return (
+              <div key={name}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(name)}
+                  className="w-full flex items-center gap-1.5 px-1 py-1 text-sm rounded-md hover:bg-white/5 text-left"
+                >
+                  {open ? <ChevronDown className="size-3.5 text-muted-foreground shrink-0" /> : <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />}
+                  <span className="flex-1 min-w-0 truncate font-medium">{name}</span>
+                  <span className="text-[11px] font-mono text-muted-foreground">{groupCards.length}</span>
+                </button>
+                {open && (
+                  <div className="space-y-1 pl-1 pb-1">
+                    {groupCards.map((c) => <Card key={c.id} c={c} />)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {backlogCards.length === 0 && (
+            <div className="text-xs text-muted-foreground italic px-1 py-2">Nic nenalezeno.</div>
+          )}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDropTarget("backlog"); }}
+            onDragLeave={() => setDropTarget((t) => (t === "backlog" ? null : t))}
+            onDrop={(e) => { e.preventDefault(); if (dragId) move(dragId, null); setDropTarget(null); }}
+            className={`rounded-md border border-dashed px-2 py-2 text-center text-[11px] font-mono transition-colors ${
+              dropTarget === "backlog" ? "border-[var(--tint-sky)] text-[var(--tint-sky)]" : "border-border text-muted-foreground/60"
+            }`}
+          >
+            sem přetáhni pro odplánování
           </div>
-        ))}
+        </div>
+
+        {/* ---- Dny jako řádky ---- */}
+        <div className="space-y-2 min-w-0">
+          {days.map((d) => <DayRow key={d.date} d={d} />)}
+        </div>
       </div>
     </div>
   );

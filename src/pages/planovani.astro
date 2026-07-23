@@ -31,7 +31,7 @@ prevMonday.setDate(prevMonday.getDate() - 7);
 const dkey = (d: Date) => d.toLocaleDateString("sv-SE");
 const todayKey = dkey(new Date());
 
-// Šablona týdne (F3) — badge na sloupcích + editor
+// Šablona týdne (F3) — badge na dnech
 const templateRows = await prisma.planningDayTemplate.findMany({
   where: { userId: session.uid },
   orderBy: { weekday: "asc" },
@@ -39,43 +39,86 @@ const templateRows = await prisma.planningDayTemplate.findMany({
 });
 const templateByDay = new Map(templateRows.map((r) => [r.weekday, r]));
 
-const DAY_LABELS = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+// Schůzky týdne — do hlavičky každého dne (plánuje se KOLEM nich)
+const weekEvents = await prisma.calendarEvent.findMany({
+  where: {
+    deletedRemotely: false,
+    source: { not: "LOCAL_ICS" },
+    allDay: false,
+    AND: [{ startsAt: { gte: monday } }, { startsAt: { lt: nextMonday } }],
+  },
+  select: { title: true, startsAt: true, endsAt: true },
+  orderBy: { startsAt: "asc" },
+});
+const fmtT = (d: Date) => d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
+const meetingsByDay = new Map<string, { time: string; title: string }[]>();
+const busyByDay = new Map<string, number>();
+for (const e of weekEvents) {
+  const key = dkey(e.startsAt);
+  const arr = meetingsByDay.get(key) ?? [];
+  if (arr.length < 6) arr.push({ time: fmtT(e.startsAt), title: e.title });
+  meetingsByDay.set(key, arr);
+  busyByDay.set(key, (busyByDay.get(key) ?? 0) + (e.endsAt.getTime() - e.startsAt.getTime()) / 3_600_000);
+}
+
+const DAY_SHORT = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+const DAY_FULL = ["Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek", "Sobota", "Neděle"];
 const days = Array.from({ length: 7 }, (_, i) => {
   const d = new Date(monday);
   d.setDate(d.getDate() + i);
+  const key = dkey(d);
   const tpl = templateByDay.get(i);
   const info = tpl ? MODE_INFO[tpl.mode as DayMode] : null;
   return {
-    date: dkey(d),
-    label: `${DAY_LABELS[i]} ${d.getDate()}.${d.getMonth() + 1}.`,
-    isToday: dkey(d) === todayKey,
+    date: key,
+    label: `${DAY_SHORT[i]} ${d.getDate()}.${d.getMonth() + 1}.`,
+    dayName: DAY_FULL[i],
+    isToday: key === todayKey,
+    isPast: key < todayKey,
     modeName: info?.name ?? null,
     modeTint: info?.tint ?? null,
     modeLabel: tpl?.label ?? null,
+    meetings: meetingsByDay.get(key) ?? [],
+    busyHours: busyByDay.get(key) ?? 0,
   };
 });
 
-// Úkoly: naplánované v okně týdne + přeteklé (naplánované dřív, nedodělané)
-// + backlog (nenaplánované otevřené, cap 80)
-const BACKLOG_CAP = 80;
-const [weekTasks, overdueTasks, backlogTasks, backlogTotal] = await Promise.all([
+// ---------------------------------------------------------------------------
+// KURÁTOROVANÝ výběr (Gideon 2026-07-23: 1450 úkolů na hromadě = k ničemu).
+// „K naplánování" = otevřené nenaplánované úkoly, které jsou AKTUÁLNÍ:
+// termín do 14 dnů NEBO vysoká priorita. Zbytek žije dál v Todoistu.
+// ---------------------------------------------------------------------------
+const horizon = new Date(); horizon.setDate(horizon.getDate() + 14); horizon.setHours(23, 59, 59, 999);
+const taskSelect = {
+  id: true, title: true, priority: true, dueAt: true, plannedFor: true, tags: true,
+  todoistProjectId: true,
+  assignedToContact: { select: { displayName: true, clientTag: true, isTeam: true } },
+} as const;
+const candidateWhere = {
+  userId: session.uid,
+  status: "open" as const,
+  plannedFor: null,
+  OR: [{ dueAt: { lte: horizon } }, { priority: "high" as const }],
+};
+
+const [weekTasks, overdueTasks, candidateTasks, candidateTotal] = await Promise.all([
   prisma.task.findMany({
     where: { userId: session.uid, status: "open", plannedFor: { gte: monday, lt: nextMonday } },
-    select: { id: true, title: true, priority: true, dueAt: true, plannedFor: true, tags: true, todoistProjectId: true },
+    select: taskSelect,
   }),
   prisma.task.findMany({
     where: { userId: session.uid, status: "open", plannedFor: { lt: monday } },
-    select: { id: true, title: true, priority: true, dueAt: true, plannedFor: true, tags: true, todoistProjectId: true },
+    select: taskSelect,
     orderBy: { plannedFor: "asc" },
     take: 30,
   }),
   prisma.task.findMany({
-    where: { userId: session.uid, status: "open", plannedFor: null },
-    select: { id: true, title: true, priority: true, dueAt: true, plannedFor: true, tags: true, todoistProjectId: true },
-    orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
-    take: BACKLOG_CAP,
+    where: candidateWhere,
+    select: taskSelect,
+    orderBy: [{ dueAt: "asc" }, { priority: "desc" }],
+    take: 150,
   }),
-  prisma.task.count({ where: { userId: session.uid, status: "open", plannedFor: null } }),
+  prisma.task.count({ where: candidateWhere }),
 ]);
 
 const projects = await prisma.todoistProjectMirror.findMany({
@@ -84,23 +127,42 @@ const projects = await prisma.todoistProjectMirror.findMany({
 });
 const projectNames = new Map(projects.map((p) => [p.todoistId, p.name]));
 
-const toCard = (t: (typeof weekTasks)[number], overdue = false) => ({
+// Klient/skupina úkolu — stejná sémantika jako smart routing:
+// tag klient-<slug> → slug; kontakt.clientTag; týmový kontakt → jméno;
+// jinak Todoist projekt; jinak „Ostatní".
+function clientLabel(t: (typeof candidateTasks)[number]): string {
+  const klientTag = t.tags.find((x) => x.startsWith("klient-"));
+  if (klientTag) {
+    const slug = klientTag.slice("klient-".length).replace(/-/g, " ");
+    return slug.charAt(0).toUpperCase() + slug.slice(1);
+  }
+  if (t.assignedToContact?.clientTag) {
+    const s = t.assignedToContact.clientTag.replace(/-/g, " ");
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  if (t.assignedToContact?.isTeam) return t.assignedToContact.displayName;
+  if (t.todoistProjectId && projectNames.get(t.todoistProjectId)) return projectNames.get(t.todoistProjectId)!;
+  return "Ostatní";
+}
+
+const toCard = (t: (typeof candidateTasks)[number], overdue = false) => ({
   id: t.id,
   title: t.title,
   priority: t.priority as "low" | "normal" | "high",
   dueAt: t.dueAt?.toISOString() ?? null,
   plannedFor: t.plannedFor ? dkey(t.plannedFor) : null,
   tags: t.tags,
-  projectName: t.todoistProjectId ? (projectNames.get(t.todoistProjectId) ?? null) : null,
+  projectName: clientLabel(t),
   overdue,
 });
 const initialCards = [
   ...overdueTasks.map((t) => toCard(t, true)),
   ...weekTasks.map((t) => toCard(t)),
-  ...backlogTasks.map((t) => toCard(t)),
+  ...candidateTasks.map((t) => toCard(t)),
 ];
 
 const fmtRange = `${monday.getDate()}. ${monday.getMonth() + 1}. – ${new Date(nextMonday.getTime() - 86400000).getDate()}. ${new Date(nextMonday.getTime() - 86400000).getMonth() + 1}.`;
+const currentMondayKey = dkey(new Date(new Date().setDate(new Date().getDate() - ((new Date().getDay() + 6) % 7))));
 ---
 
 <Shell
@@ -113,8 +175,8 @@ const fmtRange = `${monday.getDate()}. ${monday.getMonth() + 1}. – ${new Date(
       <div>
         <h1 class="font-serif text-[2.25rem] leading-tight">Plánování týdne</h1>
         <p class="text-sm text-muted-foreground mt-1">
-          Přetáhni úkol na den, kdy ho budeš dělat. Kdy ≠ dokdy — termín je jen informace.
-          Max {3} úkoly na den, jinak se den červená.
+          Vlevo úkoly, které jsou aktuální (termín do 14 dnů nebo vysoká priorita), seskupené po klientech.
+          Přetáhni je na den, kdy je budeš dělat. Max 3 na den.
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -125,7 +187,7 @@ const fmtRange = `${monday.getDate()}. ${monday.getMonth() + 1}. – ${new Date(
         <a href={`/planovani?w=${dkey(nextMonday)}`} class="glass-subtle rounded-md p-2 hover:bg-white/10" title="Další týden">
           <Icon name="lucide:chevron-right" class="size-4" />
         </a>
-        {dkey(monday) !== dkey(new Date(new Date().setDate(new Date().getDate() - ((new Date().getDay() + 6) % 7)))) && (
+        {dkey(monday) !== currentMondayKey && (
           <a href="/planovani" class="text-xs font-mono text-[var(--tint-sky)] hover:underline ml-1">dnes</a>
         )}
       </div>
@@ -137,13 +199,13 @@ const fmtRange = `${monday.getDate()}. ${monday.getMonth() + 1}. – ${new Date(
     />
     <DigestSettings client:load />
 
-    <div class="glass rounded-xl p-3 overflow-x-auto">
+    <div class="glass rounded-xl p-3">
       <PlanningBoard
         client:load
         weekStart={dkey(monday)}
         days={days}
         initialCards={initialCards}
-        backlogTotal={backlogTotal}
+        backlogTotal={candidateTotal}
       />
     </div>
   </div>
