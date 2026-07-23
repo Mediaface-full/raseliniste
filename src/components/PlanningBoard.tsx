@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Check, GripVertical, AlertTriangle } from "lucide-react";
+import { Check, GripVertical, AlertTriangle, Sparkles, Loader2, X } from "lucide-react";
+import { Button } from "./ui/Button";
 
 /**
  * Týdenní plánovací board (Petr 2026-07-22, ADHD F1).
@@ -42,6 +43,57 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
   const [dropTarget, setDropTarget] = useState<string | null>(null); // date | "backlog"
   const [filter, setFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Weekly review AI (F2): návrhy plannedFor k potvrzení
+  interface Proposal { taskId: string; title: string; date: string; reason: string | null }
+  const [aiBusy, setAiBusy] = useState(false);
+  const [proposals, setProposals] = useState<Proposal[] | null>(null);
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+
+  async function askAi() {
+    setAiBusy(true);
+    setError(null);
+    setProposals(null);
+    try {
+      const res = await fetch("/api/planovani/navrh", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ week: weekStart }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Návrh selhal."); return; }
+      setProposals(data.proposals);
+      setAiWarnings(data.warnings ?? []);
+      setChecked(new Set((data.proposals as Proposal[]).map((p) => p.taskId)));
+    } catch {
+      setError("Síťová chyba při AI návrhu.");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function confirmProposals() {
+    if (!proposals) return;
+    const chosen = proposals.filter((p) => checked.has(p.taskId));
+    if (chosen.length === 0) { setProposals(null); return; }
+    setConfirming(true);
+    try {
+      const res = await fetch("/api/planovani/potvrdit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ assignments: chosen.map((p) => ({ taskId: p.taskId, date: p.date })) }),
+      });
+      if (!res.ok) { setError("Potvrzení se nepovedlo."); return; }
+      // Lokálně přesuň karty na navržené dny
+      const map = new Map(chosen.map((p) => [p.taskId, p.date]));
+      setCards((cs) => cs.map((c) => (map.has(c.id) ? { ...c, plannedFor: map.get(c.id)!, overdue: false } : c)));
+      setProposals(null);
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   const todayKey = days.find((d) => d.isToday)?.date;
 
@@ -187,9 +239,67 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
     );
   }
 
+  const dayLabelFor = (date: string) => days.find((d) => d.date === date)?.label ?? date;
+
   return (
     <div className="space-y-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button onClick={askAi} disabled={aiBusy} variant="outline" size="sm">
+          {aiBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+          {aiBusy ? "Skládám návrh…" : "Navrhnout týden (AI)"}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          AI rozloží backlog do dnů podle termínů, kapacity a schůzek — ty jen potvrdíš.
+        </span>
+      </div>
+
       {error && <div className="text-sm text-[var(--destructive,#e5484d)]">{error}</div>}
+
+      {proposals && (
+        <div className="rounded-xl border border-[var(--tint-sky)]/40 bg-[var(--tint-sky)]/5 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">Návrh týdne — {proposals.length} úkolů</span>
+            <button type="button" onClick={() => setProposals(null)} className="p-1 rounded text-muted-foreground hover:text-foreground">
+              <X className="size-4" />
+            </button>
+          </div>
+          {aiWarnings.length > 0 && (
+            <ul className="text-xs text-[color:var(--c-signal)] space-y-0.5">
+              {aiWarnings.map((w, i) => <li key={i}>⚠ {w}</li>)}
+            </ul>
+          )}
+          {proposals.length === 0 ? (
+            <div className="text-sm text-muted-foreground">AI nenašla nic k naplánování.</div>
+          ) : (
+            <div className="space-y-1 max-h-80 overflow-y-auto">
+              {proposals.map((p) => (
+                <label key={p.taskId} className="flex items-start gap-2 text-sm rounded-md px-2 py-1 bg-black/10 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checked.has(p.taskId)}
+                    onChange={(e) => setChecked((s) => { const n = new Set(s); if (e.target.checked) n.add(p.taskId); else n.delete(p.taskId); return n; })}
+                    className="mt-1"
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="font-mono text-xs text-[var(--tint-sky)] mr-2">{dayLabelFor(p.date)}</span>
+                    {p.title}
+                    {p.reason && <span className="block text-xs text-muted-foreground">{p.reason}</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+          {proposals.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Button onClick={confirmProposals} disabled={confirming} size="sm">
+                {confirming ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                Potvrdit vybrané ({checked.size})
+              </Button>
+              <Button onClick={() => setProposals(null)} variant="ghost" size="sm">Zrušit</Button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_repeat(7,minmax(150px,1fr))] gap-2 items-start">
         <div className="space-y-1.5">
           <input
