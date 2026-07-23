@@ -24,7 +24,11 @@ export interface PlanCard {
 
 interface Props {
   weekStart: string;                 // pondělí YYYY-MM-DD
-  days: { date: string; label: string; isToday: boolean }[];
+  days: {
+    date: string; label: string; isToday: boolean;
+    // Šablona týdne (F3): badge režimu dne
+    modeName?: string | null; modeTint?: string | null; modeLabel?: string | null;
+  }[];
   initialCards: PlanCard[];
   backlogTotal: number;              // celkový počet v backlogu (cap v SSR)
 }
@@ -311,14 +315,27 @@ export default function PlanningBoard({ weekStart, days, initialCards, backlogTo
           <Column id="backlog" title="Backlog" cardsIn={backlog} />
         </div>
         {days.map((d) => (
-          <Column
-            key={d.date}
-            id={d.date}
-            title={d.label}
-            cardsIn={byDay.get(d.date) ?? []}
-            highlight={d.isToday}
-            subtitle={d.isToday && todayKey ? "dnes" : undefined}
-          />
+          <div key={d.date} className="space-y-1">
+            {d.modeName && (
+              <div
+                className="rounded-md px-2 py-0.5 text-[10px] font-mono text-center truncate"
+                style={{
+                  background: `color-mix(in oklch, var(--tint-${d.modeTint ?? "sky"}) 16%, transparent)`,
+                  color: `var(--tint-${d.modeTint ?? "sky"})`,
+                }}
+                title={d.modeLabel ?? undefined}
+              >
+                {d.modeName}{d.modeLabel ? ` · ${d.modeLabel}` : ""}
+              </div>
+            )}
+            <Column
+              id={d.date}
+              title={d.label}
+              cardsIn={byDay.get(d.date) ?? []}
+              highlight={d.isToday}
+              subtitle={d.isToday && todayKey ? "dnes" : undefined}
+            />
+          </div>
         ))}
       </div>
     </div>

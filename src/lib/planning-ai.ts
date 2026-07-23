@@ -14,6 +14,7 @@ import { z } from "zod";
 import { prisma } from "./db";
 import { getGemini, FAST_MODEL } from "./gemini";
 import { callTracked } from "./gemini-usage";
+import { getWeekTemplate, MODE_INFO, type TemplateDay } from "./week-template";
 
 const WIP_LIMIT = 3;
 
@@ -118,19 +119,25 @@ export async function proposeWeekPlan(userId: string, mondayKey: string): Promis
     existingPerDay.set(key, (existingPerDay.get(key) ?? 0) + 1);
   }
 
+  const template = await getWeekTemplate().catch(() => new Map<number, TemplateDay>());
   const DAY_LABELS = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
   const dayLines = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday); d.setDate(d.getDate() + i);
     const key = dkey(d);
+    const tpl = template.get(i);
     const parts = [
       `${key} (${DAY_LABELS[i]})`,
       key < todayKey ? "UŽ PROBĚHL — nepoužívat" : null,
+      tpl ? `režim: ${MODE_INFO[tpl.mode].name}${tpl.label ? ` (${tpl.label})` : ""} — ${MODE_INFO[tpl.mode].hint}` : null,
       `schůzek: ${(busy.get(key) ?? 0).toFixed(1)} h`,
       `už naplánováno úkolů: ${existingPerDay.get(key) ?? 0}`,
       allDayNotes.get(key)?.length ? `celodenní: ${allDayNotes.get(key)!.join(", ")}` : null,
     ].filter(Boolean);
     return `- ${parts.join(" | ")}`;
   });
+  const templateRule = template.size > 0
+    ? `7. Respektuj režimy dnů: Maker dny = deep work pro klientské úkoly. Manager dny = admin, fakturace, drobnosti, přípravy. „Vlastní" dny jsou NEDOTKNUTELNÉ — plánuj tam VÝHRADNĚ úkoly vlastních projektů (ne klientské). „Volno" dny neplánuj vůbec.`
+    : "";
 
   const prompt = `Jsi plánovací asistent pro kreativce s ADHD (Gideon, majitel studia).
 Navrhni, KTERÝ DEN v týdnu ${mondayKey} až ${dkey(new Date(nextMonday.getTime() - 86400000))} bude dělat které úkoly.
@@ -142,6 +149,7 @@ PRAVIDLA (tvrdá):
 4. Úkoly s termínem naplánuj NEJPOZDĚJI na den termínu; s prioritou high co nejdřív.
 5. Dny s hodně schůzkami (>3 h) dostávají max 1 úkol. Víkend použij jen pro úkoly s víkendovým termínem.
 6. Nenaplánované úkoly prostě vynech (zůstanou v backlogu) — nevymýšlej nové.
+${templateRule}
 
 DNY TÝDNE A KAPACITA:
 ${dayLines.join("\n")}

@@ -7,6 +7,7 @@ import {
   minutesOfDay,
 } from "./rules-config";
 import type { EventTypeStr } from "./event-classifier";
+import { getWeekTemplate, weekdayOf, MODE_INFO } from "./week-template";
 
 /**
  * Pravidlový engine — defenzivní vrstva proti přebookování.
@@ -410,6 +411,22 @@ export async function evaluateSlot(input: EvaluateInput): Promise<EvaluationResu
         rule: "OUTSIDE_AVAILABILITY",
         severity: "ERROR",
         message: `Slot je mimo definovaná booking okna (${input.type}).`,
+      });
+    }
+  }
+
+  // SOFT_THEME_DAY (ADHD F3, Petr 2026-07-22): schůzka v maker/own dni
+  // dle šablony týdne → WARNING (žlutá). Neblokuje — jen připomíná, že
+  // schůzky patří na manager dny (jedna schůzka ve 14:00 zabije maker den).
+  if (input.type.startsWith("MEETING_")) {
+    const template = await getWeekTemplate().catch(() => null);
+    const day = template?.get(weekdayOf(input.startsAt));
+    if (day && (day.mode === "maker" || day.mode === "own")) {
+      const info = MODE_INFO[day.mode];
+      signals.push({
+        rule: "SOFT_THEME_DAY",
+        severity: "WARNING",
+        message: `Podle šablony týdne je to ${info.name.toLowerCase()} den${day.label ? ` (${day.label})` : ""} — ${info.hint}. Schůzky patří na manager dny.`,
       });
     }
   }

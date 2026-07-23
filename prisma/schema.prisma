@@ -48,6 +48,7 @@ model User {
   projectBoxes  ProjectBox[]
   guestUsers    GuestUser[]
   tasks            Task[]
+  planningDayTemplates PlanningDayTemplate[]
   taskAudioBatches TaskAudioBatch[]
   journalEntries   JournalEntry[]
   ragChunks        RagChunk[]
@@ -1143,6 +1144,21 @@ enum EventType {
   OOO_FULL            // dovolená, vše blokované
   OOO_TRAVEL_WORKING  // nomád, jen prezenční blokované
   OTHER
+}
+
+// Šablona týdne — theme days (Petr 2026-07-22, ADHD F3).
+// Po/Pá manager (schůzky, admin), Út/St maker (deep work klienti),
+// Čt vlastní projekty. Řídí badge na /planovani, AI plánování a soft
+// warning při schůzce v maker/own dni.
+model PlanningDayTemplate {
+  id      String  @id @default(cuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekday Int     // 0 = pondělí … 6 = neděle
+  mode    String  // "manager" | "maker" | "own" | "off"
+  label   String? // volitelný popisek ("Klienti", "StoryMapa"…)
+
+  @@unique([userId, weekday])
 }
 
 model Location {

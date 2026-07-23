@@ -2,6 +2,8 @@
 import Shell from "../layouts/Shell.astro";
 import { Icon } from "astro-icon/components";
 import PlanningBoard from "../components/PlanningBoard";
+import WeekTemplateEditor from "../components/WeekTemplateEditor";
+import { MODE_INFO, type DayMode } from "../lib/week-template";
 import { prisma } from "../lib/db";
 import { readSession } from "../lib/session";
 
@@ -27,11 +29,29 @@ prevMonday.setDate(prevMonday.getDate() - 7);
 
 const dkey = (d: Date) => d.toLocaleDateString("sv-SE");
 const todayKey = dkey(new Date());
+
+// Šablona týdne (F3) — badge na sloupcích + editor
+const templateRows = await prisma.planningDayTemplate.findMany({
+  where: { userId: session.uid },
+  orderBy: { weekday: "asc" },
+  select: { weekday: true, mode: true, label: true },
+});
+const templateByDay = new Map(templateRows.map((r) => [r.weekday, r]));
+
 const DAY_LABELS = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
 const days = Array.from({ length: 7 }, (_, i) => {
   const d = new Date(monday);
   d.setDate(d.getDate() + i);
-  return { date: dkey(d), label: `${DAY_LABELS[i]} ${d.getDate()}.${d.getMonth() + 1}.`, isToday: dkey(d) === todayKey };
+  const tpl = templateByDay.get(i);
+  const info = tpl ? MODE_INFO[tpl.mode as DayMode] : null;
+  return {
+    date: dkey(d),
+    label: `${DAY_LABELS[i]} ${d.getDate()}.${d.getMonth() + 1}.`,
+    isToday: dkey(d) === todayKey,
+    modeName: info?.name ?? null,
+    modeTint: info?.tint ?? null,
+    modeLabel: tpl?.label ?? null,
+  };
 });
 
 // Úkoly: naplánované v okně týdne + přeteklé (naplánované dřív, nedodělané)
@@ -109,6 +129,11 @@ const fmtRange = `${monday.getDate()}. ${monday.getMonth() + 1}. – ${new Date(
         )}
       </div>
     </div>
+
+    <WeekTemplateEditor
+      client:load
+      initialDays={templateRows.map((r) => ({ weekday: r.weekday, mode: r.mode as DayMode, label: r.label }))}
+    />
 
     <div class="glass rounded-xl p-3 overflow-x-auto">
       <PlanningBoard
