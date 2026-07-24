@@ -1,0 +1,152 @@
+---
+import Base from "../../layouts/Base.astro";
+import { prisma } from "../../lib/db";
+import { readSession } from "../../lib/session";
+
+const session = await readSession(Astro.cookies);
+if (!session) return Astro.redirect("/login");
+
+// Období: ?days=30|90|365 (default 90)
+const daysParam = parseInt(Astro.url.searchParams.get("days") ?? "90", 10);
+const days = [30, 90, 365].includes(daysParam) ? daysParam : 90;
+const from = new Date();
+from.setDate(from.getDate() - days);
+
+const rows = await prisma.healthMetric.findMany({
+  where: {
+    userId: session.uid,
+    type: "blood_pressure",
+    recordedAt: { gte: from },
+    bpSystolic: { not: null },
+    bpDiastolic: { not: null },
+  },
+  orderBy: { recordedAt: "asc" },
+  select: { recordedAt: true, bpSystolic: true, bpDiastolic: true, source: true },
+});
+
+const fmtD = (d: Date) => d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" });
+const fmtT = (d: Date) => d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+const sys = rows.map((r) => r.bpSystolic!);
+const dia = rows.map((r) => r.bpDiastolic!);
+const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+
+// ---- SVG graf (SSR, tiskne se spolehlivě) ----
+const W = 900, H = 260, PADX = 44, PADY = 24;
+const lo = 50, hi = Math.max(160, ...sys) + 5;
+const x = (i: number) => rows.length <= 1 ? W / 2 : PADX + (i / (rows.length - 1)) * (W - PADX - 12);
+const y = (v: number) => H - PADY - ((v - lo) / (hi - lo)) * (H - 2 * PADY);
+const line = (vals: number[]) => vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+// Osy: vodorovné linky po 20 mmHg
+const yTicks: number[] = [];
+for (let v = 60; v <= hi; v += 20) yTicks.push(v);
+// X popisky: max ~8 rovnoměrně
+const xTickIdx = rows.length <= 8
+  ? rows.map((_, i) => i)
+  : Array.from({ length: 8 }, (_, k) => Math.round((k / 7) * (rows.length - 1)));
+---
+
+<Base title="Krevní tlak — report · Rašeliniště">
+  <main class="report">
+    <div class="toolbar no-print">
+      <a href="/health">← Zdraví</a>
+      <span>
+        Období:
+        <a href="/health/tlak-report?days=30" class={days === 30 ? "act" : ""}>30 dní</a> ·
+        <a href="/health/tlak-report?days=90" class={days === 90 ? "act" : ""}>90 dní</a> ·
+        <a href="/health/tlak-report?days=365" class={days === 365 ? "act" : ""}>rok</a>
+      </span>
+      <button onclick="window.print()">🖨 Vytisknout / uložit PDF</button>
+    </div>
+
+    <h1>Krevní tlak — přehled měření</h1>
+    <p class="meta">
+      Petr Perina · období {fmtD(from)} – {fmtD(new Date())} ({days} dní) ·
+      {rows.length} měření · průměr <strong>{Math.round(avg(sys))}/{Math.round(avg(dia))} mmHg</strong>
+      · vygenerováno {fmtD(new Date())} {fmtT(new Date())}, Rašeliniště
+    </p>
+
+    {rows.length === 0 ? (
+      <p>Za zvolené období nejsou žádná měření.</p>
+    ) : (
+      <>
+        <svg viewBox={`0 0 ${W} ${H}`} class="chart" role="img" aria-label="Graf krevního tlaku">
+          {yTicks.map((v) => (
+            <>
+              <line x1={PADX} y1={y(v)} x2={W - 8} y2={y(v)} stroke="#ccc" stroke-width="0.5" />
+              <text x={PADX - 6} y={y(v) + 3} text-anchor="end" font-size="10" fill="#666">{v}</text>
+            </>
+          ))}
+          {xTickIdx.map((i) => (
+            <text x={x(i)} y={H - 6} text-anchor="middle" font-size="10" fill="#666">
+              {rows[i].recordedAt.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" })}
+            </text>
+          ))}
+          <polyline points={line(sys)} fill="none" stroke="#d4526e" stroke-width="2" />
+          <polyline points={line(dia)} fill="none" stroke="#3d7ea6" stroke-width="2" />
+          {rows.map((r, i) => (
+            <>
+              <circle cx={x(i)} cy={y(r.bpSystolic!)} r="2.5" fill="#d4526e" />
+              <circle cx={x(i)} cy={y(r.bpDiastolic!)} r="2.5" fill="#3d7ea6" />
+            </>
+          ))}
+          <text x={W - 8} y={y(sys[sys.length - 1]) - 6} text-anchor="end" font-size="10" fill="#d4526e">systolický</text>
+          <text x={W - 8} y={y(dia[dia.length - 1]) + 14} text-anchor="end" font-size="10" fill="#3d7ea6">diastolický</text>
+        </svg>
+
+        <table>
+          <thead>
+            <tr><th>Datum</th><th>Čas</th><th>Systolický (mmHg)</th><th>Diastolický (mmHg)</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr>
+                <td>{fmtD(r.recordedAt)}</td>
+                <td>{fmtT(r.recordedAt)}</td>
+                <td class={r.bpSystolic! >= 140 ? "hi" : ""}>{r.bpSystolic}</td>
+                <td class={r.bpDiastolic! >= 90 ? "hi" : ""}>{r.bpDiastolic}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </>
+    )}
+  </main>
+
+  <style>
+    /* Report je záměrně "papírový" — černá na bílé, tiskne se 1:1 */
+    .report {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #fff;
+      color: #1a1a1a;
+      min-height: 100vh;
+      font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    }
+    :global(body) { background: #fff !important; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .meta { font-size: 12px; color: #555; margin: 0 0 16px; }
+    .chart { width: 100%; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid #ddd; padding: 5px 10px; text-align: left; }
+    th { background: #f4f4f4; font-weight: 600; }
+    td.hi { color: #c0392b; font-weight: 600; }
+    tbody tr:nth-child(even) { background: #fafafa; }
+    .toolbar {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      font-size: 13px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #eee;
+    }
+    .toolbar a { color: #3d7ea6; text-decoration: none; }
+    .toolbar a.act { font-weight: 700; text-decoration: underline; }
+    .toolbar button {
+      margin-left: auto; padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
+      background: #f4f4f4; cursor: pointer; font-size: 13px;
+    }
+    @media print {
+      .no-print { display: none; }
+      .report { padding: 0; }
+      .chart { border: none; }
+    }
+  </style>
+</Base>

@@ -623,6 +623,17 @@ function PressureSection({ s }: { s: Summary }) {
       {/* Petr 2026-07-21: rose vs pink byly k nerozeznání → diastolický sky */}
       <ChartCard title="Krevní tlak" subtitle="systolický (růžová) + diastolický (modrá)" tint={TINT.rose}>
         <BloodPressureChart data={points} systolicColor={TINT.rose} diastolicColor={TINT.sky} />
+        <div className="text-right mt-1">
+          <a
+            href="/health/tlak-report"
+            target="_blank"
+            rel="noopener"
+            className="text-xs font-mono hover:underline"
+            style={{ color: TINT.sky }}
+          >
+            Report k tisku (tabulka + graf) →
+          </a>
+        </div>
       </ChartCard>
     </div>
   );

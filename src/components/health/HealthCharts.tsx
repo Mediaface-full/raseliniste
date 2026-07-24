@@ -13,14 +13,16 @@ import {
   YAxis,
 } from "recharts";
 
+// Petr 2026-07-24: osy byly hardcoded bílé — ve světlém režimu neviditelné.
+// var(--muted-foreground) funguje v obou režimech.
 const axisProps = {
-  tick: { fontSize: 11, fill: "rgba(255,255,255,0.5)" },
+  tick: { fontSize: 11, fill: "var(--muted-foreground)" },
   tickLine: false,
-  axisLine: { stroke: "rgba(255,255,255,0.1)" },
+  axisLine: { stroke: "color-mix(in oklch, var(--foreground) 15%, transparent)" },
 };
 
 const gridProps = {
-  stroke: "rgba(255,255,255,0.06)",
+  stroke: "color-mix(in oklch, var(--foreground) 8%, transparent)",
   strokeDasharray: "3 3",
   vertical: false,
 };
@@ -36,13 +38,18 @@ function TooltipCard(props: {
   label?: string;
   suffix?: string;
   decimals?: number;
+  /** Petr 2026-07-24: u měření s časovou složkou (krevní tlak) ukázat i čas */
+  withTime?: boolean;
 }): ReactElement | null {
-  const { active, payload, label, suffix, decimals = 0 } = props;
+  const { active, payload, label, suffix, decimals = 0, withTime } = props;
   if (!active || !payload || payload.length === 0) return null;
   return (
     <div className="glass-strong rounded-md px-3 py-2 text-xs">
       <div className="font-mono text-muted-foreground mb-1">
-        {label ? new Date(label).toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric" }) : ""}
+        {label
+          ? new Date(label).toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric" }) +
+            (withTime ? ` · ${new Date(label).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit", hour12: false })}` : "")
+          : ""}
       </div>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2 tabular">
@@ -181,7 +188,7 @@ export function BloodPressureChart({
         <CartesianGrid {...gridProps} />
         <XAxis dataKey="date" tickFormatter={formatDay} {...axisProps} />
         <YAxis {...axisProps} domain={[50, 160]} />
-        <Tooltip content={<TooltipCard suffix="mmHg" decimals={0} />} />
+        <Tooltip content={<TooltipCard suffix="mmHg" decimals={0} withTime />} />
         <Line type="monotone" dataKey="systolic" name="Systolic" stroke={systolicColor} strokeWidth={2} dot={{ r: 3, fill: systolicColor, strokeWidth: 0 }} isAnimationActive={false} />
         <Line type="monotone" dataKey="diastolic" name="Diastolic" stroke={diastolicColor} strokeWidth={2} dot={{ r: 3, fill: diastolicColor, strokeWidth: 0 }} isAnimationActive={false} />
       </LineChart>
