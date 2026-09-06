@@ -20,7 +20,7 @@ const Body = z.object({
   // Gideon 2026-08-10: výjimečné povolení víkendových slotů
   allowWeekend: z.boolean().optional(),
   allowEvening: z.boolean().optional(),
-  meetSource: z.enum(["CONTACT", "COMPANY"]).nullable().optional(),
+  meetSource: z.enum(["CONTACT", "COMPANY", "NEW"]).nullable().optional(),
   // YYYY-MM-DD — konec platnosti (uloží se konec dne)
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   publicNote: z.string().max(1000).nullable().optional(),

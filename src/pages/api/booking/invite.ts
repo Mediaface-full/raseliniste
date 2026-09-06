@@ -23,7 +23,7 @@ const schema = z.object({
   allowWeekend: z.boolean().optional(),
   allowEvening: z.boolean().optional(),
   // Gideon 2026-08-24: čí Meet u online schůzky (kontaktní / firemní místnost)
-  meetSource: z.enum(["CONTACT", "COMPANY"]).nullable().optional(),
+  meetSource: z.enum(["CONTACT", "COMPANY", "NEW"]).nullable().optional(),
   // Gideon 2026-08-04 („chci aby to fungovalo"): kontakt bez emailu už
   // neblokuje — email se zadá rovnou v pozvánce a uloží se KE KONTAKTU
   // (+ push do iCloudu), pak se pozvánka normálně vytvoří.

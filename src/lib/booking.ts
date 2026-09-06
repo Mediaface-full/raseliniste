@@ -349,6 +349,9 @@ export async function confirmReservation(inviteId: string, ownerUserId: string):
       if (!contactMeetLink) {
         console.warn(`[booking.confirm] invite ${invite.id}: meetSource=COMPANY, ale firma "${invite.contact.company}" nemá CompanyMeetLink — fallback na generovaný Meet.`);
       }
+    } else if (invite.meetSource === "NEW") {
+      // Gideon 2026-09-06: výslovně „vygenerovat nový" — ignorovat uložené linky
+      contactMeetLink = null;
     } else if (invite.meetSource === "CONTACT" || !invite.meetSource) {
       // explicitní volba kontaktu, nebo auto (dosavadní chování)
       contactMeetLink = invite.contact?.defaultMeetLink?.trim() || null;

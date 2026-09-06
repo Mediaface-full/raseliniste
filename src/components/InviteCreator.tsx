@@ -90,7 +90,13 @@ export default function InviteCreator() {
     if (!selectedContactId || universal) return;
     fetch(`/api/booking/meet-options?contactId=${encodeURIComponent(selectedContactId)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.ok) setMeetOptions(d); })
+      .then((d) => {
+        if (!d?.ok) return;
+        setMeetOptions(d);
+        // Gideon 2026-09-06: default = uložený Meet kontaktu/firmy, ne nový
+        // („budu klikat jak debil a 50× na to zapomenu")
+        setMeetSource(d.contactMeetLink ? "CONTACT" : d.companyMeetLink ? "COMPANY" : "");
+      })
       .catch(() => null);
   }, [selectedContactId, universal]);
   const onlineCapable = meetingType === "CHOICE_ONLINE" || meetingType === "CHOICE_ANY";
@@ -637,26 +643,26 @@ export default function InviteCreator() {
           <FormSection title="Meet místnost" tint="mint">
           <div>
             <div className="space-y-1.5">
-              <label className="flex items-start gap-2 cursor-pointer text-sm">
-                <input type="radio" name="meetSource" checked={meetSource === ""} onChange={() => setMeetSource("")} className="mt-1" />
-                <span>Vygenerovat nový Meet<span className="block text-xs text-muted-foreground">Standardně — schůzka se dá nahrávat a udělat z ní zápis.</span></span>
-              </label>
               {meetOptions.contactMeetLink && (
                 <label className="flex items-start gap-2 cursor-pointer text-sm">
                   <input type="radio" name="meetSource" checked={meetSource === "CONTACT"} onChange={() => setMeetSource("CONTACT")} className="mt-1" />
-                  <span>Meet kontaktu<span className="block text-xs text-muted-foreground font-mono">{meetOptions.contactMeetLink}</span></span>
+                  <span>Meet kontaktu (výchozí)<span className="block text-xs text-muted-foreground font-mono">{meetOptions.contactMeetLink}</span></span>
                 </label>
               )}
               {meetOptions.companyMeetLink && (
                 <label className="flex items-start gap-2 cursor-pointer text-sm">
                   <input type="radio" name="meetSource" checked={meetSource === "COMPANY"} onChange={() => setMeetSource("COMPANY")} className="mt-1" />
                   <span>
-                    Firemní Meet{meetOptions.company ? ` — ${meetOptions.company}` : ""}
+                    Firemní Meet{meetOptions.company ? ` — ${meetOptions.company}` : ""}{!meetOptions.contactMeetLink ? " (výchozí)" : ""}
                     <span className="block text-xs text-muted-foreground font-mono">{meetOptions.companyMeetLink}</span>
                     <span className="block text-xs text-muted-foreground">Cizí místnost — bez nahrávání a bez zápisu, jen se založí schůzka.</span>
                   </span>
                 </label>
               )}
+              <label className="flex items-start gap-2 cursor-pointer text-sm">
+                <input type="radio" name="meetSource" checked={meetSource === "NEW"} onChange={() => setMeetSource("NEW")} className="mt-1" />
+                <span>Vygenerovat nový Meet<span className="block text-xs text-muted-foreground">Jednorázový link — dá se nahrávat a udělat z něj zápis.</span></span>
+              </label>
             </div>
           </div>
           </FormSection>
@@ -983,9 +989,10 @@ export default function InviteCreator() {
                           onChange={(e) => setEditForm((f) => f && ({ ...f, meetSource: e.target.value }))}
                           className="w-full px-2 py-1.5 rounded-md bg-black/30 border border-white/10 text-sm"
                         >
-                          <option value="">Vygenerovat nový (se zápisem)</option>
+                          <option value="">Auto (Meet kontaktu, jinak nový)</option>
                           <option value="CONTACT">Meet kontaktu</option>
                           <option value="COMPANY">Firemní Meet (bez zápisu)</option>
+                          <option value="NEW">Vygenerovat nový</option>
                         </select>
                       </div>
                       <div>

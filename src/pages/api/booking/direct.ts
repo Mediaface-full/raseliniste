@@ -12,7 +12,7 @@ const Body = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^\d{2}:\d{2}$/),
   durationMin: z.number().int().min(15).max(240),
-  meetSource: z.enum(["CONTACT", "COMPANY"]).nullable().optional(),
+  meetSource: z.enum(["CONTACT", "COMPANY", "NEW"]).nullable().optional(),
   publicNote: z.string().max(1000).optional(),
   internalNote: z.string().max(500).optional(),
   // Doplnění emailu ke kontaktu přímo z formuláře (stejně jako u pozvánky)
