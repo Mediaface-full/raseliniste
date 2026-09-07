@@ -17,8 +17,7 @@
 import { useState } from "react";
 import {
   ChevronDown, ChevronRight, Search, RefreshCw, Phone, Upload, History,
-  Cloud, Download, Loader2, AlertTriangle, Check, FileText, Replace,
-} from "lucide-react";
+  Cloud, Download, Loader2, AlertTriangle, Check, FileText, Replace, Bomb } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import ContactsDuplicates from "./ContactsDuplicates";
@@ -200,11 +199,11 @@ function CleanupEntitiesBanner() {
           {busy === "merge" ? <><Loader2 className="size-4 animate-spin" /> Slučuji…</> : "2) Auto-merge duplicity"}
         </Button>
         <Button onClick={runNuclear} disabled={busy !== null} className="bg-destructive/20 text-destructive border-destructive/40 ml-auto" title="Smaže všechny non-overlay kontakty. Zachová jen VIP/tým/clientTag/aliases.">
-          {busy === "nuclear" ? <><Loader2 className="size-4 animate-spin" /> Mažu…</> : "💣 Nuclear reset"}
+          {busy === "nuclear" ? <><Loader2 className="size-4 animate-spin" /> Mažu…</> : <><Bomb className="size-4" /> Nuclear reset</>}
         </Button>
       </div>
       <p className="text-xs text-muted-foreground border-t border-white/5 pt-2 mt-2">
-        💣 <strong>Nuclear reset</strong> = smaže VŠECHNY kontakty bez overlay flagů (VIP/tým/clientTag/aliases zachovány).
+        <strong>Nuclear reset</strong> = smaže VŠECHNY kontakty bez overlay flagů (VIP/tým/clientTag/aliases zachovány).
         Pak klikneš „Synchronizovat s iCloudem" v hero → naimportuje čistý dataset z iCloudu. Použij pokud cleanup+merge nestíhá.
       </p>
       {error && <div className="text-xs text-destructive">{error}</div>}
@@ -902,7 +901,7 @@ function GoogleSection() {
             <div key={c.resourceName} className="px-3 py-2 text-sm border-b border-white/5 last:border-0">
               <div className="font-medium">{c.fn}</div>
               <div className="text-xs text-muted-foreground font-mono">
-                {c.phones.length > 0 ? `${c.phones.length}` : ""}{c.emails.length > 0 ? ` ✉ ${c.emails.length}` : ""}
+                {c.phones.length > 0 ? `${c.phones.length}` : ""}{c.emails.length > 0 ? ` · ${c.emails.length} e-mail` : ""}
               </div>
             </div>
           ))}

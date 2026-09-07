@@ -286,7 +286,7 @@ function ParsedSummary({ parsed, verdict }: { parsed: ParsedEvent; verdict: Verd
           )}
           {parsed.confidence < 0.8 && (
             <div className="mt-2 text-xs text-[var(--tint-butter)]">
-              ⚠ Nízká jistota parsování ({(parsed.confidence * 100).toFixed(0)} %) — zkontroluj.
+              <AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />Nízká jistota parsování ({(parsed.confidence * 100).toFixed(0)} %) — zkontroluj.
             </div>
           )}
         </div>

@@ -316,7 +316,7 @@ export default function BwMysDetail({ id }: { id: string }) {
                       Polling à 4 s zápis automaticky doplní. */}
                   {isError && (
                     <span className="ml-auto text-[var(--tint-rose)]">
-                      ⚠ chyba zpracování
+                      <AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />chyba zpracování
                     </span>
                   )}
                 </div>
@@ -372,7 +372,7 @@ export default function BwMysDetail({ id }: { id: string }) {
                 <span className="text-xs text-muted-foreground">({ev.pocetVstupuVDobeGenerovani} zápisů)</span>
                 {/* Processing kolečko schováno (Petr 2026-05-07). */}
                 {isError && (
-                  <span className="ml-auto text-[var(--tint-rose)] text-xs">⚠ chyba</span>
+                  <span className="ml-auto text-[var(--tint-rose)] text-xs"><AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />chyba</span>
                 )}
               </summary>
               <div className="mt-3">
@@ -723,7 +723,7 @@ function FinalEvalRender({
           <div>Nálady: {d.A_statistika?.distribuceNalad}</div>
           <div>Typy: {d.A_statistika?.distribuceTypu}</div>
           {d.A_statistika?.upozorneni && (
-            <div className="text-[var(--tint-butter)] italic mt-1">⚠ {d.A_statistika.upozorneni}</div>
+            <div className="text-[var(--tint-butter)] italic mt-1"><AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />{d.A_statistika.upozorneni}</div>
           )}
         </div>
       </Section>

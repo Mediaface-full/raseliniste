@@ -77,7 +77,7 @@ export default function AwayManager({ initial }: { initial: OooEvent[] }) {
       // outOfOffice eventType). Backend kontroluje zda Google vrátil
       // stejné datum jako jsme poslali → pokud ne, ukážeme warning.
       if (data.google?.warning) {
-        setError(`⚠ ${data.google.warning}`);
+        setError(`Google: ${data.google.warning}`);
       } else {
         setSuccess("Upraveno (Google + Rašeliniště).");
       }

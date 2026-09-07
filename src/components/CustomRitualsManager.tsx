@@ -171,7 +171,7 @@ export default function CustomRitualsManager() {
                     {" "}–{" "}
                     {formatEnd(r.startHour, r.startMinute, r.durationMin)}
                     {" "}({r.durationMin} min)
-                    {r.reminderMinutes != null && ` · 🔔 ${r.reminderMinutes === 0 ? "v čase začátku" : `${r.reminderMinutes} min předem`}`}
+                    {r.reminderMinutes != null && ` · upozornění ${r.reminderMinutes === 0 ? "v čase začátku" : `${r.reminderMinutes} min předem`}`}
                     {r.syncToGoogle && (r.googleEventId ? " · v Google kalendáři" : " · Google čeká…")}
                   </div>
                 </div>
@@ -244,9 +244,16 @@ function RitualForm({
   const [customDays, setCustomDays] = useState<number[]>(
     initial?.daysOfWeek ?? [],
   );
-  const [startHour, setStartHour] = useState(initial?.startHour ?? 8);
-  const [startMinute, setStartMinute] = useState(initial?.startMinute ?? 0);
-  const [durationMin, setDurationMin] = useState(initial?.durationMin ?? 15);
+  // UX audit C17: číselná pole jako text — jdou vymazat a přepsat; parsuje se až při uložení
+  const [startHourStr, setStartHourStr] = useState(String(initial?.startHour ?? 8));
+  const [startMinuteStr, setStartMinuteStr] = useState(String(initial?.startMinute ?? 0));
+  const [durationMinStr, setDurationMinStr] = useState(String(initial?.durationMin ?? 15));
+  const startHour = parseInt(startHourStr, 10);
+  const startMinute = parseInt(startMinuteStr, 10);
+  const durationMin = parseInt(durationMinStr, 10);
+  const timeValid = Number.isFinite(startHour) && startHour >= 0 && startHour <= 23
+    && Number.isFinite(startMinute) && startMinute >= 0 && startMinute <= 59
+    && Number.isFinite(durationMin) && durationMin >= 5 && durationMin <= 480;
   const [reminderMinutes, setReminderMinutes] = useState<number | null>(initial?.reminderMinutes ?? null);
   const [syncToGoogle, setSyncToGoogle] = useState(initial?.syncToGoogle ?? false);
   const [saving, setSaving] = useState(false);
@@ -270,6 +277,14 @@ function RitualForm({
     }
     if (daysToSave.length === 0) {
       onError("Vyber aspoň jeden den.");
+      return;
+    }
+    if (!timeValid) {
+      onError("Zkontroluj čas: hodina 0–23, minuta 0–59, délka 5–480 min.");
+      return;
+    }
+    if (startHour * 60 + startMinute + durationMin > 24 * 60) {
+      onError(`Rituál by přesáhl půlnoc (končí ${formatEnd(startHour, startMinute, durationMin)}) — zkrať délku nebo posuň začátek.`);
       return;
     }
     setSaving(true);
@@ -372,8 +387,8 @@ function RitualForm({
               type="number"
               min={0}
               max={23}
-              value={startHour}
-              onChange={(e) => setStartHour(parseInt(e.target.value, 10) || 0)}
+              value={startHourStr}
+              onChange={(e) => setStartHourStr(e.target.value)}
               className="w-14 px-2 py-1.5 rounded-md bg-background/40 border border-border/60 text-sm font-mono tabular text-center"
             />
             <span className="text-muted-foreground">:</span>
@@ -382,8 +397,8 @@ function RitualForm({
               min={0}
               max={59}
               step={5}
-              value={startMinute}
-              onChange={(e) => setStartMinute(parseInt(e.target.value, 10) || 0)}
+              value={startMinuteStr}
+              onChange={(e) => setStartMinuteStr(e.target.value)}
               className="w-14 px-2 py-1.5 rounded-md bg-background/40 border border-border/60 text-sm font-mono tabular text-center"
             />
           </div>
@@ -397,8 +412,8 @@ function RitualForm({
             min={5}
             max={480}
             step={5}
-            value={durationMin}
-            onChange={(e) => setDurationMin(parseInt(e.target.value, 10) || 5)}
+            value={durationMinStr}
+            onChange={(e) => setDurationMinStr(e.target.value)}
             className="w-full px-2 py-1.5 rounded-md bg-background/40 border border-border/60 text-sm font-mono tabular"
           />
         </div>
@@ -407,7 +422,7 @@ function RitualForm({
             Konec
           </label>
           <div className="px-2 py-1.5 text-sm font-mono tabular text-muted-foreground">
-            {formatEnd(startHour, startMinute, durationMin)}
+            {timeValid ? formatEnd(startHour, startMinute, durationMin) : "—"}
           </div>
         </div>
       </div>

@@ -18,7 +18,7 @@ if (!user) return Astro.redirect("/login");
   title="Firewall · Rašeliniště"
   username={user.username}
   heading="Gideonův Firewall"
-  breadcrumb={[{ label: "Data" }, { label: "Firewall" }]}
+  breadcrumb={[{ label: "Lidé a data" }, { label: "Firewall" }]}
 >
   <FirewallLog client:load />
 </Shell>

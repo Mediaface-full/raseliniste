@@ -217,7 +217,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
       if (r.error) {
         setError(`Uloženo v Rašeliništi, ale iCloud push selhal (${r.error}) — zkus Uložit do iCloudu, jinak to sync přepíše.`);
       } else {
-        setMessage("✓ Uloženo");
+        setMessage("Uloženo");
         setTimeout(() => setMessage(null), 2000);
       }
     } catch {

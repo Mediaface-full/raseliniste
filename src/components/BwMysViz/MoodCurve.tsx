@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { AlertTriangle } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid,
 } from "recharts";
@@ -94,7 +95,7 @@ export default function MoodCurve({ entries }: { entries: Entry[] }) {
       </div>
       {swing >= 3 && (
         <div className="text-[10px] font-mono text-[var(--tint-butter)] text-center pt-1">
-          ⚠ velký výkyv nálady ({min}→{max}) — náladově skreslené?
+          <AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />velký výkyv nálady ({min}→{max}) — náladově skreslené?
         </div>
       )}
     </div>

@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type React from "react";
 import {
-  Send, Copy, Check, Loader2, AlertTriangle, User, Globe, Trash2, ExternalLink, Mail,
-} from "lucide-react";
+  Send, Copy, Check, Loader2, AlertTriangle, User, Globe, Trash2, ExternalLink, Mail, Clock } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
@@ -62,6 +61,15 @@ export default function InviteCreator() {
   const [universal, setUniversal] = useState(false);
   const selectedNeedsEmail = !universal && !!selectedContact && !(selectedContact.emails?.length);
   const [mode, setMode] = useState<"CLIENT" | "FRIEND">("CLIENT");
+  // UX audit C15: lead time z nastavení (/settings/scheduling), ne natvrdo v textu
+  const [leadCfg, setLeadCfg] = useState<{ client: number; friend: number } | null>(null);
+  useEffect(() => {
+    fetch("/api/calendar/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.config) setLeadCfg({ client: d.config.minLeadTimeClientHours, friend: d.config.minLeadTimeFriendHours }); })
+      .catch(() => null);
+  }, []);
+  const leadLabel = (m: "CLIENT" | "FRIEND") => leadCfg ? `${m === "CLIENT" ? leadCfg.client : leadCfg.friend} h` : "…";
   const [meetingType, setMeetingType] = useState<"CHOICE_PRAGUE" | "CHOICE_ONLINE" | "CHOICE_HOME" | "CHOICE_ANY" | "CHOICE_LUNCH_PRAGUE">("CHOICE_ANY");
   const [duration, setDuration] = useState("60");
 
@@ -106,6 +114,12 @@ export default function InviteCreator() {
   const [fixedDate, setFixedDate] = useState("");
   const [fixedTime, setFixedTime] = useState("10:00");
   const [fixedType, setFixedType] = useState<"MEETING_ONLINE" | "MEETING_PRAGUE" | "MEETING_HOME">("MEETING_ONLINE");
+  // UX audit C15: CTA je vždy klikací; když něco chybí, řekne co
+  const ctaBlocker: string | null =
+    !universal && !selectedContactId ? "Nejdřív vyber kontakt (nebo zaškrtni univerzální pozvánku)."
+    : selectedNeedsEmail && !/^\S+@\S+\.\S+$/.test(newEmail.trim()) ? "Kontakt nemá e-mail — doplň ho výše, aby pozvánka měla kam odejít."
+    : fixedMode && !universal && !fixedDate ? "Zadej datum schůzky."
+    : null;
   const [directResult, setDirectResult] = useState<{ meetLink: string | null; warnings: string[] } | null>(null);
   // Gideon 2026-08-27: odeslání pozvánkového linku mailem (s náhledem) / SMS
   const [sendPanelId, setSendPanelId] = useState<string | null>(null);
@@ -539,8 +553,8 @@ export default function InviteCreator() {
               onChange={(e) => setMode(e.target.value as "CLIENT" | "FRIEND")}
               className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
             >
-              <option value="CLIENT">Klient (lead time 48 h)</option>
-              <option value="FRIEND">Přítel (lead time 12 h)</option>
+              <option value="CLIENT">Klient (předstih {leadLabel("CLIENT")})</option>
+              <option value="FRIEND">Přítel (předstih {leadLabel("FRIEND")})</option>
             </select>
           </div>
           <div>
@@ -606,8 +620,8 @@ export default function InviteCreator() {
             className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Host nedostane sloty před tímto datem. Prázdné = jen globální lead time
-            ({mode === "CLIENT" ? "72 h klient" : "24 h přítel"}).
+            Host nedostane sloty před tímto datem. Prázdné = jen globální předstih
+            ({leadLabel(mode)} pro {mode === "CLIENT" ? "klienta" : "přítele"}, viz <a href="/settings/scheduling" className="underline">nastavení</a>).
           </p>
         </div>
 
@@ -697,8 +711,12 @@ export default function InviteCreator() {
         </FormSection>
 
         <Button
-          onClick={fixedMode && !universal ? createDirect : create}
-          disabled={busy || (!universal && !selectedContactId) || (selectedNeedsEmail && !/^\S+@\S+\.\S+$/.test(newEmail.trim())) || (fixedMode && !universal && !fixedDate)}
+          onClick={() => {
+            if (ctaBlocker) { setError(ctaBlocker); return; }
+            void (fixedMode && !universal ? createDirect : create)();
+          }}
+          disabled={busy}
+          aria-describedby={ctaBlocker ? "invite-cta-reason" : undefined}
         >
           {busy
             ? <><Loader2 className="animate-spin" /> Vytvářím…</>
@@ -706,6 +724,9 @@ export default function InviteCreator() {
               ? <><Send /> Založit schůzku a poslat pozvánku</>
               : <><Send /> Vygenerovat link</>}
         </Button>
+        {ctaBlocker && !busy && (
+          <p id="invite-cta-reason" className="text-xs text-muted-foreground -mt-2">{ctaBlocker}</p>
+        )}
 
         {directResult && (
           <div className="rounded-lg border border-[var(--tint-sage)]/40 bg-[var(--tint-sage)]/10 px-4 py-3 text-sm space-y-1">
@@ -788,7 +809,7 @@ export default function InviteCreator() {
                     <span>{meetingTypeLabel(inv.meetingType)}</span>
                     {inv.reservedSlot && (
                       <span className="text-[var(--tint-butter)]">
-                        · 🕐 {new Date(inv.reservedSlot.startsAt).toLocaleString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        · <Clock className="size-3 inline -mt-0.5 mr-0.5" />{new Date(inv.reservedSlot.startsAt).toLocaleString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}
                       </span>
                     )}
                   </div>

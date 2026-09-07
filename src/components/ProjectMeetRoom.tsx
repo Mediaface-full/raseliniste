@@ -122,7 +122,7 @@ export default function ProjectMeetRoom({ projectId, projectName }: { projectId:
                   type="button"
                   onClick={() => copyLink(s.meetingCode)}
                   className="text-[11px] font-mono text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5"
-                >{copied === s.meetingCode ? "✓ zkopírováno" : "kopírovat"}</button>
+                >{copied === s.meetingCode ? <><Check className="size-3 inline -mt-0.5 mr-1" />zkopírováno</> : "kopírovat"}</button>
                 {s.autoRecordOk ? (
                   <span className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--tint-sage)]"><Check className="size-3" /> nahrává se</span>
                 ) : s.lastError ? (

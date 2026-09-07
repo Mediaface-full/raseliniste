@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Moon, Sun, Calendar, ExternalLink, X, Printer, Share2, Copy, Check, ChevronDown } from "lucide-react";
+import { Moon, Sun, Calendar, ExternalLink, X, Printer, Share2, Copy, Check, ChevronDown, AlertTriangle } from "lucide-react";
 import type {
   Theme,
   Zoom,
@@ -209,7 +209,7 @@ export default function TimelineView({ initialProjectId, readOnly = false, initi
 
       {error && (
         <div className="tv-card" style={{ padding: 12, marginBottom: 12, color: "var(--tv-today)" }}>
-          ⚠ {error}
+          <AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />{error}
         </div>
       )}
 
@@ -1264,7 +1264,7 @@ function ShareModal({ project, onClose }: { project: TimelineProject; onClose: (
 
         {error && (
           <div className="tv-body" style={{ marginTop: 12, color: "var(--tv-today)" }}>
-            ⚠ {error}
+            <AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />{error}
           </div>
         )}
       </div>

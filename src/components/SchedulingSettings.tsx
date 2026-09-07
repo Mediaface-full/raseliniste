@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Save, AlertTriangle, Check, Loader2, MapPin, Home, Video, Coffee, Clock, Gauge, Calendar } from "lucide-react";
 import { Button } from "./ui/Button";
 
@@ -51,9 +51,28 @@ export default function SchedulingSettings({ initial }: { initial: Config }) {
     });
   }
 
+  // UX audit C17: křížová validace před uložením
+  function validate(c: Config): string | null {
+    const mins = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+    const windows: [string, { start: string; end: string }][] = [
+      ["Praha", c.pragueHours], ["U mě", c.homeHours], ["Online", c.onlineHours], ["Oběd — okno", c.lunchBookingHours], ["Oběd (blokovaný)", c.lunchBreak],
+    ];
+    for (const [label, w] of windows) {
+      if (!w.start || !w.end) return `${label}: vyplň začátek i konec.`;
+      if (mins(w.start) >= mins(w.end)) return `${label}: konec (${w.end}) musí být po začátku (${w.start}).`;
+    }
+    if (c.endOfDay && windows.some(([, w]) => mins(w.end) > mins(c.endOfDay))) return `Konec dne (${c.endOfDay}) je dřív než konec některého okna.`;
+    if (c.minLeadTimeFriendHours > c.minLeadTimeClientHours) return "Předstih pro přítele je delší než pro klienta — to asi nechceš.";
+    if (c.maxInPersonWarning > c.maxInPersonError) return "Osobní schůzky: varování musí být ≤ limit (chyba).";
+    if (c.weightedLoadWarning > c.weightedLoadError) return "Vážená zátěž: varování musí být ≤ limit (chyba).";
+    return null;
+  }
+
   async function save() {
-    setSaving(true);
     setError(null);
+    const invalid = validate(config);
+    if (invalid) { setError(invalid); return; }
+    setSaving(true);
     try {
       const res = await fetch("/api/calendar/settings", {
         method: "PUT",
@@ -266,14 +285,26 @@ function TimeInput({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
+/** Číselné pole, které jde vymazat a přepsat (UX audit C17). Prázdné/neplatné
+ *  se do configu nepropíše; při opuštění pole se vrátí poslední platná hodnota
+ *  (oříznutá na min/max). */
 function NumberInput({ value, onChange, min, max, step }: { value: number; onChange: (v: number) => void; min: number; max: number; step?: number }) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => { setText(String(value)); }, [value]);
+  const parse = (t: string) => (step && step < 1 ? parseFloat(t) : parseInt(t, 10));
   return (
     <input
       type="number"
-      value={value}
+      value={text}
       onChange={(e) => {
-        const v = step && step < 1 ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
-        if (!Number.isNaN(v)) onChange(v);
+        setText(e.target.value);
+        const v = parse(e.target.value);
+        if (Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)));
+      }}
+      onBlur={() => {
+        const v = parse(text);
+        if (!Number.isFinite(v)) setText(String(value));
+        else if (v < min || v > max) { const c = Math.min(max, Math.max(min, v)); setText(String(c)); onChange(c); }
       }}
       min={min}
       max={max}

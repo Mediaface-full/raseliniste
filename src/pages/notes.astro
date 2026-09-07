@@ -18,7 +18,7 @@ if (!user) return Astro.redirect("/login");
   title="Poznámky · Rašeliniště"
   username={user.username}
   heading="Poznámky"
-  breadcrumb={[{ label: "Organizace" }, { label: "Poznámky" }]}
+  breadcrumb={[{ label: "Obsah" }, { label: "Poznámky" }]}
 >
   <NotesList client:load />
 </Shell>

@@ -58,7 +58,7 @@ const statusColor =
 const statusLabel =
   status === "ok" ? "OK" : status === "stale" ? "Zaspaný" : "Chyba";
 const statusDot =
-  status === "ok" ? "" : status === "stale" ? "⏱" : "⚠";
+  status === "ok" ? "" : status === "stale" ? "zaspal" : "chyba";
 ---
 
 {variant === "compact" ? (
@@ -106,7 +106,7 @@ const statusDot =
       <div class="mt-2 pt-2 border-t border-white/5 space-y-0.5">
         {errorJobs.slice(0, 3).map(({ def, run }) => (
           <div class="text-[11px] font-mono text-[var(--tint-rose)]/90 truncate">
-            ⚠ {def.name}: {run?.lastError}
+            {def.name}: {run?.lastError}
           </div>
         ))}
         {errorJobs.length > 3 && (

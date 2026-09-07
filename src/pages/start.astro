@@ -252,7 +252,7 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
                   <span class="flex-1 min-w-0 truncate">{ev.title}</span>
                   {ev.locationText && (
                     <span class="text-xs text-muted-foreground truncate max-w-[40%]" title={ev.locationText}>
-                      📍 {ev.locationText}
+                      <Icon name="lucide:map-pin" class="size-3 inline -mt-0.5" /> {ev.locationText}
                     </span>
                   )}
                 </div>

@@ -101,8 +101,29 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const slugPreview = clientTag.trim()
+    ? clientTag.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "")
+    : "";
+
+  // UX audit C16: validace před odesláním (e-maily, narozeniny)
+  function validate(): string | null {
+    const bad = emails.map((e) => e.email.trim()).filter((e) => e && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e));
+    if (bad.length) return `E-mail „${bad[0]}" nevypadá správně.`;
+    const bd = birthDay.trim() ? parseInt(birthDay, 10) : null;
+    const bm = birthMonth.trim() ? parseInt(birthMonth, 10) : null;
+    if ((bd === null) !== (bm === null)) return "Narozeniny: vyplň den i měsíc (nebo obojí nech prázdné).";
+    if (bd !== null && bm !== null) {
+      if (!Number.isFinite(bm) || bm < 1 || bm > 12) return "Narozeniny: měsíc musí být 1–12.";
+      const maxDay = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][bm - 1];
+      if (!Number.isFinite(bd) || bd < 1 || bd > maxDay) return `Narozeniny: den musí být 1–${maxDay} pro zadaný měsíc.`;
+    }
+    return null;
+  }
+
   async function save() {
     setError(null);
+    const invalid = validate();
+    if (invalid) { setError(invalid); return; }
     setSaving(true);
     const bd = parseInt(birthDay, 10);
     const bm = parseInt(birthMonth, 10);
@@ -293,6 +314,9 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
                 onChange={(e) => setClientTag(e.target.value)}
                 placeholder="prázdné = běžný kontakt v projektu Lidé"
               />
+              {slugPreview && slugPreview !== clientTag.trim() && (
+                <p className="text-[11px] font-mono text-muted-foreground mt-1">uloží se jako: <code>{slugPreview}</code></p>
+              )}
               <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
                 Pokud má kontakt slug, úkoly delegované jemu i úkoly s tagem <code>klient-{clientTag || "<slug>"}</code> půjdou do projektu „Práce" / sekce „{clientTag ? clientTag.split("-").map(w => w.length <= 3 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)).join(" ") : "<klient>"}".
               </p>
@@ -476,6 +500,8 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
                     setEmails(copy);
                   }}
                   placeholder="email@…"
+                  type="email"
+                  inputMode="email"
                   className="flex-1"
                 />
                 <button
@@ -500,15 +526,17 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
           </EditorSection>
         </div>
 
-        {error && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">{error}</div>
-        )}
-
-        <div className="flex gap-2 pt-2">
-          <Button onClick={save} disabled={saving}>
-            {saving ? <><Loader2 className="animate-spin" /> Ukládám…</> : <><Save /> Uložit</>}
-          </Button>
-          <Button variant="ghost" onClick={() => onClose(false)}>Zrušit</Button>
+        {/* UX audit C16: patička drží dole i při dlouhém formuláři */}
+        <div className="sticky bottom-0 -mx-5 -mb-5 px-5 py-3 bg-card/95 backdrop-blur border-t border-border space-y-2">
+          {error && (
+            <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">{error}</div>
+          )}
+          <div className="flex gap-2">
+            <Button onClick={save} disabled={saving}>
+              {saving ? <><Loader2 className="animate-spin" /> Ukládám…</> : <><Save /> Uložit</>}
+            </Button>
+            <Button variant="ghost" onClick={() => onClose(false)}>Zrušit</Button>
+          </div>
         </div>
       </div>
     </div>

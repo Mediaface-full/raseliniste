@@ -272,7 +272,7 @@ export default function TaskAudioRecorder() {
             </div>
             {protection.hiddenDurations.length > 0 && (
               <div className="rounded-md border border-[var(--tint-rose)]/40 bg-[var(--tint-rose)]/10 text-xs px-3 py-2 max-w-xs">
-                ⚠ Přepnul jsi mimo stránku — část záznamu může chybět.
+                <AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />Přepnul jsi mimo stránku — část záznamu může chybět.
               </div>
             )}
             <button

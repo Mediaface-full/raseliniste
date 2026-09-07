@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/cs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import isoWeek from "dayjs/plugin/isoWeek";
-import { Loader2, ExternalLink, AlertTriangle } from "lucide-react";
+import { Loader2, ExternalLink, AlertTriangle, MapPin } from "lucide-react";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
 dayjs.extend(customParseFormat);
@@ -213,7 +213,7 @@ function EventDetailModal({ event, onClose }: { event: CalendarEventDTO; onClose
 
         {event.locationText && (
           <div className="text-sm">
-            <span className="text-muted-foreground text-xs">📍 </span>
+            <MapPin className="size-3 inline -mt-0.5 mr-1 text-muted-foreground" />
             {event.location?.name ?? event.locationText}
           </div>
         )}

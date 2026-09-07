@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Loader2, Plus, Pin, Trash2, Sparkles, FileText, Settings, Users, AudioLines,
   ChevronDown, ChevronRight, Copy, Check, FileAudio2, Mic, Send, FileDown,
-  Star, RotateCw, Pencil, Paperclip, Upload, X as XIcon, Download,
-} from "lucide-react";
+  Star, RotateCw, Pencil, Paperclip, Upload, X as XIcon, Download, Save, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import OwnerRecorder from "./OwnerRecorder";
@@ -134,7 +133,7 @@ export default function StudnaDetail({ projectId, ownerName }: { projectId: stri
           onClick={() => setTab("settings")}
           title="Tento projekt má vlastní AI prompty pro analýzu — klikni pro úpravu"
         >
-          ⚙ Tento projekt používá vlastní AI prompty (Studna Standard{project.studnaStandardPrompt ? " " : ""}{project.studnaBriefPrompt ? ", Brief " : ""})
+          <Settings className="size-3.5 inline -mt-0.5 mr-1" />Tento projekt používá vlastní AI prompty (Studna Standard{project.studnaStandardPrompt ? " " : ""}{project.studnaBriefPrompt ? ", Brief " : ""})
         </div>
       )}
 
@@ -1114,7 +1113,7 @@ function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: 
                     disabled={busy === inv.guestUser.id}
                     className="size-3.5"
                   />
-                  💾 Zachovávat audio
+                  <Save className="size-3.5 inline -mt-0.5 mr-1" />Zachovávat audio
                 </label>
                 <label
                   className="flex items-center gap-2 text-xs cursor-pointer select-none"
@@ -1218,7 +1217,7 @@ function InviteForm({
       </label>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" checked={keepAudio} onChange={(e) => setKeepAudio(e.target.checked)} className="size-4" />
-        💾 <strong>Zachovávat audio</strong> (audio nahrávky tohoto hosta se nemažou po 14 dnech)
+        <Save className="size-3.5 inline -mt-0.5 mr-1" /><strong>Zachovávat audio</strong> (audio nahrávky tohoto hosta se nemažou po 14 dnech)
       </label>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" checked={canUploadAudio} onChange={(e) => setCanUploadAudio(e.target.checked)} className="size-4" />
@@ -1296,7 +1295,7 @@ function SummariesTab({ project, onRefresh }: { project: ProjectDetail; onRefres
               {/* Processing souhrn — kolečko schováno (Petr 2026-05-07).
                   Karta jen čeká, polling ji aktualizuje. */}
               {isError && (
-                <span className="ml-auto text-[var(--tint-rose)] text-xs">⚠ chyba</span>
+                <span className="ml-auto text-[var(--tint-rose)] text-xs"><AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />chyba</span>
               )}
             </summary>
             {isProcessing ? (
@@ -1405,7 +1404,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
         </div>
         {/* Petr 2026-05-15: extractionPrompt field je legacy/dead — neaplikuje
             se v žádném AI volání (jen ukládá do DB). Skryté. Pravé custom
-            prompty jsou níž v sekci „⚙ Vlastní AI prompty pro tento projekt"
+            prompty jsou níž v sekci „Vlastní AI prompty pro tento projekt"
             (studnaStandardPrompt / studnaBriefPrompt) které opravdu řídí
             Stage 2 analýzu. Field v DB zachováno pro případnou budoucí
             funkčnost — neztratí se data. */}
@@ -1416,7 +1415,7 @@ function SettingsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh
         <div className="rounded-md border border-[var(--tint-rose)]/25 bg-[var(--tint-rose)]/[0.04] p-3">
           <div className="flex items-center justify-between mb-1">
             <label className="text-[10px] uppercase tracking-wider text-[var(--tint-rose)] font-mono">
-              ✨ Vlastní prompt pro Souhrn projektu
+              <Sparkles className="size-3.5 inline -mt-0.5 mr-1" />Vlastní prompt pro Souhrn projektu
             </label>
             {projectSummaryPrompt && (
               <button

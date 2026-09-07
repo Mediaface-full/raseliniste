@@ -196,8 +196,7 @@ function AnalysisDetailModal({ id, onClose }: { id: string; onClose: () => void 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-6 pb-6 sm:pt-10 sm:pb-10"
-      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)" }}
+      className="modal-overlay !place-items-start overflow-y-auto pt-6 pb-6 sm:pt-10 sm:pb-10"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="modal-panel w-full max-w-3xl">

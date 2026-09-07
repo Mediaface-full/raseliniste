@@ -24,6 +24,20 @@ type Tint = typeof TINTS[number];
    in-app). Odkazy jsou teď čisté <a href="https://..."> — o otevření ve
    skutečném Safari se stará JEDINĚ globální capture handler v Base.astro. */
 
+/** UX audit C18: „meet.google.com/abc" → „https://meet.google.com/abc"; nesmysl → null */
+function normalizeUrl(raw: string): string | null {
+  let u = raw.trim();
+  if (!u) return null;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = "https://" + u;
+  try {
+    const parsed = new URL(u);
+    if (!["http:", "https:"].includes(parsed.protocol) || !parsed.hostname.includes(".")) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 export default function PageLinksSettings() {
   const [links, setLinks] = useState<PageLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +70,11 @@ export default function PageLinksSettings() {
       setError("Vyplň název a URL.");
       return;
     }
+    const normalized = normalizeUrl(newUrl);
+    if (!normalized) {
+      setError(`„${newUrl.trim()}" není platná webová adresa (např. https://meet.google.com/abc-defg-hij).`);
+      return;
+    }
     setBusy("create");
     setError(null);
     try {
@@ -64,7 +83,7 @@ export default function PageLinksSettings() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: newName,
-          url: newUrl,
+          url: normalized,
           tint: newTint,
           icon: newIcon.trim() || null,
           section: newSection || null,
@@ -112,7 +131,6 @@ export default function PageLinksSettings() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Smazat tento odkaz?")) return;
     const prev = links;
     setLinks((ls) => ls.filter((l) => l.id !== id));
     // AUDIT 2026-07-31: při selhání DELETE vrátit zpět (dřív odkaz zmizel
@@ -183,7 +201,7 @@ export default function PageLinksSettings() {
             </label>
             <Input value={newIcon} onChange={(e) => setNewIcon(e.target.value)} placeholder="např. camera, image, video, globe" className="mt-1" />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Pokud nezadáš nebo zadáš neplatný název (např. „Immich"), použije se 🌐 globe.
+              Pokud nezadáš nebo zadáš neplatný název (např. „Immich"), použije se ikona globe.
             </p>
           </div>
           <div className="flex gap-2">
@@ -256,16 +274,28 @@ function PageLinkRow({
   const [tint, setTint] = useState<Tint>(link.tint as Tint);
   const [icon, setIcon] = useState(link.icon ?? "");
   const [section, setSection] = useState<"" | "MEET">(link.section === "MEET" ? "MEET" : "");
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  useEffect(() => {
+    if (!confirmRemove) return;
+    const t = setTimeout(() => setConfirmRemove(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmRemove]);
 
   async function save() {
+    setRowError(null);
+    if (!name.trim()) { setRowError("Název nesmí být prázdný."); return; }
+    const normalized = normalizeUrl(url);
+    if (!normalized) { setRowError(`„${url.trim()}" není platná webová adresa.`); return; }
     const ok = await onUpdate({
       section: section || null,
-      name: name.trim() || link.name,
-      url: url.trim() || link.url,
+      name: name.trim(),
+      url: normalized,
       tint,
       icon: icon.trim() || null,
     });
-    if (ok !== false) setEditing(false);
+    if (ok === false) { setRowError("Uložení selhalo — zkus to znovu."); return; }
+    setEditing(false);
   }
 
   if (!editing) {
@@ -296,11 +326,13 @@ function PageLinkRow({
           Upravit
         </button>
         <button
-          onClick={onRemove}
+          onClick={() => { if (confirmRemove) { setConfirmRemove(false); onRemove(); } else setConfirmRemove(true); }}
           disabled={busy}
-          className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+          aria-label={confirmRemove ? "Opravdu smazat? Klikni znovu" : "Smazat odkaz"}
+          title={confirmRemove ? "Opravdu smazat? Klikni znovu" : "Smazat odkaz"}
+          className={`p-2 rounded text-muted-foreground hover:text-destructive ${confirmRemove ? "bg-destructive/15 text-destructive" : "hover:bg-destructive/20"}`}
         >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+          {busy ? <Loader2 className="size-4 animate-spin" /> : confirmRemove ? <span className="text-xs font-medium px-1">Opravdu?</span> : <Trash2 className="size-4" />}
         </button>
       </div>
     );
@@ -308,18 +340,38 @@ function PageLinkRow({
 
   return (
     <div className="glass rounded-xl p-4 space-y-3 border border-[var(--tint-sky)]/30">
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Název" />
-      <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="URL" />
-      <TintPicker value={tint} onChange={setTint} />
-      <Input value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="Ikona (volitelně, lucide name)" />
-      <select
-        value={section}
-        onChange={(e) => setSection(e.target.value as "" | "MEET")}
-        className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
-      >
-        <option value="">Běžný odkaz</option>
-        <option value="MEET">MEET — rychlé připojení (/start)</option>
-      </select>
+      <div>
+        <label className="text-xs uppercase tracking-wider text-muted-foreground font-mono">Název</label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Název" className="mt-1" />
+      </div>
+      <div>
+        <label className="text-xs uppercase tracking-wider text-muted-foreground font-mono">URL</label>
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" inputMode="url" className="mt-1" />
+      </div>
+      <div>
+        <label className="text-xs uppercase tracking-wider text-muted-foreground font-mono block mb-2">Barva</label>
+        <TintPicker value={tint} onChange={setTint} />
+      </div>
+      <div>
+        <label className="text-xs uppercase tracking-wider text-muted-foreground font-mono">Ikona (volitelně, lucide name)</label>
+        <Input value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="např. camera, globe" className="mt-1" />
+      </div>
+      <div>
+        <label className="text-xs uppercase tracking-wider text-muted-foreground font-mono block mb-1">Sekce</label>
+        <select
+          value={section}
+          onChange={(e) => setSection(e.target.value as "" | "MEET")}
+          className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm"
+        >
+          <option value="">Běžný odkaz</option>
+          <option value="MEET">MEET — rychlé připojení (/start)</option>
+        </select>
+      </div>
+      {rowError && (
+        <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="size-4 shrink-0 mt-0.5 text-destructive" /> {rowError}
+        </div>
+      )}
       <div className="flex gap-2">
         <Button size="sm" onClick={save}><Check /> Uložit</Button>
         <Button size="sm" variant="ghost" onClick={() => setEditing(false)}><X /> Zrušit</Button>

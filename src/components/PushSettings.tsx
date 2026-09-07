@@ -311,7 +311,7 @@ export default function PushSettings() {
               onChange={(v) => updateFilter("pushUrgentEmail", v)}
             />
             <FilterToggle
-              label="🌊 Nové nahrávky ve Studánce"
+              label="Nové nahrávky ve Studánce"
               hint="Od hostů (vlastní nahrávky sám sobě neposíláme)"
               checked={filters.pushStudankaGuest}
               onChange={(v) => updateFilter("pushStudankaGuest", v)}

@@ -31,7 +31,7 @@
  */
 import { useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { MapPin, X, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { MapPin, X, ArrowUp, ArrowDown, Sparkles, Check } from "lucide-react";
 import { marked } from "marked";
 import { DEFAULT_RITUAL_TEMPLATES, type RitualType } from "@/lib/week-rituals";
 
@@ -91,7 +91,7 @@ export function BlocksToggle({ event }: { event: { id: string; blocksBooking?: b
       <span className="text-xs text-muted-foreground">
         Blokuje nabídku schůzek (booking)
         {seriesCount !== null && (
-          <span className="block text-[10px] text-[var(--tint-sage)]">✓ nastaveno pro celou sérii ({seriesCount} opakování)</span>
+          <span className="block text-[10px] text-[var(--tint-sage)]"><Check className="size-3 inline -mt-0.5 mr-0.5" />nastaveno pro celou sérii ({seriesCount} opakování)</span>
         )}
       </span>
       <button
@@ -123,8 +123,8 @@ function sourceTint(src: string): string {
 }
 
 function sourceLabel(src: string): string {
-  if (src === "RITUAL") return "✨";
-  if (src === "ANNIVERSARY") return "🕯";
+  if (src === "RITUAL") return "rituál";
+  if (src === "ANNIVERSARY") return "výročí";
   if (src === "ICLOUD_SON") return "syn";
   if (src === "ICLOUD_PARTNER") return "partner";
   if (src === "RASELINISTE") return "R";

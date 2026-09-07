@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Upload, Loader2, CheckCircle2, AlertTriangle, Trash2, ListOrdered, X, Download } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, AlertTriangle, Trash2, ListOrdered, X, Download, Star } from "lucide-react";
 import { Button } from "./ui/Button";
 
 /**
@@ -482,7 +482,7 @@ function Stat({ label, value, tint = "foreground" }: { label: string; value: num
 
 function decisionBadge(d: string) {
   if (d === "migrate") return <span className="text-[var(--tint-sky)]">→ migrate</span>;
-  if (d === "wishlist") return <span className="text-[var(--tint-butter)]">★ wishlist</span>;
+  if (d === "wishlist") return <span className="text-[var(--tint-butter)]"><Star className="size-3.5 inline -mt-0.5 mr-1" />wishlist</span>;
   if (d === "discard") return <span className="text-muted-foreground">× discard</span>;
   return <span>{d}</span>;
 }
@@ -540,7 +540,7 @@ function RemigrateToTodoistButton({ importId, onDone }: { importId: string; onDo
       </button>
       {err && (
         <div className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2">
-          ⚠ {err}
+          <AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />{err}
         </div>
       )}
       {result && (

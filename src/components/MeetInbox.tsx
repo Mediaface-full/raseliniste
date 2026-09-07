@@ -258,7 +258,7 @@ export default function MeetInbox() {
                   onClick={(e) => {
                     void navigator.clipboard.writeText(`https://meet.google.com/${s.meetingCode}`);
                     const b = e.currentTarget;
-                    b.textContent = "✓ zkopírováno";
+                    b.textContent = "Zkopírováno";
                     setTimeout(() => { b.textContent = "kopírovat link"; }, 2000);
                   }}
                   className="text-[11px] font-mono text-muted-foreground hover:text-foreground border border-border rounded px-1.5 py-0.5"

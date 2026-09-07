@@ -11,7 +11,7 @@
  */
 
 import { useState } from "react";
-import { Loader2, Users, Merge, AlertTriangle, Check, ChevronRight, ChevronDown } from "lucide-react";
+import { Loader2, Users, Merge, AlertTriangle, Check, ChevronRight, ChevronDown, Mail } from "lucide-react";
 import { Button } from "./ui/Button";
 
 interface ClusterContact {
@@ -229,7 +229,7 @@ export default function ContactsDuplicates() {
                             <div className="text-xs text-muted-foreground font-mono mt-0.5">{c.phones.join(", ")}</div>
                           )}
                           {c.emails.length > 0 && (
-                            <div className="text-xs text-muted-foreground font-mono mt-0.5">✉ {c.emails.join(", ")}</div>
+                            <div className="text-xs text-muted-foreground font-mono mt-0.5"><Mail className="size-3 inline -mt-0.5 mr-1" />{c.emails.join(", ")}</div>
                           )}
                           <div className="text-[10px] text-muted-foreground mt-0.5">
                             vytvořeno {new Date(c.createdAt).toLocaleDateString("cs-CZ")}

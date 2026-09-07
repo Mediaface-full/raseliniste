@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, X, Lock, EyeOff, Send, Paperclip, Pencil } from "lucide-react";
+import { Mic, Square, Loader2, CheckCircle2, AlertTriangle, Upload, FileAudio, X, Lock, EyeOff, Send, Paperclip, Pencil, Check } from "lucide-react";
 import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 interface Project {
@@ -492,7 +492,7 @@ export default function GuestRecorder({
             </div>
             {protection.hiddenDurations.length > 0 && (
               <div className="rounded-md border border-[var(--tint-rose)]/40 bg-[var(--tint-rose)]/10 text-xs px-3 py-2 max-w-xs">
-                ⚠ Přepnul jsi mimo stránku — část záznamu může chybět.
+                <AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />Přepnul jsi mimo stránku — část záznamu může chybět.
               </div>
             )}
             <button
@@ -692,7 +692,7 @@ function UploadAudioGuestButton({
       )}
       {lastSuccess && !uploading && (
         <div className="mt-2 text-center text-xs text-[color:var(--c-signal)]">
-          ✓ {lastSuccess}
+          <Check className="size-3.5 inline -mt-0.5 mr-1" />{lastSuccess}
         </div>
       )}
       {error && !uploading && (

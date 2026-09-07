@@ -50,6 +50,11 @@ export default function BookingPicker({ token }: { token: string }) {
   const [subject, setSubject] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  // UX audit C14: validace při kliknutí + scroll k chybě + fokus na pole
+  const [fieldError, setFieldError] = useState<"firstName" | "lastName" | "email" | "subject" | null>(null);
+  const errorRef = useRef<HTMLDivElement | null>(null);
+  const browserTz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return ""; } })();
+  const tzDiffers = !!browserTz && browserTz !== "Europe/Prague";
   // Petr 2026-05-25: confirmation screen ukazuje detaily místo holé hlášky
   // — reserve.ts vrátí meetLink, my zachytíme + zobrazíme v rich card.
   const [confirmedMeetLink, setConfirmedMeetLink] = useState<string | null>(null);
@@ -96,8 +101,29 @@ export default function BookingPicker({ token }: { token: string }) {
     }
   }
 
+  function validate(): string | null {
+    if (!invite?.requiresIdentification) return null;
+    if (!firstName.trim()) { setFieldError("firstName"); return "Vyplňte prosím jméno."; }
+    if (!lastName.trim()) { setFieldError("lastName"); return "Vyplňte prosím příjmení."; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) { setFieldError("email"); return "E-mail nevypadá správně (např. jmeno@firma.cz) — pošleme na něj potvrzení."; }
+    if (!subject.trim()) { setFieldError("subject"); return "Napište prosím krátce, o čem schůzka bude."; }
+    setFieldError(null);
+    return null;
+  }
+
+  useEffect(() => {
+    if (!error) return;
+    errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (fieldError) {
+      const el = formRef.current?.querySelector<HTMLInputElement>(`[data-field="${fieldError}"]`);
+      el?.focus({ preventScroll: true });
+    }
+  }, [error, fieldError]);
+
   async function reserve() {
     if (!chosenSlot) return;
+    const invalid = validate();
+    if (invalid) { setError(invalid); return; }
     setSubmitting(true);
     setError(null);
     try {
@@ -425,50 +451,55 @@ export default function BookingPicker({ token }: { token: string }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-mono uppercase text-muted-foreground">Jméno *</label>
-                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} required
-                    placeholder="Karel"
-                    className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
+                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} required data-field="firstName" autoComplete="given-name"
+                    placeholder="Karel" aria-invalid={fieldError === "firstName" || undefined}
+                    className={`w-full px-3 py-2 rounded-md bg-black/30 border text-sm ${fieldError === "firstName" ? "border-destructive" : "border-white/10"}`} />
                 </div>
                 <div>
                   <label className="text-xs font-mono uppercase text-muted-foreground">Příjmení *</label>
-                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} required
-                    placeholder="Novák"
-                    className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
+                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} required data-field="lastName" autoComplete="family-name"
+                    placeholder="Novák" aria-invalid={fieldError === "lastName" || undefined}
+                    className={`w-full px-3 py-2 rounded-md bg-black/30 border text-sm ${fieldError === "lastName" ? "border-destructive" : "border-white/10"}`} />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-mono uppercase text-muted-foreground">E-mail *</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-                  className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required data-field="email" autoComplete="email" inputMode="email"
+                  placeholder="jmeno@firma.cz" aria-invalid={fieldError === "email" || undefined}
+                  className={`w-full px-3 py-2 rounded-md bg-black/30 border text-sm ${fieldError === "email" ? "border-destructive" : "border-white/10"}`} />
               </div>
               <div>
                 <label className="text-xs font-mono uppercase text-muted-foreground">Telefon (volitelně)</label>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)}
+                <input type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+420 …"
                   className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
               </div>
               <div>
                 <label className="text-xs font-mono uppercase text-muted-foreground">Téma *</label>
-                <input value={subject} onChange={(e) => setSubject(e.target.value)} required
-                  placeholder="Krátká věta — o čem schůzka bude"
-                  className="w-full px-3 py-2 rounded-md bg-black/30 border border-white/10 text-sm" />
+                <input value={subject} onChange={(e) => setSubject(e.target.value)} required data-field="subject"
+                  placeholder="Krátká věta — o čem schůzka bude" aria-invalid={fieldError === "subject" || undefined}
+                  className={`w-full px-3 py-2 rounded-md bg-black/30 border text-sm ${fieldError === "subject" ? "border-destructive" : "border-white/10"}`} />
               </div>
             </div>
           )}
 
           <button
             onClick={reserve}
-            disabled={submitting || (invite.requiresIdentification && (!name || !email || !subject))}
+            disabled={submitting}
             className="w-full mt-2 px-4 py-3 rounded-md bg-[var(--tint-sage)] text-background font-medium flex items-center justify-center gap-2 disabled:opacity-40"
           >
             {submitting ? <><Loader2 className="size-4 animate-spin" /> Rezervuji…</> : <><Check className="size-4" /> Rezervovat termín</>}
           </button>
           <p className="text-xs text-muted-foreground text-center">Po kliknutí se termín zapíše do kalendáře. Potvrzení přijde mailem.</p>
+          {tzDiffers && (
+            <p className="text-xs text-muted-foreground text-center">Časy jsou zobrazeny ve vašem pásmu ({browserTz}); schůzka je plánována v čase Praha (Europe/Prague).</p>
+          )}
         </div>
       )}
 
       {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
-          <AlertTriangle className="size-4 shrink-0 mt-0.5" /> {error}
+        <div ref={errorRef} role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="size-4 shrink-0 mt-0.5 text-destructive" /> {error}
         </div>
       )}
     </div>

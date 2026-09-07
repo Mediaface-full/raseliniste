@@ -2,8 +2,7 @@ import { useState } from "react";
 import {
   Plus, Trash2, Check, Loader2, Sparkles, AlertTriangle, Info, XCircle,
   ChevronLeft, ChevronRight, Calendar as CalIcon, MapPin, Clock, RotateCw,
-  StickyNote, Shield, ShieldOff,
-} from "lucide-react";
+  StickyNote, Shield, ShieldOff, Backpack, Bus } from "lucide-react";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import DayTimeline from "./DayTimeline";
@@ -430,7 +429,7 @@ export default function DayView({ initial }: { initial: Initial }) {
               {activeBriefing.todoistTaskId ? (
                 <span className="text-[var(--tint-sage)]">Pushnuto do Todoistu</span>
               ) : (
-                <span className="text-[var(--tint-butter)]">⚠ Todoist push se nepodařil</span>
+                <span className="text-[var(--tint-butter)]"><AlertTriangle className="size-3.5 inline -mt-0.5 mr-1" />Todoist push se nepodařil</span>
               )}
               <Button variant="outline" size="sm" onClick={() => generateBriefing(true, briefingTab)} disabled={Boolean(busy)}>
                 {busy === "brief" ? <Loader2 className="animate-spin" /> : <Sparkles />} Přegenerovat
@@ -553,7 +552,7 @@ function BriefingPreview({ content }: { content: Record<string, unknown> }) {
     <div className="space-y-3 text-sm">
       {items.length > 0 && (
         <div>
-          <div className="text-xs uppercase tracking-widest text-muted-foreground font-mono mb-1.5">🎒 Vzít s sebou</div>
+          <div className="text-xs uppercase tracking-widest text-muted-foreground font-mono mb-1.5"><Backpack className="size-3.5 inline -mt-0.5 mr-1" />Vzít s sebou</div>
           <ul className="space-y-1">
             {items.map((it, i) => (
               <li key={i} className="flex items-center gap-2">
@@ -573,7 +572,7 @@ function BriefingPreview({ content }: { content: Record<string, unknown> }) {
         </div>
       )}
       {commute && (
-        <div className="text-muted-foreground">🚌 {commute}</div>
+        <div className="text-muted-foreground"><Bus className="size-3.5 inline -mt-0.5 mr-1" />{commute}</div>
       )}
     </div>
   );
