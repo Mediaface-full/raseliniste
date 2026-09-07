@@ -401,7 +401,16 @@ async function upsertFromIcs(
         else if (r === "updated") updated++;
       }
     } else {
-      const externalId = uid;
+      // FIX 2026-09-08 (Gideon: „proč nevidím trénink syna ve středu?"):
+      // CalDAV `expand=true` vrací opakovanou akci už ROZBALENOU — každý výskyt
+      // je samostatný VEVENT se STEJNÝM UID + RECURRENCE-ID a bez RRULE, takže
+      // isRecurring() je false. Všechny výskyty se pak ukládaly pod externalId
+      // = uid, přepisovaly se a přežil jen poslední v okně (trénink z 3. 9.
+      // existoval jen jako 4. 11.). Výskyt s RECURRENCE-ID dostane stejné ID
+      // jako ruční expanze výše (uid_start); starý řádek `uid` sync označí
+      // jako deletedRemotely (není v seenIds) — samoopravné.
+      const recurrenceId = ve.getFirstPropertyValue("recurrence-id");
+      const externalId = recurrenceId ? `${uid}_${startsAtRaw.toISOString()}` : uid;
       const r = await upsertOne(event, externalId, startsAtRaw, endsAtRaw, sourceTag, objectUrl);
       seenIds.add(externalId);
       if (r === "inserted") inserted++;

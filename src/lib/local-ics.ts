@@ -97,7 +97,10 @@ export function parseIcsEvents(icsText: string, calendarKey: string): { occurren
       }
     } else {
       if (endsAtRaw < windowStart || startsAtRaw > windowEnd) continue;
-      push(startsAtRaw, endsAtRaw, `${calendarKey}_${uid}`);
+      // Výjimka série (RECURRENCE-ID) sdílí UID s masterem — bez suffixu by
+      // ji `seen` zahodilo jako duplicitu (stejná past jako v iCloud syncu).
+      const recurrenceId = ve.getFirstPropertyValue("recurrence-id");
+      push(startsAtRaw, endsAtRaw, recurrenceId ? `${calendarKey}_${uid}_${startsAtRaw.toISOString()}` : `${calendarKey}_${uid}`);
     }
   }
 

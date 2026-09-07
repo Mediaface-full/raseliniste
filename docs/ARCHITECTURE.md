@@ -6,7 +6,7 @@
 
 ## Přehled
 
-Rašeliniště je **single-user osobní informační systém** pro Petra Peřinu
+Rašeliniště je **single-user osobní informační systém** pro Gideona Peřinu
 („Gideon"). Astro 6 SSR aplikace běží jako Docker kontejner na **Synology
 NAS DS718+** v Petrově domácí síti. Postgres 16 (s pgvector extension) běží
 jako druhý kontejner ve stejném docker-compose.

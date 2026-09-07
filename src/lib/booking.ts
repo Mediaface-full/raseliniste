@@ -536,9 +536,9 @@ export async function cancelInvite(inviteId: string): Promise<void> {
       html: `
         <p>Termín byl zrušen.</p>
         <p>Pro nový termín odepište na tento e-mail.</p>
-        <p>Petr Peřina</p>
+        <p>Gideon Peřina</p>
       `,
-      text: `Termín byl zrušen.\nPro nový termín odepište na tento e-mail.\n\nPetr Peřina`,
+      text: `Termín byl zrušen.\nPro nový termín odepište na tento e-mail.\n\nGideon Peřina`,
       context: "booking-cancel",
     });
   }
@@ -609,12 +609,12 @@ export function buildBookingConfirmMail(params: {
     ${meetSection}
     ${publicNoteHtml}
     <p>V příloze najdete kalendářový soubor (.ics) — můžete si jím přidat termín do libovolného kalendáře.</p>
-    <p>Petr Peřina</p>
+    <p>Gideon Peřina</p>
   `;
 
   const text = `Termín ${dateStr} ${timeStr} je potvrzen.\n${
     meetLink ? `\nMeet: ${meetLink}\n` : ""
-  }${publicNoteText}\nV příloze je kalendářový .ics soubor.\n\nPetr Peřina`;
+  }${publicNoteText}\nV příloze je kalendářový .ics soubor.\n\nGideon Peřina`;
 
   return {
     subject: `Termín potvrzen — ${dateStr} ${timeStr}`,
@@ -653,8 +653,8 @@ function buildIcs(params: {
   const fmtIcs = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   const uid = `booking-${startsAt.getTime()}-${inviteeEmail}@raseliniste.cz`;
   const summary = inviteeName
-    ? `${slotType === "MEETING_ONLINE" ? "🎥" : "🤝"} Schůzka s Petrem Peřinou${inviteeSubject ? ` — ${inviteeSubject}` : ""}`
-    : `Schůzka s Petrem Peřinou${inviteeSubject ? ` — ${inviteeSubject}` : ""}`;
+    ? `${slotType === "MEETING_ONLINE" ? "🎥" : "🤝"} Schůzka s Gideonem Peřinou${inviteeSubject ? ` — ${inviteeSubject}` : ""}`
+    : `Schůzka s Gideonem Peřinou${inviteeSubject ? ` — ${inviteeSubject}` : ""}`;
   const location = slotType === "MEETING_ONLINE" && meetLink
     ? meetLink
     : slotType === "MEETING_PRAGUE"
@@ -688,7 +688,7 @@ function buildIcs(params: {
     `SUMMARY:${esc(summary)}`,
     `DESCRIPTION:${esc(description)}`,
     location ? `LOCATION:${esc(location)}` : "",
-    `ORGANIZER;CN=Petr Peřina:mailto:oko@raseliniste.cz`,
+    `ORGANIZER;CN=Gideon Peřina:mailto:oko@raseliniste.cz`,
     `ATTENDEE;CN=${esc(inviteeName ?? inviteeEmail)};RSVP=FALSE:mailto:${inviteeEmail}`,
     "STATUS:CONFIRMED",
     "SEQUENCE:0",

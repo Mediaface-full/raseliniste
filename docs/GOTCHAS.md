@@ -7,6 +7,16 @@
 
 ---
 
+## 2026-09-08 — iCloud CalDAV `expand=true` = rozbalené výskyty se STEJNÝM UID
+
+**Symptom:** opakovaná událost ze sdíleného iCloud kalendáře (synův trénink St, angličtina Út) je v Rašeliništi vidět jen jako JEDEN výskyt na konci 60denního okna; ostatní týdny chybí.
+
+**Příčina:** tsdav `fetchCalendarObjects({ expand: true })` vrací sérii už rozbalenou — každý výskyt je samostatný VEVENT se stejným UID + `RECURRENCE-ID`, bez RRULE. `ICAL.Event.isRecurring()` je proto `false`, větev „single" ukládala `externalId = uid` a výskyty se navzájem přepisovaly (unique `source_externalId`).
+
+**Fix:** `src/lib/icloud-calendar.ts` upsertFromIcs — výskyt s `RECURRENCE-ID` dostane `uid_<start ISO>` (stejný tvar jako ruční expanze). Totéž v `src/lib/local-ics.ts` (výjimky série sdílí UID s masterem). Starý sloučený řádek `uid` sync sám označí `deletedRemotely` (není v seenIds).
+
+**Jak poznat příště:** v `/api/calendar/events` mají ICLOUD_* řádky opakovaných akcí `externalId` bez `_2026-…` suffixu a `createdAt` měsíce zpět, ale jen jeden výskyt.
+
 ## Infrastruktura
 
 ### Rašeliniště běží na Synology NAS, NE na `diego`/Hetzneru

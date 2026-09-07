@@ -275,7 +275,7 @@ export default function BookingPicker({ token }: { token: string }) {
         </div>
 
         <div className="text-center pt-2 text-xs text-muted-foreground font-mono">
-          Petr Peřina · raseliniste.cz
+          Gideon Peřina · raseliniste.cz
         </div>
       </div>
     );

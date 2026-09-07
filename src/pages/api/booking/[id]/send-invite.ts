@@ -41,9 +41,9 @@ function defaultDrafts(invite: NonNullable<Awaited<ReturnType<typeof loadInvite>
     `Stačí kliknout a vybrat čas, který Vám vyhovuje — potvrzení přijde obratem e-mailem.`,
     `Odkaz platí do ${validUntil}.`,
     "",
-    `Petr Peřina`,
+    `Gideon Peřina`,
   ].join("\n");
-  const sms = `Dobrý den, posílám odkaz pro výběr termínu schůzky: ${url} — stačí kliknout a vybrat čas. Petr Peřina`;
+  const sms = `Dobrý den, posílám odkaz pro výběr termínu schůzky: ${url} — stačí kliknout a vybrat čas. Gideon Peřina`;
   return { url, subject, body, sms };
 }
 
