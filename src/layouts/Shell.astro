@@ -41,70 +41,99 @@ type NavItem = {
   tint: string;
   enabled?: boolean;
   badge?: number;
+  /** Prefixy cest, při kterých je položka aktivní (mimo vlastní href). */
+  match?: string[];
+  /** Podmenu — vykreslí se jako rozbalovací <details>, otevřené když je aktivní dítě. */
+  children?: NavItem[];
 };
 
+// Dnešní datum v Praha TZ (UX audit: toISOString() = UTC → po 22:00 letního
+// času odkazovalo na včerejšek)
+const todayPrague = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
+
+/**
+ * UX audit 2026-09-06 (R3): menu přeskupené podle toho, CO chce Gideon udělat
+ * (ne podle technické domény). Dřív: „Organizace" 16 položek, 6 mrtvých
+ * odkazů na 404, Page Links v „Přehledu". Teď: 7 skupin, každá max ~6 položek,
+ * nastavení kalendáře a pošty v podmenu.
+ */
 const nav: { group: string; items: NavItem[] }[] = [
-  { group: "Přehled", items: [
-    { href: "/", label: "Dashboard", icon: "lucide:layout-dashboard", tint: "peach", enabled: true },
-    { href: "/settings/page-links", label: "Page Links", icon: "lucide:link", tint: "sky", enabled: true },
+  { group: "Dnes", items: [
+    { href: "/", label: "Dashboard", icon: "lucide:layout-dashboard", tint: "peach" },
+    { href: `/day/${todayPrague}`, label: "Dnešní den", icon: "lucide:sun", tint: "butter", match: ["/day/", "/dnes"] },
+    { href: "/notifikace", label: "Notifikace", icon: "lucide:bell", tint: "rose" },
+    { href: "/start", label: "Start (mobil)", icon: "lucide:smartphone", tint: "sky" },
   ]},
-  { group: "Capture", items: [
-    { href: "/triage",  label: "Triage",       icon: "lucide:inbox",    tint: "peach",    enabled: true },
-    { href: "/capture", label: "Ruční vstup",  icon: "lucide:edit-3",   tint: "mint",     enabled: true },
+  { group: "Vstupy", items: [
+    { href: "/ozvena", label: "Ozvěna — nahrát", icon: "lucide:mic", tint: "peach", match: ["/ukoly/audio", "/diktat"] },
+    { href: "/quickadd", label: "Rychlé zadání", icon: "lucide:zap", tint: "sky" },
+    { href: "/capture", label: "Ruční vstup", icon: "lucide:edit-3", tint: "mint" },
+    { href: "/triage", label: "Triage", icon: "lucide:inbox", tint: "peach" },
+    { href: "/tasks", label: "Capture inbox", icon: "lucide:list-checks", tint: "mint" },
   ]},
-  { group: "Organizace", items: [
-    { href: "/calendar", label: "Kalendář",  icon: "lucide:calendar",     tint: "sky",    enabled: true },
-    { href: "/quickadd", label: "Rychlé zadání", icon: "lucide:zap", tint: "sky", enabled: true },
-    { href: `/day/${new Date().toISOString().slice(0, 10)}`, label: "Dnes (briefing)", icon: "lucide:sun", tint: "butter", enabled: true },
-    { href: "/calendar/invite", label: "Pozvánka", icon: "lucide:send", tint: "sage", enabled: true },
-    { href: "/calendar/away", label: "Dovolená / nomád", icon: "lucide:plane", tint: "rose", enabled: true },
-    { href: "/calendar/locations", label: "Lokace", icon: "lucide:map-pin", tint: "lavender", enabled: true },
-    { href: "/calendar/settings", label: "Nastavení bookingu", icon: "lucide:settings-2", tint: "mint", enabled: true },
-    { href: "/start",    label: "Start (rychlý přístup)", icon: "lucide:sunrise", tint: "peach", enabled: true },
-    { href: "/ozvena",   label: "Ozvěna (úkoly+deník)", icon: "lucide:mic", tint: "peach", enabled: true },
-    { href: "/ukoly",    label: "Úkoly",     icon: "lucide:check-square", tint: "peach",  enabled: true },
-    { href: "/planovani", label: "Plánování týdne", icon: "lucide:kanban", tint: "sky", enabled: true },
-    { href: "/tasks",    label: "Capture inbox", icon: "lucide:inbox",   tint: "peach",  enabled: true },
-    { href: "/notes",    label: "Poznámky",  icon: "lucide:notebook-pen", tint: "mint",   enabled: true },
-    { href: "/denik",    label: "Deník",     icon: "lucide:book-open",    tint: "butter", enabled: true },
-    // { href: "/journal",  label: "Journal (legacy)", icon: "lucide:book-marked", tint: "butter", enabled: true }, // schováno 2026-05-04 — Petr používá /denik (JournalEntry), legacy Entry-based zůstává funkční přes URL
-    { href: "/letters",  label: "Dopisy",    icon: "lucide:mail-plus",    tint: "butter", enabled: true },
-    { href: "/studna",   label: "Studánka",  icon: "lucide:waves",        tint: "butter", enabled: true },
-    { href: "/projekt",  label: "Timeline",  icon: "lucide:gantt-chart-square", tint: "lavender", enabled: true },
-    { href: "/prskavka", label: "Prskavka",  icon: "lucide:sparkles",     tint: "butter", enabled: true },
-    { href: "/spiz",     label: "Spíž",      icon: "lucide:archive",      tint: "mint",   enabled: true },
+  { group: "Kalendář", items: [
+    { href: "/calendar", label: "Kalendář", icon: "lucide:calendar", tint: "sky", match: ["/calendar/tyden", "/calendar/mesic"] },
+    { href: "/calendar/invite", label: "Pozvánka na schůzku", icon: "lucide:send", tint: "sage" },
+    { href: "/calendar/away", label: "Dovolená / nomád", icon: "lucide:plane", tint: "rose" },
+    { href: "/calendar/settings", label: "Nastavení kalendáře", icon: "lucide:settings-2", tint: "sky", children: [
+      { href: "/calendar/settings", label: "Booking — pravidla", icon: "lucide:sliders-horizontal", tint: "sky" },
+      { href: "/calendar/locations", label: "Lokace", icon: "lucide:map-pin", tint: "lavender" },
+      { href: "/settings/ritualy", label: "Rituály", icon: "lucide:repeat", tint: "butter" },
+      { href: "/settings/local-calendars", label: "Nahrané kalendáře", icon: "lucide:calendar-plus", tint: "sage" },
+    ]},
+  ]},
+  { group: "Práce", items: [
+    { href: "/ukoly", label: "Úkoly", icon: "lucide:check-square", tint: "peach" },
+    { href: "/planovani", label: "Plánování týdne", icon: "lucide:kanban", tint: "sky" },
+    { href: "/studna", label: "Studánka", icon: "lucide:waves", tint: "butter" },
+    { href: "/prskavka", label: "Prskavka", icon: "lucide:sparkles", tint: "butter" },
+    { href: "/projekt", label: "Timeline", icon: "lucide:gantt-chart-square", tint: "lavender" },
+    { href: "/zeptat-se", label: "Zeptat se (AI)", icon: "lucide:message-circle-question", tint: "rose" },
+  ]},
+  { group: "Obsah", items: [
+    { href: "/denik", label: "Deník", icon: "lucide:book-open", tint: "butter", match: ["/journal"] },
+    { href: "/notes", label: "Poznámky", icon: "lucide:notebook-pen", tint: "mint" },
+    { href: "/letters", label: "Dopisy", icon: "lucide:mail-plus", tint: "butter" },
+    { href: "/spiz", label: "Spíž", icon: "lucide:archive", tint: "sage" },
   ]},
   { group: "Komunikace", items: [
-    // Pošta (Email Intelligence) — fáze 1+2 hotové, fáze 3 = tato stránka.
-    // Tint cool-blue. Skupina připravena pro budoucí Slack/WhatsApp aggregátor.
-    { href: "/posta", label: "Pošta", icon: "lucide:mail", tint: "cool-blue", enabled: true, badge: postaBadge },
-    { href: "/posta/uklid", label: "Pošta — úklid", icon: "lucide:trash-2", tint: "rose", enabled: true },
+    { href: "/posta", label: "Pošta", icon: "lucide:mail", tint: "cool-blue", badge: postaBadge, children: [
+      { href: "/posta/uklid", label: "Úklid pošty", icon: "lucide:trash-2", tint: "rose" },
+    ]},
   ]},
-  { group: "Data", items: [
-    { href: "/health",   label: "Zdraví",    icon: "lucide:heart-pulse", tint: "rose", enabled: true },
-    { href: "/contacts", label: "Kontakty",  icon: "lucide:users",  tint: "lavender", enabled: true },
-    { href: "/vyroci",   label: "Výročí",    icon: "lucide:calendar-heart", tint: "rose", enabled: true },
-    { href: "/zijes",    label: "ŽIJEŠ?",    icon: "lucide:heart-pulse", tint: "rose", enabled: true },
-    { href: "/bwmys",    label: "Myši",   icon: "lucide:arrow-left-right", tint: "lavender", enabled: true },
-    { href: "/firewall", label: "Firewall",  icon: "lucide:shield", tint: "peach",    enabled: true },
-    { href: "/finance",  label: "Finance",   icon: "lucide:wallet", tint: "sage" },
-    { href: "/files",    label: "Soubory",   icon: "lucide:folder", tint: "pink" },
+  { group: "Lidé a data", items: [
+    { href: "/contacts", label: "Kontakty", icon: "lucide:users", tint: "lavender" },
+    { href: "/vyroci", label: "Výročí", icon: "lucide:calendar-heart", tint: "rose" },
+    { href: "/health", label: "Zdraví", icon: "lucide:heart-pulse", tint: "rose" },
+    { href: "/zijes", label: "ŽIJEŠ?", icon: "lucide:activity", tint: "rose" },
+    { href: "/bwmys", label: "Myši (rozhodování)", icon: "lucide:arrow-left-right", tint: "lavender" },
+    { href: "/firewall", label: "Firewall", icon: "lucide:shield", tint: "peach" },
   ]},
-  { group: "AI", items: [
-    { href: "/ai/chat",  label: "Gemini chat", icon: "lucide:sparkles", tint: "rose" },
-    { href: "/ai/coach", label: "Claude kouč", icon: "lucide:compass",  tint: "lavender" },
-  ]},
-  { group: "Integrace", items: [
-    { href: "/integrations/superlist", label: "Superlist", icon: "lucide:list-todo", tint: "mint" },
-    { href: "/integrations/plaud",     label: "Plaud",     icon: "lucide:mic",       tint: "butter" },
-  ]},
-  { group: "Nastavení", items: [
-    { href: "/navody", label: "Návody", icon: "lucide:book-marked", tint: "butter", enabled: true },
-    { href: "/settings", label: "Nastavení", icon: "lucide:settings", tint: "lavender", enabled: true },
+  { group: "Systém", items: [
+    { href: "/settings", label: "Nastavení", icon: "lucide:settings", tint: "lavender", children: [
+      { href: "/settings/page-links", label: "Page Links", icon: "lucide:link", tint: "sky" },
+      { href: "/settings/integrations/google", label: "Integrace", icon: "lucide:plug", tint: "mint", match: ["/settings/integrations", "/settings/whatsapp", "/settings/push", "/settings/reports"] },
+    ]},
+    { href: "/navody", label: "Návody", icon: "lucide:book-marked", tint: "butter" },
   ]},
 ];
 
-const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+// Aktivní = nejdelší shoda napříč VŠEMI položkami (dřív prefix → na
+// /settings/page-links svítilo „Page Links" i „Nastavení" zároveň).
+const allItems: NavItem[] = nav.flatMap((g) => g.items.flatMap((i) => [i, ...(i.children ?? [])]));
+const matchLen = (item: NavItem): number => {
+  const cands = [item.href, ...(item.match ?? [])];
+  let best = -1;
+  for (const c of cands) {
+    if (c === "/") { if (path === "/") best = Math.max(best, 1); continue; }
+    if (path === c || path.startsWith(c.endsWith("/") ? c : c + "/")) best = Math.max(best, c.length);
+  }
+  return best;
+};
+const bestLen = Math.max(...allItems.map(matchLen));
+const activeHref = bestLen < 0 ? null : allItems.find((i) => matchLen(i) === bestLen)?.href ?? null;
+const isActive = (item: NavItem) => item.href === activeHref && matchLen(item) === bestLen;
+const hasActiveChild = (item: NavItem) => (item.children ?? []).some((c) => isActive(c));
 ---
 
 <Base title={title}>
@@ -149,42 +178,70 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
             </div>
             <ul class="space-y-0.5">
               {section.items.map((item) => {
-                const active = isActive(item.href);
-                const disabled = item.enabled === false;
+                const active = isActive(item);
+                const childActive = hasActiveChild(item);
+                const rowClass = [
+                  "relative flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors",
+                  active
+                    ? "bg-accent text-foreground font-medium"
+                    : "text-foreground/80 hover:bg-accent hover:text-foreground",
+                ];
+                const inner = (
+                  <>
+                    {active && (
+                      <span class="absolute left-0 top-2 bottom-2 w-[3px] rounded-r" style="background: var(--c);"></span>
+                    )}
+                    <Icon name={item.icon} class="size-5 shrink-0" style="color: var(--c);" />
+                    <span class="truncate">{item.label}</span>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span
+                        class="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-xs font-mono font-medium"
+                        style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
+                        title="Aktivní action_required (urgency high nebo escalation)"
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </>
+                );
+                if (!item.children) {
+                  return (
+                    <li>
+                      <a href={item.href} style={`--c: var(--tint-${item.tint});`} class:list={rowClass}>{inner}</a>
+                    </li>
+                  );
+                }
+                // Podmenu: hlavní řádek je odkaz, šipka rozbaluje; otevřené když je aktivní dítě
                 return (
                   <li>
-                    <a
-                      href={disabled ? "#" : item.href}
-                      aria-disabled={disabled}
-                      style={`--c: var(--tint-${item.tint});`}
-                      class:list={[
-                        "relative flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors",
-                        active
-                          ? "bg-accent text-foreground font-medium"
-                          : "text-foreground/80 hover:bg-accent hover:text-foreground",
-                        disabled && "opacity-45 cursor-not-allowed pointer-events-none",
-                      ]}
-                    >
-                      {active && (
-                        <span class="absolute left-0 top-2 bottom-2 w-[3px] rounded-r" style="background: var(--c);"></span>
-                      )}
-                      <Icon name={item.icon} class="size-5 shrink-0" style="color: var(--c);" />
-                      <span>{item.label}</span>
-                      {item.badge !== undefined && item.badge > 0 && (
-                        <span
-                          class="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-mono font-medium"
-                          style="background: color-mix(in oklch, var(--c) 22%, transparent); color: var(--c);"
-                          title="Aktivní action_required (urgency high nebo escalation)"
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                      {disabled && (
-                        <span class="ml-auto text-[9px] uppercase tracking-widest text-muted-foreground font-mono">
-                          soon
-                        </span>
-                      )}
-                    </a>
+                    <details class="group/sub" open={active || childActive}>
+                      <summary class="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                        <div style={`--c: var(--tint-${item.tint});`} class:list={[...rowClass, "pr-2"]}>
+                          <a href={item.href} class="flex items-center gap-3 flex-1 min-w-0">{inner}</a>
+                          <Icon name="lucide:chevron-down" class="size-4 shrink-0 text-muted-foreground transition-transform group-open/sub:rotate-180" />
+                        </div>
+                      </summary>
+                      <ul class="mt-0.5 ml-4 pl-3 border-l border-border space-y-0.5">
+                        {item.children.map((child) => {
+                          const cActive = isActive(child);
+                          return (
+                            <li>
+                              <a
+                                href={child.href}
+                                style={`--c: var(--tint-${child.tint});`}
+                                class:list={[
+                                  "relative flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[14px] transition-colors",
+                                  cActive ? "bg-accent text-foreground font-medium" : "text-foreground/75 hover:bg-accent hover:text-foreground",
+                                ]}
+                              >
+                                <Icon name={child.icon} class="size-4 shrink-0" style="color: var(--c);" />
+                                <span class="truncate">{child.label}</span>
+                              </a>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </details>
                   </li>
                 );
               })}
@@ -211,11 +268,12 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
     <div class="flex flex-col min-w-0 gap-3">
       <header class="glass rounded-xl h-16 px-4 lg:px-5 flex items-center gap-3">
         <SidebarToggle client:load />
+        {/* UX audit R3/B2: Start = mobilní rozcestník. Neutrální vzhled (tint jako CTA je mimo brand), na desktopu je domů Dashboard. */}
         <a
           href="/start"
-          class="h-10 px-3 sm:px-4 rounded-md bg-[var(--tint-sky)]/10 border-2 border-[var(--tint-sky)]/40 hover:bg-[var(--tint-sky)]/20 flex items-center gap-2 text-[var(--tint-sky)] transition-colors shrink-0 font-semibold"
-          aria-label="Zpět na úvodní obrazovku Start"
-          title="Zpět na Start"
+          class="h-10 px-3 rounded-md border border-border hover:bg-accent flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors shrink-0 lg:hidden"
+          aria-label="Start — mobilní rozcestník"
+          title="Start"
         >
           <Icon name="lucide:home" class="size-[18px]" />
           <span class="text-sm hidden sm:inline">Start</span>
@@ -268,10 +326,12 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
             <span class="hidden sm:inline">Měsíc</span>
           </a>
           <span class="hidden md:inline-block w-px h-6 bg-border mx-1" />
-          <button type="button" class="h-10 px-3 rounded-md hover:bg-accent text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors" aria-label="Hledat">
+          {/* UX audit R3: tlačítko „Hledat ⌘K" bylo bez funkce → vede na Zeptat se (AI hledání nad daty), ⌘K zkratka níže */}
+          <a href="/zeptat-se" id="topbar-search" class="h-10 px-3 rounded-md hover:bg-accent text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors" aria-label="Zeptat se — hledání napříč daty" title="Zeptat se (⌘K)">
             <Icon name="lucide:search" class="size-[18px]" />
-            <span class="hidden md:inline font-mono text-xs">⌘K</span>
-          </button>
+            <span class="hidden md:inline">Zeptat se</span>
+            <span class="hidden md:inline font-mono text-xs text-muted-foreground/80">⌘K</span>
+          </a>
           <a href="/settings" class="size-10 rounded-md hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors" aria-label="Nastavení">
             <Icon name="lucide:settings" class="size-[18px]" />
           </a>
@@ -284,6 +344,15 @@ const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWit
       </main>
     </div>
   </div>
+  <script>
+    // ⌘K / Ctrl+K → Zeptat se (UX audit R3)
+    document.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        window.location.href = "/zeptat-se";
+      }
+    });
+  </script>
   <SwUpdateBanner client:load />
   <Anotace client:load />
 
