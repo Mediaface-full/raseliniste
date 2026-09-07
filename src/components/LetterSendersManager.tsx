@@ -337,7 +337,7 @@ function SenderEditor({ sender, onChanged }: { sender: Sender; onChanged: () => 
           value={addr}
           onChange={(e) => setAddr(e.target.value)}
           rows={3}
-          className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm font-mono resize-none"
+          className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm font-mono resize-none"
         />
       </Field>
 
@@ -361,7 +361,7 @@ function SenderEditor({ sender, onChanged }: { sender: Sender; onChanged: () => 
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={5}
-          className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm resize-none"
+          className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm resize-none"
         />
         <button
           type="button"

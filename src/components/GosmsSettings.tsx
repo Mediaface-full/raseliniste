@@ -188,14 +188,14 @@ export default function GosmsSettings({ initial }: { initial: InitialProps }) {
           </p>
         </div>
         {hasCredentials && (
-          <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+          <span className="inline-flex items-center gap-1 text-xs text-[var(--tint-mint)]">
             <Check className="w-3.5 h-3.5" /> připojeno
           </span>
         )}
       </header>
 
       {error && (
-        <div className="flex items-start gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+        <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3">
           <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -228,7 +228,7 @@ export default function GosmsSettings({ initial }: { initial: InitialProps }) {
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {hasCredentials ? "Přepsat & otestovat" : "Uložit & otestovat"}
           </Button>
-          {saved && <span className="text-xs text-emerald-400 inline-flex items-center gap-1"><Check className="w-3 h-3" /> uloženo</span>}
+          {saved && <span className="text-xs text-[var(--tint-mint)] inline-flex items-center gap-1"><Check className="w-3 h-3" /> uloženo</span>}
           {hasCredentials && (
             <Button variant="ghost" onClick={disconnect}>
               <Trash2 className="w-4 h-4" /> Odpojit
@@ -238,7 +238,7 @@ export default function GosmsSettings({ initial }: { initial: InitialProps }) {
         {lastUsed && (
           <p className="text-xs text-muted-foreground">
             Naposledy použito: {lastUsed.toLocaleString("cs-CZ")}
-            {lastErr && <span className="text-red-400"> · poslední chyba: {lastErr}</span>}
+            {lastErr && <span className="text-destructive"> · poslední chyba: {lastErr}</span>}
           </p>
         )}
       </section>
@@ -326,7 +326,7 @@ export default function GosmsSettings({ initial }: { initial: InitialProps }) {
                   aria-label="Zkopírovat"
                 >
                   {copiedKey === row.key ? (
-                    <Check className="w-4 h-4 text-emerald-400" />
+                    <Check className="w-4 h-4 text-[var(--tint-mint)]" />
                   ) : (
                     <Copy className="w-4 h-4" />
                   )}

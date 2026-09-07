@@ -126,11 +126,11 @@ export default function AskWidget() {
           onKeyDown={onKeyDown}
           rows={3}
           placeholder='Např. „Co jsem psal o Karlovi v posledním měsíci?" nebo „Jaké úkoly mám otevřené k projektu Lipnice?"'
-          className="w-full px-3 py-2.5 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-base resize-none"
+          className="w-full px-3 py-2.5 rounded-md bg-background/40 border border-border/60 focus:border-primary text-base resize-none"
           disabled={loading}
         />
         <div className="flex items-center justify-between mt-2">
-          <span className="text-[11px] font-mono text-muted-foreground/60">
+          <span className="text-[11px] font-mono text-muted-foreground">
             ⌘+Enter pro odeslání
           </span>
           <button
@@ -185,7 +185,7 @@ export default function AskWidget() {
                         <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                           [{i + 1}] {meta.label}
                         </span>
-                        <span className="text-[10px] font-mono text-muted-foreground/60 ml-auto">
+                        <span className="text-[10px] font-mono text-muted-foreground ml-auto">
                           shoda {Math.round(c.similarity * 100)}%
                         </span>
                       </div>

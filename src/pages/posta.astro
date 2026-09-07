@@ -357,6 +357,7 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
                         ]}
                         title={needsConfirm ? "Potřebuje potvrzení (confidence < 0.85)" : `confidence ${c.confidence.toFixed(2)}`}
                       ></span>
+                      {needsConfirm && <span class="text-[11px] font-mono text-[var(--tint-butter)] shrink-0 mt-1.5">k potvrzení</span>}
                       <div class="flex-1 min-w-0">
                         <div class="flex items-baseline gap-2 text-xs text-muted-foreground font-mono">
                           <span class="truncate">
@@ -388,7 +389,7 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
                             </span>
                           )}
                           {c.todoistTaskId && (
-                            <span class="px-1.5 py-0.5 rounded text-emerald-400/80" style="background: color-mix(in oklch, rgb(52, 211, 153) 10%, transparent);">
+                            <span class="px-1.5 py-0.5 rounded text-[var(--tint-mint)] bg-[var(--tint-mint)]/10">
                               ↗ Todoist
                             </span>
                           )}
@@ -766,6 +767,7 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
                               : "bg-foreground/15",
                         ]}
                       ></span>
+                      {urgencyHigh ? <span class="text-[11px] font-mono text-[var(--tint-butter)] shrink-0 mt-1.5">urgentní</span> : escalation ? <span class="text-[11px] font-mono text-muted-foreground shrink-0 mt-1.5">eskalace</span> : null}
                       <div class="flex-1 min-w-0">
                         <div class="flex items-baseline gap-2 text-xs text-muted-foreground font-mono">
                           <span class="truncate">{hit.fromName ?? hit.fromAddress}</span>
@@ -813,7 +815,7 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
                             </span>
                           )}
                           {isResolved && (
-                            <span class="px-1.5 py-0.5 rounded text-emerald-400/80" style="background: color-mix(in oklch, rgb(52, 211, 153) 10%, transparent);">
+                            <span class="px-1.5 py-0.5 rounded text-[var(--tint-mint)] bg-[var(--tint-mint)]/10">
                               vyřízeno
                             </span>
                           )}
@@ -916,6 +918,7 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
                             : `urgency: ${cls?.urgency ?? "—"}`
                       }
                     ></span>
+                    {urgencyHigh ? <span class="text-[11px] font-mono text-[var(--tint-butter)] shrink-0 mt-1.5">urgentní</span> : escalation ? <span class="text-[11px] font-mono text-muted-foreground shrink-0 mt-1.5">eskalace</span> : null}
                     <div class="flex-1 min-w-0">
                       <div class="flex items-baseline gap-2 text-xs text-muted-foreground font-mono">
                         <span class="truncate">{email.fromName ?? email.fromAddress}</span>
@@ -950,7 +953,7 @@ const digestContent: DigestContent | null = digest ? (digest.content as DigestCo
                           </>
                         )}
                         {isResolved && (
-                          <span class="px-1.5 py-0.5 rounded text-emerald-400/80" style="background: color-mix(in oklch, rgb(52, 211, 153) 10%, transparent);">
+                          <span class="px-1.5 py-0.5 rounded text-[var(--tint-mint)] bg-[var(--tint-mint)]/10">
                             vyřízeno {fmtRelative(email.resolvedAt!)}
                           </span>
                         )}

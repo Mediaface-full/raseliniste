@@ -91,7 +91,7 @@ export function InlineTitle({
         }
       }}
       style={{ borderColor: accent }}
-      className={`w-full text-base font-medium leading-snug bg-black/40 border rounded -mx-1 px-1 py-0.5 text-foreground outline-none ${className}`}
+      className={`w-full text-base font-medium leading-snug bg-black/40 border rounded -mx-1 px-1 py-0.5 text-foreground ${className}`}
     />
   );
 }

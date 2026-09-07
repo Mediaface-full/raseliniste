@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type React from "react";
 import {
   Send, Copy, Check, Loader2, AlertTriangle, User, Globe, Trash2, ExternalLink, Mail,
@@ -181,6 +181,10 @@ export default function InviteCreator() {
   const [publicNote, setPublicNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [error]);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -241,7 +245,7 @@ export default function InviteCreator() {
       if (!res.ok) { setEditError(d?.error ?? `Uložení selhalo (HTTP ${res.status})`); return; }
       setEditSaved(true);
       await loadInvites();
-      setTimeout(() => { setEditingId(null); setEditForm(null); setEditSaved(false); }, 900);
+      setTimeout(() => { setEditingId(null); setEditForm(null); setEditSaved(false); }, 2500);
     } catch (e) {
       setEditError(e instanceof Error ? e.message : "Síťová chyba");
     } finally {
@@ -717,7 +721,7 @@ export default function InviteCreator() {
           <div
             className="rounded-lg border-2 border-destructive/60 bg-destructive/15 text-base px-4 py-3 flex items-start gap-3"
             role="alert"
-            ref={(el) => { if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }}
+            ref={errorRef}
           >
             <AlertTriangle className="size-5 shrink-0 mt-0.5 text-destructive" />
             <div className="flex-1">

@@ -42,6 +42,7 @@ export default function CustomRitualsManager() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -102,8 +103,15 @@ export default function CustomRitualsManager() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2">
-          {error}
+        <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
+          <span className="flex-1">{error}</span>
+          <button type="button" onClick={() => setError(null)} className="text-muted-foreground hover:text-foreground text-xs" aria-label="Zavřít chybu">×</button>
+        </div>
+      )}
+      {warning && (
+        <div role="status" className="rounded-md border border-[var(--tint-butter)]/40 bg-[var(--tint-butter)]/10 text-sm px-3 py-2 flex items-start gap-2">
+          <span className="flex-1">Rituál je uložen, ale propis do Google selhal: {warning}</span>
+          <button type="button" onClick={() => setWarning(null)} className="text-muted-foreground hover:text-foreground text-xs" aria-label="Zavřít varování">×</button>
         </div>
       )}
 
@@ -114,7 +122,8 @@ export default function CustomRitualsManager() {
             setItems((prev) => [...prev, r]);
             setEditingId(null);
           }}
-          onError={(m) => setError(m)}
+          onError={(m) => { setError(m); setWarning(null); }}
+                  onWarning={(m) => { setWarning(m); setError(null); }}
         />
       )}
 
@@ -136,7 +145,8 @@ export default function CustomRitualsManager() {
                     setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
                     setEditingId(null);
                   }}
-                  onError={(m) => setError(m)}
+                  onError={(m) => { setError(m); setWarning(null); }}
+                  onWarning={(m) => { setWarning(m); setError(null); }}
                 />
               </li>
             ) : (
@@ -212,11 +222,13 @@ function RitualForm({
   onCancel,
   onSaved,
   onError,
+  onWarning,
 }: {
   initial?: CustomRitual;
   onCancel: () => void;
   onSaved: (r: CustomRitual) => void;
   onError: (msg: string) => void;
+  onWarning: (msg: string) => void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -289,7 +301,7 @@ function RitualForm({
         return;
       }
       // Uloženo do DB; Google propis mohl selhat samostatně — ukázat, ne zamlčet
-      if (data.googleError) onError(data.googleError);
+      if (data.googleError) onWarning(data.googleError);
       onSaved(data.ritual);
     } finally {
       setSaving(false);

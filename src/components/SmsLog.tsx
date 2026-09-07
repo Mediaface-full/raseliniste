@@ -114,7 +114,7 @@ export default function SmsLog({ enabled }: { enabled: boolean }) {
       </header>
 
       {error && (
-        <div className="flex items-start gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+        <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3">
           <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
@@ -165,7 +165,7 @@ export default function SmsLog({ enabled }: { enabled: boolean }) {
                   <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     <StatusBadge status={m.status} />
                     {m.isPinned && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-300">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--tint-butter)]/15 text-[var(--tint-butter)]">
                         <Pin className="w-3 h-3" /> pinned
                       </span>
                     )}
@@ -181,10 +181,10 @@ export default function SmsLog({ enabled }: { enabled: boolean }) {
                   </div>
                   <p className="text-sm mt-1 break-words">{m.body}</p>
                   {m.errorMessage && (
-                    <p className="text-xs text-red-400 mt-1">{m.errorMessage}</p>
+                    <p className="text-xs text-destructive mt-1">{m.errorMessage}</p>
                   )}
                   {m.invalidRecipients.length > 0 && (
-                    <p className="text-xs text-amber-400 mt-1">
+                    <p className="text-xs text-[var(--tint-butter)] mt-1">
                       Neplatní příjemci: {m.invalidRecipients.join(", ")}
                     </p>
                   )}
@@ -222,10 +222,10 @@ export default function SmsLog({ enabled }: { enabled: boolean }) {
 function StatusBadge({ status }: { status: SmsRow["status"] }) {
   const map: Record<SmsRow["status"], { label: string; className: string; icon: React.ReactNode }> = {
     pending: { label: "čeká", className: "bg-sky-400/15 text-sky-300", icon: <Clock className="w-3 h-3" /> },
-    sent: { label: "odesláno", className: "bg-blue-400/15 text-blue-300", icon: <Send className="w-3 h-3" /> },
-    delivered: { label: "doručeno", className: "bg-emerald-400/15 text-emerald-300", icon: <Check className="w-3 h-3" /> },
-    undelivered: { label: "nedoručeno", className: "bg-amber-400/15 text-amber-300", icon: <TriangleAlert className="w-3 h-3" /> },
-    failed: { label: "chyba", className: "bg-red-400/15 text-red-300", icon: <TriangleAlert className="w-3 h-3" /> },
+    sent: { label: "odesláno", className: "bg-[var(--tint-sky)]/15 text-[var(--tint-sky)]", icon: <Send className="w-3 h-3" /> },
+    delivered: { label: "doručeno", className: "bg-[var(--tint-mint)]/15 text-[var(--tint-mint)]", icon: <Check className="w-3 h-3" /> },
+    undelivered: { label: "nedoručeno", className: "bg-[var(--tint-butter)]/15 text-[var(--tint-butter)]", icon: <TriangleAlert className="w-3 h-3" /> },
+    failed: { label: "chyba", className: "bg-destructive/15 text-destructive", icon: <TriangleAlert className="w-3 h-3" /> },
     cancelled: { label: "zrušeno", className: "bg-muted/30 text-muted-foreground", icon: null },
   };
   const m = map[status];

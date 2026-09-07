@@ -425,7 +425,7 @@ export default function PushSettings() {
               <Smartphone className="size-4 text-muted-foreground" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium">{s.label ?? "(bez názvu)"}</div>
-                <div className="text-[10px] font-mono text-muted-foreground/70">
+                <div className="text-[10px] font-mono text-muted-foreground">
                   …{s.endpointTail}
                 </div>
                 {s.lastError && (

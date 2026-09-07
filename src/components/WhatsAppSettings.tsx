@@ -174,7 +174,7 @@ export default function WhatsAppSettings() {
 
         <div>
           <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-            Twilio Auth Token {state?.configured && <span className="text-muted-foreground/60">(prázdné = ponechat)</span>}
+            Twilio Auth Token {state?.configured && <span className="text-muted-foreground">(prázdné = ponechat)</span>}
           </label>
           <Input
             type="password"

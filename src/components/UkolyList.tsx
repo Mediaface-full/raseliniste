@@ -132,9 +132,40 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
   // Optimistic delete bez confirm dialogu — Petr explicitně chtěl, hromadné
   // mazání 50× confirm bylo neúnosné. Server propagace do Todoist je idempotent
   // (404 ignoruje), takže náhodný klik je opravitelný (úkol manuálně znovu).
-  async function deleteTask(id: string) {
-    // Optimistic UI removal
+  // Undo okno (dávka B): úkol zmizí hned, ale 6 s jde vrátit — DELETE odejde až po
+  // vypršení nebo při dalším mazání (flush). Žádný confirm (v PWA nefunguje).
+  const [pendingDelete, setPendingDelete] = useState<{ task: Task; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const pendingRef = useRef<{ task: Task; timer: ReturnType<typeof setTimeout> } | null>(null);
+  useEffect(() => () => { if (pendingRef.current) { clearTimeout(pendingRef.current.timer); void performDelete(pendingRef.current.task.id); } }, []);
+
+  function deleteTask(id: string) {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    if (pendingRef.current) {
+      clearTimeout(pendingRef.current.timer);
+      void performDelete(pendingRef.current.task.id);
+    }
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    const timer = setTimeout(() => {
+      pendingRef.current = null;
+      setPendingDelete(null);
+      void performDelete(id);
+    }, 6000);
+    const entry = { task, timer };
+    pendingRef.current = entry;
+    setPendingDelete(entry);
+  }
+
+  function undoDelete() {
+    const entry = pendingRef.current;
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    pendingRef.current = null;
+    setPendingDelete(null);
+    setTasks((prev) => (prev.some((t) => t.id === entry.task.id) ? prev : [entry.task, ...prev]));
+  }
+
+  async function performDelete(id: string) {
     try {
       const res = await fetch(`/api/ukoly/${id}`, { method: "DELETE" });
       if (!res.ok) {
@@ -242,8 +273,16 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
         </div>
       )}
 
+      {pendingDelete && (
+        <div role="status" className="rounded-md border border-border bg-card text-sm px-3 py-2 flex items-center gap-3">
+          <Trash2 className="size-4 shrink-0 text-muted-foreground" />
+          <span className="flex-1 truncate">Úkol „{pendingDelete.task.title}" smazán.</span>
+          <button type="button" onClick={undoDelete} className="font-medium underline underline-offset-2 hover:text-[var(--c-signal)]">Vrátit zpět</button>
+        </div>
+      )}
+
       {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
+        <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
           <AlertTriangle className="size-4 shrink-0 mt-0.5" /> {error}
           <button onClick={() => setError(null)} className="ml-auto text-muted-foreground"><X className="size-4" /></button>
         </div>
@@ -534,7 +573,7 @@ function TaskRow({
             </span>
           )}
           {task.todoistProjectName && (
-            <span className="text-[10px] font-mono text-muted-foreground/70 shrink-0 truncate max-w-[120px]">
+            <span className="text-[10px] font-mono text-muted-foreground shrink-0 truncate max-w-[120px]">
               {task.todoistProjectName}
             </span>
           )}
@@ -547,7 +586,7 @@ function TaskRow({
           {(task.notes || task.rawSnippet) && (
             <button
               onClick={() => setShowDetail(!showDetail)}
-              className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+              className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
               title={showDetail ? "Skrýt detail" : "Detail (poznámka/citát)"}
             >
               <ChevronDown className={`size-3.5 transition-transform ${showDetail ? "rotate-180" : ""}`} />
@@ -557,23 +596,23 @@ function TaskRow({
             <button
               onClick={onPush}
               disabled={busy}
-              className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-              title="Push do Todoistu"
+              className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+              title="Push do Todoistu" aria-label="Push do Todoistu"
             >
               {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
             </button>
           )}
           <button
             onClick={() => setEditing(!editing)}
-            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+            className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
             title="Upravit"
           >
             <Edit3 className="size-3.5" />
           </button>
           <button
             onClick={onDelete}
-            className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
-            title="Smazat"
+            className="p-2 ml-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive"
+            title="Smazat" aria-label="Smazat"
           >
             <Trash2 className="size-3.5" />
           </button>

@@ -113,7 +113,7 @@ export default function AnniversaryManager() {
                           {it.reminderDaysBefore === 0 ? "v den" : `${it.reminderDaysBefore} dní předem`}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground/50">bez upozornění</span>
+                        <span className="text-muted-foreground">bez upozornění</span>
                       )}
                       {it.reminderChannels.includes("email") && (
                         <span className="flex items-center gap-1 text-[var(--tint-sky)]">

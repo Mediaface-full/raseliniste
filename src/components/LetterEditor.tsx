@@ -267,7 +267,7 @@ zde napíšeš text dopisu. Odstavce odděluj prázdným řádkem. Oslovení i z
 
 S pozdravem
 Petr Gideon Peřina"
-              className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm leading-relaxed resize-y"
+              className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm leading-relaxed resize-y"
             />
           ) : (
             <textarea
@@ -275,7 +275,7 @@ Petr Gideon Peřina"
               onChange={(e) => setBodyFinal(e.target.value)}
               rows={18}
               placeholder='Tady se objeví učesaný text po kliknutí na „Učesat".'
-              className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm leading-relaxed resize-y"
+              className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm leading-relaxed resize-y"
             />
           )}
         </div>
@@ -303,7 +303,7 @@ Petr Gideon Peřina"
                 onChange={(e) => setPromptOverride(e.target.value)}
                 rows={3}
                 placeholder="(volitelné) Dodatečné instrukce…"
-                className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm resize-none"
+                className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm resize-none"
               />
             </div>
           )}

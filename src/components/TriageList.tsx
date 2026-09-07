@@ -200,7 +200,7 @@ export default function TriageList() {
         <div
           className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md text-sm font-medium shadow-lg ${
             toast.type === "ok"
-              ? "bg-[var(--tint-sage)]/90 text-black"
+              ? "bg-[var(--tint-sage)]/90 text-background"
               : "bg-destructive/90 text-destructive-foreground"
           }`}
         >

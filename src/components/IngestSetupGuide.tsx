@@ -24,6 +24,8 @@ function CodeBlock({ children, label }: { children: string; label?: string }) {
       <button
         type="button"
         onClick={copy}
+        aria-label={copied ? "Zkopírováno" : "Kopírovat"}
+        title="Kopírovat"
         className="absolute top-1 right-1 px-2 py-1 rounded text-xs bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
         style={label ? { top: 22 } : undefined}
       >

@@ -174,7 +174,7 @@ export default function OwnerRecorder({
             <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-mono">
               Do kterého projektu nahráváš?
             </label>
-            <span className="text-[10px] font-mono text-muted-foreground/60">
+            <span className="text-[10px] font-mono text-muted-foreground">
               {projects.length} projekt{projects.length === 1 ? "" : projects.length < 5 ? "y" : "ů"}
             </span>
           </div>
@@ -210,7 +210,7 @@ export default function OwnerRecorder({
             <button
               onClick={startRecording}
               disabled={!selectedId}
-              className={`rounded-full bg-[var(--tint-peach)] text-black grid place-items-center shadow-xl shadow-black/30 hover:scale-105 transition-transform active:scale-95 disabled:opacity-40 ${compact ? "size-16" : "size-24"}`}
+              className={`rounded-full bg-[var(--tint-peach)] text-background grid place-items-center shadow-xl shadow-black/30 hover:scale-105 transition-transform active:scale-95 disabled:opacity-40 ${compact ? "size-16" : "size-24"}`}
             >
               <Mic className={compact ? "size-7" : "size-10"} />
             </button>
@@ -243,7 +243,7 @@ export default function OwnerRecorder({
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => upload(briefFile, "BRIEF", 0)}
-                    className="px-4 py-2 rounded-md bg-[var(--tint-mint)] text-black text-sm font-medium"
+                    className="px-4 py-2 rounded-md bg-[var(--tint-mint)] text-background text-sm font-medium"
                   >
                     Odeslat brief
                   </button>
@@ -258,7 +258,7 @@ export default function OwnerRecorder({
             ) : (
               <button
                 onClick={() => briefInputRef.current?.click()}
-                className="px-5 py-3 rounded-md bg-[var(--tint-mint)] text-black font-medium flex items-center gap-2"
+                className="px-5 py-3 rounded-md bg-[var(--tint-mint)] text-background font-medium flex items-center gap-2"
               >
                 <Upload className="size-4" /> Vybrat soubor
               </button>

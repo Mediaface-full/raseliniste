@@ -183,7 +183,7 @@ export default function JournalEntryView({ entryId }: { entryId: string }) {
       <div className="flex items-center gap-3 flex-wrap">
         <a href="/denik" className="text-xs font-mono text-muted-foreground hover:text-foreground">← Deník</a>
         <span className="text-xs font-mono text-muted-foreground"><Calendar className="inline size-3" /> {dateStr}</span>
-        <span className="text-[10px] font-mono text-muted-foreground/60">{fileId}</span>
+        <span className="text-[10px] font-mono text-muted-foreground">{fileId}</span>
         {entry.mood && (
           <span className="text-xs font-mono text-[var(--tint-butter)]">{MOOD_LABELS[entry.mood]}</span>
         )}

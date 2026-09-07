@@ -237,7 +237,7 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
             dlaždicemi — kontext „co mě čeká, musím přejíždět?". */}
         {upcomingEvents.length > 0 && (
           <a href="/dnes" class="block glass rounded-2xl p-3 space-y-2 hover:bg-white/5 transition" style="--c: var(--tint-sky);">
-            <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground/70 px-1">
+            <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground px-1">
               Dnes nadchází
             </div>
             {upcomingEvents.map((ev) => {
@@ -301,7 +301,7 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
             Links; klik otevře schůzku — na iOS PWA přes x-safari v Base) */}
         {meetLinks.length > 0 && (
           <div class="pt-2 space-y-2">
-            <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground/70 px-1">
+            <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground px-1">
               Meet — připojit se
             </div>
             <div class="grid grid-cols-3 gap-2.5">
@@ -334,7 +334,7 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
 
         {/* Audio sekce — vlastní podnadpis, vizuálně oddělené */}
         <div class="pt-2 space-y-2">
-          <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground/70 px-1">
+          <div class="text-[10px] uppercase tracking-[0.22em] font-mono text-muted-foreground px-1">
             Nahrávání
           </div>
           <div class="grid grid-cols-3 gap-2.5">
@@ -378,7 +378,7 @@ const anniversariesUpcoming = anniversariesSoon.filter((a) => a.days > 0 && a.da
 
         <SchedulerStatus variant="compact" />
 
-        <div class="text-center text-xs font-mono text-muted-foreground/60">
+        <div class="text-center text-xs font-mono text-muted-foreground">
           Tip: <strong>Sdílet → Přidat na plochu</strong> = ikona Rašeliniště
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, Mic, RefreshCw, X, Check } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Loader2, Mic, RefreshCw, X, Check } from "lucide-react";
 import { Button } from "./ui/Button";
 
 /**
@@ -149,8 +149,20 @@ export default function PlaudInbox() {
         </div>
       )}
 
-      {error && <div className="text-sm text-[var(--destructive,#e5484d)]">{error}</div>}
-      {message && <div className="text-sm text-muted-foreground">{message}</div>}
+      {error && (
+        <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 text-sm px-3 py-2 flex items-start gap-2">
+          <AlertTriangle className="size-4 shrink-0 mt-0.5 text-destructive" />
+          <span className="flex-1">{error}</span>
+          <button type="button" onClick={() => setError(null)} className="text-muted-foreground hover:text-foreground" aria-label="Zavřít chybu"><X className="size-4" /></button>
+        </div>
+      )}
+      {message && (
+        <div role="status" className="rounded-md border border-[var(--tint-mint)]/40 bg-[var(--tint-mint)]/10 text-sm px-3 py-2 flex items-start gap-2">
+          <Check className="size-4 shrink-0 mt-0.5 text-[var(--tint-mint)]" />
+          <span className="flex-1">{message}</span>
+          <button type="button" onClick={() => setMessage(null)} className="text-muted-foreground hover:text-foreground" aria-label="Zavřít zprávu"><X className="size-4" /></button>
+        </div>
+      )}
 
       {notes.length === 0 ? (
         <div className="text-sm text-muted-foreground italic">Žádné zápisy — až Plaud zpracuje nahrávku, objeví se tady.</div>

@@ -279,7 +279,7 @@ export default function DenikList() {
             Filtry {hasFilter && "•"}
           </button>
           {hasFilter && (
-            <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground">
+            <button onClick={clearAllFilters} className="text-xs text-muted-foreground hover:text-foreground" aria-label="Zrušit filtry" title="Zrušit filtry">
               <X className="size-4" />
             </button>
           )}

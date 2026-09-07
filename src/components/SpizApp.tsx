@@ -199,7 +199,7 @@ export default function SpizApp() {
           </div>
         )}
 
-        <div className="text-[11px] font-mono text-muted-foreground/60 mt-4">
+        <div className="text-[11px] font-mono text-muted-foreground mt-4">
           max 500 MB · po nahrání se odkaz sám zkopíruje do schránky
         </div>
 

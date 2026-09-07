@@ -458,7 +458,7 @@ export default function BookingPicker({ token }: { token: string }) {
           <button
             onClick={reserve}
             disabled={submitting || (invite.requiresIdentification && (!name || !email || !subject))}
-            className="w-full mt-2 px-4 py-3 rounded-md bg-[var(--tint-sage)] text-black font-medium flex items-center justify-center gap-2 disabled:opacity-40"
+            className="w-full mt-2 px-4 py-3 rounded-md bg-[var(--tint-sage)] text-background font-medium flex items-center justify-center gap-2 disabled:opacity-40"
           >
             {submitting ? <><Loader2 className="size-4 animate-spin" /> Rezervuji…</> : <><Check className="size-4" /> Rezervovat termín</>}
           </button>

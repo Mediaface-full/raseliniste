@@ -118,7 +118,7 @@ export default function ArgumentsGrid({ arguments: args }: { arguments: Decision
         <div className="text-left">↙ Náladově proti</div>
         <div className="text-right">Náladově pro ↘</div>
       </div>
-      <div className="text-[10px] font-mono text-muted-foreground/70 text-center pt-1">
+      <div className="text-[10px] font-mono text-muted-foreground text-center pt-1">
         velikost = četnost · plné = napříč náladami · průhledné = jen v určité náladě
       </div>
     </div>

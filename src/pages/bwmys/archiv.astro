@@ -97,7 +97,7 @@ const STATUS_LABEL: Record<string, { label: string; tint: string }> = {
                 >
                   {st.label}
                 </span>
-                <span class="text-[10px] font-mono text-muted-foreground/60 ml-auto">
+                <span class="text-[10px] font-mono text-muted-foreground ml-auto">
                   {it.datumUzavreni ? new Date(it.datumUzavreni).toLocaleDateString("cs-CZ") : "—"}
                 </span>
               </div>
@@ -108,7 +108,7 @@ const STATUS_LABEL: Record<string, { label: string; tint: string }> = {
                 </div>
               )}
               <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] font-mono text-muted-foreground/60">{it.kontext}</span>
+                <span class="text-[10px] font-mono text-muted-foreground">{it.kontext}</span>
                 <a
                   href={`/api/bwmys/${it.id}/export`}
                   class="text-[10px] font-mono text-[var(--tint-sky)] hover:underline ml-auto"

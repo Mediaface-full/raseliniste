@@ -259,7 +259,7 @@ export default function DiktatRecorder() {
           <>
             <button
               onClick={startRecording}
-              className="size-24 rounded-full text-black grid place-items-center shadow-xl hover:scale-105 transition-transform active:scale-95"
+              className="size-24 rounded-full text-background grid place-items-center shadow-xl hover:scale-105 transition-transform active:scale-95"
               style={{ background: cfg.color }}
             >
               <Mic className="size-10" />
@@ -336,7 +336,7 @@ export default function DiktatRecorder() {
                   <Lock className="size-3" /> obrazovka uzamčena proti spánku
                 </span>
               ) : protection.wakeLockSupported ? (
-                <span className="text-muted-foreground/60">wake lock nedostupný</span>
+                <span className="text-muted-foreground">wake lock nedostupný</span>
               ) : null}
               {protection.hiddenDurations.length > 0 && (
                 <span className="text-[var(--tint-rose)] flex items-center gap-1">

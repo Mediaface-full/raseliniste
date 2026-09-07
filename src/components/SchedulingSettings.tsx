@@ -250,7 +250,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     <div>
       <label className="text-xs font-mono uppercase text-muted-foreground tracking-wider">{label}</label>
       {children}
-      {hint && <p className="text-xs text-muted-foreground/70 mt-0.5">{hint}</p>}
+      {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
     </div>
   );
 }

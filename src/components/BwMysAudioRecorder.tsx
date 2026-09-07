@@ -142,7 +142,7 @@ export default function BwMysAudioRecorder({
             <>
               <button
                 onClick={startRecording}
-                className="size-20 rounded-full bg-[var(--tint-lavender)] text-black grid place-items-center shadow-xl hover:scale-105 transition-transform active:scale-95"
+                className="size-20 rounded-full bg-[var(--tint-lavender)] text-background grid place-items-center shadow-xl hover:scale-105 transition-transform active:scale-95"
               >
                 <Mic className="size-8" />
               </button>

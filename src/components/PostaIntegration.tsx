@@ -210,14 +210,14 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
       </header>
 
       {error && (
-        <div className="flex items-start gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+        <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3">
           <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {initial.gmailSyncError && !error && !result && (
-        <div className="flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+        <div className="flex items-start gap-2 text-xs text-[var(--tint-butter)] bg-[var(--tint-butter)]/10 border border-[var(--tint-butter)]/30 rounded-lg p-3">
           <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
           <span>Poslední pokus selhal: {initial.gmailSyncError}</span>
         </div>
@@ -398,7 +398,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
         generuje 7:00 ráno (cron). Tlačítka jsou on-demand spuštění.
       </p>
       {digestMessage && (
-        <div className="text-xs text-emerald-400 font-mono">{digestMessage}</div>
+        <div className="text-xs text-[var(--tint-mint)] font-mono">{digestMessage}</div>
       )}
 
       {classifyResult && (
@@ -417,7 +417,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
             <div>Klasifikováno: {classifyResult.classified}</div>
             <div>↺ Přeskočeno (už klasifikováno): {classifyResult.skipped}</div>
             {classifyResult.errors > 0 && (
-              <div className="text-red-400">Chyb: {classifyResult.errors}</div>
+              <div className="text-destructive">Chyb: {classifyResult.errors}</div>
             )}
             {classifyResult.durationMs && (
               <div>⏱ Doba: {(classifyResult.durationMs / 1000).toFixed(1)} s</div>
@@ -430,7 +430,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
               </summary>
               <ul className="mt-1 space-y-0.5 text-[11px] font-mono">
                 {classifyResult.errorDetails.map((e, i) => (
-                  <li key={i} className="text-red-400">
+                  <li key={i} className="text-destructive">
                     {e.emailId}: {e.error}
                   </li>
                 ))}
@@ -455,7 +455,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
           <div className="font-mono text-xs text-muted-foreground space-y-0.5">
             <div>Naimportováno: {result.imported}</div>
             <div>↺ Přeskočeno (už v DB): {result.skipped}</div>
-            {result.errors > 0 && <div className="text-red-400">Chyb: {result.errors}</div>}
+            {result.errors > 0 && <div className="text-destructive">Chyb: {result.errors}</div>}
             <div>⏱ Doba: {(result.durationMs / 1000).toFixed(1)} s</div>
             {result.emailAddress && <div>{result.emailAddress}</div>}
           </div>
@@ -466,7 +466,7 @@ export default function PostaIntegration({ initial }: { initial: InitialProps })
               </summary>
               <ul className="mt-1 space-y-0.5 text-[11px] font-mono">
                 {result.errorDetails.map((e, i) => (
-                  <li key={i} className="text-red-400">
+                  <li key={i} className="text-destructive">
                     {e.gmailMessageId}: {e.error}
                   </li>
                 ))}

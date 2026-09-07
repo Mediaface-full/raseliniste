@@ -494,7 +494,7 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm resize-none"
+              className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm resize-none"
             />
           </div>
           </EditorSection>

@@ -363,10 +363,10 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
               </Button>
             </div>
             {syncResult && (
-              <div className="text-xs text-emerald-400 font-mono pt-1">{syncResult}</div>
+              <div className="text-xs text-[var(--tint-mint)] font-mono pt-1">{syncResult}</div>
             )}
             {linkResult && (
-              <div className="text-xs text-emerald-400 font-mono pt-1">{linkResult}</div>
+              <div className="text-xs text-[var(--tint-mint)] font-mono pt-1">{linkResult}</div>
             )}
           </div>
         )}
@@ -397,7 +397,7 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
                 <select
                   value={vyruseni}
                   onChange={(e) => setVyruseni(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm"
+                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm"
                 >
                   <option value="">— Inbox (default) —</option>
                   {projects.map((p) => (
@@ -413,7 +413,7 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
                 <select
                   value={vip}
                   onChange={(e) => setVip(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm"
+                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm"
                 >
                   <option value="">— Inbox (default) —</option>
                   {projects.map((p) => (
@@ -429,7 +429,7 @@ export default function IntegrationsSettings({ initial }: { initial: InitialProp
                 <select
                   value={mojeUkoly}
                   onChange={(e) => setMojeUkoly(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-sm"
+                  className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-sm"
                 >
                   <option value="">— Inbox (default) —</option>
                   {projects.map((p) => (

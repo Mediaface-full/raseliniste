@@ -148,7 +148,7 @@ export default function LoginForm() {
         </Field>
 
         {error && (
-          <div className="rounded-md border border-destructive/30 bg-destructive/10 text-destructive-foreground text-sm px-3 py-2" role="alert">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 text-destructive text-sm px-3 py-2" role="alert">
             {error}
           </div>
         )}

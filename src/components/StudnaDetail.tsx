@@ -532,8 +532,8 @@ function RecordingCard({
                 type="button"
                 onClick={onMarkError}
                 disabled={busy}
-                className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground/40 hover:text-destructive disabled:opacity-50"
-                title="Zrušit zpracování (pokud uvázlo) — pak můžeš Regenerovat"
+                className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground hover:text-destructive disabled:opacity-50"
+                title="Zrušit zpracování (pokud uvázlo) — pak můžeš Regenerovat" aria-label="Zrušit zpracování (pokud uvázlo) — pak můžeš Regenerovat"
               >
                 ⨯
               </button>
@@ -633,7 +633,7 @@ function RecordingCard({
                           {th.rationale && (
                             <div className="text-[11px] text-muted-foreground italic mt-0.5">{th.rationale}</div>
                           )}
-                          <div className="text-[10px] font-mono text-muted-foreground/70 mt-0.5">
+                          <div className="text-[10px] font-mono text-muted-foreground mt-0.5">
                             {th.category} · {th.importance}
                           </div>
                         </div>
@@ -718,7 +718,7 @@ function RecordingCard({
                                 </div>
                               )}
                               {d.timestamp && (
-                                <div className="text-[10px] font-mono text-muted-foreground/60 mt-0.5">
+                                <div className="text-[10px] font-mono text-muted-foreground mt-0.5">
                                   {d.timestamp}
                                 </div>
                               )}
@@ -906,7 +906,7 @@ function RecordingCard({
               onClick={cleanAndRegenerate}
               disabled={busy || reuploading || cleaning}
               className="p-1.5 rounded hover:bg-[var(--tint-butter)]/20 transition-colors text-[var(--tint-butter)]"
-              title="Vyčistit audio přes ffmpeg (highpass 200 Hz + lowpass 3 kHz + dynaudnorm) a regenerovat. Použij když Gemini neumí přečíst kvůli hudbě/šumu v pozadí. POZOR: přepíše originál."
+              title="Vyčistit audio přes ffmpeg (highpass 200 Hz + lowpass 3 kHz + dynaudnorm) a regenerovat. Použij když Gemini neumí přečíst kvůli hudbě/šumu v pozadí. POZOR: přepíše originál." aria-label="Vyčistit audio přes ffmpeg (highpass 200 Hz + lowpass 3 kHz + dynaudnorm) a regenerovat. Použij když Gemini neumí přečíst kvůli hudbě/šumu v pozadí. POZOR: přepíše originál."
             >
               {cleaning ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
             </button>
@@ -915,7 +915,7 @@ function RecordingCard({
             onClick={onTogglePin}
             disabled={busy}
             className="p-1.5 rounded hover:bg-white/5 transition-colors"
-            title={recording.isPinned ? "Odepnout" : "Připnout (zachovat audio)"}
+            title={recording.isPinned ? "Odepnout" : "Připnout (zachovat audio)"} aria-label={recording.isPinned ? "Odepnout" : "Připnout (zachovat audio)"}
           >
             <Pin
               className="size-4"
@@ -930,6 +930,8 @@ function RecordingCard({
               className="p-1.5 rounded hover:bg-[var(--tint-sky)]/20 transition-colors text-[var(--tint-sky)]"
               title={recording.status === "processed"
                 ? "Přegenerovat AI analýzu (přepis + resumé znovu z audia)"
+                : "Regenerovat AI analýzu z uloženého audia"} aria-label={recording.status === "processed"
+                ? "Přegenerovat AI analýzu (přepis + resumé znovu z audia)"
                 : "Regenerovat AI analýzu z uloženého audia"}
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}
@@ -939,7 +941,7 @@ function RecordingCard({
             onClick={onDelete}
             disabled={busy}
             className="p-1.5 rounded hover:bg-destructive/20 transition-colors text-muted-foreground"
-            title="Smazat"
+            title="Smazat" aria-label="Smazat"
           >
             <Trash2 className="size-4" />
           </button>
@@ -1728,7 +1730,7 @@ function TextInputCard({ projectId, onSuccess }: { projectId: string; onSuccess:
         onChange={(e) => setText(e.target.value)}
         placeholder="Vlož text (zápis schůzky, briefovací poznámky...)"
         rows={10}
-        className="w-full rounded-md bg-black/30 border border-white/10 p-3 text-sm leading-relaxed font-mono focus:outline-none focus:border-[var(--tint-mint)]/40 resize-y min-h-[200px]"
+        className="w-full rounded-md bg-black/30 border border-white/10 p-3 text-sm leading-relaxed font-mono focus:border-[var(--tint-mint)]/40 resize-y min-h-[200px]"
       />
       <div className="flex items-center gap-3 text-[11px] font-mono text-muted-foreground">
         <span>{text.length.toLocaleString("cs-CZ")} znaků</span>
@@ -1855,7 +1857,7 @@ function FilesTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: (
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder='Volitelný popis (např. "faktura listopad 2026")'
-          className="w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:border-[var(--tint-mint)]/40"
+          className="w-full rounded-md bg-black/30 border border-white/10 px-3 py-2 text-sm focus:border-[var(--tint-mint)]/40"
           disabled={uploading}
         />
 
@@ -2133,7 +2135,7 @@ function ProjectAskCard({ projectId, recordingsCount }: { projectId: string; rec
         onChange={(e) => { setQ(e.target.value); setEstimate(null); setAnswer(null); }}
         placeholder="Napiš otázku — třeba: Co Radek říkal o financích? Kolik je tam zmínek o Mortykovi? Shrň pro mě klíčová rozhodnutí z briefů."
         rows={3}
-        className="w-full rounded-md bg-black/30 border border-white/10 p-3 text-sm leading-relaxed focus:outline-none focus:border-[var(--tint-lavender)]/40 resize-y min-h-[80px]"
+        className="w-full rounded-md bg-black/30 border border-white/10 p-3 text-sm leading-relaxed focus:border-[var(--tint-lavender)]/40 resize-y min-h-[80px]"
         disabled={busy !== null}
       />
 

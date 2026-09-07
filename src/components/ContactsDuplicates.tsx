@@ -231,7 +231,7 @@ export default function ContactsDuplicates() {
                           {c.emails.length > 0 && (
                             <div className="text-xs text-muted-foreground font-mono mt-0.5">✉ {c.emails.join(", ")}</div>
                           )}
-                          <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
                             vytvořeno {new Date(c.createdAt).toLocaleDateString("cs-CZ")}
                           </div>
                         </div>

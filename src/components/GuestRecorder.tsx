@@ -268,7 +268,7 @@ export default function GuestRecorder({
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
             disabled={phase !== "idle"}
-            className="w-full px-3 py-2.5 rounded-md bg-background/40 border border-border/60 focus:border-primary focus:outline-none text-base"
+            className="w-full px-3 py-2.5 rounded-md bg-background/40 border border-border/60 focus:border-primary text-base"
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -288,7 +288,7 @@ export default function GuestRecorder({
           <>
             <button
               onClick={startRecording}
-              className="size-24 rounded-full bg-[var(--c-signal)] text-black grid place-items-center shadow-xl shadow-black/30 hover:scale-105 transition-transform active:scale-95"
+              className="size-24 rounded-full bg-[var(--c-signal)] text-primary-foreground grid place-items-center shadow-xl shadow-black/30 hover:scale-105 transition-transform active:scale-95"
               aria-label="Začít nahrávat"
             >
               <Mic className="size-10" />
@@ -374,7 +374,7 @@ export default function GuestRecorder({
                     rows={5}
                     maxLength={8000}
                     placeholder="Sem napiš co potřebuješ — odkaz, jméno, číslo, zprávu. Můžeš to poslat samostatně (bez nahrávky), nebo to půjde k nahrávce. AI text neanalyzuje."
-                    className="w-full px-3 py-2 rounded-md bg-background/40 text-sm leading-relaxed resize-y focus:outline-none"
+                    className="w-full px-3 py-2 rounded-md bg-background/40 text-sm leading-relaxed resize-y"
                     style={{
                       border: "1px solid color-mix(in oklch, var(--foreground) 30%, transparent)",
                     }}
@@ -422,7 +422,7 @@ export default function GuestRecorder({
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={uploadBriefFile}
-                    className="px-4 py-2 rounded-md bg-[var(--tint-mint)] text-black text-sm font-medium"
+                    className="px-4 py-2 rounded-md bg-[var(--tint-mint)] text-background text-sm font-medium"
                   >
                     Odeslat brief
                   </button>
@@ -438,7 +438,7 @@ export default function GuestRecorder({
               <>
                 <button
                   onClick={() => briefInputRef.current?.click()}
-                  className="px-5 py-3 rounded-md bg-[var(--tint-mint)] text-black font-medium flex items-center gap-2"
+                  className="px-5 py-3 rounded-md bg-[var(--tint-mint)] text-background font-medium flex items-center gap-2"
                 >
                   <Upload className="size-4" /> Vybrat soubor
                 </button>

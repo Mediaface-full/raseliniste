@@ -330,6 +330,7 @@ function Section({
       <button
         type="button"
         onClick={onToggle}
+        aria-expanded={isOpen}
         className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-white/5"
       >
         {isOpen ? <ChevronDown className="size-4 text-muted-foreground" /> : <ChevronRight className="size-4 text-muted-foreground" />}

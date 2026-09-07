@@ -595,7 +595,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
           <button
             onClick={runIcloudSync}
             disabled={syncingIcloud || syncingGoogle || !icloudStatus.connected}
-            title="Stáhnout kontakty z iCloudu + auto-merge duplicit"
+            title="Stáhnout kontakty z iCloudu + auto-merge duplicit" aria-label="Stáhnout kontakty z iCloudu + auto-merge duplicit"
             className="px-2.5 py-1 rounded-md border border-border bg-secondary/40 text-foreground text-xs font-medium flex items-center gap-1 disabled:opacity-40 hover:bg-accent"
           >
             {syncingIcloud ? <Loader2 className="size-3 animate-spin" /> : <Cloud className="size-3" />}
@@ -604,7 +604,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
           <button
             onClick={runGoogleSync}
             disabled={syncingIcloud || syncingGoogle}
-            title="Obousměrný sync s Google Workspace"
+            title="Obousměrný sync s Google Workspace" aria-label="Obousměrný sync s Google Workspace"
             className="px-2.5 py-1 rounded-md border border-border bg-secondary/40 text-foreground text-xs font-medium flex items-center gap-1 disabled:opacity-40 hover:bg-accent"
           >
             {syncingGoogle ? <Loader2 className="size-3 animate-spin" /> : <Cloud className="size-3" />}
@@ -613,7 +613,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
           <button
             ref={toolsBtnRef}
             onClick={openTools}
-            title="Akce — uložit, obnovit, přidat kontakt/skupinu, zahodit"
+            title="Akce — uložit, obnovit, přidat kontakt/skupinu, zahodit" aria-label="Akce — uložit, obnovit, přidat kontakt/skupinu, zahodit"
             className="px-2.5 py-1 rounded-md border border-foreground/30 bg-foreground text-background text-xs font-medium flex items-center gap-1 hover:opacity-90"
           >
             <Wrench className="size-3" />
@@ -634,7 +634,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
             value={searchInput}
             onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
             placeholder="jméno, e-mail, telefon, firma…"
-            className="w-full pl-10 pr-3 py-2.5 rounded-md border-2 border-border bg-background text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
+            className="w-full pl-10 pr-3 py-2.5 rounded-md border-2 border-border bg-background text-foreground placeholder:text-muted-foreground text-sm focus-visible:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-ring transition"
           />
         </div>
         <select
@@ -841,8 +841,8 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
               <th className="px-2 py-2 text-left w-[100px]">Narozeniny</th>
               <th className="px-2 py-2 text-left w-[200px]">Poznámka</th>
               <th className="px-2 py-2 text-center w-[60px]" title="VIP/Team flagy z Rašeliniště (overlay)">Flag</th>
-              <th className="px-2 py-2 text-center w-[40px]" title="Push do iCloudu">⤴</th>
-              <th className="px-2 py-2 text-center w-[40px]" title="Smazat kontakt (DB + iCloud + Google)"></th>
+              <th className="px-2 py-2 text-center w-[52px] text-xs" title="Push do iCloudu">iCloud</th>
+              <th className="px-2 py-2 text-center w-[56px] text-xs" title="Smazat kontakt (DB + iCloud + Google)">Smazat</th>
             </tr>
           </thead>
           <tbody>
@@ -907,7 +907,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
                         className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition ${
                           eff.isVip
                             ? "border-[color:var(--c-signal)]/60 bg-[color:var(--c-signal)]/15 text-[color:var(--c-signal)]"
-                            : "border-border text-muted-foreground/40 hover:text-foreground hover:border-foreground/40"
+                            : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                         }`}
                       >VIP</button>
                       <button
@@ -917,7 +917,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
                         className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition ${
                           eff.isTeam
                             ? "border-foreground/60 bg-foreground/10 text-foreground"
-                            : "border-border text-muted-foreground/40 hover:text-foreground hover:border-foreground/40"
+                            : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                         }`}
                       >TÝM</button>
                       {eff.clientTag && (
@@ -927,7 +927,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setEditingContactId(c.id); }}
                         title="Upravit kontakt (oslovení, aliasy, klient tag, todoist user, VIP odkaz na call-log)"
-                        className="ml-0.5 p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent transition"
+                        className="ml-0.5 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition"
                       >
                         <Edit3 className="size-3" />
                       </button>
@@ -1102,7 +1102,7 @@ function EditableCell({
             if (e.key === "Enter") { e.preventDefault(); commit(); (e.currentTarget.closest("tr")?.nextElementSibling?.querySelector("td:nth-child(" + (Array.from(e.currentTarget.closest("tr")!.children).indexOf(e.currentTarget.closest("td")!) + 1) + ")") as HTMLElement | null)?.click(); }
             if (e.key === "Escape") cancel();
           }}
-          className="w-full min-w-[14rem] px-1 py-0.5 rounded bg-black/40 border border-[var(--tint-sky)]/50 text-sm font-mono outline-none"
+          className="w-full min-w-[14rem] px-1 py-0.5 rounded bg-black/40 border border-[var(--tint-sky)]/50 text-sm font-mono"
         />
       </td>
     );
@@ -1112,7 +1112,7 @@ function EditableCell({
     <td className="px-2 py-2 cursor-pointer" onClick={() => setEditing(true)}>
       <span className="block truncate">
         {icon}
-        {value || <span className="text-muted-foreground/50 italic">{placeholder ?? "—"}</span>}
+        {value || <span className="text-muted-foreground italic">{placeholder ?? "—"}</span>}
       </span>
     </td>
   );
@@ -1168,7 +1168,7 @@ function BirthdayCell({
             if (e.key === "Escape") setEditing(false);
           }}
           placeholder="YYYY-MM-DD nebo D.M.YYYY"
-          className="w-full px-1 py-0.5 rounded bg-black/40 border border-[var(--tint-sky)]/50 text-xs font-mono outline-none"
+          className="w-full px-1 py-0.5 rounded bg-black/40 border border-[var(--tint-sky)]/50 text-xs font-mono"
         />
       </td>
     );
@@ -1176,7 +1176,7 @@ function BirthdayCell({
 
   return (
     <td className="px-2 py-2 cursor-pointer font-mono text-xs" onClick={() => setEditing(true)}>
-      {value || <span className="text-muted-foreground/50 italic">—</span>}
+      {value || <span className="text-muted-foreground italic">—</span>}
     </td>
   );
 }

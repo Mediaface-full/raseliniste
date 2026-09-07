@@ -179,7 +179,7 @@ export default function TaskAudioRecorder() {
           <>
             <button
               onClick={startRecording}
-              className="size-24 rounded-full bg-[var(--tint-peach)] text-black grid place-items-center shadow-xl hover:scale-105 transition-transform active:scale-95"
+              className="size-24 rounded-full bg-[var(--tint-peach)] text-background grid place-items-center shadow-xl hover:scale-105 transition-transform active:scale-95"
             >
               <Mic className="size-10" />
             </button>

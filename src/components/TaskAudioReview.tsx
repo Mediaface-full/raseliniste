@@ -459,7 +459,7 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground/70 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             Stránka se obnovuje sama každé 3 sekundy. Můžeš zatím dělat něco jiného.
           </p>
         </div>
@@ -725,7 +725,7 @@ function ProposalRow({
         <button
           onClick={onRemove}
           className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive shrink-0"
-          title="Smazat tento návrh"
+          title="Smazat tento návrh" aria-label="Smazat tento návrh"
         >
           <X className="size-4" />
         </button>
@@ -752,7 +752,7 @@ function ProposalRow({
                   const newTTag = e.target.value as TTag;
                   onChange({ tags: [...stripTTag(proposal.tags), newTTag] });
                 }}
-                className="bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground cursor-pointer hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
+                className="bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground cursor-pointer hover:border-foreground/40 focus-visible:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-ring transition"
               >
                 {T_TAGS.map((t) => (
                   <option key={t} value={t}>{T_LABEL[t]}</option>
@@ -770,7 +770,7 @@ function ProposalRow({
                   const v = e.target.value;
                   onChange({ dueAt: v ? new Date(`${v}T09:00:00`).toISOString() : null, dueIsTime: false });
                 }}
-                className="bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground cursor-pointer hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
+                className="bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground cursor-pointer hover:border-foreground/40 focus-visible:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-ring transition"
               />
             </label>
 
@@ -780,7 +780,7 @@ function ProposalRow({
               <select
                 value={proposal.priority}
                 onChange={(e) => onChange({ priority: e.target.value as "low" | "normal" | "high" })}
-                className={`bg-background border rounded-md px-2 py-1 text-sm font-mono cursor-pointer focus:outline-none focus:ring-2 focus:ring-foreground/10 transition ${
+                className={`bg-background border rounded-md px-2 py-1 text-sm font-mono cursor-pointer focus-visible:outline-none focus:ring-2 focus:ring-ring transition ${
                   proposal.priority === "high"
                     ? "border-[color:var(--c-signal)]/60 text-[color:var(--c-signal)] hover:border-[color:var(--c-signal)]"
                     : proposal.priority === "low"
@@ -802,7 +802,7 @@ function ProposalRow({
               <select
                 value={proposal.assignedToContactId ?? ""}
                 onChange={(e) => onChange({ assignedToContactId: e.target.value || null })}
-                className="bg-background border border-border rounded-md px-2 py-1 text-sm text-foreground cursor-pointer hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 max-w-[160px] transition"
+                className="bg-background border border-border rounded-md px-2 py-1 text-sm text-foreground cursor-pointer hover:border-foreground/40 focus-visible:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-ring max-w-[160px] transition"
               >
                 <option value="">Já</option>
                 {contacts.map((c) => <option key={c.id} value={c.id}>{c.displayName}</option>)}
@@ -838,7 +838,7 @@ function ProposalRow({
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 placeholder="tagy, čárkou"
-                className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground placeholder:text-muted-foreground/60 hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
+                className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1 text-sm font-mono text-foreground placeholder:text-muted-foreground hover:border-foreground/40 focus-visible:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-ring transition"
               />
             </label>
           </div>
@@ -849,7 +849,7 @@ function ProposalRow({
             onChange={(e) => onChange({ notes: e.target.value || null })}
             placeholder="+ poznámka"
             rows={proposal.notes ? 2 : 1}
-            className="w-full mt-3 bg-background border border-border rounded-md px-2.5 py-1.5 text-sm leading-snug resize-y text-foreground placeholder:text-muted-foreground/60 hover:border-foreground/40 focus:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-foreground/10 transition"
+            className="w-full mt-3 bg-background border border-border rounded-md px-2.5 py-1.5 text-sm leading-snug resize-y text-foreground placeholder:text-muted-foreground hover:border-foreground/40 focus-visible:outline-none focus:border-foreground/60 focus:ring-2 focus:ring-ring transition"
           />
 
           {/* Citace z přepisu */}

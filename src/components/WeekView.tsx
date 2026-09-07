@@ -395,7 +395,7 @@ export default function WeekView({
 
           {/* All-day spanning row — multi-day eventy jsou jeden vizuální blok
               napříč sloupci, ne separátní per-day badge */}
-          <div className="text-[9px] font-mono text-muted-foreground/70 px-1 py-0.5 border-r border-white/[0.06]">cel.den</div>
+          <div className="text-[9px] font-mono text-muted-foreground px-1 py-0.5 border-r border-white/[0.06]">cel.den</div>
           <div
             className="col-span-7 relative border-b border-white/[0.06]"
             style={{
@@ -467,7 +467,7 @@ export default function WeekView({
             {Array.from({ length: HOURS_VISIBLE + 1 }).map((_, i) => (
               <div
                 key={i}
-                className="absolute right-1 text-[10px] font-mono tabular text-muted-foreground/60 -translate-y-1.5"
+                className="absolute right-1 text-[10px] font-mono tabular text-muted-foreground -translate-y-1.5"
                 style={{ top: i * HOUR_PX }}
               >
                 {String(HOUR_START + i).padStart(2, "0")}:00
