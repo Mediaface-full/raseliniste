@@ -117,7 +117,13 @@ export default function UkolyList({ todoistConfigured }: { todoistConfigured: bo
       if (res.ok) {
         const data = await res.json();
         setTasks((prev) => prev.map((t) => (t.id === id ? data.task : t)));
+      } else {
+        // UX audit A4: dřív tiché selhání — UI ukázalo starou hodnotu
+        const d = await res.json().catch(() => null);
+        setError(d?.error ?? `Uložení úkolu selhalo (HTTP ${res.status}).`);
       }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Síťová chyba při ukládání.");
     } finally {
       setBusy(null);
     }
@@ -435,6 +441,9 @@ function CreateTaskForm({
             title,
             notes: notes || null,
             dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+            // UX audit A6: inline editace je jen datum — bez tohoto by úkol
+            // s časem po každé editaci "ztratil" čas (zobrazoval 01:00/02:00)
+            dueIsTime: false,
             tags: tags.split(",").map((s) => s.trim()).filter(Boolean),
             priority,
             assignedToContactId: assignedToContactId || null,

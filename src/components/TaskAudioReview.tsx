@@ -396,7 +396,6 @@ export default function TaskAudioReview({ batchId }: { batchId: string }) {
     return discardNow();
   }
   async function discardNow() {
-    if (!confirm("Opravdu zahodit všechny návrhy?")) return;
     const res = await fetch(`/api/ukoly/audio/${batchId}/discard`, { method: "POST" });
     if (res.ok) window.location.href = "/ukoly";
   }

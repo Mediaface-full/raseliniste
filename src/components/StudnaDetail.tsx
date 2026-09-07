@@ -961,6 +961,9 @@ function formatDuration(sec: number): string {
 // =============================================================================
 function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: () => void }) {
   const [inviting, setInviting] = useState(false);
+  // UX audit A7: odkaz pro hosta se ukáže v panelu (alert() v PWA nevyskočí)
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -1034,6 +1037,21 @@ function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: 
         )}
       </div>
 
+      {inviteLink && (
+        <div className="rounded-lg border border-[var(--tint-sage)]/40 bg-[var(--tint-sage)]/10 p-3 text-sm space-y-2" role="status">
+          <div className="font-semibold">Pozvánka vytvořena — pošli hostovi tenhle odkaz:</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <code className="font-mono text-xs break-all flex-1 min-w-0">{inviteLink}</code>
+            <button
+              type="button"
+              onClick={() => { navigator.clipboard.writeText(inviteLink).then(() => { setInviteLinkCopied(true); setTimeout(() => setInviteLinkCopied(false), 2500); }).catch(() => null); }}
+              className="text-xs px-2.5 py-1.5 rounded-md border border-border hover:bg-accent shrink-0"
+            >{inviteLinkCopied ? "Zkopírováno" : "Kopírovat"}</button>
+            <button type="button" onClick={() => setInviteLink(null)} className="text-xs text-muted-foreground underline shrink-0">Zavřít</button>
+          </div>
+        </div>
+      )}
+
       {inviting && (
         <InviteForm
           projectId={project.id}
@@ -1042,7 +1060,8 @@ function GuestsTab({ project, onRefresh }: { project: ProjectDetail; onRefresh: 
             setInviting(false);
             onRefresh();
             navigator.clipboard.writeText(link).catch(() => null);
-            alert(`Pozvánka vytvořena.\n\nLink (zkopírováno do schránky):\n${link}`);
+            // UX audit A7: alert() v PWA nevyskočí → odkaz se ukáže v panelu
+            setInviteLink(link);
           }}
         />
       )}

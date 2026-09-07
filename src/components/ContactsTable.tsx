@@ -879,7 +879,7 @@ export default function ContactsTable({ initialTotal, icloudStatus, googleStatus
                   />
                   <EditableCell
                     value={eff.addressLines.join(" / ")}
-                    onSave={(v) => editCell(c.id, "addressLines", v)}
+                    onSave={(v) => editCell(c.id, "address", v)}
                     placeholder="—"
                   />
                   <EditableCell

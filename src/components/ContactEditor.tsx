@@ -183,7 +183,7 @@ export function ContactEditor({ contact, onClose }: EditorProps) {
   }
 
   return (
-    <div className="modal-overlay" onClick={() => onClose(false)}>
+    <div className="modal-overlay">{/* UX audit A5: klik do overlay dřív zahodil rozepsaný kontakt bez varování */}
       <div
         className="modal-panel max-w-4xl w-full max-h-[90vh] overflow-y-auto p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}

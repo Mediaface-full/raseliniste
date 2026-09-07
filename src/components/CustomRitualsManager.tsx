@@ -60,9 +60,12 @@ export default function CustomRitualsManager() {
 
   async function remove(id: string) {
     if (!confirm("Smazat tento rituál? Nelze vrátit zpět.")) return;
-    const res = await fetch(`/api/rituals/${id}`, { method: "DELETE" });
-    if (res.ok) {
+    const res = await fetch(`/api/rituals/${id}`, { method: "DELETE" }).catch(() => null);
+    if (res?.ok) {
       setItems((prev) => prev.filter((r) => r.id !== id));
+    } else {
+      const d = await res?.json().catch(() => null);
+      setError(d?.error ?? "Smazání rituálu selhalo.");
     }
   }
 
@@ -75,6 +78,9 @@ export default function CustomRitualsManager() {
     if (res.ok) {
       const data = await res.json();
       setItems((prev) => prev.map((x) => (x.id === r.id ? data.ritual : x)));
+    } else {
+      const d = await res.json().catch(() => null);
+      setError(d?.error ?? "Změna stavu rituálu selhala.");
     }
   }
 

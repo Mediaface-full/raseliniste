@@ -335,8 +335,9 @@ export default function InviteCreator() {
 
   async function cancel(inviteId: string) {
     if (!confirm("Opravdu zrušit tuto pozvánku?")) return;
-    const res = await fetch(`/api/booking/${inviteId}/cancel`, { method: "POST" });
-    if (res.ok) void loadInvites();
+    const res = await fetch(`/api/booking/${inviteId}/cancel`, { method: "POST" }).catch(() => null);
+    if (res?.ok) void loadInvites();
+    else setError("Zrušení pozvánky selhalo.");
   }
 
   // Petr 2026-05-21: znovu odeslat potvrzovací mail. Použít pokud kontakt

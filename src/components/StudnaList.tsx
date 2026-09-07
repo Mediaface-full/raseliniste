@@ -18,6 +18,7 @@ export type ProjectListMode = "studanka" | "prskavka";
 export default function StudnaList({ mode = "studanka" }: { mode?: ProjectListMode } = {}) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   // Mode-specific URL prefixy. Detail projektu (/studna/<id>) je sdílený
@@ -35,8 +36,16 @@ export default function StudnaList({ mode = "studanka" }: { mode?: ProjectListMo
     setLoading(true);
     try {
       const res = await fetch(apiUrl);
-      const data = await res.json();
-      if (res.ok) setProjects(data.projects);
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setProjects(data.projects);
+        setLoadError(null);
+      } else {
+        // UX audit A4: chyba načtení dřív vypadala jako „Zatím žádné projekty"
+        setLoadError(data?.error ?? `Načtení selhalo (HTTP ${res.status}).`);
+      }
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Síťová chyba.");
     } finally {
       setLoading(false);
     }
@@ -80,7 +89,13 @@ export default function StudnaList({ mode = "studanka" }: { mode?: ProjectListMo
         />
       )}
 
-      {projects.length === 0 ? (
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm flex items-start gap-3" role="alert">
+          <span className="font-semibold text-destructive shrink-0">Načtení projektů selhalo.</span>
+          <span className="flex-1">{loadError}</span>
+          <button type="button" onClick={() => void load()} className="underline text-sm shrink-0">Zkusit znovu</button>
+        </div>
+      ) : projects.length === 0 ? (
         <div className="glass rounded-xl p-8 text-center text-muted-foreground">
           {emptyMsg}
         </div>

@@ -195,6 +195,10 @@
 }
 
 /* ---- Base ---- */
+/* UX audit 2026-09-06 (A3): iOS Safari přibližuje stránku při focusu do pole
+   s písmem < 16px. Inputy měly text-sm (≈14,9px při 17px rootu). */
+input, select, textarea { font-size: max(16px, 1rem); }
+
 html {
   font-size: 17px; /* Petr 2026-06-18: zvětšeno z 16px — brand body 16-20px,
                      plus Petr má lepší orientaci / kontrast. */

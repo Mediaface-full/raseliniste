@@ -98,7 +98,14 @@ export default function PageLinksSettings() {
       if (res.ok) {
         const data = await res.json();
         setLinks((prev) => prev.map((l) => (l.id === id ? data.link : l)));
+        return true;
       }
+      const d = await res.json().catch(() => null);
+      setError(d?.error ?? `Uložení odkazu selhalo (HTTP ${res.status}).`);
+      return false;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Síťová chyba.");
+      return false;
     } finally {
       setBusy(null);
     }
@@ -240,7 +247,7 @@ function PageLinkRow({
 }: {
   link: PageLink;
   busy: boolean;
-  onUpdate: (patch: Partial<PageLink>) => void;
+  onUpdate: (patch: Partial<PageLink>) => Promise<boolean> | void;
   onRemove: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -250,15 +257,15 @@ function PageLinkRow({
   const [icon, setIcon] = useState(link.icon ?? "");
   const [section, setSection] = useState<"" | "MEET">(link.section === "MEET" ? "MEET" : "");
 
-  function save() {
-    onUpdate({
+  async function save() {
+    const ok = await onUpdate({
       section: section || null,
       name: name.trim() || link.name,
       url: url.trim() || link.url,
       tint,
       icon: icon.trim() || null,
     });
-    setEditing(false);
+    if (ok !== false) setEditing(false);
   }
 
   if (!editing) {

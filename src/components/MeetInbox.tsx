@@ -133,6 +133,7 @@ export default function MeetInbox() {
   async function removeSpace(id: string) {
     const res = await fetch(`/api/studna/meet/spaces?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => null);
     if (res?.ok) setSpaces((s) => s.filter((x) => x.id !== id));
+    else setError("Odebrání místnosti selhalo.");
   }
 
   // Gideon 2026-09-01: mizerný přepis → přepsat znovu (nový model Pro)
