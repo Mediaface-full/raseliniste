@@ -4,6 +4,18 @@
 > a ví kde se skončilo. Detail jednotlivých session bloků v
 > `INSTRUKCE/HANDOFF-*.md` a v memory souborech.
 
+## Session 2026-09-06 → 09-07 — UX audit: dávky A, B, C + nové menu
+
+Zdroj: `docs/UX-AUDIT-2026-09-06.md`. Commity `a30f09d` (A), `5f0cd40` (menu R3), `1ec90b8` (B), `7b9168d` (C).
+
+- **A (nic nespadne):** tichá selhání → viditelné chyby (UkolyList, CustomRituals, InviteCreator, MeetInbox…), `confirm()` pryč z PWA cest (dvouklik), ContactEditor overlay nezavírá klik mimo, StudnaList „Zkusit znovu".
+- **Menu (R3):** 8 skupin podle záměru (Dnes / Vstupy / Kalendář / Práce / Obsah / Komunikace / Lidé a data / Systém), `<details>` podmenu se otevírá na aktivní položce, ⌘K → /zeptat-se, mrtvé položky odstraněny. Breadcrumby stránek srovnány se skupinami (C).
+- **B (vidím, co se děje):** paleta Tailwind (red/emerald/amber/blue) → tokeny (`destructive`, `--tint-mint/butter/sky`); `text-black` na tintech → `text-background`; `text-muted-foreground/40–70` bez opacity; `focus:outline-none` bez ringu odstraněn (globální `:focus-visible` outline v Signal); Meet/Plaud inbox chyby+úspěch jako panel s ikonou a zavřením; rituály: chyba vs. Google varování zvlášť; **undo mazání úkolu** (6 s „Vrátit zpět", DELETE až po vypršení / flush při dalším mazání); aria-label na ikonových tlačítkách (title → aria-label), textové hlavičky v tabulce kontaktů (iCloud / Smazat), pošta stav i textem (k potvrzení / urgentní / eskalace), dotykové cíle `p-2`.
+- **C (formuláře):** BookingPicker validuje při kliknutí (jméno, příjmení, e-mail formát, téma) + scroll/fokus na pole + `type=tel` + poznámka o časovém pásmu když prohlížeč ≠ Praha; InviteCreator čte předstih z `/api/calendar/settings` (dřív natvrdo 48/12 vs. 72/24!) a CTA je vždy klikací s inline důvodem; ContactEditor validace e-mailů a narozenin + sticky patička + náhled normalizovaného slugu; SchedulingSettings křížová validace oken/limitů + `NumberInput` jde vymazat; rituály čas jako text (vymazatelné) + kontrola přesahu půlnoci; PageLinks `normalizeUrl` (bez schématu → https://), popisky v editaci, chyba u řádku, dvouklik mazání; emoji → lucide (mimo deník, tisk a TrencadisBoard = 1:1 replika designu); HealthAnalysesList na `.modal-overlay`.
+- **`&#13;` cleanup dat:** existující endpoint `/api/contacts/cleanup-entities` (tlačítko „Sanitace po prvním iCloud sync" v Kontakty → Nástroje) — na produkci spustit ručně.
+- **Otevřené z auditu:** R1 (ConfirmDialog primitiva pro zbylých ~80 `confirm()` mimo PWA cesty), R2 (remap `text-[10px]/[11px]` → `text-xs`), R4 (jednotný toast/alert/skeleton), R5 (Signal rozpočet CTA), R6 (řazení/stránkování tabulek), R7 (dirty check), R8 (Studánka+Prskavka sloučení — čeká na Gideonovo slovo).
+- **Pasti:** `focus:outline-none` nikdy bez viditelné náhrady; číselné inputy nikdy `parseInt(...) || 0` v onChange (nejde vymazat); lead time nikdy natvrdo v UI textu.
+
 ## SNAPSHOT 2026-09-01 — pevný bod před UX/flow vlnou
 
 > Gideon: „budeme teď dělat hodně úprav přehlednosti a flow" — tohle je
