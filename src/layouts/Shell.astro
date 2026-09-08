@@ -268,6 +268,16 @@ const hasActiveChild = (item: NavItem) => (item.children ?? []).some((c) => isAc
     <div class="flex flex-col min-w-0 gap-3">
       <header class="glass rounded-xl h-16 px-4 lg:px-5 flex items-center gap-3">
         <SidebarToggle client:load />
+        {/* Gideon 2026-09-08: v desktopové (PWA) appce není prohlížečové „zpět" — tlačítko v topbaru */}
+        <button
+          type="button"
+          onclick="history.length > 1 ? history.back() : (location.href = '/')"
+          class="h-10 w-10 rounded-md border border-border hover:bg-accent grid place-items-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          aria-label="Zpět"
+          title="Zpět (Alt+←)"
+        >
+          <Icon name="lucide:arrow-left" class="size-[18px]" />
+        </button>
         {/* UX audit R3/B2: Start = mobilní rozcestník. Neutrální vzhled (tint jako CTA je mimo brand), na desktopu je domů Dashboard. */}
         <a
           href="/start"

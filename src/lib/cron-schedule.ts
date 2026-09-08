@@ -49,6 +49,12 @@ export const CRON_JOBS: CronJobDef[] = [
     description: "Pull Google Calendar událostí",
   },
   {
+    name: "todoist-reconcile",
+    endpoint: "/api/cron/todoist-reconcile",
+    schedule: { type: "daily", hour: 3, minute: 30 },
+    description: "Todoist — dorovnání driftu (hotové/smazané/přesunuté, které incremental sync minul)",
+  },
+  {
     name: "sync-contacts",
     endpoint: "/api/cron/sync-contacts",
     schedule: { type: "daily", hour: 4, minute: 0 },

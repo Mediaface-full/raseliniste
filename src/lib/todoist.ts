@@ -433,3 +433,50 @@ export async function listAllCollaborators(token: string): Promise<TodoistCollab
   }
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "cs"));
 }
+
+// ---------------------------------------------------------------------------
+// Gideon 2026-09-08 — aktivní úkoly projektu + filtr (P1/P2 na dashboardu,
+// reconcile driftu MEDIAFACE 47 vs. ~20 v Todoistu).
+// ---------------------------------------------------------------------------
+
+export interface TodoistActiveTask {
+  id: string;
+  content: string;
+  project_id: string;
+  section_id?: string | null;
+  parent_id?: string | null;
+  priority: 1 | 2 | 3 | 4;
+  due?: { date: string; string?: string; datetime?: string | null } | null;
+  url?: string;
+  checked?: boolean;
+  is_completed?: boolean;
+  responsible_uid?: string | null;
+}
+
+type TaskPage = { results: TodoistActiveTask[]; next_cursor: string | null };
+
+async function pageAll(token: string, basePath: string, maxPages = 20): Promise<TodoistActiveTask[]> {
+  const all: TodoistActiveTask[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < maxPages; i++) {
+    const sep = basePath.includes("?") ? "&" : "?";
+    const page: TaskPage = await call<TaskPage>(token, `${basePath}${cursor ? `${sep}cursor=${encodeURIComponent(cursor)}` : ""}`);
+    if (Array.isArray(page)) return page as unknown as TodoistActiveTask[];
+    if (!page?.results) break;
+    all.push(...page.results);
+    if (!page.next_cursor) break;
+    cursor = page.next_cursor;
+  }
+  return all;
+}
+
+/** Aktivní (nedokončené) úkoly — celý účet nebo jeden projekt. Včetně podúkolů. */
+export async function listActiveTasks(token: string, projectId?: string): Promise<TodoistActiveTask[]> {
+  const q = projectId ? `?project_id=${encodeURIComponent(projectId)}&limit=200` : "?limit=200";
+  return pageAll(token, `/tasks${q}`);
+}
+
+/** Todoist filtr (stejná syntaxe jako v appce: "p1", "today | overdue", …). */
+export async function filterTasks(token: string, query: string): Promise<TodoistActiveTask[]> {
+  return pageAll(token, `/tasks/filter?query=${encodeURIComponent(query)}&limit=200`, 5);
+}
