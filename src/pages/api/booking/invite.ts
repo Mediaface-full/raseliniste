@@ -130,5 +130,19 @@ export const GET: APIRoute = async ({ cookies }) => {
       contact: { select: { id: true, displayName: true } },
     },
   });
-  return Response.json({ invites });
+  // Gideon 2026-09-08: poslední mail na adresu hosta — ať je odmítnutí vidět
+  // rovnou v seznamu (SMTP2GO webhook propisuje reject/bounce do MailLogu).
+  const emails = Array.from(new Set(invites.map((i) => i.inviteeEmail).filter((e): e is string => !!e)));
+  const logs = emails.length
+    ? await prisma.mailLog.findMany({
+        where: { to: { in: emails }, createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+        orderBy: { createdAt: "desc" },
+        select: { to: true, ok: true, error: true, subject: true, createdAt: true, context: true },
+      })
+    : [];
+  const lastByEmail = new Map<string, (typeof logs)[number]>();
+  for (const l of logs) if (!lastByEmail.has(l.to)) lastByEmail.set(l.to, l);
+  return Response.json({
+    invites: invites.map((i) => ({ ...i, lastMail: i.inviteeEmail ? lastByEmail.get(i.inviteeEmail) ?? null : null })),
+  });
 };

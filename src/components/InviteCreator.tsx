@@ -32,6 +32,7 @@ interface InviteRow {
   reservedSlot: { startsAt: string; endsAt: string; type: string } | null;
   contact: { id: string; displayName: string } | null;
   createdAt: string;
+  lastMail?: { ok: boolean; error: string | null; subject: string; createdAt: string; context: string | null } | null;
 }
 
 /** Editace parametrů pozvánky, dokud si host nevybral termín (Gideon 2026-08-05) */
@@ -795,6 +796,14 @@ export default function InviteCreator() {
                   <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
                     <div className="flex items-center gap-2 min-w-0">
                       <StatusBadge status={inv.status} />
+                      {inv.lastMail && !inv.lastMail.ok && (
+                        <span
+                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/40 shrink-0"
+                          title={`${inv.lastMail.subject} — ${inv.lastMail.error ?? "chyba"}`}
+                        >
+                          <AlertTriangle className="size-3" /> mail nedoručen
+                        </span>
+                      )}
                       <span className="text-base font-medium truncate">
                         {inv.contact?.displayName ?? inv.inviteeName ?? (isUniversal ? "Univerzální link" : "—")}
                       </span>
