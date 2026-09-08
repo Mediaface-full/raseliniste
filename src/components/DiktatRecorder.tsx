@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Mic, Square, Loader2, AlertTriangle, Upload, Check, CheckSquare, BookOpen, Lock, Eye, EyeOff, Paperclip } from "lucide-react";
+import { Mic, Square, Loader2, AlertTriangle, Upload, Check, CheckSquare, BookOpen, Lock, Eye, EyeOff, Paperclip, FileText } from "lucide-react";
 import { useRecordingProtection, recordingProtectionTip } from "./useRecordingProtection";
 
 const TICK_MS = 250;
@@ -14,6 +14,8 @@ const MODES = {
     color: "var(--c-signal)",
     description: "Salva úkolů → AI je rozdělí, ty schválíš v review.",
     endpoint: "/api/ukoly/audio",
+    textEndpoint: "/api/ukoly/text",
+    textPlaceholder: "Sem vlož přepis nebo napiš text — třeba z Plaudu, z mailu, z poznámek. Klidně dlouhý; AI z něj vyrobí úkoly stejně jako z nahrávky.",
     successPath: (id: string) => `/ukoly/audio/${id}/review`,
     limitOptions: [3, 10, 30],
     defaultLimit: 10,
@@ -25,6 +27,8 @@ const MODES = {
     color: "var(--c-signal)",
     description: "Volný proud myšlenek → AI vyrobí strukturovaný zápis.",
     endpoint: "/api/denik/audio",
+    textEndpoint: "/api/denik/text",
+    textPlaceholder: "Sem vlož přepis nebo napiš text — volný proud, klidně dlouhý. AI z něj udělá strukturovaný zápis stejně jako z nahrávky.",
     successPath: (id: string) => `/denik/${id}/edit`,
     limitOptions: [5, 15, 30, 60],
     defaultLimit: 15,
@@ -67,6 +71,35 @@ export default function DiktatRecorder() {
   const startedAtRef = useRef<number>(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Gideon 2026-09-08: „musím mít možnost vložit přepis, ne jen audio" —
+  // textová cesta = stejná pipeline bez Stage 1 (přepis už máme).
+  const [textOpen, setTextOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [textBusy, setTextBusy] = useState(false);
+  const [textDone, setTextDone] = useState<string | null>(null);
+  async function submitText() {
+    const body = text.trim();
+    if (!body) { setError("Vlož nejdřív nějaký text."); return; }
+    setTextBusy(true);
+    setError(null);
+    setTextDone(null);
+    try {
+      const res = await fetch(cfg.textEndpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(mode === "journal" ? { text: body, date: new Date().toISOString().slice(0, 10) } : { text: body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.error ?? `Odeslání selhalo (HTTP ${res.status})`); return; }
+      setText("");
+      setTextDone(cfg.successPath(data.batchId ?? data.entryId));
+    } catch (e) {
+      setError(`Odeslání selhalo: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setTextBusy(false);
+    }
+  }
 
   useEffect(() => {
     const m = loadMode();
@@ -302,6 +335,55 @@ export default function DiktatRecorder() {
               >
                 Nevíš jak na to? Otevři návod →
               </a>
+            </div>
+            {/* Gideon 2026-09-08: vložený text místo audia */}
+            <div className="w-full max-w-sm mt-3">
+              {!textOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setTextOpen(true)}
+                  className="w-full px-4 py-3 rounded-md text-sm flex items-center justify-center gap-2 transition-colors border border-dashed border-border bg-secondary/30 text-foreground hover:border-foreground hover:bg-secondary/50"
+                >
+                  <FileText className="size-4" />
+                  Vložit přepis nebo text
+                </button>
+              ) : (
+                <div className="space-y-2 text-left">
+                  <label htmlFor="diktat-text" className="text-xs font-mono uppercase text-muted-foreground">
+                    {mode === "task" ? "Text → úkoly" : "Text → deníkový zápis"}
+                  </label>
+                  <textarea
+                    id="diktat-text"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder={cfg.textPlaceholder}
+                    rows={10}
+                    className="w-full px-3 py-2 rounded-md bg-background/40 border border-border/60 focus:border-primary text-base leading-relaxed resize-y min-h-[160px]"
+                  />
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground font-mono">
+                    <span>{text.length.toLocaleString("cs-CZ")} znaků</span>
+                    <button type="button" onClick={() => { setTextOpen(false); setTextDone(null); }} className="hover:text-foreground">zavřít</button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={submitText}
+                    disabled={textBusy || !text.trim()}
+                    className="w-full px-4 py-3 rounded-md text-sm font-medium flex items-center justify-center gap-2 bg-[var(--c-signal)] text-primary-foreground disabled:opacity-40"
+                  >
+                    {textBusy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                    {mode === "task" ? "Vyrobit úkoly z textu" : "Vyrobit zápis z textu"}
+                  </button>
+                  {textDone && (
+                    <div role="status" className="rounded-md border border-[var(--tint-mint)]/40 bg-[var(--tint-mint)]/10 text-sm px-3 py-2 flex items-start gap-2">
+                      <Check className="size-4 shrink-0 mt-0.5 text-[var(--tint-mint)]" />
+                      <span>
+                        Odesláno, AI to zpracovává na pozadí.{" "}
+                        <a href={textDone} className="underline font-medium">{mode === "task" ? "Otevřít review" : "Otevřít zápis"}</a>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <input
               ref={fileInputRef}

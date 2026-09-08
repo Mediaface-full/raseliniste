@@ -43,8 +43,10 @@ export function getInFlightJournalSnapshot(): Array<{ entryId: string; ageMs: nu
 
 export async function processJournalAudio(params: {
   entryId: string;
-  audio: Buffer;
-  mimeType: string;
+  audio?: Buffer;
+  mimeType?: string;
+  /** Gideon 2026-09-08: hotový přepis (vložený text) — Stage 1 se přeskočí. */
+  transcript?: string;
 }): Promise<void> {
   const entry: InFlightJournal = {
     entryId: params.entryId,
@@ -60,21 +62,28 @@ export async function processJournalAudio(params: {
       return;
     }
 
-    console.log(`[process-journal-audio] ${params.entryId} start (${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB)`);
+    console.log(`[process-journal-audio] ${params.entryId} start (${params.transcript ? `text ${params.transcript.length} znaků` : `${((params.audio?.byteLength ?? 0) / 1024 / 1024).toFixed(1)} MB`})`);
 
     try {
       // Stage 1: přepis (reuse audio-transcribe two-stage pipeline,
-      // ale my chceme jen transcript — ne projektovou analysis)
-      const transcribeResult = await transcribeAudio({
-        audio: params.audio,
-        mimeType: params.mimeType,
-        recordingType: "STANDARD", // deník je středně dlouhý (do 30 min)
-        projectContext: null,
-      });
-
-      const transcript = transcribeResult.transcript.trim();
-      if (!transcript) {
-        throw new Error("Přepis je prázdný — nahrávka byla zřejmě tichá.");
+      // ale my chceme jen transcript — ne projektovou analysis).
+      // Vložený text Stage 1 přeskočí.
+      let transcript: string;
+      if (params.transcript != null) {
+        transcript = params.transcript.trim();
+        if (!transcript) throw new Error("Vložený text je prázdný.");
+      } else {
+        if (!params.audio) throw new Error("Chybí audio i text.");
+        const transcribeResult = await transcribeAudio({
+          audio: params.audio,
+          mimeType: params.mimeType ?? "audio/webm",
+          recordingType: "STANDARD", // deník je středně dlouhý (do 30 min)
+          projectContext: null,
+        });
+        transcript = transcribeResult.transcript.trim();
+        if (!transcript) {
+          throw new Error("Přepis je prázdný — nahrávka byla zřejmě tichá.");
+        }
       }
 
       // Uložit transcript hned (kdyby Stage 2 selhal, máme aspoň surový text)

@@ -50,8 +50,10 @@ export function getInFlightTaskAudioSnapshot(): Array<{ batchId: string; ageMs: 
 
 export async function processTaskAudio(params: {
   batchId: string;
-  audio: Buffer;
-  mimeType: string;
+  audio?: Buffer;
+  mimeType?: string;
+  /** Gideon 2026-09-08: hotový přepis (vložený text) — Stage 1 se přeskočí. */
+  transcript?: string;
 }): Promise<void> {
   const entry: InFlightTask = {
     batchId: params.batchId,
@@ -67,21 +69,28 @@ export async function processTaskAudio(params: {
       return;
     }
 
-    console.log(`[process-task-audio] ${params.batchId} start (${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB)`);
+    console.log(`[process-task-audio] ${params.batchId} start (${params.transcript ? `text ${params.transcript.length} znaků` : `${((params.audio?.byteLength ?? 0) / 1024 / 1024).toFixed(1)} MB`})`);
 
     try {
     // Stage 1: přepis (znovupoužití existujícího transcribeAudio,
     // ale pro úkoly nepotřebujeme jeho analysis — jen transcript).
-    const transcribeResult = await transcribeAudio({
-      audio: params.audio,
-      mimeType: params.mimeType,
-      recordingType: "STANDARD", // úkolová salva je krátká
-      projectContext: null,
-    });
-
-    const transcript = transcribeResult.transcript.trim();
-    if (!transcript) {
-      throw new Error("Přepis je prázdný — nahrávka byla zřejmě tichá.");
+    // Vložený text Stage 1 přeskočí.
+    let transcript: string;
+    if (params.transcript != null) {
+      transcript = params.transcript.trim();
+      if (!transcript) throw new Error("Vložený text je prázdný.");
+    } else {
+      if (!params.audio) throw new Error("Chybí audio i text.");
+      const transcribeResult = await transcribeAudio({
+        audio: params.audio,
+        mimeType: params.mimeType ?? "audio/webm",
+        recordingType: "STANDARD", // úkolová salva je krátká
+        projectContext: null,
+      });
+      transcript = transcribeResult.transcript.trim();
+      if (!transcript) {
+        throw new Error("Přepis je prázdný — nahrávka byla zřejmě tichá.");
+      }
     }
 
     // Uložit transcript hned (kdyby Stage 2 selhal, máme aspoň přepis)
