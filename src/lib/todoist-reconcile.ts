@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { getTask, listActiveTasks } from "./todoist";
-import { getTodoistToken } from "./todoist-activity";
+import { fetchOwnTodoistUserId, getTodoistToken } from "./todoist-activity";
 
 /**
  * Reconcile driftu Todoist ↔ Task mirror (Gideon 2026-09-08: „jak to, že
@@ -27,7 +27,11 @@ export interface DriftItem {
 }
 
 export interface DriftReport {
-  projects: Array<{ name: string; todoistId: string; dbOpen: number; liveActive: number; stale: number }>;
+  projects: Array<{
+    name: string; todoistId: string; dbOpen: number; liveActive: number; stale: number;
+    /** Rozpad živého seznamu — proč Todoist v projektu „ukazuje míň": podúkoly jsou sbalené, cizí přiřazení jde odfiltrovat. */
+    liveTopLevel: number; liveSubtasks: number; liveAssignedToOthers: number; liveUnassigned: number;
+  }>;
   items: DriftItem[];
   fixed: { done: number; cancelled: number; moved: number };
   errors: string[];
@@ -52,11 +56,14 @@ export async function reconcileTodoistDrift(
 
   const maxGets = opts.maxGets ?? 150;
   let gets = 0;
+  const ownId = await fetchOwnTodoistUserId(token).catch(() => null);
 
   for (const p of mirrors) {
     let live: Map<string, { project_id: string }>;
+    let liveList: Awaited<ReturnType<typeof listActiveTasks>>;
     try {
-      live = new Map((await listActiveTasks(token, p.todoistId)).map((t) => [t.id, { project_id: t.project_id }]));
+      liveList = await listActiveTasks(token, p.todoistId);
+      live = new Map(liveList.map((t) => [t.id, { project_id: t.project_id }]));
     } catch (e) {
       report.errors.push(`${p.name}: list selhal — ${e instanceof Error ? e.message : String(e)}`);
       continue;
@@ -66,7 +73,13 @@ export async function reconcileTodoistDrift(
       select: { id: true, todoistTaskId: true, title: true },
     });
     const stale = dbOpen.filter((t) => !live.has(t.todoistTaskId!));
-    report.projects.push({ name: p.name, todoistId: p.todoistId, dbOpen: dbOpen.length, liveActive: live.size, stale: stale.length });
+    report.projects.push({
+      name: p.name, todoistId: p.todoistId, dbOpen: dbOpen.length, liveActive: live.size, stale: stale.length,
+      liveTopLevel: liveList.filter((t) => !t.parent_id).length,
+      liveSubtasks: liveList.filter((t) => !!t.parent_id).length,
+      liveAssignedToOthers: liveList.filter((t) => t.responsible_uid && ownId && t.responsible_uid !== ownId).length,
+      liveUnassigned: liveList.filter((t) => !t.responsible_uid).length,
+    });
 
     for (const t of stale) {
       if (gets >= maxGets) { report.errors.push(`Limit ${maxGets} GET dosažen — zbytek příště.`); break; }
