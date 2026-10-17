@@ -11,6 +11,8 @@ import Anotace from "@/components/Anotace";
 import { Icon } from "astro-icon/components";
 import { readSession } from "@/lib/session";
 import { getPostaBadgeCount } from "@/lib/posta-badge";
+import { prisma } from "@/lib/db";
+import lucideIcons from "@iconify-json/lucide/icons.json";
 
 interface Props {
   title: string;
@@ -31,6 +33,39 @@ if (session) {
     postaBadge = await getPostaBadgeCount(session.uid);
   } catch {
     // Pošta není nakonfigurovaná, count = 0. Tichý fail, sidebar nesmí padnout.
+  }
+}
+
+// Gideon 2026-10-17 (anotace „v menu mi úplně zmizely statické odkazy"):
+// přestavba menu 2026-09-07 schovala Page Links do zavřeného podmenu Nastavení.
+// Vlastní odkazy (bez MEET dlaždic) jsou zase přímo v sidebaru jako skupina.
+// Ikona z uživatelského vstupu se validuje proti lucide setu — neexistující
+// jméno by shodilo SSR celé stránky (lekce 2026-05-27).
+const LUCIDE = new Set([
+  ...Object.keys((lucideIcons as { icons: Record<string, unknown> }).icons),
+  ...Object.keys((lucideIcons as { aliases?: Record<string, unknown> }).aliases ?? {}),
+]);
+const TINTS = new Set(["peach", "mint", "lavender", "sky", "sage", "butter", "rose", "pink"]);
+let userLinks: { id: string; name: string; url: string; icon: string; tint: string }[] = [];
+if (session) {
+  try {
+    const rows = await prisma.pageLink.findMany({
+      where: { userId: session.uid, OR: [{ section: null }, { section: { not: "MEET" } }] },
+      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+      select: { id: true, name: true, url: true, icon: true, tint: true },
+    });
+    userLinks = rows.map((r) => {
+      const ic = (r.icon ?? "").trim().toLowerCase();
+      return {
+        id: r.id,
+        name: r.name,
+        url: r.url,
+        icon: `lucide:${ic && LUCIDE.has(ic) ? ic : "globe"}`,
+        tint: TINTS.has(r.tint) ? r.tint : "sky",
+      };
+    });
+  } catch {
+    // sidebar nesmí padnout kvůli odkazům
   }
 }
 
@@ -171,7 +206,36 @@ const hasActiveChild = (item: NavItem) => (item.children ?? []).some((c) => isAc
       </div>
 
       <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5 text-[15px]">
-        {nav.map((section) => (
+        {nav.map((section, sectionIdx) => (
+          <>
+          {sectionIdx === 1 && userLinks.length > 0 && (
+            <div>
+              <div class="px-2.5 mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-mono font-medium">
+                <span>Odkazy</span>
+                <a href="/settings/page-links" class="normal-case tracking-normal hover:text-foreground" title="Upravit odkazy" aria-label="Upravit odkazy">
+                  <Icon name="lucide:pencil" class="size-3.5" />
+                </a>
+              </div>
+              <ul class="space-y-0.5">
+                {userLinks.map((l) => (
+                  <li>
+                    <a
+                      href={l.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={`--c: var(--tint-${l.tint});`}
+                      class="relative flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-foreground/80 hover:bg-accent hover:text-foreground"
+                      title={l.url}
+                    >
+                      <Icon name={l.icon} class="size-5 shrink-0" style="color: var(--c);" />
+                      <span class="truncate">{l.name}</span>
+                      <Icon name="lucide:external-link" class="size-3.5 ml-auto shrink-0 text-muted-foreground" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div>
             <div class="px-2.5 mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-mono font-medium">
               {section.group}
@@ -247,6 +311,7 @@ const hasActiveChild = (item: NavItem) => (item.children ?? []).some((c) => isAc
               })}
             </ul>
           </div>
+          </>
         ))}
       </nav>
 
