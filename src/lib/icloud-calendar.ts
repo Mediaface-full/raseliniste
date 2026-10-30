@@ -434,13 +434,28 @@ async function upsertOne(
   const locationText = event.location ?? null;
   const allDay = isAllDayEvent(event);
 
-  const type: EventTypeStr = await classifyEvent({
-    title,
-    description,
-    locationText,
-    allDay,
-    source: sourceTag,
+  const existing = await prisma.calendarEvent.findUnique({
+    where: { source_externalId: { source: sourceTag, externalId } },
+    select: { id: true, title: true, description: true, locationText: true, allDay: true, type: true },
   });
+  // iCloud nemá etag → sync à 5 min přepisuje každou událost. AI (klasifikace
+  // + příprava) jen když se obsah změnil, jinak ~288 placených volání/den
+  // na každou událost s popisem (2026-10-30, Vertex náklady).
+  const contentUnchanged = !!existing
+    && existing.title === title
+    && (existing.description ?? null) === description
+    && (existing.locationText ?? null) === locationText
+    && existing.allDay === allDay;
+
+  const type: EventTypeStr = contentUnchanged
+    ? (existing!.type as EventTypeStr)
+    : await classifyEvent({
+        title,
+        description,
+        locationText,
+        allDay,
+        source: sourceTag,
+      });
 
   const data = {
     source: sourceTag,
@@ -460,11 +475,6 @@ async function upsertOne(
     lastSyncedAt: new Date(),
   };
 
-  const existing = await prisma.calendarEvent.findUnique({
-    where: { source_externalId: { source: sourceTag, externalId } },
-    select: { id: true },
-  });
-
   if (!existing) {
     // Nový výskyt opakované akce dědí ruční blocksBooking override série —
     // jinak by každý nově dosyncovaný týden spadl zpět na „auto"
@@ -478,7 +488,7 @@ async function upsertOne(
     return "inserted";
   }
   await prisma.calendarEvent.update({ where: { id: existing.id }, data });
-  void extractPrepInBackground(existing.id, title, description);
+  if (!contentUnchanged) void extractPrepInBackground(existing.id, title, description);
   return "updated";
 }
 

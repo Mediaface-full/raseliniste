@@ -79,6 +79,7 @@ export async function processJournalAudio(params: {
           mimeType: params.mimeType ?? "audio/webm",
           recordingType: "STANDARD", // deník je středně dlouhý (do 30 min)
           projectContext: null,
+          skipAnalysis: true,
         });
         transcript = transcribeResult.transcript.trim();
         if (!transcript) {

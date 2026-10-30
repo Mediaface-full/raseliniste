@@ -317,6 +317,9 @@ export async function transcribeAudio(params: {
   // Per-projekt override Gemini modelu pro Stage 2. Pokud null/undefined,
   // použije se default: BRIEF=Pro, STANDARD=Flash.
   analysisModelOverride?: string | null;
+  // Jen Stage 1 (přepis) — Ozvěna (úkoly/deník) analýzu nepotřebuje, šetří
+  // jedno placené volání na každou nahrávku. Vrací minimalAnalysis.
+  skipAnalysis?: boolean;
 }): Promise<TranscribeResult> {
   assertAudioNotEmpty(params.audio, params.mimeType);
   const isBrief = params.recordingType === "BRIEF";
@@ -501,6 +504,15 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
       `Pravděpodobně tiché/nečitelné audio. Audio: ${(params.audio.byteLength / 1024 / 1024).toFixed(1)} MB, mime ${params.mimeType}. ` +
       `Audio je uložené — tlačítko „Zkusit od začátku" to zkusí znovu.`,
     );
+  }
+
+  if (params.skipAnalysis) {
+    return {
+      transcript,
+      analysis: minimalAnalysis(isBrief, "Analýza se pro tento typ záznamu nedělá."),
+      model,
+      promptChars: prompt.length,
+    };
   }
 
   // -------------------------------------------------------------------------

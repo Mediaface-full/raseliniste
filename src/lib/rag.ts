@@ -19,6 +19,7 @@
 
 import { prisma } from "./db";
 import { getGemini, EMBEDDING_MODEL, EMBEDDING_DIM, ANALYSIS_MODEL } from "./gemini";
+import { callTracked } from "./gemini-usage";
 
 // ---------------------------------------------------------------------------
 // Konstanty
@@ -362,10 +363,14 @@ ${params.question}
 ODPOVĚĎ (česky, stručně, s [čísly] citací):`;
 
   const ai = getGemini();
-  const response = await ai.models.generateContent({
-    model: ANALYSIS_MODEL,
-    contents: prompt,
-    config: { temperature: 0.3 },
+  const response = await callTracked({
+    module: "rag-ask",
+    modelName: ANALYSIS_MODEL,
+    fn: () => ai.models.generateContent({
+      model: ANALYSIS_MODEL,
+      contents: prompt,
+      config: { temperature: 0.3 },
+    }),
   });
 
   const answer = response.text?.trim() ?? "(prázdná odpověď)";

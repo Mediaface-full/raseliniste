@@ -86,6 +86,7 @@ export async function processTaskAudio(params: {
         mimeType: params.mimeType ?? "audio/webm",
         recordingType: "STANDARD", // úkolová salva je krátká
         projectContext: null,
+        skipAnalysis: true,
       });
       transcript = transcribeResult.transcript.trim();
       if (!transcript) {
