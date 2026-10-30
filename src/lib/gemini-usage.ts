@@ -75,10 +75,18 @@ export function calculateCost(
   modelName: string,
   inputTokens: number,
   outputTokens: number,
+  audioInputTokens = 0,
 ): { usd: number; czk: number } {
   const pricing = PRICING[modelName] ?? PRICING._default;
-  const inputCost = (inputTokens / 1_000_000) * pricing.inputUsdPer1M;
-  const outputCost = (outputTokens / 1_000_000) * pricing.outputUsdPer1M;
+  // 2.5 Pro: prompt nad 200k tokenů (dlouhé audio) = dražší pásmo pro vstup i výstup.
+  const longContext = modelName === "gemini-2.5-pro" && inputTokens > 200_000;
+  const inRate = longContext ? 2.5 : pricing.inputUsdPer1M;
+  const outRate = longContext ? 15 : pricing.outputUsdPer1M;
+  const audioTokens = Math.min(audioInputTokens, inputTokens);
+  const audioRate = longContext ? inRate : (pricing.audioInputUsdPer1M ?? inRate);
+  const inputCost = ((inputTokens - audioTokens) / 1_000_000) * inRate
+    + (audioTokens / 1_000_000) * audioRate;
+  const outputCost = (outputTokens / 1_000_000) * outRate;
   const usd = inputCost + outputCost;
   return { usd, czk: usd * USD_TO_CZK };
 }
@@ -91,10 +99,18 @@ export async function trackGeminiCall(input: TrackInput): Promise<void> {
   try {
     const usage = input.response?.usageMetadata ?? {};
     const inputTokens = Number(usage.promptTokenCount ?? 0);
-    const outputTokens = Number(usage.candidatesTokenCount ?? usage.totalTokenCount ?? 0) - inputTokens;
-    const safeOutput = Math.max(0, outputTokens);
+    // 2026-10-30: výstup = odpověď + thinking (oba se účtují výstupní sazbou).
+    // Dřív se od candidatesTokenCount odečítal vstup → skoro vždy 0 a přehled
+    // ukazoval jen zlomek skutečné útraty.
+    const safeOutput = Math.max(0,
+      Number(usage.candidatesTokenCount ?? 0) + Number(usage.thoughtsTokenCount ?? 0));
+    const audioInputTokens = Array.isArray(usage.promptTokensDetails)
+      ? usage.promptTokensDetails
+          .filter((d: any) => d?.modality === "AUDIO")
+          .reduce((sum: number, d: any) => sum + Number(d?.tokenCount ?? 0), 0)
+      : 0;
 
-    const { usd, czk } = calculateCost(input.modelName, inputTokens, safeOutput);
+    const { usd, czk } = calculateCost(input.modelName, inputTokens, safeOutput, audioInputTokens);
 
     await prisma.aiUsageLog.create({
       data: {

@@ -240,6 +240,12 @@ export async function classifyEmail(
     result.error = err instanceof Error ? err.message : String(err);
     result.durationMs = Date.now() - start;
     console.warn(`[posta-classify] emailId=${emailId} LLM failed: ${result.error.slice(0, 300)}`);
+    // Počítadlo pokusů — cron po MAX_CLASSIFY_ATTEMPTS mail přestane zkoušet
+    // (jinak vadný mail = placené volání à 15 min donekonečna).
+    await prisma.emailMessage.update({
+      where: { id: emailId },
+      data: { classifyAttempts: { increment: 1 } },
+    }).catch(() => null);
     return result;
   }
 
@@ -345,6 +351,8 @@ export async function classifyBatch(
   };
 }
 
+const MAX_CLASSIFY_ATTEMPTS = 3;
+
 /**
  * Najde unclassified maily uživatele a klasifikuje je (max `limit`).
  * Vola se z cronu nebo manuálně.
@@ -356,7 +364,7 @@ export async function classifyPendingForUser(
   const start = Date.now();
 
   const pending = await prisma.emailMessage.findMany({
-    where: { userId, classification: null },
+    where: { userId, classification: null, classifyAttempts: { lt: MAX_CLASSIFY_ATTEMPTS } },
     select: { id: true },
     orderBy: { receivedAt: "desc" }, // novější priorita
     take: limit,

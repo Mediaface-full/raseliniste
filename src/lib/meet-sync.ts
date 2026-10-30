@@ -64,9 +64,17 @@ export async function syncMeetNotes(userId: string): Promise<MeetSyncStats> {
   const { token } = await client.getAccessToken();
   if (!token) throw new Error("Google access token se nepodařilo získat.");
 
-  // Self-heal: zaseknuté processing >30 min (restart kontejneru) → pending
+  // Self-heal: zaseknuté processing >30 min (restart kontejneru) → pending.
+  // Přeskočí zápisy, které v tomto procesu ještě běží — dlouhá schůzka by
+  // jinak dostala souběžný druhý Pro přepis (2026-10-30, Vertex náklady).
+  const running = Array.from(inFlight).map((f) => f.noteId);
   await prisma.meetNote.updateMany({
-    where: { userId, status: "processing", updatedAt: { lt: new Date(Date.now() - 30 * 60 * 1000) } },
+    where: {
+      userId,
+      status: "processing",
+      updatedAt: { lt: new Date(Date.now() - 30 * 60 * 1000) },
+      ...(running.length > 0 ? { id: { notIn: running } } : {}),
+    },
     data: { status: "pending" },
   });
 
@@ -96,7 +104,10 @@ export async function syncMeetNotes(userId: string): Promise<MeetSyncStats> {
       select: { id: true, status: true, deleted: true },
     });
     if (existing?.deleted) continue; // tombstone
-    if (existing && (existing.status === "done" || existing.status === "processing")) continue;
+    // error se automaticky neopakuje — dřív se chybný zápis znovu stahoval
+    // a přepisoval Pro modelem každých 30 min po 21 dní. Ruční retry:
+    // tlačítko „Přepsat znovu" v MeetInbox (retranscribeMeetNote).
+    if (existing && (existing.status === "done" || existing.status === "processing" || existing.status === "error")) continue;
 
     let noteId = existing?.id;
     if (!noteId) {

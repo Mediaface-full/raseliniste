@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { readUpload, uploadExists } from "@/lib/uploads";
-import { processRecording } from "@/lib/process-recording";
+import { processRecording, getInFlightStudnaSnapshot } from "@/lib/process-recording";
 
 export const prerender = false;
 
@@ -20,9 +20,14 @@ export const prerender = false;
  *     stáří, pak je necháme být (skutečně rozbitý záznam).
  *
  * Spustí processing znovu z uloženého audia.
+ *
+ * 2026-10-30 (Vertex náklady): nahrávky, které v tomto procesu právě běží,
+ * se přeskakují (dlouhé audio dostávalo každých 15 min souběžnou kopii),
+ * processing starší 24 h se označí jako error místo retry navždy a error
+ * se zkouší jen 1× za 6 h (dřív až 24 plných přepisů za den).
  */
 const STUCK_THRESHOLD_MIN = 10;
-const ERROR_RETRY_INTERVAL_MIN = 60;        // retry erroru max 1× za hodinu
+const ERROR_RETRY_INTERVAL_MIN = 6 * 60;    // retry erroru max 1× za 6 h
 const ERROR_MAX_AGE_HOURS = 24;             // po 24 h už neretry-ujeme
 const MAX_RETRIES_PER_RUN = 8;
 
@@ -38,14 +43,21 @@ export const POST: APIRoute = async ({ request }) => {
   const errorRetryCutoff = new Date(now - ERROR_RETRY_INTERVAL_MIN * 60 * 1000);
   const errorMaxAge = new Date(now - ERROR_MAX_AGE_HOURS * 60 * 60 * 1000);
 
+  await prisma.projectRecording.updateMany({
+    where: { status: "processing", createdAt: { lt: errorMaxAge } },
+    data: { status: "error", processingError: "Zpracování nedoběhlo do 24 h — automatický retry vzdán. Tlačítko „Zkusit od začátku“ to zkusí znovu." },
+  });
+
+  const running = getInFlightStudnaSnapshot().map((f) => f.recordingId);
   const stuck = await prisma.projectRecording.findMany({
     where: {
+      ...(running.length > 0 ? { id: { notIn: running } } : {}),
       OR: [
-        // Případ 1: processing > 10 min
-        { status: "processing", createdAt: { lt: stuckCutoff } },
+        // Případ 1: processing > 10 min (a neběží v tomto procesu)
+        { status: "processing", createdAt: { lt: stuckCutoff, gte: errorMaxAge } },
         // Případ 2: error mladší 24 h, neaktualizovaný posledních 60 min
         // (`updatedAt` se updatuje při každém update, takže poslední retry pokus
-        // se přepne sem. 60 min cooldown brání busy-loop kdy Gemini stále padá.)
+        // se přepne sem. 6h cooldown brání busy-loop kdy Gemini stále padá.)
         { status: "error", createdAt: { gt: errorMaxAge }, updatedAt: { lt: errorRetryCutoff } },
       ],
     },

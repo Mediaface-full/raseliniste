@@ -2566,6 +2566,13 @@ model EmailMessage {
   // AND embeddedAt IS NULL LIMIT 50, generuje chunks + embeddings do RagChunk.
   embeddedAt        DateTime?
 
+  // 2026-10-30 (Vertex náklady) — scan marker + počítadla pokusů. Bez nich se
+  // odeslaný mail bez závazku a mail s opakovanou chybou klasifikace posílaly
+  // do Gemini znovu při každém cron běhu (à 15 min), donekonečna.
+  commitmentScannedAt     DateTime?
+  commitmentScanAttempts  Int       @default(0)
+  classifyAttempts        Int       @default(0)
+
   classification    EmailClassification?
   sourceCommitments DetectedCommitment[] @relation("CommitmentSource")
 
@@ -2576,6 +2583,7 @@ model EmailMessage {
   @@index([userId, hasOutboundCommitmentCandidates])
   @@index([userId, resolvedAt])
   @@index([userId, embeddedAt])
+  @@index([userId, commitmentScannedAt])
 }
 
 // ============================================================================

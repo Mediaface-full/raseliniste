@@ -168,6 +168,20 @@ async function upsertEvent(
   const description = ev.description ?? null;
   const locationText = ev.location ?? null;
 
+  const existing = await prisma.calendarEvent.findUnique({
+    where: { source_externalId: { source: "GOOGLE_PRIMARY", externalId: ev.id } },
+    select: { id: true, etag: true },
+  });
+  // Pokud etag se nezměnil, jen touch lastSyncedAt — PŘED klasifikací, ať se
+  // nevolá AI pro nezměněnou událost při každém 5min syncu.
+  if (existing?.etag && existing.etag === ev.etag) {
+    await prisma.calendarEvent.update({
+      where: { id: existing.id },
+      data: { lastSyncedAt: new Date() },
+    });
+    return "skipped";
+  }
+
   // Klasifikace
   let type: EventTypeStr = "OTHER";
   if (ev.eventType === "outOfOffice") {
@@ -203,11 +217,6 @@ async function upsertEvent(
     lastSyncedAt: new Date(),
   };
 
-  const existing = await prisma.calendarEvent.findUnique({
-    where: { source_externalId: { source: "GOOGLE_PRIMARY", externalId: ev.id } },
-    select: { id: true, etag: true },
-  });
-
   if (!existing) {
     // Dědičnost blocksBooking pro nové výskyty opakované série (viz
     // calendar-series.ts; Gideon 2026-08-04)
@@ -218,14 +227,6 @@ async function upsertEvent(
     });
     void extractPrepInBackground(created.id, title, description);
     return "inserted";
-  }
-  // Pokud etag se nezměnil, jen touch lastSyncedAt
-  if (existing.etag && existing.etag === ev.etag) {
-    await prisma.calendarEvent.update({
-      where: { id: existing.id },
-      data: { lastSyncedAt: new Date() },
-    });
-    return "skipped";
   }
   await prisma.calendarEvent.update({ where: { id: existing.id }, data });
   // Etag se změnil = description možná také → re-extract prep

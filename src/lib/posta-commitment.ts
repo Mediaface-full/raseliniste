@@ -100,6 +100,11 @@ interface CandidateRowForDedup {
 }
 
 const BATCH_LIMIT = 30; // max emaily per cron run; LLM call per email ~2-5s
+// 2026-10-30: skenují se jen odeslané maily mladší než tohle okno (starší
+// závazky stejně spadnou pod stale marker 30 d) a max MAX_SCAN_ATTEMPTS
+// pokusů na mail při chybě — jinak jedna vadná zpráva = placené volání à 15 min.
+const SCAN_WINDOW_DAYS = 30;
+const MAX_SCAN_ATTEMPTS = 3;
 
 export async function detectCommitmentsForUser(userId: string): Promise<DetectStats> {
   const start = Date.now();
@@ -127,25 +132,18 @@ export async function detectCommitmentsForUser(userId: string): Promise<DetectSt
   }
   const meEmail = user.gmailEmailAddress.toLowerCase();
 
-  // 2) Najdi outbound maily co nemají DetectedCommitment záznam.
-  //    Odkud = klasifikace musí existovat (jinak nemáme základní filter
-  //    "this is meaningful") + from = me + není už scanováno.
-  //
-  //    Test pro "already scanned" — pokud existuje JAKÝKOLI DetectedCommitment
-  //    pro tento sourceEmailId, mail je hotový (i kdyby všechny candidates
-  //    measly skip pro low confidence, nechceme rescan). Pro to potřebujeme
-  //    samostatný marker — použijeme `EmailMessage.commitmentScannedAt` field.
-  //    Pojďme to nemít teď a místo toho:
-  //    Pokud existuje commitment WHERE sourceEmailId = email.id → skip.
-  //    Pokud žádný — možná je low confidence (commitments=[]), ale to neumíme
-  //    detekovat. Workaround: pro fázi 6 chceme rescan vzácný, klidně reprocessing.
-  //    TODO: budoucí scan-marker field. Pro fázi 6 OK.
+  // 2) Najdi outbound maily, které ještě neprošly scanem.
+  //    Marker = commitmentScannedAt (nastaví se po úspěšném LLM scanu, i když
+  //    nenašel žádný závazek). Chyby počítá commitmentScanAttempts.
+  //    Klasifikace musí existovat (základní filtr „this is meaningful").
   const candidates = await prisma.emailMessage.findMany({
     where: {
       userId,
       fromAddress: { equals: meEmail, mode: "insensitive" },
       classification: { isNot: null },
-      sourceCommitments: { none: {} }, // ještě nescanováno
+      commitmentScannedAt: null,
+      commitmentScanAttempts: { lt: MAX_SCAN_ATTEMPTS },
+      receivedAt: { gte: new Date(Date.now() - SCAN_WINDOW_DAYS * 86400000) },
     },
     select: {
       id: true,
@@ -178,6 +176,13 @@ export async function detectCommitmentsForUser(userId: string): Promise<DetectSt
     try {
       const result = await scanEmail(email, meEmail);
       stats.scanned++;
+      // Scan proběhl → mail je hotový, i když nenašel žádný závazek.
+      // (Dřív marker = existence DetectedCommitment → mail bez závazku se
+      // skenoval znovu každých 15 min, ~2 880 Gemini volání/den.)
+      await prisma.emailMessage.update({
+        where: { id: email.id },
+        data: { commitmentScannedAt: new Date() },
+      });
       stats.candidatesFound += result.candidates.length;
 
       // 4) Per candidate: routing + dedup + insert
@@ -220,6 +225,10 @@ export async function detectCommitmentsForUser(userId: string): Promise<DetectSt
       await sleep(150);
     } catch (e) {
       stats.errors++;
+      await prisma.emailMessage.update({
+        where: { id: email.id },
+        data: { commitmentScanAttempts: { increment: 1 } },
+      }).catch(() => null);
       stats.errorDetails.push({
         emailId: email.id,
         error: e instanceof Error ? e.message.slice(0, 200) : "?",
@@ -302,6 +311,8 @@ JSON:`;
     config: {
       temperature: 0.2,
       maxOutputTokens: 1500,
+      // Thinking se účtuje jako výstup a bez stropu může useknout JSON.
+      thinkingConfig: { thinkingBudget: 512 },
       responseMimeType: "application/json",
       responseSchema: RESPONSE_SCHEMA as never,
       systemInstruction: SYSTEM_INSTRUCTION,
