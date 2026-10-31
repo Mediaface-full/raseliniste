@@ -282,6 +282,35 @@ const INLINE_AUDIO_LIMIT_BYTES = 14 * 1024 * 1024;
  * Petr 2026-05-14: host záznamy s prázdným audio (cleanup-audio cron smazal
  * soubor, klient nahrál 0-byte blob, atd.) padaly na Gemini 400.
  */
+/**
+ * Doslovný přepis nepotřebuje „přemýšlení". Bez stropu si ho 2.5 Pro u dlouhé
+ * schůzky vzal tolik, že vyčerpal celý maxOutputTokens a nevrátil žádný text
+ * → error → (do 2026-10-30) retry à 30 min: jedna 94min schůzka 20.–24. 10.
+ * = 227 volání, ~3 600 Kč. Flash jde vypnout (0), Pro má minimum 128.
+ */
+function transcribeThinkingBudget(model: string): number {
+  return model.includes("pro") ? 128 : 0;
+}
+
+/**
+ * Gemini občas na konec (výjimečně na začátek) přepisu připíše první větu
+ * vlastního zadání — typicky když audio končí uprostřed věty (2026-10-31 test
+ * 94 min: „…72 přepiš toto audio do textu doslova."). Odřízne ji jen přesně
+ * na okraji přepisu, uprostřed textu nic nemaže.
+ */
+function stripPromptEcho(transcript: string, prompt: string): string {
+  const firstSentence = prompt.trim().split(/\n|(?<=[.!?:])\s/)[0] ?? "";
+  const words = firstSentence.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (words.length < 3) return transcript;
+  const body = words.join("[^\\p{L}\\p{N}]+");
+  const atEnd = new RegExp(`[^\\p{L}\\p{N}]*${body}[^\\p{L}\\p{N}]*$`, "iu");
+  const atStart = new RegExp(`^[^\\p{L}\\p{N}]*${body}[^\\p{L}\\p{N}]*`, "iu");
+  const cleaned = transcript.replace(atEnd, "").replace(atStart, "").trim();
+  // Kdyby přepis nebyl nic jiného než ozvěna zadání, nech původní (prázdný
+  // přepis by se tvářil jako tiché audio).
+  return cleaned.length > 0 ? cleaned : transcript;
+}
+
 function assertAudioNotEmpty(audio: Buffer, mimeType: string): void {
   if (audio.byteLength === 0) {
     throw new Error(
@@ -455,6 +484,7 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
         config: {
           temperature,
           maxOutputTokens: 65000, // pro 90 min audio reálně potřeba
+          thinkingConfig: { thinkingBudget: transcribeThinkingBudget(DEFAULT_MODEL) },
         },
       });
     } catch (e) {
@@ -487,7 +517,7 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
       durationMs: Date.now() - stage1Start,
     });
 
-    transcript = (transcribeResp.text ?? "").trim();
+    transcript = stripPromptEcho((transcribeResp.text ?? "").trim(), transcribePrompt);
     if (!transcript) {
       throw new Error(diagnoseEmptyResponse(transcribeResp, params.audio.byteLength, params.mimeType, `mode ${usedMode}`));
     }
@@ -770,7 +800,7 @@ ${params.projectContext ? `Kontext projektu (pro lepší rozpoznání jmen/term�
       return await genai.models.generateContent({
         model: usedModel,
         contents: [{ role: "user", parts: [audioPart as never, { text: prompt }] }],
-        config: { temperature, maxOutputTokens: 65000 },
+        config: { temperature, maxOutputTokens: 65000, thinkingConfig: { thinkingBudget: transcribeThinkingBudget(usedModel) } },
       });
     } catch (e) {
       // Petr 2026-05-14: Gemini 400 INVALID_ARGUMENT pro Studanka UPLOAD
@@ -801,7 +831,7 @@ ${params.projectContext ? `Kontext projektu (pro lepší rozpoznání jmen/term�
       modelName: usedModel,
       durationMs: Date.now() - start,
     });
-    transcript = (resp.text ?? "").trim();
+    transcript = stripPromptEcho((resp.text ?? "").trim(), prompt);
     if (!transcript) {
       throw new Error(diagnoseEmptyResponse(resp, params.audio.byteLength, params.mimeType, "UPLOAD"));
     }
