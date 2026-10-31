@@ -282,6 +282,16 @@ const INLINE_AUDIO_LIMIT_BYTES = 14 * 1024 * 1024;
  * Petr 2026-05-14: host záznamy s prázdným audio (cleanup-audio cron smazal
  * soubor, klient nahrál 0-byte blob, atd.) padaly na Gemini 400.
  */
+/**
+ * Doslovný přepis nepotřebuje „přemýšlení". Bez stropu si ho 2.5 Pro u dlouhé
+ * schůzky vzal tolik, že vyčerpal celý maxOutputTokens a nevrátil žádný text
+ * → error → (do 2026-10-30) retry à 30 min: jedna 94min schůzka 20.–24. 10.
+ * = 227 volání, ~3 600 Kč. Flash jde vypnout (0), Pro má minimum 128.
+ */
+function transcribeThinkingBudget(model: string): number {
+  return model.includes("pro") ? 128 : 0;
+}
+
 function assertAudioNotEmpty(audio: Buffer, mimeType: string): void {
   if (audio.byteLength === 0) {
     throw new Error(
@@ -455,6 +465,7 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
         config: {
           temperature,
           maxOutputTokens: 65000, // pro 90 min audio reálně potřeba
+          thinkingConfig: { thinkingBudget: transcribeThinkingBudget(DEFAULT_MODEL) },
         },
       });
     } catch (e) {
@@ -770,7 +781,7 @@ ${params.projectContext ? `Kontext projektu (pro lepší rozpoznání jmen/term�
       return await genai.models.generateContent({
         model: usedModel,
         contents: [{ role: "user", parts: [audioPart as never, { text: prompt }] }],
-        config: { temperature, maxOutputTokens: 65000 },
+        config: { temperature, maxOutputTokens: 65000, thinkingConfig: { thinkingBudget: transcribeThinkingBudget(usedModel) } },
       });
     } catch (e) {
       // Petr 2026-05-14: Gemini 400 INVALID_ARGUMENT pro Studanka UPLOAD
