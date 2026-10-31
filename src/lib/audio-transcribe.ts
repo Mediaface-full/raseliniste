@@ -292,6 +292,25 @@ function transcribeThinkingBudget(model: string): number {
   return model.includes("pro") ? 128 : 0;
 }
 
+/**
+ * Gemini občas na konec (výjimečně na začátek) přepisu připíše první větu
+ * vlastního zadání — typicky když audio končí uprostřed věty (2026-10-31 test
+ * 94 min: „…72 přepiš toto audio do textu doslova."). Odřízne ji jen přesně
+ * na okraji přepisu, uprostřed textu nic nemaže.
+ */
+function stripPromptEcho(transcript: string, prompt: string): string {
+  const firstSentence = prompt.trim().split(/\n|(?<=[.!?:])\s/)[0] ?? "";
+  const words = firstSentence.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (words.length < 3) return transcript;
+  const body = words.join("[^\\p{L}\\p{N}]+");
+  const atEnd = new RegExp(`[^\\p{L}\\p{N}]*${body}[^\\p{L}\\p{N}]*$`, "iu");
+  const atStart = new RegExp(`^[^\\p{L}\\p{N}]*${body}[^\\p{L}\\p{N}]*`, "iu");
+  const cleaned = transcript.replace(atEnd, "").replace(atStart, "").trim();
+  // Kdyby přepis nebyl nic jiného než ozvěna zadání, nech původní (prázdný
+  // přepis by se tvářil jako tiché audio).
+  return cleaned.length > 0 ? cleaned : transcript;
+}
+
 function assertAudioNotEmpty(audio: Buffer, mimeType: string): void {
   if (audio.byteLength === 0) {
     throw new Error(
@@ -498,7 +517,7 @@ DOPLŇUJÍCÍ PRAVIDLO PRO TENTO PŘEPIS:
       durationMs: Date.now() - stage1Start,
     });
 
-    transcript = (transcribeResp.text ?? "").trim();
+    transcript = stripPromptEcho((transcribeResp.text ?? "").trim(), transcribePrompt);
     if (!transcript) {
       throw new Error(diagnoseEmptyResponse(transcribeResp, params.audio.byteLength, params.mimeType, `mode ${usedMode}`));
     }
@@ -812,7 +831,7 @@ ${params.projectContext ? `Kontext projektu (pro lepší rozpoznání jmen/term�
       modelName: usedModel,
       durationMs: Date.now() - start,
     });
-    transcript = (resp.text ?? "").trim();
+    transcript = stripPromptEcho((resp.text ?? "").trim(), prompt);
     if (!transcript) {
       throw new Error(diagnoseEmptyResponse(resp, params.audio.byteLength, params.mimeType, "UPLOAD"));
     }
